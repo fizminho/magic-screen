@@ -45,7 +45,7 @@ export default function App() {
       }
       setUpdatedAt(data.updatedAt);
       setSourceStatus(data.refresh?.failed ? "Quote provider failed for "+data.refresh.failed+" symbols" : data.refresh?.remaining ? "Quotes updated; "+data.refresh.remaining+" still pending" : data.sourceStatus ?? "Connected");
-    } catch {
+    } catch (error) {
       setStocks([]);
       setMarketUniverse(universe.filter(x => x.market === market));
       setSourceStatus(error instanceof Error ? error.message : "API not configured");
