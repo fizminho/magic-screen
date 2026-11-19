@@ -79,8 +79,13 @@ async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
         const result = payload?.chart?.result?.[0], meta = result?.meta, quote = result?.indicators?.quote?.[0];
         const closes = (quote?.close ?? []).filter((v:any)=>typeof v==="number");
         const price = typeof meta?.regularMarketPrice==="number" ? meta.regularMarketPrice : closes.at(-1) ?? null;
-        const previous = typeof meta?.chartPreviousClose==="number" ? meta.chartPreviousClose : closes.length>1 ? closes.at(-2) : null;
-        const change = price!=null && previous ? ((price-previous)/previous)*100 : null;
+        // chartPreviousClose can refer to the close before the full 5-day chart range.
+        // Prefer the previous-session close; otherwise use the penultimate daily candle.
+        const previous = typeof meta?.previousClose==="number" ? meta.previousClose
+          : typeof meta?.regularMarketPreviousClose==="number" ? meta.regularMarketPreviousClose
+          : closes.length>1 ? closes.at(-2)
+          : typeof meta?.chartPreviousClose==="number" ? meta.chartPreviousClose : null;
+        const change = price!=null && previous!=null && previous>0 ? ((price-previous)/previous)*100 : null;
         if (price==null) throw new Error("No quote in provider response");
         await env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,price,change_percent,shariah_status,data_status,provider,updated_at) VALUES (?,?,?,?,?,?,'unverified','quote_only','Yahoo Finance',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,currency=excluded.currency,price=excluded.price,change_percent=excluded.change_percent,data_status='quote_only',provider=excluded.provider,updated_at=excluded.updated_at").bind(item.symbol,item.market,item.name,item.currency,price,change,new Date().toISOString()).run();
         updated++;
