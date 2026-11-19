@@ -59,5 +59,6 @@ export const universe: UniverseEntry[] = [
   {symbol:"PG",name:"Procter & Gamble",market:"US",currency:"USD"},
   {symbol:"ABBV",name:"AbbVie",market:"US",currency:"USD"},
   {symbol:"ADBE",name:"Adobe",market:"US",currency:"USD"},
-  {symbol:"INTU",name:"Intuit",market:"US",currency:"USD"}
+  {symbol:"INTU",name:"Intuit",market:"US",currency:"USD"},
+  {symbol:"TSLA",name:"Tesla",market:"US",currency:"USD"}
 ];
