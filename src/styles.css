@@ -311,3 +311,20 @@
 
 /* Stale SEC periods are a data-quality warning, not a ranking status. */
 .intent-flag.stale { border-color:#76552e; background:#2a2118; color:#f0bd78; }
+
+
+/* Gemini diagnostic output is review-only and kept readable on mobile. */
+.ai-result {
+  max-height:38vh;
+  overflow:auto;
+  margin:12px 0 0;
+  padding:12px;
+  border:1px solid #34445e;
+  border-radius:6px;
+  background:#091221;
+  color:#cbd8eb;
+  font:9px/1.55 "DM Mono",monospace;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.import-dialog .refresh-btn { margin-top:14px; }
