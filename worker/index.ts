@@ -267,37 +267,48 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   // extracted XBRL instance separately for diagnostic visibility only; these facts are not
   // passed to Gemini, calculations, or ranking until their labels and contexts are reviewed.
   const filingBase="https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/";
-  const instanceResponse=await fetch(filingBase+"hrb-20260630_htm.xml",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}});
+  const indexResponse=await fetch(filingBase+"index.json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json"}});
+  let instancePath="";
+  if(indexResponse.ok) {
+    const indexPayload:any=await indexResponse.json();
+    const files=indexPayload?.directory?.item??[];
+    const instanceFile=files.find((x:any)=>/_htm\\.xml$/i.test(String(x.name??"")))
+      ?? files.find((x:any)=>/extracted xbrl instance document/i.test(String(x.description??"")));
+    if(instanceFile?.name) instancePath=String(instanceFile.name);
+  }
+  const instanceResponse=instancePath
+    ? await fetch(filingBase+encodeURIComponent(instancePath),{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}})
+    : new Response("SEC filing instance document not found",{status:404});
   let instanceOperatingFacts:any[]=[];
   if(instanceResponse.ok) {
     const xml=await instanceResponse.text();
     const contexts=new Map<string,{start:string|null;end:string;hasDimensions:boolean}>();
-    for(const match of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?context\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?context>/gi)) {
-      const id=match[1].match(/\\bid=["']([^"']+)["']/i)?.[1];
+    for(const match of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?context\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?context>/gi)) {
+      const id=match[1].match(/\bid=["']([^"']+)["']/i)?.[1];
       const body=match[2];
       const start=body.match(/<(?:[A-Za-z0-9_-]+:)?startDate>([^<]+)</i)?.[1]??null;
       const end=body.match(/<(?:[A-Za-z0-9_-]+:)?endDate>([^<]+)</i)?.[1]??body.match(/<(?:[A-Za-z0-9_-]+:)?instant>([^<]+)</i)?.[1];
-      if(id && end) contexts.set(id,{start,end,hasDimensions:/<(?:[A-Za-z0-9_-]+:)?(?:explicitMember|typedMember)\\b/i.test(body)});
+      if(id && end) contexts.set(id,{start,end,hasDimensions:/<(?:[A-Za-z0-9_-]+:)?(?:explicitMember|typedMember)\b/i.test(body)});
     }
     const usdUnits=new Set<string>();
-    for(const match of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?unit\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?unit>/gi)) {
-      const id=match[1].match(/\\bid=["']([^"']+)["']/i)?.[1];
+    for(const match of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?unit\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?unit>/gi)) {
+      const id=match[1].match(/\bid=["']([^"']+)["']/i)?.[1];
       if(id && /iso4217:USD/i.test(match[2])) usdUnits.add(id);
     }
-    for(const match of xml.matchAll(/<([A-Za-z][\\w.-]*):([A-Za-z][\\w.-]*)\\b([^>]*)>([\\s\\S]*?)<\\/\\1:\\2>/g)) {
+    for(const match of xml.matchAll(/<([A-Za-z][\w.-]*):([A-Za-z][\w.-]*)\b([^>]*)>([\s\S]*?)<\/\1:\2>/g)) {
       const prefix=match[1],tag=match[2],attrs=match[3],raw=match[4];
       if(!/revenue|operating|expense|cost|income/i.test(tag)) continue;
-      const contextId=attrs.match(/\\bcontextRef=["']([^"']+)["']/i)?.[1];
-      const unitId=attrs.match(/\\bunitRef=["']([^"']+)["']/i)?.[1];
+      const contextId=attrs.match(/\bcontextRef=["']([^"']+)["']/i)?.[1];
+      const unitId=attrs.match(/\bunitRef=["']([^"']+)["']/i)?.[1];
       if(!contextId || !unitId || !usdUnits.has(unitId)) continue;
       const context=contexts.get(contextId);
       if(!context || context.end!==anchor.end || context.hasDimensions || !context.start) continue;
       const days=(Date.parse(context.end)-Date.parse(context.start))/86400000;
       if(days<330 || days>400) continue;
       const textValue=raw.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
-      if(!/^-?\\d+(?:\\.\\d+)?$/.test(textValue)) continue;
-      const scale=Number(attrs.match(/\\bscale=["'](-?\\d+)["']/i)?.[1]??0);
-      const sign=attrs.match(/\\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
+      if(!/^-?\d+(?:\.\d+)?$/.test(textValue)) continue;
+      const scale=Number(attrs.match(/\bscale=["'](-?\d+)["']/i)?.[1]??0);
+      const sign=attrs.match(/\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
       const value=Number(textValue)*Math.pow(10,scale)*sign;
       if(!Number.isFinite(value)) continue;
       instanceOperatingFacts.push({tag:prefix+":"+tag,value,start:context.start,end:context.end,kind:"annual",source:"SEC extracted XBRL instance",context:contextId});
