@@ -52,7 +52,7 @@ Content-Type: application/json
 Configuration:
 - Set `GEMINI_API_KEY` as a Cloudflare Worker secret. Never put it in frontend code, GitHub files, or chat.
 - The endpoint also requires the existing `UNIVERSE_SYNC_TOKEN` secret. The token is sent only as a bearer header.
-- The Worker calls the Gemini 3.8 Flash GenerateContent API with storage disabled.
+- The Worker calls the Gemini 3.8 Flash GenerateContent API using the API key in the `x-goog-api-key` header. Review Google's API data-use terms for the applicable account tier before sending sensitive material.
 
 Safety rules:
 - Gemini receives only a bounded list of SEC Company Facts entries explicitly reported in USD under the selected annual filing accession and period end.
