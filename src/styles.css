@@ -240,3 +240,24 @@
   .mfi-control { flex:1; min-width:90px; }
   .mfi-control input,.mfi-control select { width:100%; min-width:0; }
 }
+
+
+/* Cleaner stock rows: source is explicit, while unknown Shariah status stays out of the main table. */
+.source-cell { max-width:250px; }
+.source-cell a { display:flex; flex-direction:column; gap:4px; color:#b8f36b; text-decoration:none; font-size:10px; }
+.source-cell a:hover { text-decoration:underline; }
+.source-url { color:#7f8da7; font:8px "DM Mono"; overflow-wrap:anywhere; line-height:1.45; }
+@media (min-width:761px) {
+  table { min-width:980px; }
+}
+@media (max-width:760px) {
+  tbody td:nth-child(3)::before { content:"PRICE"; }
+  tbody td:nth-child(4)::before { content:"MARKET CAP"; }
+  tbody td:nth-child(5)::before { content:"DAY CHANGE"; }
+  tbody td:nth-child(6)::before { content:"FORMULA RANK"; }
+  tbody td:nth-child(7) { grid-column:1 / -1; padding-top:2px; padding-right:30px; }
+  tbody td:nth-child(7)::before { content:"SOURCE"; display:block; margin-bottom:5px; color:#71819c; font:500 8px "DM Mono"; letter-spacing:.8px; }
+  .source-cell { max-width:none; }
+  .source-cell a { gap:4px; font-size:10px; }
+  .source-url { font-size:8px; }
+}
