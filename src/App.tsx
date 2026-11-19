@@ -36,7 +36,7 @@ export default function App() {
       }
       const response = await fetch(`/api/stocks?market=${market}&refresh=1`);
       if (!response.ok) throw new Error("API unavailable");
-      const data = await response.json() as ApiResponse;
+      const data = await response.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number}};
       setStocks(data.stocks ?? []);
       const universeResponse = await fetch("/api/universe?market=" + market);
       if (universeResponse.ok) {
@@ -44,11 +44,11 @@ export default function App() {
         if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
       }
       setUpdatedAt(data.updatedAt);
-      setSourceStatus(data.sourceStatus ?? "Connected");
+      setSourceStatus(data.refresh?.failed ? "Quote provider failed for "+data.refresh.failed+" symbols" : data.refresh?.remaining ? "Quotes updated; "+data.refresh.remaining+" still pending" : data.sourceStatus ?? "Connected");
     } catch {
       setStocks([]);
       setMarketUniverse(universe.filter(x => x.market === market));
-      setSourceStatus("API not configured");
+      setSourceStatus(error instanceof Error ? error.message : "API not configured");
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [market]);
