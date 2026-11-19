@@ -360,7 +360,20 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const target=locators.find(x=>/#(?:us-gaap_)?CostsAndExpenses(?:$|[^A-Za-z])/i.test(x.href));
       if(!target) continue;
       const locatorByLabel=new Map(locators.map(x=>[x.label,x.href.split("#").pop()]));
-      const relatedArcs=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\b([^>]*)\/?\s*>/gi)].map((m:any)=>({from:m[1].match(/(?:xlink:)?from=["\x27]([^"\x27]+)["\x27]/i)?.[1],to:m[1].match(/(?:xlink:)?to=["\x27]([^"\x27]+)["\x27]/i)?.[1]})).filter((x:any)=>x.from===target.label||x.to===target.label).map((x:any)=>({parent:locatorByLabel.get(x.from)??null,child:locatorByLabel.get(x.to)??null}));
+      // INTENTIONAL: retain XBRL arc order and preferred-label metadata. Direct
+      // relationships without their ordering can hide the statement's intended hierarchy.
+      const relatedArcs=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\\b([^>]*)\\/?\\s*>/gi)]
+        .map((m:any)=>{
+          const attrs=m[1];
+          return {
+            from:attrs.match(/(?:xlink:)?from=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1],
+            to:attrs.match(/(?:xlink:)?to=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1],
+            order:Number(attrs.match(/\\border=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1]??0),
+            preferred_label:attrs.match(/(?:xlink:)?preferredLabel=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1]??null
+          };
+        })
+        .filter((x:any)=>x.from===target.label||x.to===target.label)
+        .map((x:any)=>({parent:locatorByLabel.get(x.from)??null,child:locatorByLabel.get(x.to)??null,order:x.order,preferred_label:x.preferred_label}));
       costsAndExpensesPresentation.push({role,concept:target.href.split("#").pop(),presentation_relationships:relatedArcs});
     }
   }
