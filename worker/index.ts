@@ -235,11 +235,24 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
         break;
       }
       const errorBody=await aiResponse.text();
+      const status=aiResponse.status;
       try {
         const parsedError=JSON.parse(errorBody);
-        geminiErrorDetail=String(parsedError?.error?.message??parsedError?.message??errorBody).slice(0,500);
-      } catch { geminiErrorDetail=errorBody.slice(0,500); }
-      const status=aiResponse.status;
+        const googleError=parsedError?.error??parsedError;
+        const message=String(googleError?.message??errorBody).slice(0,350);
+        const apiStatus=String(googleError?.status??"");
+        const reasons=Array.isArray(googleError?.details)
+          ? [...new Set(googleError.details.map((x:any)=>String(x?.reason??"")).filter(Boolean))].join(",")
+          : "";
+        const services=Array.isArray(googleError?.details)
+          ? [...new Set(googleError.details.map((x:any)=>String(x?.metadata?.service??"")).filter(Boolean))].join(",")
+          : "";
+        geminiErrorDetail="HTTP "+status+(apiStatus?" "+apiStatus:"")+": "+message
+          +(reasons?"; reason="+reasons:"")+(services?"; service="+services:"");
+        if(status===403) geminiErrorDetail+=". Access-denied responses are not retried across models; check Google AI Studio project eligibility, verification, billing status, and API-key restrictions.";
+      } catch {
+        geminiErrorDetail="HTTP "+status+": "+errorBody.slice(0,500);
+      }
       if(status===404) break;
       if(![429,500,503].includes(status) || attempt===1) break;
       await new Promise(resolve=>setTimeout(resolve,1500*(attempt+1)));
