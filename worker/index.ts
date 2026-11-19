@@ -236,6 +236,8 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       }
       const errorBody=await aiResponse.text();
       const status=aiResponse.status;
+      // INTENTIONAL: preserve Google API status/reason metadata for diagnosis, and never
+      // rotate models after HTTP 403 because access denial is not a model-capability failure.
       try {
         const parsedError=JSON.parse(errorBody);
         const googleError=parsedError?.error??parsedError;
