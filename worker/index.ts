@@ -186,11 +186,12 @@ async function syncUsFundamentals(env:Env, limit=8) {
       const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","LongTermDebtAndFinanceLeaseObligationsCurrent","ShortTermBorrowings"],periodEnd,false) : {value:null,tag:null,filed:null};
       const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","LongTermDebtAndFinanceLeaseObligationsNoncurrent","LongTermDebt"],periodEnd,false) : {value:null,tag:null,filed:null};
       const cap=Number(item.market_cap);
+      const debtKnown=debtCurrent.value!=null || debtLong.value!=null;
       const totalDebt=(debtCurrent.value??0)+(debtLong.value??0);
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
       const investedCapital=netWorkingCapital+(ppe.value??0);
       const enterpriseValue=cap+totalDebt-(cash.value??0);
-      const complete=ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
+      const complete=ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
       const ey=complete ? (ebit.value as number)/enterpriseValue : null;
       const roc=complete ? (ebit.value as number)/investedCapital : null;
       const status=complete ? "calculated" : "missing_required_facts";
