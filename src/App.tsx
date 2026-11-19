@@ -34,17 +34,10 @@ export default function App() {
   async function load(forceMfiSync = false) {
     setLoading(true);
     try {
-      let fundamentalsStatus = "";
       if (market === "US") {
         const syncResponse = await fetch("/api/mfi/screen?minimumMarketCap=" + minimumMarketCap + "&select30=" + (mfiCount === 30) + (forceMfiSync ? "&force=1" : ""));
         const syncData = await syncResponse.json() as {error?:string;imported?:number};
         if (!syncResponse.ok) throw new Error(syncData.error || "Magic Formula screening failed");
-        // Process a small SEC batch on each visit. Remaining companies are picked up on later refreshes.
-        const fundamentalsResponse = await fetch("/api/fundamentals/sync?limit=8");
-        if (fundamentalsResponse.ok) {
-          const fundamentalsData = await fundamentalsResponse.json() as {processed?:number;calculated?:number;remaining?:number;ranked?:number};
-          fundamentalsStatus = " · SEC fundamentals " + (fundamentalsData.calculated ?? 0) + " calculated, " + (fundamentalsData.remaining ?? 0) + " pending";
-        }
       }
       const response = await fetch(`/api/stocks?market=${market}&refresh=1`);
       if (!response.ok) throw new Error("API unavailable");
@@ -56,6 +49,17 @@ export default function App() {
         if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
       }
       setUpdatedAt(data.updatedAt);
+      let fundamentalsStatus = "";
+      if (market === "US") {
+        const fundamentalsResponse = await fetch("/api/fundamentals/status");
+        if (fundamentalsResponse.ok) {
+          const fundamentals = await fundamentalsResponse.json() as {calculated?:number;total?:number;unmapped?:number;incomplete?:number;provider_error?:number};
+          fundamentalsStatus = " · SEC fundamentals " + (fundamentals.calculated ?? 0) + "/" + (fundamentals.total ?? 0) + " ready";
+          if (fundamentals.unmapped) fundamentalsStatus += ", " + fundamentals.unmapped + " unmapped";
+          if (fundamentals.incomplete) fundamentalsStatus += ", " + fundamentals.incomplete + " incomplete";
+          if (fundamentals.provider_error) fundamentalsStatus += ", " + fundamentals.provider_error + " errors";
+        }
+      }
       setSourceStatus((data.refresh?.failed ? "Quote provider failed for "+data.refresh.failed+" symbols" : data.refresh?.remaining ? "Quotes updated; "+data.refresh.remaining+" still pending" : data.sourceStatus ?? "Connected") + fundamentalsStatus);
     } catch (error) {
       setStocks([]);
