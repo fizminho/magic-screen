@@ -8,7 +8,7 @@ The US screener uses SEC EDGAR Company Facts as its primary financial-statement 
 2. It fetches each company's Company Facts JSON from `/api/xbrl/companyfacts/CIK##########.json`.
 3. It selects the latest available annual 10-K, 20-F, or 40-F Operating Income (EBIT), then reads balance-sheet facts for the same fiscal period.
 4. It stores the extracted facts and calculated ratios in D1. Successfully calculated company facts are refreshed after 30 days; incomplete/provider-error cases are retried after seven days. Ticker mappings are refreshed weekly and when new MFI candidates have no mapping.
-5. A Cloudflare Cron Trigger runs every 10 minutes and processes up to 10 companies per invocation. This works independently of browser visits, so the first 30/50-company universe is populated progressively in the background. The UI only reads the latest sync status; it does not fetch SEC facts itself.
+5. A Cloudflare Cron Trigger runs every 30 minutes and processes up to 10 companies per invocation. This works independently of browser visits, so the first 30/50-company universe is populated progressively in the background. The UI only reads the latest sync status; it does not fetch SEC facts itself.
 
 ## Initial Magic Formula calculations
 
@@ -16,7 +16,7 @@ The US screener uses SEC EDGAR Company Facts as its primary financial-statement 
 - **Enterprise Value** = MFI market capitalization + reported debt - reported cash
 - **Return on Capital** = annual EBIT / (Current Assets - Current Liabilities + Net PP&E)
 
-The calculation uses the latest reported annual EBIT and balance-sheet facts for the same fiscal year-end. It does not annualize a partial quarter. Because MFI market capitalisation is denominated in USD, the pipeline only uses SEC XBRL facts explicitly reported in USD. Issuers reporting only in another currency remain incomplete until currency conversion is implemented; their local-currency values are never mixed with USD market capitalisation. A ratio remains unavailable when required facts or a usable denominator are missing. Debt must have at least one recognized reported debt fact; missing debt data is not silently treated as zero.
+The calculation uses annual and balance-sheet facts from the same filing accession and fiscal year-end. It does not annualize a partial quarter. Because MFI market capitalisation is denominated in USD, the pipeline only uses SEC XBRL facts explicitly reported in USD. Issuers reporting only in another currency remain incomplete until currency conversion is implemented; their local-currency values are never mixed with USD market capitalisation. A ratio remains unavailable when required facts or a usable denominator are missing. Debt must have at least one recognized reported debt fact; missing debt data is not silently treated as zero.
 
 The SEC data is not a pre-calculated Magic Formula ranking. The Worker calculates each ratio from reported facts. A combined rank (rank by Earnings Yield plus rank by Return on Capital) is published only after every active MFI candidate in the selected universe has usable fundamentals. Until then the rank remains blank, avoiding misleading partial-universe rankings.
 
@@ -26,8 +26,42 @@ The SEC data is not a pre-calculated Magic Formula ranking. The Worker calculate
 
 - `limit`: number of companies to process in a request, capped at 10. This endpoint remains available for controlled/manual diagnostics, but the UI does not call it during normal page loads.
 - `GET /api/fundamentals/status` reports total MFI candidates, calculated companies, unmapped tickers, incomplete facts, provider errors, and the latest update time.
-- The scheduled job processes up to 10 companies every 10 minutes. A 30-company universe normally takes about 30 minutes and a 50-company universe about 50 minutes to work through, assuming successful SEC responses. No repeated page refresh is required.
+- The scheduled job processes up to 10 companies every 30 minutes. A 30-company universe normally takes about one hour and a 50-company universe about two and a half hours to work through, assuming successful SEC responses. No repeated page refresh is required.
 - A company with missing required XBRL facts or a provider error is retried after seven days; successful calculations are refreshed after 30 days.
+
+
+## Gemini-assisted fact discovery (diagnostic only)
+
+When SEC Company Facts does not expose a recognised XBRL concept, a protected diagnostic endpoint can ask Gemini to map alternative tags from the same filing:
+
+`POST /api/ai/fundamentals/extract`
+
+Request body:
+
+```json
+{"symbol":"HRB"}
+```
+
+Required headers:
+
+```http
+Authorization: Bearer <UNIVERSE_SYNC_TOKEN>
+Content-Type: application/json
+```
+
+Configuration:
+- Set `GEMINI_API_KEY` as a Cloudflare Worker secret. Never put it in frontend code, GitHub files, or chat.
+- The endpoint also requires the existing `UNIVERSE_SYNC_TOKEN` secret. The token is sent only as a bearer header.
+- The Worker calls the Gemini 3.8 Flash GenerateContent API with storage disabled.
+
+Safety rules:
+- Gemini receives only a bounded list of SEC Company Facts entries explicitly reported in USD under the selected annual filing accession and period end.
+- A returned selection is accepted only when its tag, exact numeric value, and fact type match an item supplied from SEC. The model cannot create a new numeric value.
+- The response is always marked `AI_EXTRACTED_REVIEW_REQUIRED` and `eligible_for_magic_formula: false`. A tag match does not establish accounting equivalence or formula suitability.
+- This diagnostic does not write to D1, update `stock_fundamentals`, calculate ratios, or publish ranks. It is manually invoked and does not run on page loads or cron.
+- Missing or ambiguous concepts remain unavailable. Do not treat the AI output as verified financial data.
+
+Example response fields include the symbol, SEC accession, fiscal period, filing URL, per-field validation status, and whether each selected value exactly matched a supplied SEC fact.
 
 ## Important limitations
 
