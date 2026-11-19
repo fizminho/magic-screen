@@ -13,6 +13,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"rank" | "name" | "change">("rank");
   const [stocks, setStocks] = useState<Stock[]>([]);
+  const [marketUniverse, setMarketUniverse] = useState(universe);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
@@ -26,17 +27,23 @@ export default function App() {
       if (!response.ok) throw new Error("API unavailable");
       const data = await response.json() as ApiResponse;
       setStocks(data.stocks ?? []);
+      const universeResponse = await fetch("/api/universe?market=" + market);
+      if (universeResponse.ok) {
+        const master = await universeResponse.json() as { stocks?: Array<{symbol:string;company_name:string;currency:string;market:Market}> };
+        if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
+      }
       setUpdatedAt(data.updatedAt);
       setSourceStatus(data.sourceStatus ?? "Connected");
     } catch {
       setStocks([]);
+      setMarketUniverse(universe.filter(x => x.market === market));
       setSourceStatus("API not configured");
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [market]);
 
   const rows = useMemo(() => {
-    const base = universe.filter(x => x.market === market).map(x => stocks.find(s => s.symbol === x.symbol) ?? ({
+    const base = marketUniverse.filter(x => x.market === market).map(x => stocks.find(s => s.symbol === x.symbol) ?? ({
       symbol:x.symbol, market:x.market, company_name:x.name, currency:x.currency, price:null, change_percent:null,
       market_cap:null, earnings_yield:null, return_on_capital:null, magic_formula_rank:null,
       shariah_status:"unverified" as const, shariah_source:null, shariah_as_of:null, data_status:"awaiting_sync",
@@ -45,7 +52,7 @@ export default function App() {
     return base.filter(s => (tab !== "shariah" || s.shariah_status === "compliant") && (tab !== "watchlist" || watchlist.includes(s.symbol)))
       .filter(s => `${s.symbol} ${s.company_name}`.toLowerCase().includes(query.toLowerCase()))
       .sort((a,b) => sort === "name" ? a.company_name.localeCompare(b.company_name) : sort === "change" ? (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity) : (a.magic_formula_rank ?? 999) - (b.magic_formula_rank ?? 999));
-  }, [stocks, market, tab, query, sort, watchlist]);
+  }, [stocks, marketUniverse, market, tab, query, sort, watchlist]);
 
   const available = stocks.filter(s => s.price != null).length;
   const ranked = stocks.filter(s => s.magic_formula_rank != null).length;
@@ -71,7 +78,7 @@ export default function App() {
         <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div>
         {showInfo && <div className="info-banner"><ShieldCheck size={18}/><div><b>Data integrity comes first.</b><p>Prices, fundamentals and Shariah status are only shown when a source is available and verified. Unknown is not the same as compliant. This first build is awaiting its initial Cloudflare data sync.</p></div><button onClick={()=>setShowInfo(false)}>×</button></div>}
         <div className="stats-grid">
-          <div className="stat-card"><div className="stat-top">UNIVERSE <span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">{universe.filter(x=>x.market===market).length}<small> stocks tracked</small></div><div className="stat-foot">Initial watch universe</div></div>
+          <div className="stat-card"><div className="stat-top">UNIVERSE <span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">{marketUniverse.filter(x=>x.market===market).length}<small> stocks tracked</small></div><div className="stat-foot">Initial watch universe</div></div>
           <div className="stat-card"><div className="stat-top">LIVE QUOTES <span className="stat-icon green"><TrendingUp size={16}/></span></div><div className="stat-value">{available}<small> / {universe.filter(x=>x.market===market).length}</small></div><div className="stat-foot">{available ? "Quotes received" : "Waiting for market data"}</div></div>
           <div className="stat-card"><div className="stat-top">FORMULA RANKED <span className="stat-icon violet"><Sparkles size={16}/></span></div><div className="stat-value">{ranked}<small> stocks</small></div><div className="stat-foot">Needs verified fundamentals</div></div>
           <div className="stat-card"><div className="stat-top">LAST UPDATED <span className="stat-icon"><Clock3 size={16}/></span></div><div className="stat-value time-value">{updatedAt ? new Date(updatedAt).toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"}) : "—"}</div><div className="stat-foot">{updatedAt ? new Date(updatedAt).toLocaleDateString("en-MY") : "No successful sync yet"}</div></div>
