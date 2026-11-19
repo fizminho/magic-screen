@@ -188,11 +188,18 @@ async function syncUsFundamentals(env:Env, limit=8) {
       const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
       const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet"],periodEnd,false) : {value:null,tag:null,filed:null};
       const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","LongTermDebtAndFinanceLeaseObligationsCurrent","ShortTermBorrowings"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","LongTermDebtAndFinanceLeaseObligationsNoncurrent","LongTermDebt"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const leaseLong=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtTotal=periodEnd ? secFactValue(facts,["LongTermDebt"],periodEnd,false) : {value:null,tag:null,filed:null};
       const cap=Number(item.market_cap);
-      const debtKnown=debtCurrent.value!=null || debtLong.value!=null;
-      const totalDebt=(debtCurrent.value??0)+(debtLong.value??0);
+      const splitDebtKnown=debtCurrent.value!=null || shortDebt.value!=null || debtLong.value!=null;
+      const leaseDebtKnown=leaseCurrent.value!=null || leaseLong.value!=null;
+      const debtKnown=splitDebtKnown || leaseDebtKnown || debtTotal.value!=null;
+      const totalDebt=splitDebtKnown ? (debtCurrent.value??0)+(shortDebt.value??0)+(debtLong.value??0)
+        : leaseDebtKnown ? (leaseCurrent.value??0)+(leaseLong.value??0) : (debtTotal.value??0);
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
       const investedCapital=netWorkingCapital+(ppe.value??0);
       const enterpriseValue=cap+totalDebt-(cash.value??0);
