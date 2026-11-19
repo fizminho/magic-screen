@@ -329,9 +329,9 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   const roleDefinitions=new Map<string,string>();
   if(schemaResponse.ok) {
     const schemaXml=await schemaResponse.text();
-    for(const roleMatch of schemaXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?roleType\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?roleType>/gi)) {
-      const roleUri=roleMatch[1].match(/\\broleURI=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1];
-      const definition=roleMatch[2].match(/<(?:[A-Za-z0-9_-]+:)?definition>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?definition>/i)?.[1]?.replace(/<[^>]*>/g,"").trim();
+    for(const roleMatch of schemaXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?roleType\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?roleType>/gi)) {
+      const roleUri=roleMatch[1].match(/\broleURI=["\x27]([^"\x27]+)["\x27]/i)?.[1];
+      const definition=roleMatch[2].match(/<(?:[A-Za-z0-9_-]+:)?definition>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?definition>/i)?.[1]?.replace(/<[^>]*>/g,"").trim();
       if(roleUri&&definition) roleDefinitions.set(roleUri,definition);
     }
   }
