@@ -44,3 +44,8 @@ When changing one of these behaviours, update this document and the related inli
 - **CI performs a Wrangler dry-run after the TypeScript/Vite build.** This validates Cloudflare Worker bundling and static-asset configuration without deploying or changing production resources. A successful GitHub build still does not prove a live Cloudflare deployment.
 
 - **Pipeline status separates pending stages.** The US status panel distinguishes candidates waiting for a market-cap snapshot, candidates mapped and ready for their first SEC facts attempt, incomplete facts, stale market-cap valuations, unmapped tickers, and provider errors. These states are not interchangeable and should remain separately visible.
+
+
+## Stale fundamentals safeguard
+
+- **Annual SEC periods older than 550 days are stale, not rankable.** Keep the SEC facts and filing dates for diagnosis, but set the calculated ratios to null, mark the record `stale_fiscal_period`, and expose a short `STALE FACTS` stock-card flag. The pipeline retries stale records on the normal incomplete-facts cadence. This is a conservative freshness guard, not a claim that every issuer files on the same schedule.
