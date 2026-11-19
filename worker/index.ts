@@ -68,7 +68,8 @@ async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   let updated=0, failed=0;
   const markets = onlyMarket ? [onlyMarket] : ["MY","US"];
   for (const market of markets) {
-    const candidates = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name AS name,m.currency FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY CASE WHEN q.updated_at IS NULL THEN 0 ELSE 1 END,q.updated_at ASC,m.symbol ASC LIMIT 40").bind(market).all<any>();
+    const priority = symbols[market].map(item=>"\u0027"+item.symbol.replaceAll("\u0027","\u0027\u0027")+"\u0027").join(",");
+    const candidates = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name AS name,m.currency FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status=\u0027active\u0027 ORDER BY CASE WHEN m.symbol IN ("+priority+") THEN 0 ELSE 1 END,CASE WHEN q.updated_at IS NULL THEN 0 ELSE 1 END,q.updated_at ASC,m.symbol ASC LIMIT 40").bind(market).all<any>();
     for (const item of candidates.results) {
       try {
         const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(item.symbol)+"?range=5d&interval=1d";
