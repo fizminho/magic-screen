@@ -62,36 +62,52 @@ async function ensureSchema(env: Env) {
 async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   await ensureSchema(env);
   const started = new Date().toISOString();
-  const batch = env.DB.prepare("INSERT INTO refresh_log (started_at,status,message) VALUES (?, 'running', 'Yahoo Finance chart quote refresh')");
-  const log = await batch.bind(started).run();
+  const log = await env.DB.prepare("INSERT INTO refresh_log (started_at,status,message) VALUES (?, 'running', 'Yahoo Finance quote batch refresh')").bind(started).run();
   let updated=0, failed=0;
-  for (const market of (onlyMarket ? [onlyMarket] : ["MY","US"] as const)) {
-    for (const item of symbols[market]) {
+  const markets = onlyMarket ? [onlyMarket] : ["MY","US"];
+  for (const market of markets) {
+    const candidates = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name AS name,m.currency FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY CASE WHEN q.updated_at IS NULL THEN 0 ELSE 1 END,q.updated_at ASC,m.symbol ASC LIMIT 40").bind(market).all();
+    for (const item of candidates.results) {
       try {
         const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(item.symbol)+"?range=5d&interval=1d";
         const res = await fetch(url,{headers:{"User-Agent":"Mozilla/5.0 MagicScreen/0.1"}});
         if (!res.ok) throw new Error("Quote provider HTTP "+res.status);
-        const payload:any = await res.json();
-        const result = payload?.chart?.result?.[0];
-        const meta = result?.meta;
-        const quote = result?.indicators?.quote?.[0];
-        const closes = (quote?.close ?? []).filter((v:any)=>typeof v==="number");
+        const payload = await res.json();
+        const result = payload?.chart?.result?.[0], meta = result?.meta, quote = result?.indicators?.quote?.[0];
+        const closes = (quote?.close ?? []).filter(v=>typeof v==="number");
         const price = typeof meta?.regularMarketPrice==="number" ? meta.regularMarketPrice : closes.at(-1) ?? null;
         const previous = typeof meta?.chartPreviousClose==="number" ? meta.chartPreviousClose : closes.length>1 ? closes.at(-2) : null;
         const change = price!=null && previous ? ((price-previous)/previous)*100 : null;
         if (price==null) throw new Error("No quote in provider response");
-        await env.DB.prepare(`INSERT INTO stock_snapshot (symbol,market,company_name,currency,price,change_percent,shariah_status,data_status,provider,updated_at)
-          VALUES (?,?,?,?,?,?,'unverified','quote_only','Yahoo Finance',?)
-          ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,currency=excluded.currency,price=excluded.price,
-          change_percent=excluded.change_percent,data_status='quote_only',provider=excluded.provider,updated_at=excluded.updated_at`)
-          .bind(item.symbol,item.market,item.name,item.currency,price,change, new Date().toISOString()).run();
+        await env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,price,change_percent,shariah_status,data_status,provider,updated_at) VALUES (?,?,?,?,?,?,'unverified','quote_only','Yahoo Finance',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,currency=excluded.currency,price=excluded.price,change_percent=excluded.change_percent,data_status='quote_only',provider=excluded.provider,updated_at=excluded.updated_at").bind(item.symbol,item.market,item.name,item.currency,price,change,new Date().toISOString()).run();
         updated++;
-      } catch (e) { failed++; }
+      } catch { failed++; }
     }
   }
-  await env.DB.prepare("UPDATE refresh_log SET completed_at=?,status=?,message=? WHERE id=?")
-    .bind(new Date().toISOString(),failed===0?"success":"partial",`Updated ${updated}; failed ${failed}`,log.meta.last_row_id).run();
-  return {updated,failed};
+  const cutoff = new Date(Date.now()-24*60*60*1000).toISOString();
+  const remaining = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.listing_status='active' AND (? IS NULL OR m.market=?) AND (q.updated_at IS NULL OR q.updated_at < ?)").bind(onlyMarket ?? null,onlyMarket ?? null,cutoff).first();
+  await env.DB.prepare("UPDATE refresh_log SET completed_at=?,status=?,message=? WHERE id=?").bind(new Date().toISOString(),failed===0?"success":"partial","Updated "+updated+"; failed "+failed+"; stale or missing "+(remaining?.count ?? 0),log.meta.last_row_id).run();
+  return {updated,failed,remaining:remaining?.count ?? 0,batchSize:40};
+}
+async function syncUsUniverse(env: Env) {
+  await ensureSchema(env);
+  const response = await fetch("https://www.sec.gov/files/company_tickers_exchange.json",{headers:{"User-Agent":"MagicScreen/0.1 contact support@binalah.co"}});
+  if (!response.ok) throw new Error("SEC directory HTTP "+response.status);
+  const payload = await response.json();
+  const fields = payload.fields ?? [];
+  const ix = {name:fields.indexOf("name"),ticker:fields.indexOf("ticker"),exchange:fields.indexOf("exchange")};
+  if (Object.values(ix).some(i=>i<0)) throw new Error("Unexpected SEC directory format");
+  const exchanges = new Set(["Nasdaq","NYSE","NYSE American","NYSE Arca","Cboe","Cboe BZX"]);
+  const rows = (payload.data ?? []).filter(r=>exchanges.has(String(r[ix.exchange])) && /^[A-Z][A-Z0-9.-]{0,9}$/.test(String(r[ix.ticker] ?? "")) && String(r[ix.name] ?? "").trim().length>0);
+  const now = new Date().toISOString();
+  let imported=0;
+  for (let i=0;i<rows.length;i+=80) {
+    const batch = rows.slice(i,i+80).map(r=>env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD',?,'active','SEC company_tickers_exchange.json',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,source=excluded.source,source_updated_at=excluded.source_updated_at,listing_status='active'").bind(String(r[ix.ticker]).trim().toUpperCase(),String(r[ix.name]).trim(),String(r[ix.exchange]),now));
+    await env.DB.batch(batch);
+    imported+=batch.length;
+  }
+  const total = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master WHERE market='US' AND listing_status='active'").first();
+  return {imported,total:total?.count ?? imported,source:"SEC company_tickers_exchange.json",asOf:now,note:"SEC states this directory does not guarantee accuracy or complete exchange coverage."};
 }
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -117,16 +133,17 @@ export default {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
         await ensureSchema(env);
+        const sync = market==="US" && url.searchParams.get("sync")==="1" ? await syncUsUniverse(env) : null;
         const result = await env.DB.prepare("SELECT * FROM stock_master WHERE market=? AND listing_status='active' ORDER BY company_name").bind(market).all();
-        return json({market,stocks:result.results,count:result.results.length});
-      } catch { return json({market,stocks:[],count:0}); }
+        return json({market,stocks:result.results,count:result.results.length,sync});
+      } catch (e) { return json({market,stocks:[],count:0,error:String(e)},502); }
     }
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
         if (url.searchParams.get("refresh")==="1") await refreshQuotes(env, market);
         else await ensureSchema(env);
-        const result = await env.DB.prepare("SELECT * FROM stock_snapshot WHERE market=? ORDER BY COALESCE(magic_formula_rank,999), company_name").bind(market).all();
+        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,q.earnings_yield,q.return_on_capital,q.magic_formula_rank,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,COALESCE(q.data_status,'awaiting_quote') AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
         return json({market,stocks:result.results,updatedAt:latest?.updated_at ?? null,sourceStatus:result.results.length?"Quote cache connected":"Waiting for scheduled quote sync"});
       } catch { return json({market,stocks:[],updatedAt:null,sourceStatus:"Database not initialised"}); }
