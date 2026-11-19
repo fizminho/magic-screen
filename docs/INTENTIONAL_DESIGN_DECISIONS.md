@@ -18,7 +18,7 @@ This document records deliberate behaviour in Magic Screen. These are guardrails
 - **Missing debt is not assumed to be zero.** A company must have a recognized debt fact before the calculation is considered complete. A zero-debt company should be represented by a reported fact, not by missing data.
 - **Missing required facts mean no ratios and no rank.** Unsupported XBRL tags, unavailable statements, non-positive denominators, and unsupported currency should remain incomplete rather than being filled with guesses.
 - **Wait for market cap before SEC ingestion.** The background job skips candidates without a market-cap snapshot. This prevents an import/quote timing gap from prematurely marking a company incomplete.
-- **Annual EBIT is not annualized from a partial quarter.** The first version uses annual 10-K, 20-F, or 40-F periods and balance-sheet facts around the corresponding fiscal period end.
+- **Annual EBIT is not annualized from a partial quarter.** The first version uses annual 10-K, 20-F, or 40-F periods and balance-sheet facts around the corresponding fiscal period end. The selected annual period may be anchored by recognised EBIT or revenue facts, but an EBIT fact must match that exact fiscal year end. Never reuse an older EBIT fact merely because the latest filing uses an unsupported tag; leave the ratio incomplete until the current-period tag is supported.
 
 ## Background processing
 
