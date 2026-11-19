@@ -330,9 +330,11 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const role=linkMatch[1].match(/(?:xlink:)?role=["\x27]([^"\x27]+)["\x27]/i)?.[1]??null;
       const body=linkMatch[2];
       const locators=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\b([^>]*)\/?\s*>/gi)].map((m:any)=>({label:m[1].match(/(?:xlink:)?label=["\x27]([^"\x27]+)["\x27]/i)?.[1]??"",href:m[1].match(/(?:xlink:)?href=["\x27]([^"\x27]+)["\x27]/i)?.[1]??""}));
-      const target=locators.findIndex(x=>/#(?:us-gaap_)?CostsAndExpenses(?:$|[^A-Za-z])/i.test(x.href));
-      if(target<0) continue;
-      costsAndExpensesPresentation.push({role,concept:locators[target].href.split("#").pop(),nearby_concepts:locators.slice(Math.max(0,target-3),Math.min(locators.length,target+4)).map(x=>x.href.split("#").pop())});
+      const target=locators.find(x=>/#(?:us-gaap_)?CostsAndExpenses(?:$|[^A-Za-z])/i.test(x.href));
+      if(!target) continue;
+      const locatorByLabel=new Map(locators.map(x=>[x.label,x.href.split("#").pop()]));
+      const relatedArcs=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\\b([^>]*)\\/?\\s*>/gi)].map((m:any)=>({from:m[1].match(/(?:xlink:)?from=["\x27]([^"\x27]+)["\x27]/i)?.[1],to:m[1].match(/(?:xlink:)?to=["\x27]([^"\x27]+)["\x27]/i)?.[1]})).filter((x:any)=>x.from===target.label||x.to===target.label).map((x:any)=>({parent:locatorByLabel.get(x.from)??null,child:locatorByLabel.get(x.to)??null}));
+      costsAndExpensesPresentation.push({role,concept:target.href.split("#").pop(),presentation_relationships:relatedArcs});
     }
   }
   // INTENTIONAL: diagnostic reconciliation only, never a production EBIT input.
