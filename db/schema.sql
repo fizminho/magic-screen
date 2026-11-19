@@ -25,3 +25,17 @@ CREATE TABLE IF NOT EXISTS refresh_log (
   status TEXT NOT NULL,
   message TEXT
 );
+
+CREATE TABLE IF NOT EXISTS stock_master (
+  symbol TEXT NOT NULL,
+  market TEXT NOT NULL CHECK (market IN ('MY', 'US')),
+  company_name TEXT NOT NULL,
+  currency TEXT NOT NULL,
+  exchange TEXT,
+  sector TEXT,
+  listing_status TEXT NOT NULL DEFAULT 'active',
+  source TEXT NOT NULL,
+  source_updated_at TEXT NOT NULL,
+  PRIMARY KEY (symbol, market)
+);
+CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market, company_name);
