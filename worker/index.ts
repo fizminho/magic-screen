@@ -49,6 +49,16 @@ async function ensureSchema(env: Env) {
   ]);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS stock_master (symbol TEXT NOT NULL, market TEXT NOT NULL, company_name TEXT NOT NULL, currency TEXT NOT NULL, exchange TEXT, sector TEXT, listing_status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL, source_updated_at TEXT NOT NULL, PRIMARY KEY(symbol,market))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market,company_name)").run();
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS sec_company_map (symbol TEXT PRIMARY KEY, cik TEXT NOT NULL, updated_at TEXT NOT NULL)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS stock_fundamentals (
+      symbol TEXT NOT NULL, market TEXT NOT NULL DEFAULT 'US', cik TEXT, ebit REAL, current_assets REAL,
+      current_liabilities REAL, net_ppe REAL, total_debt REAL, cash REAL, market_cap REAL,
+      earnings_yield REAL, return_on_capital REAL, fiscal_period TEXT, filed_at TEXT,
+      status TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'SEC EDGAR Company Facts', updated_at TEXT NOT NULL,
+      PRIMARY KEY(symbol,market)
+    )`)
+  ]);
   const now = new Date().toISOString();
   for (const market of ["MY","US"] as const) {
     const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master WHERE market=?").bind(market).first<{count:number}>();
@@ -118,6 +128,93 @@ async function syncUsUniverse(env: Env) {
   return {imported,total:total?.count ?? imported,source:"SEC company_tickers_exchange.json",asOf:now,note:"SEC states this directory does not guarantee accuracy or complete exchange coverage."};
 }
 
+function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean): {value:number|null;tag:string|null;filed:string|null} {
+  const gaap=facts?.facts?.["us-gaap"] ?? {};
+  for (const tag of tags) {
+    const units=gaap[tag]?.units ?? {};
+    const entries=Object.values(units).flat() as any[];
+    const eligible=entries.filter((x:any)=>{
+      if (typeof x.val!=="number" || !x.end || !x.filed || !["10-K","20-F","40-F","10-Q"].includes(x.form)) return false;
+      if (x.end>periodEnd) return false;
+      if (annual) {
+        if (!x.start) return false;
+        const days=(Date.parse(x.end)-Date.parse(x.start))/86400000;
+        return days>=330 && days<=400 && ["10-K","20-F","40-F"].includes(x.form);
+      }
+      return !x.start && (Date.parse(periodEnd)-Date.parse(x.end))/86400000<=120;
+    }).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
+    if (eligible.length) return {value:eligible[0].val,tag,filed:eligible[0].filed};
+  }
+  return {value:null,tag:null,filed:null};
+}
+
+async function syncUsFundamentals(env:Env, limit=8) {
+  await ensureSchema(env);
+  const mapAge=await env.DB.prepare("SELECT MIN(updated_at) AS updated_at,COUNT(*) AS count FROM sec_company_map").first<any>();
+  const mapStale=!mapAge?.count || !mapAge.updated_at || Date.now()-Date.parse(mapAge.updated_at)>7*86400000;
+  if (mapStale) {
+    const response=await fetch("https://www.sec.gov/files/company_tickers_exchange.json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept-Encoding":"gzip, deflate"}});
+    if (!response.ok) throw new Error("SEC ticker map returned HTTP "+response.status);
+    const payload:any=await response.json();
+    const fields=payload.fields??[];
+    const ix={cik:fields.indexOf("cik"),ticker:fields.indexOf("ticker")};
+    if (ix.cik<0 || ix.ticker<0) throw new Error("Unexpected SEC ticker map format");
+    const now=new Date().toISOString();
+    const active=await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active'").all<any>();
+    const wanted=new Set(active.results.map((x:any)=>String(x.symbol).toUpperCase()));
+    const mapped=(payload.data??[]).filter((r:any[])=>wanted.has(String(r[ix.ticker]).toUpperCase()) && Number(r[ix.cik])>0);
+    for(let i=0;i<mapped.length;i+=80) await env.DB.batch(mapped.slice(i,i+80).map((r:any[])=>env.DB.prepare("INSERT INTO sec_company_map(symbol,cik,updated_at) VALUES(?,?,?) ON CONFLICT(symbol) DO UPDATE SET cik=excluded.cik,updated_at=excluded.updated_at").bind(String(r[ix.ticker]).toUpperCase(),String(r[ix.cik]).padStart(10,"0"),now)));
+  }
+  const staleBefore=new Date(Date.now()-30*86400000).toISOString();
+  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.cik IS NOT NULL AND (f.updated_at IS NULL OR f.updated_at<?) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 ELSE 1 END,f.updated_at,m.symbol LIMIT ?").bind(staleBefore,Math.max(1,Math.min(10,limit))).all<any>();
+  let processed=0,calculated=0,failed=0;
+  for(const item of candidates.results) {
+    const now=new Date().toISOString();
+    try {
+      const response=await fetch("https://data.sec.gov/api/xbrl/companyfacts/CIK"+item.cik+".json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json"}});
+      if(!response.ok) throw new Error("SEC company facts HTTP "+response.status);
+      const facts:any=await response.json();
+      const annualFacts=facts?.facts?.["us-gaap"]?.OperatingIncomeLoss?.units?.USD ?? [];
+      const annual=annualFacts.filter((x:any)=>x.val!=null && x.start && x.end && ["10-K","20-F","40-F"].includes(x.form) && (Date.parse(x.end)-Date.parse(x.start))/86400000>=330 && (Date.parse(x.end)-Date.parse(x.start))/86400000<=400).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
+      const periodEnd=annual[0]?.end ?? "";
+      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss"],periodEnd,true) : {value:null,tag:null,filed:null};
+      const assets=periodEnd ? secFactValue(facts,["AssetsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","LongTermDebtAndFinanceLeaseObligationsCurrent","ShortTermBorrowings"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","LongTermDebtAndFinanceLeaseObligationsNoncurrent","LongTermDebt"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const cap=Number(item.market_cap);
+      const totalDebt=(debtCurrent.value??0)+(debtLong.value??0);
+      const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
+      const investedCapital=netWorkingCapital+(ppe.value??0);
+      const enterpriseValue=cap+totalDebt-(cash.value??0);
+      const complete=ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
+      const ey=complete ? (ebit.value as number)/enterpriseValue : null;
+      const roc=complete ? (ebit.value as number)/investedCapital : null;
+      const status=complete ? "calculated" : "missing_required_facts";
+      await env.DB.prepare("INSERT INTO stock_fundamentals(symbol,market,cik,ebit,current_assets,current_liabilities,net_ppe,total_debt,cash,market_cap,earnings_yield,return_on_capital,fiscal_period,filed_at,status,source,updated_at) VALUES(?,'US',?,?,?,?,?,?,?,?,?,?,?,?,?,'SEC EDGAR Company Facts',?) ON CONFLICT(symbol,market) DO UPDATE SET cik=excluded.cik,ebit=excluded.ebit,current_assets=excluded.current_assets,current_liabilities=excluded.current_liabilities,net_ppe=excluded.net_ppe,total_debt=excluded.total_debt,cash=excluded.cash,market_cap=excluded.market_cap,earnings_yield=excluded.earnings_yield,return_on_capital=excluded.return_on_capital,fiscal_period=excluded.fiscal_period,filed_at=excluded.filed_at,status=excluded.status,source=excluded.source,updated_at=excluded.updated_at")
+        .bind(item.symbol,item.cik,ebit.value,assets.value,liabilities.value,ppe.value,totalDebt,cash.value,item.market_cap,ey,roc,periodEnd||null,ebit.filed,status,now).run();
+      await env.DB.prepare("UPDATE stock_snapshot SET earnings_yield=?,return_on_capital=?,magic_formula_rank=NULL,data_status=? WHERE symbol=? AND market='US'").bind(ey,roc,complete?"fundamentals_calculated":"fundamentals_incomplete",item.symbol).run();
+      if(complete) calculated++;
+      processed++;
+    } catch(error) {
+      failed++;
+      await env.DB.prepare("INSERT INTO stock_fundamentals(symbol,market,cik,status,source,updated_at) VALUES(?,'US',?,'provider_error','SEC EDGAR Company Facts',?) ON CONFLICT(symbol,market) DO UPDATE SET status='provider_error',updated_at=excluded.updated_at").bind(item.symbol,item.cik,now).run();
+      processed++;
+    }
+  }
+  const totals=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN f.status='calculated' THEN 1 ELSE 0 END) AS valid FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+  let ranked=0;
+  if(totals?.total>0 && totals.valid===totals.total) {
+    const rankedRows=await env.DB.prepare("SELECT symbol,ROW_NUMBER() OVER(ORDER BY earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY return_on_capital DESC) AS combined_rank FROM stock_fundamentals WHERE market='US' AND status='calculated'").all<any>();
+    for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US'").bind(row.combined_rank,row.symbol).run();
+    ranked=rankedRows.results.length;
+  }
+  const remaining=Math.max(0,(totals?.total??0)-(totals?.valid??0));
+  return {source:"SEC EDGAR Company Facts",processed,calculated,failed,remaining,ranked,total:totals?.total??0,note:"Ranks are published only when every active MFI candidate has usable required facts."};
+}
+
 async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true, forceRefresh=false) {
   await ensureSchema(env);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS mfi_screening_meta (id INTEGER PRIMARY KEY CHECK(id=1), minimum_market_cap INTEGER NOT NULL, selected_count INTEGER NOT NULL, result_count INTEGER NOT NULL, source_updated_at TEXT NOT NULL, price_date TEXT, quarter_date TEXT)").run();
@@ -183,6 +280,12 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname==="/api/fundamentals/sync" && request.method==="GET") {
+      try {
+        const limit=Math.min(10,Math.max(1,Number(url.searchParams.get("limit")??8)));
+        return json(await syncUsFundamentals(env,limit));
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC EDGAR Company Facts"},503); }
+    }
     if (url.pathname==="/api/mfi/screen") {
       try {
         const minimumMarketCap = Math.min(5000000,Math.max(50,Number(url.searchParams.get("minimumMarketCap") ?? 50)));
