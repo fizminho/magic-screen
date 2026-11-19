@@ -134,7 +134,9 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
   const concepts=facts?.facts?.[taxonomy] ?? {};
   for (const tag of tags) {
     const units=concepts[tag]?.units ?? {};
-    const entries=Object.values(units).flat() as any[];
+    // Market capitalisation from MFI is USD. Only use SEC facts explicitly tagged in USD;
+    // never mix an issuer's local-currency facts into USD valuation formulas.
+    const entries=(units.USD ?? []) as any[];
     const eligible=entries.filter((x:any)=>{
       if (typeof x.val!=="number" || !x.end || !x.filed || !["10-K","20-F","40-F","10-Q"].includes(x.form)) return false;
       if (x.end>periodEnd) return false;
