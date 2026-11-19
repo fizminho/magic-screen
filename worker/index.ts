@@ -29,7 +29,22 @@ const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";curren
   ]
 };
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"}});
+async function ensureSchema(env: Env) {
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS stock_snapshot (
+      symbol TEXT NOT NULL, market TEXT NOT NULL CHECK (market IN ('MY','US')), company_name TEXT NOT NULL, currency TEXT NOT NULL,
+      price REAL, change_percent REAL, market_cap REAL, earnings_yield REAL, return_on_capital REAL, magic_formula_rank INTEGER,
+      shariah_status TEXT NOT NULL DEFAULT 'unverified', shariah_source TEXT, shariah_as_of TEXT,
+      data_status TEXT NOT NULL DEFAULT 'unavailable', provider TEXT, updated_at TEXT NOT NULL, PRIMARY KEY (symbol,market)
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_snapshot_market_rank ON stock_snapshot(market, magic_formula_rank)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS refresh_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, started_at TEXT NOT NULL, completed_at TEXT, status TEXT NOT NULL, message TEXT
+    )`)
+  ]);
+}
 async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
+  await ensureSchema(env);
   const started = new Date().toISOString();
   const batch = env.DB.prepare("INSERT INTO refresh_log (started_at,status,message) VALUES (?, 'running', 'Yahoo Finance chart quote refresh')");
   const log = await batch.bind(started).run();
@@ -68,10 +83,9 @@ export default {
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
-      if (url.searchParams.get("refresh")==="1") {
-        try { await refreshQuotes(env, market); } catch { return json({error:"Refresh failed",market}, 502); }
-      }
       try {
+        if (url.searchParams.get("refresh")==="1") await refreshQuotes(env, market);
+        else await ensureSchema(env);
         const result = await env.DB.prepare("SELECT * FROM stock_snapshot WHERE market=? ORDER BY COALESCE(magic_formula_rank,999), company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
         return json({market,stocks:result.results,updatedAt:latest?.updated_at ?? null,sourceStatus:result.results.length?"Quote cache connected":"Waiting for scheduled quote sync"});
