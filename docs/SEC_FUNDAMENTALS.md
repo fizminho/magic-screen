@@ -78,3 +78,8 @@ The US screener also exposes an **AI fact diagnostic** button. Enter the existin
 - SEC EDGAR API overview: https://www.sec.gov/search-filings/edgar-application-programming-interfaces
 - SEC Company Facts endpoint pattern: https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json
 - SEC developer resources and fair-access guidance: https://www.sec.gov/about/developer-resources
+
+
+## Cash availability guardrail
+
+The pipeline accepts unrestricted cash and cash-equivalent facts only when calculating Enterprise Value. It does not deduct combined restricted and unrestricted cash from debt. If SEC Company Facts exposes only a combined restricted-cash concept, the cash input remains missing until a suitable unrestricted amount is available. This conservative rule avoids overstating cash available to repay debt.
