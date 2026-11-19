@@ -20,6 +20,10 @@ export default function App() {
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [showInfo, setShowInfo] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importToken, setImportToken] = useState("");
+  const [importStatus, setImportStatus] = useState("");
+  const [importing, setImporting] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 40;
 
@@ -30,7 +34,7 @@ export default function App() {
         const syncResponse = await fetch("/api/universe?market=US&sync=1");
         if (!syncResponse.ok) throw new Error("US universe sync failed");
       }
-      const response = await fetch(`/api/stocks?market=${market}${refresh ? "&refresh=1" : ""}`);
+      const response = await fetch(`/api/stocks?market=${market}&refresh=1`);
       if (!response.ok) throw new Error("API unavailable");
       const data = await response.json() as ApiResponse;
       setStocks(data.stocks ?? []);
@@ -68,6 +72,45 @@ export default function App() {
   const ranked = stocks.filter(s => s.magic_formula_rank != null).length;
   const toggleWatch = (symbol: string) => setWatchlist(old => old.includes(symbol) ? old.filter(x=>x!==symbol) : [...old,symbol]);
 
+  async function importBursaFile(file: File) {
+    if (!importToken.trim()) { setImportStatus("Enter the UNIVERSE_SYNC_TOKEN you configured in Cloudflare."); return; }
+    setImporting(true); setImportStatus("Reading CSV...");
+    try {
+      const lines = (await file.text()).replace(/^\\uFEFF/, "").split(/\\r?\\n/).filter(line=>line.trim());
+      const parseRow = (line:string) => {
+        const values:string[]=[]; let value="", quoted=false;
+        for(let i=0;i<line.length;i++) {
+          const ch=line[i];
+          if(ch === '"') { if(quoted && line[i+1] === '"') { value+='"'; i++; } else quoted=!quoted; }
+          else if(ch === "," && !quoted) { values.push(value.trim()); value=""; }
+          else value+=ch;
+        }
+        values.push(value.trim()); return values;
+      };
+      if(lines.length<2) throw new Error("CSV must contain a header and at least one company row.");
+      const headers=parseRow(lines[0]).map(x=>x.toLowerCase().replace(/[^a-z0-9]+/g," ").trim());
+      const find=(names:string[])=>headers.findIndex(h=>names.includes(h));
+      const symbolIndex=find(["symbol","ticker","stock code","stock number","code","stock no"]);
+      const nameIndex=find(["company name","name of company","company","name","issuer name"]);
+      const exchangeIndex=find(["exchange","market","listing market"]);
+      const sectorIndex=find(["sector","industry"]);
+      if(symbolIndex<0 || nameIndex<0) throw new Error("Could not identify the ticker/code and company-name columns in this CSV.");
+      const rows=lines.slice(1).map(line=>{
+        const values=parseRow(line);
+        return {symbol:values[symbolIndex]??"",company_name:values[nameIndex]??"",exchange:exchangeIndex>=0?values[exchangeIndex]:"Main Market",sector:sectorIndex>=0?values[sectorIndex]:"",listing_status:"active"};
+      }).filter(row=>row.symbol.trim() && row.company_name.trim());
+      if(!rows.length) throw new Error("No valid company rows found in the CSV.");
+      setImportStatus("Uploading "+rows.length.toLocaleString()+" companies...");
+      const response=await fetch("/api/universe/import-my",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+importToken.trim()},body:JSON.stringify({source:file.name,rows})});
+      const result=await response.json() as {imported?:number;error?:string};
+      if(!response.ok) throw new Error(result.error || "Import failed ("+response.status+").");
+      setImportStatus("Imported "+(result.imported ?? 0)+" Bursa listings. Reloading market data...");
+      await load(true);
+      setImportToken("");
+    } catch(error) { setImportStatus(error instanceof Error?error.message:"Import failed."); }
+    finally { setImporting(false); }
+  }
+
   return <div className="app-shell">
     <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
       <a className="brand" href="#"><span className="brand-mark"><TrendingUp size={19}/></span><span>magic<span className="brand-light">screen</span><small>INVESTMENT RESEARCH</small></span></a>
@@ -85,7 +128,8 @@ export default function App() {
     <main className="main">
       <header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <b>Stock screener</b></div><div className="top-actions"><span className="market-pill">{market==="MY"?"🇲🇾 Bursa Malaysia":"🇺🇸 US Market"}</span><button className="icon-btn" title="About data" onClick={()=>setShowInfo(!showInfo)}><CircleHelp size={18}/></button><div className="avatar small-avatar">MS</div></div></header>
       <section className="content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div>
+        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><div className="heading-actions">{market==="MY" && <button className="import-btn" onClick={()=>{setImportOpen(true);setImportStatus("");}}><Database size={14}/> Import Bursa CSV</button>}<button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div></div>
+        {importOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Import Bursa listings"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">BURSA MALAYSIA</div><h3>Import listed companies</h3></div><button className="modal-close" onClick={()=>setImportOpen(false)} aria-label="Close import">×</button></div><p>Upload the official Bursa company directory as a CSV file. The importer recognises common ticker and company-name column headings.</p><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={importToken} onChange={e=>setImportToken(e.target.value)} placeholder="Paste your Cloudflare Worker secret" autoComplete="off"/></label><label className="csv-upload"><Database size={18}/><b>{importing?"Importing...":"Choose Bursa CSV file"}</b><small>CSV format only. Export the Bursa directory to CSV first.</small><input type="file" accept=".csv,text/csv" disabled={importing} onChange={e=>{const file=e.currentTarget.files?.[0];if(file)void importBursaFile(file);e.currentTarget.value="";}}/></label>{importStatus && <div className="import-status">{importStatus}</div>}<small className="import-security">The token is sent directly to your Worker for this request only. It is not saved in the browser.</small></div></div>}
         {showInfo && <div className="info-banner"><ShieldCheck size={18}/><div><b>Data integrity comes first.</b><p>Prices, fundamentals and Shariah status are only shown when a source is available and verified. Unknown is not the same as compliant. US listings are discovered from the SEC directory. Bursa listings are loaded from the Bursa directory import. Yahoo Finance quotes are unofficial. Magic Formula metrics and Shariah classifications stay blank or unverified until reliable, dated financial and screening sources are connected.</p></div><button onClick={()=>setShowInfo(false)}>×</button></div>}
         <div className="stats-grid">
           <div className="stat-card"><div className="stat-top">UNIVERSE <span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">{marketUniverse.filter(x=>x.market===market).length}<small> stocks tracked</small></div><div className="stat-foot">Initial watch universe</div></div>
