@@ -307,7 +307,7 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
     ]));
   }
   const activeSymbols = rows.map(row=>row.symbol);
-  await env.DB.prepare("UPDATE stock_master SET listing_status='inactive' WHERE market='US' AND symbol NOT IN ("+activeSymbols.map(()=>"?").join(",")+")").bind(...activeSymbols).run();
+  await env.DB.prepare("UPDATE stock_master SET listing_status='inactive' WHERE market='US' AND listing_status!='inactive' AND symbol NOT IN ("+activeSymbols.map(()=>"?").join(",")+")").bind(...activeSymbols).run();
   await env.DB.prepare("INSERT INTO mfi_screening_meta (id,minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET minimum_market_cap=excluded.minimum_market_cap,selected_count=excluded.selected_count,result_count=excluded.result_count,source_updated_at=excluded.source_updated_at,price_date=excluded.price_date,quarter_date=excluded.quarter_date").bind(minimumMarketCap,select30?30:50,rows.length,now,rows[0]?.priceDate ?? null,rows[0]?.quarterDate ?? null).run();
   return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,cached:false,stocks:rows};
 }
