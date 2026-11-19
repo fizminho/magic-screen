@@ -18,7 +18,8 @@ export default function App() {
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [showInfo, setShowInfo] = useState(false);\n  const [menuOpen, setMenuOpen] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 40;
 
