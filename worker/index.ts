@@ -121,7 +121,7 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   const page = await fetch(pageUrl, {headers, redirect:"follow"});
   const pageHtml = await page.text();
   if (!page.ok) throw new Error("Magic Formula page returned HTTP "+page.status);
-  if (/Account\\/LogOn|name=["']Email["']|>\\s*Login\\s*</i.test(page.url+" "+pageHtml)) throw new Error("Magic Formula session expired or is not authenticated. Refresh MFI_SESSION_COOKIE.");
+  if (/Account\/LogOn|name=["']Email["']|>\s*Login\s*</i.test(page.url+" "+pageHtml)) throw new Error("Magic Formula session expired or is not authenticated. Refresh MFI_SESSION_COOKIE.");
   const token = pageHtml.match(/name=["']__RequestVerificationToken["'][^>]*value=["']([^"']+)["']/i)?.[1]
     ?? pageHtml.match(/value=["']([^"']+)["'][^>]*name=["']__RequestVerificationToken["']/i)?.[1];
   if (!token) throw new Error("Could not find the anti-forgery token. The screening page may have changed.");
@@ -133,15 +133,15 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   const response = await fetch(pageUrl,{method:"POST",headers:{...headers,"Accept":"*/*","Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest","Referer":pageUrl,"Origin":"https://www.magicformulainvesting.com"},body:form.toString(),redirect:"follow"});
   const html = await response.text();
   if (!response.ok) throw new Error("Magic Formula screening returned HTTP "+response.status);
-  if (/Account\\/LogOn|name=["']Email["']|>\\s*Login\\s*</i.test(response.url+" "+html)) throw new Error("Magic Formula rejected the session. Refresh MFI_SESSION_COOKIE.");
-  const table = html.match(/<table\\b[^>]*class=["'][^"']*screeningdata[^"']*["'][^>]*>([\\s\\S]*?)<\\/table>/i)?.[1];
+  if (/Account\/LogOn|name=["']Email["']|>\s*Login\s*</i.test(response.url+" "+html)) throw new Error("Magic Formula rejected the session. Refresh MFI_SESSION_COOKIE.");
+  const table = html.match(/<table\b[^>]*class=["'][^"']*screeningdata[^"']*["'][^>]*>([\s\S]*?)<\/table>/i)?.[1];
   if (!table) throw new Error("Could not find the screening results table in Magic Formula response.");
-  const rows = [...table.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map(match => {
-    const cells = [...match[1].matchAll(/<td\\b[^>]*>([\\s\\S]*?)<\\/td>/gi)].map(cell =>
-      cell[1].replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/\\s+/g," ").trim()
+  const rows = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(match => {
+    const cells = [...match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(cell =>
+      cell[1].replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/\s+/g," ").trim()
     );
     if (cells.length < 5) return null;
-    const symbol = cells[1].toUpperCase().replace(/[^A-Z0-9.\\-]/g,"");
+    const symbol = cells[1].toUpperCase().replace(/[^A-Z0-9.\-]/g,"");
     const cap = Number(cells[2].replace(/,/g,""));
     if (!symbol || !Number.isFinite(cap)) return null;
     return {symbol,name:cells[0],marketCapMillions:cap,priceDate:cells[3],quarterDate:cells[4]};
