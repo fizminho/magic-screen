@@ -315,6 +315,17 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname==="/api/pipeline/status" && request.method==="GET") {
+      try {
+        await ensureSchema(env);
+        const market=url.searchParams.get("market")==="US" ? "US" : "MY";
+        const quotes=await env.DB.prepare("SELECT MAX(updated_at) AS last_updated FROM stock_snapshot WHERE market=?").bind(market).first<any>();
+        if (market==="MY") return json({market,last_quote_sync:quotes?.last_updated??null});
+        const mfi=await env.DB.prepare("SELECT source_updated_at,price_date,quarter_date,result_count,minimum_market_cap,selected_count FROM mfi_screening_meta WHERE id=1").first<any>();
+        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        return json({market,last_quote_sync:quotes?.last_updated??null,mfi_last_sync:mfi?.source_updated_at??null,mfi_price_date:mfi?.price_date??null,mfi_quarter_date:mfi?.quarter_date??null,mfi_count:mfi?.result_count??0,mfi_minimum_market_cap:mfi?.minimum_market_cap??null,mfi_selected_count:mfi?.selected_count??null,sec});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
+    }
     if (url.pathname==="/api/fundamentals/status" && request.method==="GET") {
       try {
         await ensureSchema(env);
