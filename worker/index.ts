@@ -263,6 +263,47 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       ? {status:"matched_to_sec_fact",tag:match.tag,value:match.value,label:match.label,kind:match.kind}
       : {status:"rejected",tag:selected.tag,value:selected.value,reason:"AI selection did not exactly match a supplied same-accession SEC fact"};
   }
+  // INTENTIONAL: Company Facts omits issuer-specific extension taxonomies. Read the filing's
+  // extracted XBRL instance separately for diagnostic visibility only; these facts are not
+  // passed to Gemini, calculations, or ranking until their labels and contexts are reviewed.
+  const filingBase="https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/";
+  const instanceResponse=await fetch(filingBase+"hrb-20260630_htm.xml",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}});
+  let instanceOperatingFacts:any[]=[];
+  if(instanceResponse.ok) {
+    const xml=await instanceResponse.text();
+    const contexts=new Map<string,{start:string|null;end:string;hasDimensions:boolean}>();
+    for(const match of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?context\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?context>/gi)) {
+      const id=match[1].match(/\\bid=["']([^"']+)["']/i)?.[1];
+      const body=match[2];
+      const start=body.match(/<(?:[A-Za-z0-9_-]+:)?startDate>([^<]+)</i)?.[1]??null;
+      const end=body.match(/<(?:[A-Za-z0-9_-]+:)?endDate>([^<]+)</i)?.[1]??body.match(/<(?:[A-Za-z0-9_-]+:)?instant>([^<]+)</i)?.[1];
+      if(id && end) contexts.set(id,{start,end,hasDimensions:/<(?:[A-Za-z0-9_-]+:)?(?:explicitMember|typedMember)\\b/i.test(body)});
+    }
+    const usdUnits=new Set<string>();
+    for(const match of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?unit\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?unit>/gi)) {
+      const id=match[1].match(/\\bid=["']([^"']+)["']/i)?.[1];
+      if(id && /iso4217:USD/i.test(match[2])) usdUnits.add(id);
+    }
+    for(const match of xml.matchAll(/<([A-Za-z][\\w.-]*):([A-Za-z][\\w.-]*)\\b([^>]*)>([\\s\\S]*?)<\\/\\1:\\2>/g)) {
+      const prefix=match[1],tag=match[2],attrs=match[3],raw=match[4];
+      if(!/revenue|operating|expense|cost|income/i.test(tag)) continue;
+      const contextId=attrs.match(/\\bcontextRef=["']([^"']+)["']/i)?.[1];
+      const unitId=attrs.match(/\\bunitRef=["']([^"']+)["']/i)?.[1];
+      if(!contextId || !unitId || !usdUnits.has(unitId)) continue;
+      const context=contexts.get(contextId);
+      if(!context || context.end!==anchor.end || context.hasDimensions || !context.start) continue;
+      const days=(Date.parse(context.end)-Date.parse(context.start))/86400000;
+      if(days<330 || days>400) continue;
+      const textValue=raw.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+      if(!/^-?\\d+(?:\\.\\d+)?$/.test(textValue)) continue;
+      const scale=Number(attrs.match(/\\bscale=["'](-?\\d+)["']/i)?.[1]??0);
+      const sign=attrs.match(/\\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
+      const value=Number(textValue)*Math.pow(10,scale)*sign;
+      if(!Number.isFinite(value)) continue;
+      instanceOperatingFacts.push({tag:prefix+":"+tag,value,start:context.start,end:context.end,kind:"annual",source:"SEC extracted XBRL instance",context:contextId});
+    }
+    instanceOperatingFacts=instanceOperatingFacts.slice(0,200);
+  }
   // INTENTIONAL: expose relevant annual filing facts for human review, not as accepted EBIT.
   // This lets us inspect candidate revenue/expense concepts without letting the model calculate or rank.
   // INTENTIONAL: build the review list from all same-accession candidates, not only
@@ -273,7 +314,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
       return score(a)-score(b)||a.tag.localeCompare(b.tag);
     }).slice(0,100);
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,related_operating_facts:relatedOperatingFacts,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
