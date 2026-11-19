@@ -325,7 +325,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
       return score(a)-score(b)||a.tag.localeCompare(b.tag);
     }).slice(0,100);
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
