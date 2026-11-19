@@ -129,7 +129,7 @@ export default {
             const rawSymbol = String(r.symbol || "").trim().toUpperCase();
             const symbol = rawSymbol && !rawSymbol.endsWith(".KL") ? rawSymbol + ".KL" : rawSymbol;
             const companyName = String(r.company_name || r.name || "").trim();
-            if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\\.KL$/.test(symbol) || !companyName) return null;
+            if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\.KL$/.test(symbol) || !companyName) return null;
             return env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,sector,listing_status,source,source_updated_at) VALUES (?, 'MY', ?, 'MYR', ?, ?, ?, ?, ?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,sector=excluded.sector,listing_status=excluded.listing_status,source=excluded.source,source_updated_at=excluded.source_updated_at").bind(symbol,companyName,String(r.exchange || "BURSA"),r.sector || null,r.listing_status || "active",String(payload.source || "Bursa directory import"),now);
           }).filter(Boolean) as D1PreparedStatement[];
           if (batch.length) { await env.DB.batch(batch); imported += batch.length; }
