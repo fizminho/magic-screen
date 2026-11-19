@@ -68,15 +68,15 @@ async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   let updated=0, failed=0;
   const markets = onlyMarket ? [onlyMarket] : ["MY","US"];
   for (const market of markets) {
-    const candidates = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name AS name,m.currency FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY CASE WHEN q.updated_at IS NULL THEN 0 ELSE 1 END,q.updated_at ASC,m.symbol ASC LIMIT 40").bind(market).all();
+    const candidates = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name AS name,m.currency FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY CASE WHEN q.updated_at IS NULL THEN 0 ELSE 1 END,q.updated_at ASC,m.symbol ASC LIMIT 40").bind(market).all<any>();
     for (const item of candidates.results) {
       try {
         const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(item.symbol)+"?range=5d&interval=1d";
         const res = await fetch(url,{headers:{"User-Agent":"Mozilla/5.0 MagicScreen/0.1"}});
         if (!res.ok) throw new Error("Quote provider HTTP "+res.status);
-        const payload = await res.json();
+        const payload: any = await res.json();
         const result = payload?.chart?.result?.[0], meta = result?.meta, quote = result?.indicators?.quote?.[0];
-        const closes = (quote?.close ?? []).filter(v=>typeof v==="number");
+        const closes = (quote?.close ?? []).filter((v:any)=>typeof v==="number");
         const price = typeof meta?.regularMarketPrice==="number" ? meta.regularMarketPrice : closes.at(-1) ?? null;
         const previous = typeof meta?.chartPreviousClose==="number" ? meta.chartPreviousClose : closes.length>1 ? closes.at(-2) : null;
         const change = price!=null && previous ? ((price-previous)/previous)*100 : null;
@@ -95,16 +95,16 @@ async function syncUsUniverse(env: Env) {
   await ensureSchema(env);
   const response = await fetch("https://www.sec.gov/files/company_tickers_exchange.json",{headers:{"User-Agent":"MagicScreen/0.1 contact support@binalah.co"}});
   if (!response.ok) throw new Error("SEC directory HTTP "+response.status);
-  const payload = await response.json();
+  const payload: any = await response.json();
   const fields = payload.fields ?? [];
   const ix = {name:fields.indexOf("name"),ticker:fields.indexOf("ticker"),exchange:fields.indexOf("exchange")};
   if (Object.values(ix).some(i=>i<0)) throw new Error("Unexpected SEC directory format");
   const exchanges = new Set(["Nasdaq","NYSE","NYSE American","NYSE Arca","Cboe","Cboe BZX"]);
-  const rows = (payload.data ?? []).filter(r=>exchanges.has(String(r[ix.exchange])) && /^[A-Z][A-Z0-9.-]{0,9}$/.test(String(r[ix.ticker] ?? "")) && String(r[ix.name] ?? "").trim().length>0);
+  const rows = (payload.data ?? []).filter((r:any[])=>exchanges.has(String(r[ix.exchange])) && /^[A-Z][A-Z0-9.-]{0,9}$/.test(String(r[ix.ticker] ?? "")) && String(r[ix.name] ?? "").trim().length>0);
   const now = new Date().toISOString();
   let imported=0;
   for (let i=0;i<rows.length;i+=80) {
-    const batch = rows.slice(i,i+80).map(r=>env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD',?,'active','SEC company_tickers_exchange.json',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,source=excluded.source,source_updated_at=excluded.source_updated_at,listing_status='active'").bind(String(r[ix.ticker]).trim().toUpperCase(),String(r[ix.name]).trim(),String(r[ix.exchange]),now));
+    const batch = rows.slice(i,i+80).map((r:any[])=>env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD',?,'active','SEC company_tickers_exchange.json',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,source=excluded.source,source_updated_at=excluded.source_updated_at,listing_status='active'").bind(String(r[ix.ticker]).trim().toUpperCase(),String(r[ix.name]).trim(),String(r[ix.exchange]),now));
     await env.DB.batch(batch);
     imported+=batch.length;
   }
