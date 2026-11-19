@@ -36,7 +36,7 @@ export default function App() {
   useEffect(() => { void load(); }, [market]);
 
   const rows = useMemo(() => {
-    const base = stocks.length ? stocks : universe.filter(x => x.market === market).map(x => ({
+    const base = universe.filter(x => x.market === market).map(x => stocks.find(s => s.symbol === x.symbol) ?? ({
       symbol:x.symbol, market:x.market, company_name:x.name, currency:x.currency, price:null, change_percent:null,
       market_cap:null, earnings_yield:null, return_on_capital:null, magic_formula_rank:null,
       shariah_status:"unverified" as const, shariah_source:null, shariah_as_of:null, data_status:"awaiting_sync",
