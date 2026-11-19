@@ -318,13 +318,15 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const periodAgeDays=periodEnd ? (Date.now()-Date.parse(periodEnd+"T00:00:00Z"))/86400000 : null;
       // INTENTIONAL: keep old SEC facts for diagnostics, but never calculate or rank them as current fundamentals.
       const staleFiscalPeriod=periodAgeDays!=null && periodAgeDays>maxAnnualPeriodAgeDays;
-      // INTENTIONAL: accept directly reported operating income only. Do not backsolve EBIT from\
-      // pretax income plus interest because non-operating gains/losses can also be present.\n      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"],periodEnd,periodAccession,true) : {value:null,tag:null,filed:null};
+      // INTENTIONAL: accept directly reported operating income only. Do not backsolve EBIT from
+      // pretax income plus interest because non-operating gains/losses can also be present.
+      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"],periodEnd,periodAccession,true) : {value:null,tag:null,filed:null};
       const assets=periodEnd ? secFactValue(facts,["AssetsCurrent","CurrentAssets"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent","CurrentLiabilities"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet","PropertyPlantAndEquipment"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
-      // INTENTIONAL: exclude combined restricted/unrestricted cash concepts from EV.\
-      // If unrestricted cash is not separately reported, leave the input missing rather than overstate liquidity.\n      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashAndCashEquivalents"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      // INTENTIONAL: exclude combined restricted/unrestricted cash concepts from EV.
+      // If unrestricted cash is not separately reported, leave the input missing rather than overstate liquidity.
+      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashAndCashEquivalents"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","BorrowingsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
