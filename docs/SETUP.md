@@ -25,7 +25,7 @@
 
 ## Automatic refresh
 
-Two Cron Triggers run separate batches to stay within Cloudflare's per-invocation subrequest limits: Bursa Malaysia at 22:17 UTC Sunday to Thursday (06:17 Malaysia time, Monday to Friday), and US equities at 22:47 UTC Monday to Friday (17:47 US Eastern time during standard time). Provider throttling or market holidays can result in partial updates.
+Two Cron Triggers run separate batches to stay within Cloudflare's per-invocation subrequest limits: Bursa Malaysia at 22:17 UTC Sunday to Thursday (06:17 Malaysia time, Monday to Friday), and US equities at 22:47 UTC Monday to Friday (17:47 US Eastern time during standard time, 18:47 during daylight time). Provider throttling or market holidays can result in partial updates.
 
 The initial quote adapter uses Yahoo Finance's chart endpoint for indicative market quotes. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution price feed. The scheduled refresh does not fetch financial statements.
 
