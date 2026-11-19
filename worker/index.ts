@@ -234,7 +234,10 @@ async function syncUsFundamentals(env:Env, limit=10) {
   // candidate must have complete, usable inputs or all ranks remain blank.
   if(totals?.total>0 && totals.valid===totals.total) {
     const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
-    for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US'").bind(row.combined_rank,row.symbol).run();
+    // INTENTIONAL: only write rank rows when the calculated rank actually changes.
+    // The SEC cron runs every ten minutes; unconditional updates would consume D1's
+    // daily row-write allowance even when the underlying fundamentals are unchanged.
+    for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US' AND magic_formula_rank IS NOT ?").bind(row.combined_rank,row.symbol,row.combined_rank).run();
     ranked=rankedRows.results.length;
   }
   const remaining=Math.max(0,(totals?.total??0)-(totals?.valid??0));
@@ -297,8 +300,8 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   const now = new Date().toISOString();
   for (let i=0;i<rows.length;i+=40) {
     await env.DB.batch(rows.slice(i,i+40).flatMap(row=>[
-      env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD','Magic Formula Investing','active','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,listing_status='active',source=excluded.source,source_updated_at=excluded.source_updated_at").bind(row.symbol,row.name,now),
-      env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,market_cap,shariah_status,data_status,provider,updated_at) VALUES (?,'US',?,'USD',?,'unverified','mfi_screened','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,market_cap=excluded.market_cap,updated_at=excluded.updated_at").bind(row.symbol,row.name,row.marketCapMillions*1000000,now)
+      env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD','Magic Formula Investing','active','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,listing_status='active',source=excluded.source,source_updated_at=excluded.source_updated_at WHERE stock_master.company_name IS NOT excluded.company_name OR stock_master.exchange IS NOT excluded.exchange OR stock_master.listing_status IS NOT 'active' OR stock_master.source_updated_at IS NOT excluded.source_updated_at").bind(row.symbol,row.name,now),
+      env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,market_cap,shariah_status,data_status,provider,updated_at) VALUES (?,'US',?,'USD',?,'unverified','mfi_screened','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,market_cap=excluded.market_cap,updated_at=excluded.updated_at WHERE stock_snapshot.company_name IS NOT excluded.company_name OR stock_snapshot.market_cap IS NOT excluded.market_cap").bind(row.symbol,row.name,row.marketCapMillions*1000000,now)
     ]));
   }
   const activeSymbols = rows.map(row=>row.symbol);
