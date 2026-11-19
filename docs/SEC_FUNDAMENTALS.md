@@ -7,8 +7,8 @@ The US screener uses SEC EDGAR Company Facts as its primary financial-statement 
 1. The Worker maps the active Magic Formula Investing tickers to SEC CIK identifiers using the SEC company ticker/exchange directory.
 2. It fetches each company's Company Facts JSON from `/api/xbrl/companyfacts/CIK##########.json`.
 3. It selects the latest available annual 10-K, 20-F, or 40-F Operating Income (EBIT), then reads balance-sheet facts for the same fiscal period.
-4. It stores the extracted facts and calculated ratios in D1. Company facts are refreshed after 30 days; ticker mappings are refreshed weekly and when new MFI candidates have no mapping.
-5. The UI processes up to eight companies per US screener load/refresh so a single Worker request does not fan out across the entire universe.
+4. It stores the extracted facts and calculated ratios in D1. Successfully calculated company facts are refreshed after 30 days; incomplete/provider-error cases are retried after seven days. Ticker mappings are refreshed weekly and when new MFI candidates have no mapping.
+5. A Cloudflare Cron Trigger runs every 10 minutes and processes up to 10 companies per invocation. This works independently of browser visits, so the first 30/50-company universe is populated progressively in the background. The UI only reads the latest sync status; it does not fetch SEC facts itself.
 
 ## Initial Magic Formula calculations
 
@@ -22,12 +22,12 @@ The SEC data is not a pre-calculated Magic Formula ranking. The Worker calculate
 
 ## Endpoint
 
-`GET /api/fundamentals/sync?limit=8`
+`GET /api/fundamentals/sync?limit=10`
 
-- `limit`: number of companies to process in this request, capped at 10.
-- The response reports processed, calculated, failed, remaining, and ranked counts.
-- The endpoint is called by the US screener after the MFI universe is available.
-- A company with missing required XBRL facts is recorded as incomplete and retried after 30 days. Provider errors are recorded and also retried after the same interval.
+- `limit`: number of companies to process in a request, capped at 10. This endpoint remains available for controlled/manual diagnostics, but the UI does not call it during normal page loads.
+- `GET /api/fundamentals/status` reports total MFI candidates, calculated companies, unmapped tickers, incomplete facts, provider errors, and the latest update time.
+- The scheduled job processes up to 10 companies every 10 minutes. A 30-company universe normally takes about 30 minutes and a 50-company universe about 50 minutes to work through, assuming successful SEC responses. No repeated page refresh is required.
+- A company with missing required XBRL facts or a provider error is retried after seven days; successful calculations are refreshed after 30 days.
 
 ## Important limitations
 
