@@ -320,6 +320,21 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   // INTENTIONAL: inspect presentation linkbase placement as diagnostic evidence only.
   // A concept role helps establish accounting meaning; reconciliation alone is insufficient.
   const presentationFile=filingFiles.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_pre.xml"));
+  // INTENTIONAL: resolve presentation role URIs to filing-defined descriptions where available.
+  // The URI alone is opaque; the schema roleType definition helps reviewers identify the statement.
+  const schemaFile=filingFiles.find((x:any)=>String(x.name??"").toLowerCase().endsWith(".xsd"));
+  const schemaResponse=schemaFile?.name
+    ? await fetch(filingBase+encodeURIComponent(String(schemaFile.name)),{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}})
+    : new Response("SEC filing schema not found",{status:404});
+  const roleDefinitions=new Map<string,string>();
+  if(schemaResponse.ok) {
+    const schemaXml=await schemaResponse.text();
+    for(const roleMatch of schemaXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?roleType\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?roleType>/gi)) {
+      const roleUri=roleMatch[1].match(/\\broleURI=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1];
+      const definition=roleMatch[2].match(/<(?:[A-Za-z0-9_-]+:)?definition>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?definition>/i)?.[1]?.replace(/<[^>]*>/g,"").trim();
+      if(roleUri&&definition) roleDefinitions.set(roleUri,definition);
+    }
+  }
   const labelFile=filingFiles.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_lab.xml"));
   const presentationResponse=presentationFile?.name
     ? await fetch(filingBase+encodeURIComponent(String(presentationFile.name)),{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}})
@@ -374,7 +389,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
         })
         .filter((x:any)=>!!x.from&&!!x.to&&(x.from===target.label||x.to===target.label))
         .map((x:any)=>({parent:x.from?locatorByLabel.get(x.from)??null:null,child:x.to?locatorByLabel.get(x.to)??null:null,order:x.order,preferred_label:x.preferred_label}));
-      costsAndExpensesPresentation.push({role,concept:target.href.split("#").pop(),presentation_relationships:relatedArcs});
+      costsAndExpensesPresentation.push({role,role_definition:role?roleDefinitions.get(role)??null:null,concept:target.href.split("#").pop(),presentation_relationships:relatedArcs});
     }
   }
   // INTENTIONAL: diagnostic reconciliation only, never a production EBIT input.
@@ -419,7 +434,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
       return score(a)-score(b)||a.tag.localeCompare(b.tag);
     }).slice(0,100);
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,presentation_document:presentationFile?.name??null,presentation_status:presentationResponse.ok?"loaded":"unavailable_http_"+presentationResponse.status,label_document:labelFile?.name??null,label_status:labelResponse.ok?"loaded":"unavailable_http_"+labelResponse.status,costs_and_expenses_labels:costsAndExpensesLabels,costs_and_expenses_presentation:costsAndExpensesPresentation,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,presentation_document:presentationFile?.name??null,presentation_status:presentationResponse.ok?"loaded":"unavailable_http_"+presentationResponse.status,schema_document:schemaFile?.name??null,schema_status:schemaResponse.ok?"loaded":"unavailable_http_"+schemaResponse.status,label_document:labelFile?.name??null,label_status:labelResponse.ok?"loaded":"unavailable_http_"+labelResponse.status,costs_and_expenses_labels:costsAndExpensesLabels,costs_and_expenses_presentation:costsAndExpensesPresentation,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
