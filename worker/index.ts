@@ -330,11 +330,24 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   const costsAndExpensesLabels:any[]=[];
   if(labelResponse.ok) {
     const labelXml=await labelResponse.text();
-    for(const resource of labelXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?label\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?label>/gi)) {
-      const attrs=resource[1];
-      const role=attrs.match(/(?:xlink:)?role=["\x27]([^"\x27]+)["\x27]/i)?.[1]??null;
-      const textValue=resource[2].replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
-      if(textValue) costsAndExpensesLabels.push({role,label:textValue});
+    for(const linkMatch of labelXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?labelLink\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?labelLink>/gi)) {
+      const body=linkMatch[2];
+      const locators=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\b([^>]*)\/?\s*>/gi)].map((m:any)=>({label:m[1].match(/(?:xlink:)?label=["\x27]([^"\x27]+)["\x27]/i)?.[1]??"",href:m[1].match(/(?:xlink:)?href=["\x27]([^"\x27]+)["\x27]/i)?.[1]??""}));
+      const target=locators.find(x=>/#(?:us-gaap_)?CostsAndExpenses(?:$|[^A-Za-z])/i.test(x.href));
+      if(!target) continue;
+      const resources=new Map<string,any>();
+      for(const resource of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?label\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?label>/gi)) {
+        const attrs=resource[1];
+        const resourceLabel=attrs.match(/(?:xlink:)?label=["\x27]([^"\x27]+)["\x27]/i)?.[1];
+        const role=attrs.match(/(?:xlink:)?role=["\x27]([^"\x27]+)["\x27]/i)?.[1]??null;
+        const textValue=resource[2].replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+        if(resourceLabel&&textValue) resources.set(resourceLabel,{role,label:textValue});
+      }
+      for(const arc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?labelArc\b([^>]*)\/?\s*>/gi)) {
+        const from=arc[1].match(/(?:xlink:)?from=["\x27]([^"\x27]+)["\x27]/i)?.[1];
+        const to=arc[1].match(/(?:xlink:)?to=["\x27]([^"\x27]+)["\x27]/i)?.[1];
+        if(from===target.label&&resources.has(to)) costsAndExpensesLabels.push(resources.get(to));
+      }
     }
   }
   const costsAndExpensesPresentation:any[]=[];
