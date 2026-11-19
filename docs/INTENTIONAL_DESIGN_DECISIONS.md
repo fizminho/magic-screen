@@ -61,3 +61,6 @@ When changing one of these behaviours, update this document and the related inli
 - **The diagnostic input is bounded.** Only a maximum of 500 same-accession USD concepts are sent to the model, prioritised by financial-statement-related labels. If a required concept is not in that set or cannot be mapped safely, it remains missing.
 - **Short-term AI extraction flags must remain explicit.** If AI-derived data is later surfaced in a stock card, use a short label such as `AI REVIEW` and explain that it is not yet eligible for the Magic Formula. Never label model output as verified solely because it matches a supplied fact.
 
+
+
+- **Gemini JSON must satisfy the full extraction contract.** A response is not accepted merely because it parses as a JSON object. All six required fields must be present with the expected nullable tag/value and reason shape; partial or malformed objects are retried and then passed to the next Flash-Lite model. This prevents an empty or truncated-but-parseable response from being reported as a successful diagnostic.
