@@ -119,14 +119,20 @@ export default {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
+        await ensureSchema(env);
         const payload: any = await request.json();
         if (!Array.isArray(payload.rows) || payload.rows.length > 5000) return json({error:"Expected rows array, maximum 5000"},400);
         const now = new Date().toISOString();
         let imported = 0;
         for (let i=0; i<payload.rows.length; i+=80) {
-          const batch = payload.rows.slice(i,i+80).map((r: any) => env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,sector,listing_status,source,source_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,sector=excluded.sector,listing_status=excluded.listing_status,source=excluded.source,source_updated_at=excluded.source_updated_at").bind(String(r.symbol || "").trim().toUpperCase(),"MY",String(r.company_name || r.name || "").trim(),"MYR",String(r.exchange || "BURSA"),r.sector || null,r.listing_status || "active",String(payload.source || "Bursa directory import"),now));
-          await env.DB.batch(batch);
-          imported += batch.length;
+          const batch = payload.rows.slice(i,i+80).map((r: any) => {
+            const rawSymbol = String(r.symbol || "").trim().toUpperCase();
+            const symbol = rawSymbol && !rawSymbol.endsWith(".KL") ? rawSymbol + ".KL" : rawSymbol;
+            const companyName = String(r.company_name || r.name || "").trim();
+            if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\\.KL$/.test(symbol) || !companyName) return null;
+            return env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,sector,listing_status,source,source_updated_at) VALUES (?, 'MY', ?, 'MYR', ?, ?, ?, ?, ?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,sector=excluded.sector,listing_status=excluded.listing_status,source=excluded.source,source_updated_at=excluded.source_updated_at").bind(symbol,companyName,String(r.exchange || "BURSA"),r.sector || null,r.listing_status || "active",String(payload.source || "Bursa directory import"),now);
+          }).filter(Boolean) as D1PreparedStatement[];
+          if (batch.length) { await env.DB.batch(batch); imported += batch.length; }
         }
         return json({imported,source:payload.source || "Bursa directory import",asOf:now});
       } catch (e) { return json({error:String(e)},400); }
