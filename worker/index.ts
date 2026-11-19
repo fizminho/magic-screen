@@ -1,5 +1,5 @@
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; }
-const symbols: Record<string, {name:string;market:"MY"|"US";currency:string}[]> = {
+const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
     {symbol:"1155.KL",name:"Maybank",market:"MY",currency:"MYR"},{symbol:"1295.KL",name:"Public Bank",market:"MY",currency:"MYR"},
     {symbol:"1023.KL",name:"CIMB Group",market:"MY",currency:"MYR"},{symbol:"5183.KL",name:"Petronas Chemicals",market:"MY",currency:"MYR"},
