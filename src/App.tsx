@@ -33,10 +33,17 @@ export default function App() {
   async function load(forceMfiSync = false) {
     setLoading(true);
     try {
+      let fundamentalsStatus = "";
       if (market === "US") {
         const syncResponse = await fetch("/api/mfi/screen?minimumMarketCap=" + minimumMarketCap + "&select30=" + (mfiCount === 30) + (forceMfiSync ? "&force=1" : ""));
         const syncData = await syncResponse.json() as {error?:string;imported?:number};
         if (!syncResponse.ok) throw new Error(syncData.error || "Magic Formula screening failed");
+        // Process a small SEC batch on each visit. Remaining companies are picked up on later refreshes.
+        const fundamentalsResponse = await fetch("/api/fundamentals/sync?limit=8");
+        if (fundamentalsResponse.ok) {
+          const fundamentalsData = await fundamentalsResponse.json() as {processed?:number;calculated?:number;remaining?:number;ranked?:number};
+          fundamentalsStatus = " · SEC fundamentals " + (fundamentalsData.calculated ?? 0) + " calculated, " + (fundamentalsData.remaining ?? 0) + " pending";
+        }
       }
       const response = await fetch(`/api/stocks?market=${market}&refresh=1`);
       if (!response.ok) throw new Error("API unavailable");
@@ -48,7 +55,7 @@ export default function App() {
         if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
       }
       setUpdatedAt(data.updatedAt);
-      setSourceStatus(data.refresh?.failed ? "Quote provider failed for "+data.refresh.failed+" symbols" : data.refresh?.remaining ? "Quotes updated; "+data.refresh.remaining+" still pending" : data.sourceStatus ?? "Connected");
+      setSourceStatus((data.refresh?.failed ? "Quote provider failed for "+data.refresh.failed+" symbols" : data.refresh?.remaining ? "Quotes updated; "+data.refresh.remaining+" still pending" : data.sourceStatus ?? "Connected") + fundamentalsStatus);
     } catch (error) {
       setStocks([]);
       setMarketUniverse(market === "US" ? [] : universe.filter(x => x.market === market));
