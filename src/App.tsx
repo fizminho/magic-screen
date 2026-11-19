@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownUp, ArrowUpRight, Bell, ChevronDown, CircleHelp, Clock3, Database, Filter, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp } from "lucide-react";
+import { Activity, ArrowDownUp, ArrowUpRight, Bell, ChevronDown, CircleHelp, Clock3, Database, Filter, Menu, RefreshCw, Search, ShieldCheck, Sparkles, TrendingUp, X } from "lucide-react";
 import { universe } from "./data/universe";
 import type { ApiResponse, Market, Stock } from "./types";
 
@@ -18,7 +18,7 @@ export default function App() {
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);\n  const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 40;
 
@@ -68,14 +68,14 @@ export default function App() {
   const toggleWatch = (symbol: string) => setWatchlist(old => old.includes(symbol) ? old.filter(x=>x!==symbol) : [...old,symbol]);
 
   return <div className="app-shell">
-    <aside className="sidebar">
+    <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
       <a className="brand" href="#"><span className="brand-mark"><TrendingUp size={19}/></span><span>magic<span className="brand-light">screen</span><small>INVESTMENT RESEARCH</small></span></a>
       <div className="side-label">WORKSPACE</div>
-      <button className="side-link active" onClick={()=>setTab("all")}><Activity size={17}/> Screener <span className="side-dot"/></button>
-      <button className="side-link" onClick={()=>setTab("watchlist")}><Bell size={17}/> Watchlist <span className="side-count">{watchlist.length}</span></button>
+      <button className="side-link active" onClick={()=>{setTab("all");setMenuOpen(false);}}><Activity size={17}/> Screener <span className="side-dot"/></button>
+      <button className="side-link" onClick={()=>{setTab("watchlist");setMenuOpen(false);}}><Bell size={17}/> Watchlist <span className="side-count">{watchlist.length}</span></button>
       <div className="side-label side-gap">MARKETS</div>
-      <button className={`side-link ${market==="MY"?"market-active":""}`} onClick={()=>setMarket("MY")}><span className="flag">🇲🇾</span> Bursa Malaysia</button>
-      <button className={`side-link ${market==="US"?"market-active":""}`} onClick={()=>setMarket("US")}><span className="flag">🇺🇸</span> United States</button>
+      <button className={`side-link ${market==="MY"?"market-active":""}`} onClick={()=>{setMarket("MY");setMenuOpen(false);}}><span className="flag">🇲🇾</span> Bursa Malaysia</button>
+      <button className={`side-link ${market==="US"?"market-active":""}`} onClick={()=>{setMarket("US");setMenuOpen(false);}}><span className="flag">🇺🇸</span> United States</button>
       <div className="sidebar-bottom">
         <div className="status-card"><span className="status-icon"><Database size={15}/></span><div><b>Data pipeline</b><small>{sourceStatus}</small></div><span className={`pulse ${available ? "live":""}`}/></div>
         <div className="profile"><div className="avatar">MS</div><div><b>Magic Screen</b><small>Personal workspace</small></div><ChevronDown size={15}/></div>
