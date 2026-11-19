@@ -159,7 +159,8 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   await env.DB.prepare("INSERT INTO mfi_screening_meta (id,minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET minimum_market_cap=excluded.minimum_market_cap,selected_count=excluded.selected_count,result_count=excluded.result_count,source_updated_at=excluded.source_updated_at,price_date=excluded.price_date,quarter_date=excluded.quarter_date").bind(minimumMarketCap,select30?30:50,rows.length,now,rows[0]?.priceDate ?? null,rows[0]?.quarterDate ?? null).run();
   return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,stocks:rows};
 }
-\nexport default {
+
+export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname==="/api/mfi/screen") {
