@@ -107,27 +107,6 @@ async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   await env.DB.prepare("UPDATE refresh_log SET completed_at=?,status=?,message=? WHERE id=?").bind(new Date().toISOString(),failed===0?"success":"partial","Updated "+updated+"; failed "+failed+"; stale or missing "+(remaining?.count ?? 0),log.meta.last_row_id).run();
   return {updated,failed,remaining:remaining?.count ?? 0,batchSize:40};
 }
-async function syncUsUniverse(env: Env) {
-  await ensureSchema(env);
-  const response = await fetch("https://www.sec.gov/files/company_tickers_exchange.json",{headers:{"User-Agent":"MagicScreen/0.1 contact support@binalah.co"}});
-  if (!response.ok) throw new Error("SEC directory HTTP "+response.status);
-  const payload: any = await response.json();
-  const fields = payload.fields ?? [];
-  const ix = {name:fields.indexOf("name"),ticker:fields.indexOf("ticker"),exchange:fields.indexOf("exchange")};
-  if (Object.values(ix).some(i=>i<0)) throw new Error("Unexpected SEC directory format");
-  const exchanges = new Set(["Nasdaq","NYSE","NYSE American","NYSE Arca","Cboe","Cboe BZX"]);
-  const rows = (payload.data ?? []).filter((r:any[])=>exchanges.has(String(r[ix.exchange])) && /^[A-Z][A-Z0-9.-]{0,9}$/.test(String(r[ix.ticker] ?? "")) && String(r[ix.name] ?? "").trim().length>0);
-  const now = new Date().toISOString();
-  let imported=0;
-  for (let i=0;i<rows.length;i+=80) {
-    const batch = rows.slice(i,i+80).map((r:any[])=>env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD',?,'active','SEC company_tickers_exchange.json',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,source=excluded.source,source_updated_at=excluded.source_updated_at,listing_status='active'").bind(String(r[ix.ticker]).trim().toUpperCase(),String(r[ix.name]).trim(),String(r[ix.exchange]),now));
-    await env.DB.batch(batch);
-    imported+=batch.length;
-  }
-  const total = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master WHERE market='US' AND listing_status='active'").first();
-  return {imported,total:total?.count ?? imported,source:"SEC company_tickers_exchange.json",asOf:now,note:"SEC states this directory does not guarantee accuracy or complete exchange coverage."};
-}
-
 // INTENTIONAL: MFI market cap is USD. Keep SEC inputs USD-only until explicit FX conversion
 // (with a dated, auditable rate source) exists; missing local-currency facts must stay unavailable.
 function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean): {value:number|null;tag:string|null;filed:string|null} {
@@ -392,9 +371,10 @@ export default {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
         await ensureSchema(env);
-        const sync = market==="US" && url.searchParams.get("sync")==="1" ? await syncUsUniverse(env) : null;
+        // INTENTIONAL: this is a read-only legacy/master-data endpoint. US candidate selection belongs to MFI;
+        // never repopulate the displayed US universe from the broad SEC ticker directory.
         const result = await env.DB.prepare("SELECT * FROM stock_master WHERE market=? AND listing_status='active' ORDER BY company_name").bind(market).all();
-        return json({market,stocks:result.results,count:result.results.length,sync});
+        return json({market,stocks:result.results,count:result.results.length});
       } catch (e) { return json({market,stocks:[],count:0,error:String(e)},502); }
     }
     if (url.pathname==="/api/stocks") {
