@@ -276,3 +276,7 @@
   .source-cell { max-width:none; }
   .metric-cell { font-size:11px; }
 }
+
+@media (max-width:760px) {
+  tbody td:nth-child(7) { grid-column:auto; padding:0; }
+}
