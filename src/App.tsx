@@ -25,7 +25,7 @@ export default function App() {
   async function load(refresh = false) {
     setLoading(true);
     try {
-      if (refresh && market === "US") {
+      if (market === "US") {
         const syncResponse = await fetch("/api/universe?market=US&sync=1");
         if (!syncResponse.ok) throw new Error("US universe sync failed");
       }
