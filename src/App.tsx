@@ -165,7 +165,7 @@ export default function App() {
         <div className="pipeline-meta">
           {market==="US" ? <>
             <div><span>MFI UNIVERSE SYNC</span><b>{dateTime(pipeline?.mfi_last_sync)}</b><small>{pipeline?.mfi_count ?? 0} candidates · Price date {pipeline?.mfi_price_date ?? "—"} · Quarter data {pipeline?.mfi_quarter_date ?? "—"}</small></div>
-            <div><span>SEC FUNDAMENTALS</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} calculated · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.stale_market_cap ?? 0} valuation refresh pending · {pipeline?.sec?.unmapped ?? 0} unmapped</small></div>
+            <div><span>SEC DATA LAST PROCESSED</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} current · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.stale_market_cap ?? 0} valuation refresh pending · {pipeline?.sec?.unmapped ?? 0} unmapped · {pipeline?.sec?.provider_error ?? 0} provider errors</small></div>
           </> : <div><span>QUOTE CACHE</span><b>{dateTime(pipeline?.last_quote_sync)}</b><small>Latest stored Bursa quote timestamp</small></div>}
         </div>
         <div className="section-title"><div><div className="eyebrow">DISCOVER OPPORTUNITIES</div><h2>{market==="MY"?"Bursa Malaysia":"US Equities"} <span className="sub-count">{rows.length} companies</span></h2></div><div className="method-tag"><Sparkles size={14}/> MAGIC FORMULA</div></div>
