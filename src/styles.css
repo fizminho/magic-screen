@@ -282,3 +282,20 @@
 }
 
 .metric-date { display:block; margin-top:4px; color:#71819c; font:8px "DM Mono"; white-space:nowrap; }
+
+
+/* Short stock-card flag: explicit MFI universe membership, not a formula rank. */
+.intent-flag {
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  margin-top:4px;
+  padding:2px 5px;
+  border:1px solid #3b5135;
+  border-radius:3px;
+  background:#17251f;
+  color:#b8f36b;
+  font:500 7px "DM Mono",monospace;
+  letter-spacing:.55px;
+  line-height:1.35;
+}
