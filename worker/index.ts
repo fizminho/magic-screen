@@ -1,4 +1,4 @@
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
     {symbol:"1155.KL",name:"Maybank",market:"MY",currency:"MYR"},{symbol:"1295.KL",name:"Public Bank",market:"MY",currency:"MYR"},
@@ -112,9 +112,61 @@ async function syncUsUniverse(env: Env) {
   const total = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master WHERE market='US' AND listing_status='active'").first();
   return {imported,total:total?.count ?? imported,source:"SEC company_tickers_exchange.json",asOf:now,note:"SEC states this directory does not guarantee accuracy or complete exchange coverage."};
 }
-export default {
+
+async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true) {
+  await ensureSchema(env);
+  if (!env.MFI_SESSION_COOKIE) throw new Error("Magic Formula session is not configured. Add MFI_SESSION_COOKIE as a Cloudflare Worker secret.");
+  const headers = { "User-Agent":"Mozilla/5.0 (compatible; MagicScreen/1.0)", "Cookie":env.MFI_SESSION_COOKIE };
+  const pageUrl = "https://www.magicformulainvesting.com/Screening/StockScreening";
+  const page = await fetch(pageUrl, {headers, redirect:"follow"});
+  const pageHtml = await page.text();
+  if (!page.ok) throw new Error("Magic Formula page returned HTTP "+page.status);
+  if (/Account\\/LogOn|name=["']Email["']|>\\s*Login\\s*</i.test(page.url+" "+pageHtml)) throw new Error("Magic Formula session expired or is not authenticated. Refresh MFI_SESSION_COOKIE.");
+  const token = pageHtml.match(/name=["']__RequestVerificationToken["'][^>]*value=["']([^"']+)["']/i)?.[1]
+    ?? pageHtml.match(/value=["']([^"']+)["'][^>]*name=["']__RequestVerificationToken["']/i)?.[1];
+  if (!token) throw new Error("Could not find the anti-forgery token. The screening page may have changed.");
+  const form = new URLSearchParams();
+  form.set("MinimumMarketCap",String(minimumMarketCap));
+  form.set("Select30",select30?"true":"false");
+  form.set("stocks","Get Stocks");
+  form.set("__RequestVerificationToken",token);
+  const response = await fetch(pageUrl,{method:"POST",headers:{...headers,"Accept":"*/*","Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest","Referer":pageUrl,"Origin":"https://www.magicformulainvesting.com"},body:form.toString(),redirect:"follow"});
+  const html = await response.text();
+  if (!response.ok) throw new Error("Magic Formula screening returned HTTP "+response.status);
+  if (/Account\\/LogOn|name=["']Email["']|>\\s*Login\\s*</i.test(response.url+" "+html)) throw new Error("Magic Formula rejected the session. Refresh MFI_SESSION_COOKIE.");
+  const table = html.match(/<table\\b[^>]*class=["'][^"']*screeningdata[^"']*["'][^>]*>([\\s\\S]*?)<\\/table>/i)?.[1];
+  if (!table) throw new Error("Could not find the screening results table in Magic Formula response.");
+  const rows = [...table.matchAll(/<tr\\b[^>]*>([\\s\\S]*?)<\\/tr>/gi)].map(match => {
+    const cells = [...match[1].matchAll(/<td\\b[^>]*>([\\s\\S]*?)<\\/td>/gi)].map(cell =>
+      cell[1].replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/\\s+/g," ").trim()
+    );
+    if (cells.length < 5) return null;
+    const symbol = cells[1].toUpperCase().replace(/[^A-Z0-9.\\-]/g,"");
+    const cap = Number(cells[2].replace(/,/g,""));
+    if (!symbol || !Number.isFinite(cap)) return null;
+    return {symbol,name:cells[0],marketCapMillions:cap,priceDate:cells[3],quarterDate:cells[4]};
+  }).filter((row): row is {symbol:string;name:string;marketCapMillions:number;priceDate:string;quarterDate:string} => !!row && !!row.name);
+  if (!rows.length) throw new Error("Magic Formula returned no parseable stock rows.");
+  const now = new Date().toISOString();
+  await env.DB.prepare("UPDATE stock_master SET listing_status='inactive' WHERE market='US'").run();
+  for (let i=0;i<rows.length;i+=80) {
+    await env.DB.batch(rows.slice(i,i+80).map(row=>env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD','Magic Formula Investing','active','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,listing_status='active',source=excluded.source,source_updated_at=excluded.source_updated_at").bind(row.symbol,row.name,now)));
+  }
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS mfi_screening_meta (id INTEGER PRIMARY KEY CHECK(id=1), minimum_market_cap INTEGER NOT NULL, selected_count INTEGER NOT NULL, result_count INTEGER NOT NULL, source_updated_at TEXT NOT NULL, price_date TEXT, quarter_date TEXT)").run();
+  await env.DB.prepare("INSERT INTO mfi_screening_meta (id,minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET minimum_market_cap=excluded.minimum_market_cap,selected_count=excluded.selected_count,result_count=excluded.result_count,source_updated_at=excluded.source_updated_at,price_date=excluded.price_date,quarter_date=excluded.quarter_date").bind(minimumMarketCap,select30?30:50,rows.length,now,rows[0]?.priceDate ?? null,rows[0]?.quarterDate ?? null).run();
+  return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,stocks:rows};
+}
+\nexport default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname==="/api/mfi/screen") {
+      try {
+        const minimumMarketCap = Math.min(5000000,Math.max(50,Number(url.searchParams.get("minimumMarketCap") ?? 50)));
+        const select30 = url.searchParams.get("select30") !== "false";
+        const result = await syncMagicFormulaUniverse(env,minimumMarketCap,select30);
+        return json(result);
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Magic Formula Investing"},503); }
+    }
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
     if (url.pathname==="/api/universe/import-my" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
