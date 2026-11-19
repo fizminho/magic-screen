@@ -306,6 +306,10 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   }).filter((row): row is {symbol:string;name:string;marketCapMillions:number;priceDate:string;quarterDate:string} => !!row && !!row.name);
   if (!rows.length) throw new Error("Magic Formula returned no parseable stock rows.");
   const now = new Date().toISOString();
+  const previousUniverse = await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing' ORDER BY symbol").all<any>();
+  const previousSymbols = previousUniverse.results.map((row:any)=>String(row.symbol)).sort();
+  const nextSymbols = rows.map(row=>row.symbol).sort();
+  const universeChanged = previousSymbols.length!==nextSymbols.length || previousSymbols.some((symbol:string,index:number)=>symbol!==nextSymbols[index]);
   for (let i=0;i<rows.length;i+=40) {
     await env.DB.batch(rows.slice(i,i+40).flatMap(row=>[
       env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD','Magic Formula Investing','active','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,listing_status='active',source=excluded.source,source_updated_at=excluded.source_updated_at WHERE stock_master.company_name IS NOT excluded.company_name OR stock_master.exchange IS NOT excluded.exchange OR stock_master.listing_status IS NOT 'active' OR stock_master.source IS NOT 'Magic Formula Investing'").bind(row.symbol,row.name,now),
@@ -314,6 +318,11 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   }
   const activeSymbols = rows.map(row=>row.symbol);
   await env.DB.prepare("UPDATE stock_master SET listing_status='inactive' WHERE market='US' AND listing_status!='inactive' AND symbol NOT IN ("+activeSymbols.map(()=>"?").join(",")+")").bind(...activeSymbols).run();
+  if(universeChanged) {
+    // INTENTIONAL: any candidate membership change invalidates the previous combined
+    // ranking. SEC ingestion will republish ranks only after the new full universe is ready.
+    await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=NULL WHERE market='US' AND magic_formula_rank IS NOT NULL").run();
+  }
   await env.DB.prepare("INSERT INTO mfi_screening_meta (id,minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET minimum_market_cap=excluded.minimum_market_cap,selected_count=excluded.selected_count,result_count=excluded.result_count,source_updated_at=excluded.source_updated_at,price_date=excluded.price_date,quarter_date=excluded.quarter_date").bind(minimumMarketCap,select30?30:50,rows.length,now,rows[0]?.priceDate ?? null,rows[0]?.quarterDate ?? null).run();
   return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,cached:false,stocks:rows};
 }
