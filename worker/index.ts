@@ -346,7 +346,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       for(const arc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?labelArc\b([^>]*)\/?\s*>/gi)) {
         const from=arc[1].match(/(?:xlink:)?from=["\x27]([^"\x27]+)["\x27]/i)?.[1];
         const to=arc[1].match(/(?:xlink:)?to=["\x27]([^"\x27]+)["\x27]/i)?.[1];
-        if(from===target.label&&resources.has(to)) costsAndExpensesLabels.push(resources.get(to));
+        if(from===target.label&&to&&resources.has(to)) costsAndExpensesLabels.push(resources.get(to));
       }
     }
   }
@@ -372,8 +372,8 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
             preferred_label:attrs.match(/(?:xlink:)?preferredLabel=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1]??null
           };
         })
-        .filter((x:any)=>x.from===target.label||x.to===target.label)
-        .map((x:any)=>({parent:locatorByLabel.get(x.from)??null,child:locatorByLabel.get(x.to)??null,order:x.order,preferred_label:x.preferred_label}));
+        .filter((x:any)=>!!x.from&&!!x.to&&(x.from===target.label||x.to===target.label))
+        .map((x:any)=>({parent:x.from?locatorByLabel.get(x.from)??null:null,child:x.to?locatorByLabel.get(x.to)??null:null,order:x.order,preferred_label:x.preferred_label}));
       costsAndExpensesPresentation.push({role,concept:target.href.split("#").pop(),presentation_relationships:relatedArcs});
     }
   }
