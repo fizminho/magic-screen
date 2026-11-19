@@ -212,9 +212,22 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
             try { parsed=JSON.parse(cleaned.slice(first,last+1)); } catch { parsed=null; }
           }
         }
-        if(parsed && typeof parsed==="object" && !Array.isArray(parsed)) break;
+        // INTENTIONAL: require the complete six-field response contract before accepting
+        // a model result. A syntactically valid but partial object (for example {}) must
+        // trigger retry/fallback instead of being mistaken for a successful extraction.
+        const requiredAiFields=["ebit","current_assets","current_liabilities","net_ppe","total_debt","cash"];
+        const validShape=parsed && typeof parsed==="object" && !Array.isArray(parsed)
+          && requiredAiFields.every((field:string)=> {
+            const value=parsed[field];
+            return value && typeof value==="object" && !Array.isArray(value)
+              && (value.tag===null || typeof value.tag==="string")
+              && (value.value===null || typeof value.value==="number")
+              && typeof value.reason==="string";
+          });
+        if(validShape) break;
+        parsed=null;
         const finishReason=String(candidate?.finishReason??"unknown");
-        geminiErrorDetail="Model returned non-JSON content (finishReason="+finishReason+").";
+        geminiErrorDetail="Model returned invalid or incomplete six-field JSON (finishReason="+finishReason+").";
         if(attempt===0) {
           await new Promise(resolve=>setTimeout(resolve,500));
           continue;
