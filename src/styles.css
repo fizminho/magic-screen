@@ -232,3 +232,11 @@
   .import-dialog { padding:18px; }
   .import-dialog h3 { font-size:18px; }
 }
+
+.mfi-control { display:flex; flex-direction:column; gap:4px; color:#8fa0ba; font:9px "DM Mono"; letter-spacing:.4px; }
+.mfi-control input,.mfi-control select { height:36px; min-width:82px; border:1px solid #34445e; border-radius:6px; background:#111c30; color:#e5edf8; padding:0 8px; font:11px "DM Sans"; }
+@media(max-width:760px) {
+  .heading-actions { flex-wrap:wrap; }
+  .mfi-control { flex:1; min-width:90px; }
+  .mfi-control input,.mfi-control select { width:100%; min-width:0; }
+}
