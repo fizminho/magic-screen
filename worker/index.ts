@@ -329,8 +329,13 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   const hrbInterest=uniqueInstanceFact("InterestExpenseDebt");
   const hrbPretax=uniqueInstanceFact("IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest");
   const reconciliationFacts=[hrbRevenue,hrbCosts,hrbOtherNonoperating,hrbInterest,hrbPretax];
-  let derivedEbitCandidate:any={status:"not_validated",value:null,reason:"Required same-context reported line items were not uniquely available for a complete reconciliation."};
-  if(reconciliationFacts.every(Boolean)) {
+  // INTENTIONAL: this concept combination has only been reviewed for HRB FY2026 accession 0000012659-26-000026.
+  // Never apply the same tag arithmetic to another issuer or another filing until its presentation is independently validated.
+  const isHrbFy2026Target=symbol==="HRB" && anchor.accn==="0000012659-26-000026" && anchor.end==="2026-06-30";
+  let derivedEbitCandidate:any=isHrbFy2026Target
+    ? {status:"not_validated",value:null,scope:"HRB FY2026 10-K only",reason:"Required same-context reported line items were not uniquely available for a complete reconciliation."}
+    : {status:"out_of_scope",value:null,scope:"HRB FY2026 10-K only",reason:"This diagnostic derivation is intentionally restricted to the reviewed HRB FY2026 filing; no EBIT arithmetic is attempted for other issuers or periods."};
+  if(isHrbFy2026Target && reconciliationFacts.every(Boolean)) {
     const [revenue,costs,otherNonoperating,interest,pretax]=reconciliationFacts as any[];
     const sameContext=reconciliationFacts.every((x:any)=>x.context===revenue.context && x.start===revenue.start && x.end===revenue.end);
     const operatingIncome=revenue.value-costs.value;
