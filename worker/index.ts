@@ -49,8 +49,15 @@ async function ensureSchema(env: Env) {
   ]);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS stock_master (symbol TEXT NOT NULL, market TEXT NOT NULL, company_name TEXT NOT NULL, currency TEXT NOT NULL, exchange TEXT, sector TEXT, listing_status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL, source_updated_at TEXT NOT NULL, PRIMARY KEY(symbol,market))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market,company_name)").run();
-  const now = new Date().toISOString();
-  for (const market of ["MY","US"] as const) { for (const item of symbols[market]) { await env.DB.prepare("INSERT OR IGNORE INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,?,?,?,?,'active','curated-starter-universe',?)").bind(item.symbol,item.market,item.name,item.currency,market==="MY"?"BURSA":"NASDAQ/NYSE",now).run(); } }
+  const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master").first<{count:number}>();
+  if (!existing?.count) {
+    const now = new Date().toISOString();
+    const seed = (["MY","US"] as const).flatMap(market => symbols[market].map(item =>
+      env.DB.prepare("INSERT OR IGNORE INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,?,?,?,?,'active','curated-starter-universe',?)")
+        .bind(item.symbol,item.market,item.name,item.currency,market==="MY"?"BURSA":"NASDAQ/NYSE",now)
+    ));
+    await env.DB.batch(seed);
+  }
 }
 async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   await ensureSchema(env);
@@ -110,7 +117,7 @@ export default {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
         await ensureSchema(env);
-        const result = await env.DB.prepare("SELECT * FROM stock_master WHERE market=? ORDER BY company_name").bind(market).all();
+        const result = await env.DB.prepare("SELECT * FROM stock_master WHERE market=? AND listing_status='active' ORDER BY company_name").bind(market).all();
         return json({market,stocks:result.results,count:result.results.length});
       } catch { return json({market,stocks:[],count:0}); }
     }
