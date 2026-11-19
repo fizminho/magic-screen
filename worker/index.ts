@@ -97,7 +97,7 @@ async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
           : typeof meta?.chartPreviousClose==="number" ? meta.chartPreviousClose : null;
         const change = price!=null && previous!=null && previous>0 ? ((price-previous)/previous)*100 : null;
         if (price==null) throw new Error("No quote in provider response");
-        await env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,price,change_percent,shariah_status,data_status,provider,updated_at) VALUES (?,?,?,?,?,?,'unverified','quote_only','Yahoo Finance',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,currency=excluded.currency,price=excluded.price,change_percent=excluded.change_percent,data_status='quote_only',provider=excluded.provider,updated_at=excluded.updated_at").bind(item.symbol,item.market,item.name,item.currency,price,change,new Date().toISOString()).run();
+        await env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,price,change_percent,shariah_status,data_status,provider,updated_at) VALUES (?,?,?,?,?,?,'unverified','quote_only','Yahoo Finance',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,currency=excluded.currency,price=excluded.price,change_percent=excluded.change_percent,data_status=CASE WHEN earnings_yield IS NOT NULL AND return_on_capital IS NOT NULL THEN 'fundamentals_calculated' ELSE 'quote_only' END,provider=excluded.provider,updated_at=excluded.updated_at").bind(item.symbol,item.market,item.name,item.currency,price,change,new Date().toISOString()).run();
         updated++;
       } catch { failed++; }
     }
@@ -151,7 +151,8 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
 async function syncUsFundamentals(env:Env, limit=8) {
   await ensureSchema(env);
   const mapAge=await env.DB.prepare("SELECT MIN(updated_at) AS updated_at,COUNT(*) AS count FROM sec_company_map").first<any>();
-  const mapStale=!mapAge?.count || !mapAge.updated_at || Date.now()-Date.parse(mapAge.updated_at)>7*86400000;
+  const missingMap=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.symbol IS NULL").first<any>();
+  const mapStale=!mapAge?.count || !mapAge.updated_at || Date.now()-Date.parse(mapAge.updated_at)>7*86400000 || (missingMap?.count??0)>0;
   if (mapStale) {
     const response=await fetch("https://www.sec.gov/files/company_tickers_exchange.json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept-Encoding":"gzip, deflate"}});
     if (!response.ok) throw new Error("SEC ticker map returned HTTP "+response.status);
