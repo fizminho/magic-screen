@@ -265,7 +265,14 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   }
   // INTENTIONAL: expose relevant annual filing facts for human review, not as accepted EBIT.
   // This lets us inspect candidate revenue/expense concepts without letting the model calculate or rank.
-  const relatedOperatingFacts=bounded.filter(x=>x.kind==="annual" && /revenue|operating|expense|cost|income/i.test(x.label+" "+x.tag)).slice(0,60);
+  // INTENTIONAL: build the review list from all same-accession candidates, not only
+  // the 500 facts sent to Gemini, so useful annual line items are not hidden by prompt limits.
+  const relatedOperatingFacts=candidates
+    .filter(x=>x.kind==="annual" && /revenue|operating|expense|cost|income/i.test(x.label+" "+x.tag))
+    .sort((a,b)=>{
+      const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
+      return score(a)-score(b)||a.tag.localeCompare(b.tag);
+    }).slice(0,100);
   return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,related_operating_facts:relatedOperatingFacts,candidate_count:bounded.length};
 }
 
