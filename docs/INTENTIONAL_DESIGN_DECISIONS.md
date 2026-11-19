@@ -5,6 +5,7 @@ This document records deliberate behaviour in Magic Screen. These are guardrails
 ## US candidate universe and ranking
 
 - **Magic Formula Investing (MFI) is the US candidate-universe source.** The SEC ticker directory is used only to map MFI tickers to CIKs for fundamentals lookup. Do not merge the full SEC-listed universe into the displayed US screener.
+- **US universe ownership is exclusive to MFI.** The frontend must not call the legacy `/api/universe?market=US` endpoint. That endpoint is read-only for compatibility/diagnostics; the former SEC directory import via `sync=1` is retired. SEC's ticker directory is only for ticker-to-CIK mapping. Keep the Bursa `/api/universe?market=MY` flow unchanged.
 - **MFI's screening table is not a Magic Formula ranking.** Its returned rows are alphabetically ordered and do not include Earnings Yield or Return on Capital. Do not treat source order as a score or rank.
 - **The `MFI CANDIDATE` stock-card flag is a source-membership label only.** It indicates that the stock was intentionally included by the MFI screener; it does not mean the stock has passed the Magic Formula ranking or a Shariah screen.
 - **Ranks are all-or-nothing.** A combined rank (Earnings Yield rank + Return on Capital rank) is published only when every active MFI candidate has complete required fundamentals. If candidate membership changes or any candidate becomes incomplete, clear the old ranks; recalculate when the new full universe is ready. This avoids presenting stale or partial rankings.
