@@ -4,7 +4,7 @@
 
 - React + TypeScript screener UI, responsive for mobile and desktop.
 - Cloudflare Worker API and D1 cache.
-- 30 Bursa Malaysia and 30 US starter tickers.
+- 30 Bursa Malaysia and 30 US starter tickers. The initial universe is a curated starter list, not yet a dynamically discovered top-30-by-market-cap universe.
 - Weekday scheduled quote refresh, split by market.
 - Search, market switcher, sort and browser-session watchlist.
 - Conservative Shariah labels: all records start as **Unverified**.
