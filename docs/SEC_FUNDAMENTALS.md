@@ -63,6 +63,8 @@ Safety rules:
 
 Example response fields include the symbol, SEC accession, fiscal period, filing URL, per-field validation status, and whether each selected value exactly matched a supplied SEC fact.
 
+The US screener also exposes an **AI fact diagnostic** button. Enter the existing `UNIVERSE_SYNC_TOKEN` in its dialog and select a ticker such as `HRB`. The token is held only in component state for the request and is cleared after success or when the dialog closes. Never enter the Gemini API key in the browser.
+
 ## Important limitations
 
 - XBRL tagging differs across issuers. The first version supports standard US-GAAP and selected IFRS concepts, and deliberately leaves unsupported cases unranked.
