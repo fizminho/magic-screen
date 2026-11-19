@@ -16,7 +16,16 @@ const symbols: Record<string, {name:string;market:"MY"|"US";currency:string}[]> 
     {symbol:"AAPL",name:"Apple",market:"US",currency:"USD"},{symbol:"MSFT",name:"Microsoft",market:"US",currency:"USD"},{symbol:"NVDA",name:"NVIDIA",market:"US",currency:"USD"},
     {symbol:"GOOGL",name:"Alphabet",market:"US",currency:"USD"},{symbol:"AMZN",name:"Amazon",market:"US",currency:"USD"},{symbol:"META",name:"Meta Platforms",market:"US",currency:"USD"},
     {symbol:"AVGO",name:"Broadcom",market:"US",currency:"USD"},{symbol:"TSM",name:"Taiwan Semiconductor ADR",market:"US",currency:"USD"},{symbol:"LLY",name:"Eli Lilly",market:"US",currency:"USD"},
-    {symbol:"BRK-B",name:"Berkshire Hathaway",market:"US",currency:"USD"}
+    {symbol:"BRK-B",name:"Berkshire Hathaway",market:"US",currency:"USD"},{symbol:"JPM",name:"JPMorgan Chase",market:"US",currency:"USD"},
+    {symbol:"V",name:"Visa",market:"US",currency:"USD"},{symbol:"MA",name:"Mastercard",market:"US",currency:"USD"},
+    {symbol:"XOM",name:"Exxon Mobil",market:"US",currency:"USD"},{symbol:"COST",name:"Costco",market:"US",currency:"USD"},
+    {symbol:"WMT",name:"Walmart",market:"US",currency:"USD"},{symbol:"ORCL",name:"Oracle",market:"US",currency:"USD"},
+    {symbol:"CRM",name:"Salesforce",market:"US",currency:"USD"},{symbol:"NFLX",name:"Netflix",market:"US",currency:"USD"},
+    {symbol:"AMD",name:"Advanced Micro Devices",market:"US",currency:"USD"},{symbol:"QCOM",name:"Qualcomm",market:"US",currency:"USD"},
+    {symbol:"TXN",name:"Texas Instruments",market:"US",currency:"USD"},{symbol:"CAT",name:"Caterpillar",market:"US",currency:"USD"},
+    {symbol:"MU",name:"Micron Technology",market:"US",currency:"USD"},{symbol:"KO",name:"Coca-Cola",market:"US",currency:"USD"},
+    {symbol:"PG",name:"Procter & Gamble",market:"US",currency:"USD"},{symbol:"ABBV",name:"AbbVie",market:"US",currency:"USD"},
+    {symbol:"ADBE",name:"Adobe",market:"US",currency:"USD"},{symbol:"INTU",name:"Intuit",market:"US",currency:"USD"}
   ]
 };
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"}});
@@ -59,6 +68,9 @@ export default {
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
+      if (url.searchParams.get("refresh")==="1") {
+        try { await refreshQuotes(env); } catch { return json({error:"Refresh failed",market}, 502); }
+      }
       try {
         const result = await env.DB.prepare("SELECT * FROM stock_snapshot WHERE market=? ORDER BY COALESCE(magic_formula_rank,999), company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
