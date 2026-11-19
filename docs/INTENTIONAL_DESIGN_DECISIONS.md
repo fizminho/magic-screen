@@ -69,3 +69,6 @@ When changing one of these behaviours, update this document and the related inli
 
 
 The HRB diagnostic also attempts to discover the filing's extracted XBRL instance document from the SEC accession directory and expose same-period, non-dimensional USD annual operating/revenue/expense facts as `instance_operating_facts`. This is diagnostic-only: instance facts are not sent to Gemini, stored, calculated, or ranked. If the SEC directory index or instance document is unavailable, the response reports `instance_facts_status` and continues with Company Facts results.
+
+
+- **HRB derived EBIT diagnostic is filing-scoped.** The current revenue-minus-`CostsAndExpenses` reconciliation is permitted only for HRB accession `0000012659-26-000026`, fiscal period ending `2026-06-30`. Other issuers and other HRB filings receive `out_of_scope`; they must not inherit this issuer-specific tag interpretation. The candidate remains review-only and cannot populate fundamentals or rankings.
