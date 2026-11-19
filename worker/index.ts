@@ -118,8 +118,23 @@ async function syncUsUniverse(env: Env) {
   return {imported,total:total?.count ?? imported,source:"SEC company_tickers_exchange.json",asOf:now,note:"SEC states this directory does not guarantee accuracy or complete exchange coverage."};
 }
 
-async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true) {
+async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true, forceRefresh=false) {
   await ensureSchema(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS mfi_screening_meta (id INTEGER PRIMARY KEY CHECK(id=1), minimum_market_cap INTEGER NOT NULL, selected_count INTEGER NOT NULL, result_count INTEGER NOT NULL, source_updated_at TEXT NOT NULL, price_date TEXT, quarter_date TEXT)").run();
+
+  // Reuse the last successful MFI result for six hours when the screen settings match.
+  // This avoids a login/session round-trip every time someone opens the screener.
+  if (!forceRefresh) {
+    const cached = await env.DB.prepare("SELECT minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date FROM mfi_screening_meta WHERE id=1").first<any>();
+    const cacheAge = cached?.source_updated_at ? Date.now() - Date.parse(cached.source_updated_at) : Infinity;
+    if (cached && cached.minimum_market_cap === minimumMarketCap && cached.selected_count === (select30 ? 30 : 50) && cacheAge >= 0 && cacheAge < 6 * 60 * 60 * 1000) {
+      const result = await env.DB.prepare("SELECT m.symbol,m.company_name AS name,COALESCE(q.market_cap,0)/1000000.0 AS marketCapMillions FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.company_name").all<any>();
+      if (result.results.length === cached.result_count) {
+        return {imported:result.results.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:cached.source_updated_at,priceDate:cached.price_date,quarterDate:cached.quarter_date,cached:true,stocks:result.results};
+      }
+    }
+  }
+
   if (!env.MFI_SESSION_COOKIE) throw new Error("Magic Formula session is not configured. Add MFI_SESSION_COOKIE as a Cloudflare Worker secret.");
   const headers = { "User-Agent":"Mozilla/5.0 (compatible; MagicScreen/1.0)", "Cookie":env.MFI_SESSION_COOKIE };
   const pageUrl = "https://www.magicformulainvesting.com/Screening/StockScreening";
@@ -161,9 +176,8 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   }
   const activeSymbols = rows.map(row=>row.symbol);
   await env.DB.prepare("UPDATE stock_master SET listing_status='inactive' WHERE market='US' AND symbol NOT IN ("+activeSymbols.map(()=>"?").join(",")+")").bind(...activeSymbols).run();
-  await env.DB.prepare("CREATE TABLE IF NOT EXISTS mfi_screening_meta (id INTEGER PRIMARY KEY CHECK(id=1), minimum_market_cap INTEGER NOT NULL, selected_count INTEGER NOT NULL, result_count INTEGER NOT NULL, source_updated_at TEXT NOT NULL, price_date TEXT, quarter_date TEXT)").run();
   await env.DB.prepare("INSERT INTO mfi_screening_meta (id,minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET minimum_market_cap=excluded.minimum_market_cap,selected_count=excluded.selected_count,result_count=excluded.result_count,source_updated_at=excluded.source_updated_at,price_date=excluded.price_date,quarter_date=excluded.quarter_date").bind(minimumMarketCap,select30?30:50,rows.length,now,rows[0]?.priceDate ?? null,rows[0]?.quarterDate ?? null).run();
-  return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,stocks:rows};
+  return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,cached:false,stocks:rows};
 }
 
 export default {
@@ -173,7 +187,8 @@ export default {
       try {
         const minimumMarketCap = Math.min(5000000,Math.max(50,Number(url.searchParams.get("minimumMarketCap") ?? 50)));
         const select30 = url.searchParams.get("select30") !== "false";
-        const result = await syncMagicFormulaUniverse(env,minimumMarketCap,select30);
+        const forceRefresh = url.searchParams.get("force")==="1";
+        const result = await syncMagicFormulaUniverse(env,minimumMarketCap,select30,forceRefresh);
         return json(result);
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Magic Formula Investing"},503); }
     }
