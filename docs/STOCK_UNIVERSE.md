@@ -2,14 +2,13 @@
 
 ## United States
 
-Magic Screen can import the SEC's public company ticker/exchange directory into D1:
+Magic Screen's US candidate universe comes exclusively from the authenticated Magic Formula Investing (MFI) screening endpoint:
 
-- Source: https://www.sec.gov/files/company_tickers_exchange.json
-- Endpoint: `GET /api/universe?market=US&sync=1`
-- The frontend invokes this sync when **Refresh data** is pressed on the US market.
-- The SEC warns that this directory is not guaranteed to be accurate or complete. It is a discovery universe, not a definitive list of every exchange-listed security. It can include ETFs, trusts and foreign issuers, so review the results before treating them as eligible common stocks.
-
-The import is additive/upsert-based. It does not automatically delete records absent from a later SEC file, because absence from this directory does not prove a security was delisted.
+- Source: https://www.magicformulainvesting.com/Screening/StockScreening
+- Refresh endpoint: `GET /api/mfi/screen`
+- Displayed US stocks are read from `GET /api/stocks?market=US`.
+- SEC's `company_tickers_exchange.json` directory is used only inside the fundamentals pipeline to map MFI tickers to CIKs. It must not be imported as the US candidate universe.
+- `GET /api/universe?market=US` remains a read-only legacy/master-data query for compatibility and diagnostics. It is not called by the frontend and does not trigger SEC universe synchronisation. The former `sync=1` behaviour has been retired.
 
 ## Bursa Malaysia
 
