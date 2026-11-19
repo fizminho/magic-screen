@@ -31,7 +31,7 @@ The SEC data is not a pre-calculated Magic Formula ranking. The Worker calculate
 
 ## Important limitations
 
-- XBRL tagging differs across issuers. The first version uses standard US-GAAP concepts and deliberately leaves unsupported cases unranked.
+- XBRL tagging differs across issuers. The first version supports standard US-GAAP and selected IFRS concepts, and deliberately leaves unsupported cases unranked.
 - Financial companies and companies with unusual balance sheets may not have meaningful working-capital-based Return on Capital. Review sector suitability before interpreting their ratios.
 - Market capitalization comes from the MFI screening result; SEC provides the reported financial statements.
 - SEC facts can be amended or restated. The stored period and filing date should be checked when reviewing a company.
