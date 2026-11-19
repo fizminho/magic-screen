@@ -16,20 +16,11 @@
 
 In the Cloudflare dashboard, open **Storage & databases → D1 SQL Database** and create a database named `magic-screen-db`.
 
-Copy the database ID. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.toml` with that ID. The repository is already configured to bind the database as `DB`.
+Copy its database ID. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.toml` with that ID. The repository is already configured to bind the database as `DB`.
 
-### 2. Initialise the schema
+The Worker creates its tables and index automatically on the first API request or scheduled refresh. You do not need to run SQL manually.
 
-From the project root, run:
-
-```bash
-npm install
-npx wrangler d1 execute magic-screen-db --remote --file=./db/schema.sql
-```
-
-Alternatively, paste the contents of `db/schema.sql` into the database's Cloudflare D1 Console.
-
-### 3. Connect GitHub for automatic deployment
+### 2. Connect GitHub for automatic deployment
 
 In Cloudflare, open **Workers & Pages → Create application → Connect to Git**. Select GitHub, then choose `fizminho/magic-screen` and the `main` branch.
 
