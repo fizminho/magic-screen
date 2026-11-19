@@ -150,7 +150,7 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
 
 async function syncUsFundamentals(env:Env, limit=8) {
   await ensureSchema(env);
-  const mapAge=await env.DB.prepare("SELECT MIN(updated_at) AS updated_at,COUNT(*) AS count FROM sec_company_map").first<any>();
+  const mapAge=await env.DB.prepare("SELECT MIN(cm.updated_at) AS updated_at,COUNT(cm.symbol) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
   const missingMap=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.symbol IS NULL").first<any>();
   const mapStale=!mapAge?.count || !mapAge.updated_at || Date.now()-Date.parse(mapAge.updated_at)>7*86400000 || (missingMap?.count??0)>0;
   if (mapStale) {
