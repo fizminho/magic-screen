@@ -85,3 +85,13 @@
   .searchbox input { font-size:16px; }
   button, input { -webkit-tap-highlight-color:transparent; }
 }
+
+.pagination { display:flex; align-items:center; gap:8px; }
+.pagination button { min-height:30px; padding:0 9px; border:1px solid #2b3850; border-radius:5px; background:#121c30; color:#c4cede; font:10px "DM Sans"; cursor:pointer; }
+.pagination button:disabled { opacity:.35; cursor:not-allowed; }
+.pagination span { color:#8b9ab3; font:9px "DM Mono"; white-space:nowrap; }
+@media(max-width:760px) {
+  .table-footer { display:flex; flex-direction:column; align-items:stretch; gap:12px; }
+  .pagination { justify-content:space-between; }
+  .pagination button { min-height:38px; padding:0 14px; font-size:11px; }
+}
