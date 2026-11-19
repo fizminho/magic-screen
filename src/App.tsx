@@ -19,6 +19,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
   const [showInfo, setShowInfo] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 40;
 
   async function load(refresh = false) {
     setLoading(true);
@@ -45,6 +47,7 @@ export default function App() {
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [market]);
+  useEffect(() => { setPage(1); }, [market, tab, query, sort]);
 
   const rows = useMemo(() => {
     const base = marketUniverse.filter(x => x.market === market).map(x => stocks.find(s => s.symbol === x.symbol) ?? ({
@@ -58,6 +61,8 @@ export default function App() {
       .sort((a,b) => sort === "name" ? a.company_name.localeCompare(b.company_name) : sort === "change" ? (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity) : (a.magic_formula_rank ?? 999) - (b.magic_formula_rank ?? 999));
   }, [stocks, marketUniverse, market, tab, query, sort, watchlist]);
 
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
   const available = stocks.filter(s => s.price != null).length;
   const ranked = stocks.filter(s => s.magic_formula_rank != null).length;
   const toggleWatch = (symbol: string) => setWatchlist(old => old.includes(symbol) ? old.filter(x=>x!==symbol) : [...old,symbol]);
@@ -90,9 +95,9 @@ export default function App() {
         <div className="section-title"><div><div className="eyebrow">DISCOVER OPPORTUNITIES</div><h2>{market==="MY"?"Bursa Malaysia":"US Equities"} <span className="sub-count">{rows.length} companies</span></h2></div><div className="method-tag"><Sparkles size={14}/> MAGIC FORMULA</div></div>
         <div className="toolbar"><div className="tabs"><button className={tab==="all"?"selected":""} onClick={()=>setTab("all")}>All stocks</button><button className={tab==="shariah"?"selected":""} onClick={()=>setTab("shariah")}> <ShieldCheck size={14}/> Shariah verified</button><button className={tab==="watchlist"?"selected":""} onClick={()=>setTab("watchlist")}>Watchlist</button></div><div className="tools"><div className="searchbox"><Search size={15}/><input placeholder="Search company or ticker..." value={query} onChange={e=>setQuery(e.target.value)}/></div><button className="sort-btn" onClick={()=>setSort(s=>s==="rank"?"name":s==="name"?"change":"rank")}><ArrowDownUp size={14}/> Sort: {sort==="rank"?"Formula":sort==="name"?"Name":"Change"}</button></div></div>
         <div className="table-wrap"><table><thead><tr><th className="rank-col">#</th><th>COMPANY</th><th>PRICE</th><th>DAY CHANGE</th><th>MAGIC FORMULA</th><th>SHARIAH STATUS</th><th></th></tr></thead><tbody>
-          {rows.map((s,i)=><tr key={s.symbol}><td className="rank-cell">{s.magic_formula_rank ?? String(i+1).padStart(2,"0")}</td><td><div className="company-cell"><div className="ticker-icon">{s.symbol.replace(".KL","").slice(0,2)}</div><div><b>{s.company_name}</b><small>{s.symbol}</small></div></div></td><td className="price-cell">{money(s.price,s.currency)}</td><td className={s.change_percent==null?"muted":s.change_percent>=0?"positive":"negative"}>{pct(s.change_percent)}</td><td>{s.magic_formula_rank ? <span className="formula-score">#{s.magic_formula_rank}</span> : <span className="pending">Awaiting fundamentals</span>}</td><td><span className={`shariah ${s.shariah_status}`}><i/>{s.shariah_status==="compliant"?"Verified compliant":s.shariah_status==="non_compliant"?"Not compliant":"Unverified"}</span></td><td><button className={`star-btn ${watchlist.includes(s.symbol)?"starred":""}`} onClick={()=>toggleWatch(s.symbol)} aria-label="Toggle watchlist">★</button></td></tr>)}
+          {pageRows.map((s,i)=><tr key={s.symbol}><td className="rank-cell">{s.magic_formula_rank ?? String(i+1).padStart(2,"0")}</td><td><div className="company-cell"><div className="ticker-icon">{s.symbol.replace(".KL","").slice(0,2)}</div><div><b>{s.company_name}</b><small>{s.symbol}</small></div></div></td><td className="price-cell">{money(s.price,s.currency)}</td><td className={s.change_percent==null?"muted":s.change_percent>=0?"positive":"negative"}>{pct(s.change_percent)}</td><td>{s.magic_formula_rank ? <span className="formula-score">#{s.magic_formula_rank}</span> : <span className="pending">Awaiting fundamentals</span>}</td><td><span className={`shariah ${s.shariah_status}`}><i/>{s.shariah_status==="compliant"?"Verified compliant":s.shariah_status==="non_compliant"?"Not compliant":"Unverified"}</span></td><td><button className={`star-btn ${watchlist.includes(s.symbol)?"starred":""}`} onClick={()=>toggleWatch(s.symbol)} aria-label="Toggle watchlist">★</button></td></tr>)}
         </tbody></table>{rows.length===0 && <div className="empty-state"><Filter size={24}/><b>No stocks match this view</b><span>Try another search or switch tabs.</span></div>}</div>
-        <div className="table-footer"><span>Showing {rows.length} of {universe.filter(x=>x.market===market).length} tracked companies</span><span><i className="legend-dot"/> Data status: {available ? "Partial live data" : "Awaiting first sync"}</span></div>
+        <div className="table-footer"><span>Showing {rows.length ? (page-1)*pageSize+1 : 0}–{Math.min(page*pageSize,rows.length)} of {rows.length} companies</span><div className="pagination"><button disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</button><span>{page} / {pageCount}</span><button disabled={page>=pageCount} onClick={()=>setPage(p=>Math.min(pageCount,p+1))}>Next</button></div><span><i className="legend-dot"/> Data status: {available ? "Partial live data" : "Awaiting first sync"}</span></div>
         <div className="method-note"><div className="method-note-icon"><CircleHelp size={17}/></div><div><b>How the Magic Formula works</b><p>Ranks businesses by a combination of Earnings Yield and Return on Capital. Both require reliable financial statements. This screen will not invent a score when either input is missing.</p></div><button onClick={()=>setShowInfo(true)}>Data methodology <ArrowUpRight size={14}/></button></div>
         <footer><span>© 2026 Magic Screen</span><span>Research tool only · Not investment advice</span><span>Built for clarity <span className="footer-star">✳</span></span></footer>
       </section>
