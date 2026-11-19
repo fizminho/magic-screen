@@ -280,3 +280,5 @@
 @media (max-width:760px) {
   tbody td:nth-child(7) { grid-column:auto; padding:0; }
 }
+
+.metric-date { display:block; margin-top:4px; color:#71819c; font:8px "DM Mono"; white-space:nowrap; }
