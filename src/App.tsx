@@ -36,18 +36,41 @@ export default function App() {
 
   async function load(forceMfiSync = false) {
     setLoading(true);
+    let cachedStocksLoaded = false;
     try {
-      if (market === "US") {
-        const syncResponse = await fetch("/api/mfi/screen?minimumMarketCap=" + minimumMarketCap + "&select30=" + (mfiCount === 30) + (forceMfiSync ? "&force=1" : ""));
-        const syncData = await syncResponse.json() as {error?:string;imported?:number};
-        if (!syncResponse.ok) throw new Error(syncData.error || "Magic Formula screening failed");
-      }
-      const response = await fetch(`/api/stocks?market=${market}&refresh=1`);
-      if (!response.ok) throw new Error("API unavailable");
-      const data = await response.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number}};
+      // INTENTIONAL: normal loads read D1 cache only. Refresh failures must not hide cached rows.
+      const response = await fetch(`/api/stocks?market=${market}`);
+      if (!response.ok) throw new Error("Cached stock API unavailable");
+      const data = await response.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number;error?:string}};
       setStocks(data.stocks ?? []);
-      // INTENTIONAL: the US screener is driven exclusively by the MFI results returned through /api/stocks.
-      // Fetch the imported master universe only for Malaysia; avoid an unused US universe request.
+      cachedStocksLoaded = true;
+      setUpdatedAt(data.updatedAt);
+
+      let refreshMessage = "";
+      if (forceMfiSync) {
+        if (market === "US") {
+          try {
+            const syncResponse = await fetch("/api/mfi/screen?minimumMarketCap=" + minimumMarketCap + "&select30=" + (mfiCount === 30) + "&force=1");
+            const syncData = await syncResponse.json() as {error?:string};
+            if (!syncResponse.ok) throw new Error(syncData.error || "MFI refresh failed");
+          } catch (error) {
+            refreshMessage = " · Showing cached stocks; MFI refresh unavailable: " + (error instanceof Error ? error.message : "unknown error");
+          }
+        }
+        try {
+          const quoteResponse = await fetch(`/api/stocks?market=${market}&refresh=1`);
+          const quoteData = await quoteResponse.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number;error?:string}};
+          if (quoteData.stocks?.length) {
+            setStocks(quoteData.stocks);
+            setUpdatedAt(quoteData.updatedAt);
+          }
+          if (!quoteResponse.ok) throw new Error(quoteData.refresh?.error || "Quote refresh failed");
+          if (quoteData.refresh?.failed) refreshMessage += " · Quote refresh failed for " + quoteData.refresh.failed + " symbols";
+        } catch (error) {
+          refreshMessage += " · Cached quotes retained: " + (error instanceof Error ? error.message : "refresh unavailable");
+        }
+      }
+
       if (market === "MY") {
         const universeResponse = await fetch("/api/universe?market=MY");
         if (universeResponse.ok) {
@@ -55,7 +78,6 @@ export default function App() {
           if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
         }
       }
-      setUpdatedAt(data.updatedAt);
       const pipelineResponse = await fetch("/api/pipeline/status?market=" + market);
       if (pipelineResponse.ok) setPipeline(await pipelineResponse.json() as PipelineStatus);
       let fundamentalsStatus = "";
@@ -70,11 +92,10 @@ export default function App() {
           if (fundamentals.provider_error) fundamentalsStatus += ", " + fundamentals.provider_error + " errors";
         }
       }
-      setSourceStatus((data.refresh?.failed ? "Quote provider failed for "+data.refresh.failed+" symbols" : data.refresh?.remaining ? "Quotes updated; "+data.refresh.remaining+" still pending" : data.sourceStatus ?? "Connected") + fundamentalsStatus);
+      setSourceStatus((data.sourceStatus ?? "Showing cached data") + fundamentalsStatus + refreshMessage);
     } catch (error) {
-      setStocks([]);
-      setMarketUniverse(market === "US" ? [] : universe.filter(x => x.market === market));
-      setSourceStatus(error instanceof Error ? error.message : "API not configured");
+      // INTENTIONAL: secondary request failures never clear a successfully loaded D1 cache.
+      if (!cachedStocksLoaded) setSourceStatus(error instanceof Error ? error.message : "Cached stock data unavailable");
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [market, mfiCount, minimumMarketCap]);
