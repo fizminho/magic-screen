@@ -1,4 +1,4 @@
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
     {symbol:"1155.KL",name:"Maybank",market:"MY",currency:"MYR"},{symbol:"1295.KL",name:"Public Bank",market:"MY",currency:"MYR"},
@@ -198,7 +198,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       ? {status:"matched_to_sec_fact",tag:match.tag,value:match.value,label:match.label,kind:match.kind}
       : {status:"rejected",tag:selected.tag,value:selected.value,reason:"AI selection did not exactly match a supplied same-accession SEC fact"};
   }
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+anchor.accn.replace(/-/g,"")+"-index.htm",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
