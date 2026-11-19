@@ -90,6 +90,22 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
+    if (url.pathname==="/api/universe/import-my" && request.method==="POST") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        const payload: any = await request.json();
+        if (!Array.isArray(payload.rows) || payload.rows.length > 5000) return json({error:"Expected rows array, maximum 5000"},400);
+        const now = new Date().toISOString();
+        let imported = 0;
+        for (let i=0; i<payload.rows.length; i+=80) {
+          const batch = payload.rows.slice(i,i+80).map((r: any) => env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,sector,listing_status,source,source_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,sector=excluded.sector,listing_status=excluded.listing_status,source=excluded.source,source_updated_at=excluded.source_updated_at").bind(String(r.symbol || "").trim().toUpperCase(),"MY",String(r.company_name || r.name || "").trim(),"MYR",String(r.exchange || "BURSA"),r.sector || null,r.listing_status || "active",String(payload.source || "Bursa directory import"),now));
+          await env.DB.batch(batch);
+          imported += batch.length;
+        }
+        return json({imported,source:payload.source || "Bursa directory import",asOf:now});
+      } catch (e) { return json({error:String(e)},400); }
+    }
     if (url.pathname==="/api/universe") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
