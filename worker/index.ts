@@ -109,7 +109,7 @@ async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
 }
 // INTENTIONAL: MFI market cap is USD. Keep SEC inputs USD-only until explicit FX conversion
 // (with a dated, auditable rate source) exists; missing local-currency facts must stay unavailable.
-function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean): {value:number|null;tag:string|null;filed:string|null} {
+function secFactValue(facts:any, tags:string[], periodEnd:string, accession:string, annual:boolean): {value:number|null;tag:string|null;filed:string|null} {
   const taxonomies=["us-gaap","ifrs-full"];
   for (const taxonomy of taxonomies) {
   const concepts=facts?.facts?.[taxonomy] ?? {};
@@ -119,7 +119,9 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
     // never mix an issuer's local-currency facts into USD valuation formulas.
     const entries=(units.USD ?? []) as any[];
     const eligible=entries.filter((x:any)=>{
-      if (typeof x.val!=="number" || !x.end || !x.filed || !["10-K","20-F","40-F","10-Q"].includes(x.form)) return false;
+      if (typeof x.val!=="number" || !x.end || !x.filed || !accession || x.accn!==accession || !["10-K","20-F","40-F","10-Q"].includes(x.form)) return false;
+// INTENTIONAL: every selected fact must come from the same filing accession as the fiscal-period anchor.
+// Matching dates alone can combine restated or comparative facts from different filings.
       if (annual) {
         // INTENTIONAL: annual income-statement facts must match the selected fiscal year end exactly.
         // Do not silently reuse an older EBIT fact when the latest filing uses an unsupported XBRL tag.
@@ -181,21 +183,24 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const annualPeriodTags=["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities","Revenues","Revenue","RevenueFromContractWithCustomerExcludingAssessedTax","RevenueFromContractWithCustomerIncludingAssessedTax","SalesRevenueNet","SalesRevenueGoodsNet","SalesRevenueServicesNet"];
       const annualFacts=["us-gaap","ifrs-full"].flatMap(taxonomy=>annualPeriodTags.flatMap(tag=>facts?.facts?.[taxonomy]?.[tag]?.units?.USD ?? []));
       const annual=annualFacts.filter((x:any)=>x.val!=null && x.start && x.end && ["10-K","20-F","40-F"].includes(x.form) && (Date.parse(x.end)-Date.parse(x.start))/86400000>=330 && (Date.parse(x.end)-Date.parse(x.start))/86400000<=400).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
+      // INTENTIONAL: select one annual filing as the provenance anchor. All income-statement
+      // and balance-sheet inputs below must carry this same accession number.
       const periodEnd=annual[0]?.end ?? "";
+      const periodAccession=annual[0]?.accn ?? "";
       const periodAgeDays=periodEnd ? (Date.now()-Date.parse(periodEnd+"T00:00:00Z"))/86400000 : null;
       // INTENTIONAL: keep old SEC facts for diagnostics, but never calculate or rank them as current fundamentals.
       const staleFiscalPeriod=periodAgeDays!=null && periodAgeDays>maxAnnualPeriodAgeDays;
-      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"],periodEnd,true) : {value:null,tag:null,filed:null};
-      const assets=periodEnd ? secFactValue(facts,["AssetsCurrent","CurrentAssets"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent","CurrentLiabilities"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet","PropertyPlantAndEquipment"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents","CashAndCashEquivalents"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","BorrowingsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const leaseLong=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtTotal=periodEnd ? secFactValue(facts,["LongTermDebt","Borrowings"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"],periodEnd,periodAccession,true) : {value:null,tag:null,filed:null};
+      const assets=periodEnd ? secFactValue(facts,["AssetsCurrent","CurrentAssets"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent","CurrentLiabilities"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet","PropertyPlantAndEquipment"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents","CashAndCashEquivalents"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","BorrowingsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const leaseLong=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const debtTotal=periodEnd ? secFactValue(facts,["LongTermDebt","Borrowings"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const cap=Number(item.market_cap);
       const splitDebtKnown=debtCurrent.value!=null || shortDebt.value!=null || debtLong.value!=null;
       const leaseDebtKnown=leaseCurrent.value!=null || leaseLong.value!=null;
