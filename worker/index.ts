@@ -29,12 +29,12 @@ const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";curren
   ]
 };
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"}});
-async function refreshQuotes(env: Env) {
+async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   const started = new Date().toISOString();
   const batch = env.DB.prepare("INSERT INTO refresh_log (started_at,status,message) VALUES (?, 'running', 'Yahoo Finance chart quote refresh')");
   const log = await batch.bind(started).run();
   let updated=0, failed=0;
-  for (const market of ["MY","US"] as const) {
+  for (const market of (onlyMarket ? [onlyMarket] : ["MY","US"] as const)) {
     for (const item of symbols[market]) {
       try {
         const url = "https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(item.symbol)+"?range=5d&interval=1d";
@@ -69,7 +69,7 @@ export default {
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       if (url.searchParams.get("refresh")==="1") {
-        try { await refreshQuotes(env); } catch { return json({error:"Refresh failed",market}, 502); }
+        try { await refreshQuotes(env, market); } catch { return json({error:"Refresh failed",market}, 502); }
       }
       try {
         const result = await env.DB.prepare("SELECT * FROM stock_snapshot WHERE market=? ORDER BY COALESCE(magic_formula_rank,999), company_name").bind(market).all();
