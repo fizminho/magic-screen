@@ -37,7 +37,7 @@ Two Cron Triggers run separate batches to stay within Cloudflare's per-invocatio
 - Bursa Malaysia: 22:17 UTC Sunday to Thursday (06:17 Malaysia time, Monday to Friday).
 - US equities: 22:47 UTC Monday to Friday (17:47 US Eastern during standard time, 18:47 during daylight time).
 
-The first quote adapter uses Yahoo Finance's chart endpoint for indicative quotes. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution-price feed. Provider throttling or market holidays can result in partial updates. The scheduled refresh does not fetch financial statements.
+The first quote adapter uses Yahoo Finance's chart endpoint for indicative quotes. The selected ticker universe is currently static; automatic universe discovery and Magic Formula re-ranking are future steps. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution-price feed. Provider throttling or market holidays can result in partial updates. The scheduled refresh does not fetch financial statements.
 
 ## Shariah status and Magic Formula
 
