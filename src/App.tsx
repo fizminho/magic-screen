@@ -4,7 +4,7 @@ import { universe } from "./data/universe";
 import type { ApiResponse, Market, Stock } from "./types";
 
 type Tab = "all" | "shariah" | "watchlist";
-type PipelineStatus = {last_quote_sync?:string|null;mfi_last_sync?:string|null;mfi_price_date?:string|null;mfi_quarter_date?:string|null;mfi_count?:number;sec?:{total?:number;calculated?:number;last_updated?:string|null;incomplete?:number;provider_error?:number;unmapped?:number}};
+type PipelineStatus = {last_quote_sync?:string|null;mfi_last_sync?:string|null;mfi_price_date?:string|null;mfi_quarter_date?:string|null;mfi_count?:number;sec?:{total?:number;calculated?:number;last_updated?:string|null;incomplete?:number;provider_error?:number;unmapped?:number;stale_market_cap?:number}};
 const dateTime = (value?:string|null) => value ? new Date(value).toLocaleString("en-MY",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Not available";
 const money = (value: number | null, currency: string) => value == null ? "—" : new Intl.NumberFormat("en-US", {style:"currency",currency,maximumFractionDigits:2}).format(value);
 const pct = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
@@ -58,10 +58,10 @@ export default function App() {
       if (market === "US") {
         const fundamentalsResponse = await fetch("/api/fundamentals/status");
         if (fundamentalsResponse.ok) {
-          const fundamentals = await fundamentalsResponse.json() as {calculated?:number;total?:number;unmapped?:number;incomplete?:number;provider_error?:number};
+          const fundamentals = await fundamentalsResponse.json() as {calculated?:number;total?:number;unmapped?:number;incomplete?:number;provider_error?:number;stale_market_cap?:number};
           fundamentalsStatus = " · SEC fundamentals " + (fundamentals.calculated ?? 0) + "/" + (fundamentals.total ?? 0) + " ready";
           if (fundamentals.unmapped) fundamentalsStatus += ", " + fundamentals.unmapped + " unmapped";
-          if (fundamentals.incomplete) fundamentalsStatus += ", " + fundamentals.incomplete + " incomplete";
+          if (fundamentals.incomplete) fundamentalsStatus += ", " + fundamentals.incomplete + " incomplete";\n          if (fundamentals.stale_market_cap) fundamentalsStatus += ", " + fundamentals.stale_market_cap + " valuation refresh pending";
           if (fundamentals.provider_error) fundamentalsStatus += ", " + fundamentals.provider_error + " errors";
         }
       }
@@ -164,7 +164,7 @@ export default function App() {
         <div className="pipeline-meta">
           {market==="US" ? <>
             <div><span>MFI UNIVERSE SYNC</span><b>{dateTime(pipeline?.mfi_last_sync)}</b><small>{pipeline?.mfi_count ?? 0} candidates · Price date {pipeline?.mfi_price_date ?? "—"} · Quarter data {pipeline?.mfi_quarter_date ?? "—"}</small></div>
-            <div><span>SEC FUNDAMENTALS</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} calculated · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.unmapped ?? 0} unmapped</small></div>
+            <div><span>SEC FUNDAMENTALS</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} calculated · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.stale_market_cap ?? 0} valuation refresh pending · {pipeline?.sec?.unmapped ?? 0} unmapped</small></div>
           </> : <div><span>QUOTE CACHE</span><b>{dateTime(pipeline?.last_quote_sync)}</b><small>Latest stored Bursa quote timestamp</small></div>}
         </div>
         <div className="section-title"><div><div className="eyebrow">DISCOVER OPPORTUNITIES</div><h2>{market==="MY"?"Bursa Malaysia":"US Equities"} <span className="sub-count">{rows.length} companies</span></h2></div><div className="method-tag"><Sparkles size={14}/> MAGIC FORMULA</div></div>
