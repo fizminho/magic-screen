@@ -315,6 +315,33 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
     }
     instanceOperatingFacts=instanceOperatingFacts.slice(0,200);
   }
+  // INTENTIONAL: diagnostic reconciliation only, never a production EBIT input.
+  // Require exact concepts from one non-dimensional context and reconcile through
+  // reported non-operating income, interest expense and pretax income.
+  const uniqueInstanceFact=(tag:string)=>{
+    const matches=instanceOperatingFacts.filter(x=>x.tag==="us-gaap:"+tag);
+    const keys=new Set(matches.map(x=>String(x.value)+"|"+x.context+"|"+x.start+"|"+x.end));
+    return keys.size===1 ? matches[0] : null;
+  };
+  const hrbRevenue=uniqueInstanceFact("RevenueFromContractWithCustomerExcludingAssessedTax");
+  const hrbCosts=uniqueInstanceFact("CostsAndExpenses");
+  const hrbOtherNonoperating=uniqueInstanceFact("OtherNonoperatingIncomeExpense");
+  const hrbInterest=uniqueInstanceFact("InterestExpenseDebt");
+  const hrbPretax=uniqueInstanceFact("IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest");
+  const reconciliationFacts=[hrbRevenue,hrbCosts,hrbOtherNonoperating,hrbInterest,hrbPretax];
+  let derivedEbitCandidate:any={status:"not_validated",value:null,reason:"Required same-context reported line items were not uniquely available for a complete reconciliation."};
+  if(reconciliationFacts.every(Boolean)) {
+    const [revenue,costs,otherNonoperating,interest,pretax]=reconciliationFacts as any[];
+    const sameContext=reconciliationFacts.every((x:any)=>x.context===revenue.context && x.start===revenue.start && x.end===revenue.end);
+    const operatingIncome=revenue.value-costs.value;
+    const reconciledPretax=operatingIncome+otherNonoperating.value-interest.value;
+    const difference=reconciledPretax-pretax.value;
+    if(sameContext && Math.abs(difference)<=1) {
+      derivedEbitCandidate={status:"reconciled_candidate",value:operatingIncome,method:"RevenueFromContractWithCustomerExcludingAssessedTax - CostsAndExpenses",context:revenue.context,start:revenue.start,end:revenue.end,components:{revenue:revenue.value,operating_costs_and_expenses:costs.value,other_nonoperating_income_expense:otherNonoperating.value,interest_expense:interest.value,reported_pretax_income:pretax.value,reconciled_pretax_income:reconciledPretax,reconciliation_difference:difference},reason:"Derived operating income reconciles to reported pretax income after separately accounting for other non-operating income and interest expense. Diagnostic only; not yet used by the fundamentals pipeline."};
+    } else {
+      derivedEbitCandidate={status:"rejected",value:null,reason:sameContext?"Derived operating income did not reconcile to reported pretax income within $1.":"Required line items did not share one exact context and fiscal period.",reconciliation_difference:difference};
+    }
+  }
   // INTENTIONAL: expose relevant annual filing facts for human review, not as accepted EBIT.
   // This lets us inspect candidate revenue/expense concepts without letting the model calculate or rank.
   // INTENTIONAL: build the review list from all same-accession candidates, not only
@@ -325,7 +352,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
       return score(a)-score(b)||a.tag.localeCompare(b.tag);
     }).slice(0,100);
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
