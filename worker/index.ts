@@ -90,6 +90,14 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
+    if (url.pathname==="/api/universe") {
+      const market = url.searchParams.get("market")==="US" ? "US" : "MY";
+      try {
+        await ensureSchema(env);
+        const result = await env.DB.prepare("SELECT * FROM stock_master WHERE market=? ORDER BY company_name").bind(market).all();
+        return json({market,stocks:result.results,count:result.results.length});
+      } catch { return json({market,stocks:[],count:0}); }
+    }
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
