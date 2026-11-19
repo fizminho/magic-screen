@@ -197,3 +197,38 @@
   .sidebar .side-gap { margin-top:14px; }
   .sidebar .sidebar-bottom { margin-top:20px; }
 }
+
+
+/* Final mobile navigation and Bursa import dialog overrides */
+@media (max-width:760px) {
+  .menu-toggle { display:flex !important; position:relative; z-index:7; }
+  .sidebar { display:flex !important; }
+  .sidebar-backdrop { display:block !important; }
+  .topbar { justify-content:flex-start; gap:10px; }
+  .breadcrumb { flex:1; min-width:0; white-space:nowrap; }
+  .top-actions { flex:0 0 auto; }
+  .heading-actions { display:flex; width:100%; gap:8px; }
+  .heading-actions .refresh-btn, .heading-actions .import-btn { flex:1; width:auto; justify-content:center; min-width:0; }
+  .import-btn { min-height:42px; }
+}
+.heading-actions { display:flex; align-items:center; gap:9px; }
+.import-btn { border:1px solid #3b5135; background:#17251f; color:#c8ef9e; padding:10px 12px; border-radius:6px; font-size:10px; display:flex; align-items:center; gap:7px; cursor:pointer; white-space:nowrap; }
+.import-btn:hover { border-color:#b8f36b; }
+.import-overlay { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:18px; background:rgba(2,7,17,.78); backdrop-filter:blur(4px); }
+.import-dialog { width:min(100%,480px); padding:22px; border:1px solid #34445e; border-radius:12px; background:#111a2d; box-shadow:0 24px 80px rgba(0,0,0,.5); }
+.import-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.import-dialog h3 { margin:7px 0 0; color:#f0f3fa; font:650 20px Manrope,sans-serif; }
+.import-dialog p { color:#9ba9c0; font-size:11px; line-height:1.6; margin:14px 0 18px; }
+.modal-close { width:32px; height:32px; border:1px solid #34445e; border-radius:6px; background:#17233a; color:#dce5f4; font-size:21px; cursor:pointer; }
+.token-label { display:grid; gap:7px; color:#8fa0ba; font:500 9px "DM Mono"; letter-spacing:.8px; }
+.token-label input { width:100%; height:42px; border:1px solid #34445e; border-radius:6px; background:#0b1426; color:#e8eef8; padding:0 11px; font:12px "DM Sans"; letter-spacing:0; }
+.csv-upload { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:14px; padding:22px 14px; border:1px dashed #52647f; border-radius:8px; background:#142138; color:#b8f36b; cursor:pointer; text-align:center; }
+.csv-upload b { color:#e5edf8; font-size:12px; }
+.csv-upload small { color:#8494ae; font-size:9px; }
+.csv-upload input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.import-status { margin-top:12px; padding:10px; border-radius:6px; background:#1b2940; color:#dce7f7; font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
+.import-security { display:block; margin-top:12px; color:#73839e; font-size:9px; line-height:1.5; }
+@media (max-width:760px) {
+  .import-dialog { padding:18px; }
+  .import-dialog h3 { font-size:18px; }
+}
