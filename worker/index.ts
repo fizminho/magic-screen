@@ -25,7 +25,7 @@ const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";curren
     {symbol:"TXN",name:"Texas Instruments",market:"US",currency:"USD"},{symbol:"CAT",name:"Caterpillar",market:"US",currency:"USD"},
     {symbol:"MU",name:"Micron Technology",market:"US",currency:"USD"},{symbol:"KO",name:"Coca-Cola",market:"US",currency:"USD"},
     {symbol:"PG",name:"Procter & Gamble",market:"US",currency:"USD"},{symbol:"ABBV",name:"AbbVie",market:"US",currency:"USD"},
-    {symbol:"ADBE",name:"Adobe",market:"US",currency:"USD"},{symbol:"INTU",name:"Intuit",market:"US",currency:"USD"}
+    {symbol:"ADBE",name:"Adobe",market:"US",currency:"USD"},{symbol:"INTU",name:"Intuit",market:"US",currency:"USD"},{symbol:"TSLA",name:"Tesla",market:"US",currency:"USD"}
   ]
 };
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"}});
@@ -79,7 +79,8 @@ export default {
     }
     return env.ASSETS.fetch(request);
   },
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(refreshQuotes(env));
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    const market = controller.cron.startsWith("17 ") ? "MY" : "US";
+    ctx.waitUntil(refreshQuotes(env, market));
   }
 };
