@@ -120,12 +120,14 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
     const entries=(units.USD ?? []) as any[];
     const eligible=entries.filter((x:any)=>{
       if (typeof x.val!=="number" || !x.end || !x.filed || !["10-K","20-F","40-F","10-Q"].includes(x.form)) return false;
-      if (x.end>periodEnd) return false;
       if (annual) {
-        if (!x.start) return false;
+        // INTENTIONAL: annual income-statement facts must match the selected fiscal year end exactly.
+        // Do not silently reuse an older EBIT fact when the latest filing uses an unsupported XBRL tag.
+        if (x.end!==periodEnd || !x.start) return false;
         const days=(Date.parse(x.end)-Date.parse(x.start))/86400000;
         return days>=330 && days<=400 && ["10-K","20-F","40-F"].includes(x.form);
       }
+      if (x.end>periodEnd) return false;
       return !x.start && (Date.parse(periodEnd)-Date.parse(x.end))/86400000<=120;
     }).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
     if (eligible.length) return {value:eligible[0].val,tag,filed:eligible[0].filed};
@@ -173,7 +175,11 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const response=await fetch("https://data.sec.gov/api/xbrl/companyfacts/CIK"+item.cik+".json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json"}});
       if(!response.ok) throw new Error("SEC company facts HTTP "+response.status);
       const facts:any=await response.json();
-      const annualFacts=["us-gaap","ifrs-full"].flatMap(taxonomy=>["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"].flatMap(tag=>facts?.facts?.[taxonomy]?.[tag]?.units?.USD ?? []));
+      // INTENTIONAL: anchor the fiscal period using EBIT facts or recognised annual revenue facts.
+      // Some issuers do not expose operating income under standard EBIT concepts; revenue anchors
+      // keep the selected period current while unsupported EBIT remains missing, never backfilled.
+      const annualPeriodTags=["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities","Revenues","Revenue","RevenueFromContractWithCustomerExcludingAssessedTax","RevenueFromContractWithCustomerIncludingAssessedTax","SalesRevenueNet","SalesRevenueGoodsNet","SalesRevenueServicesNet"];
+      const annualFacts=["us-gaap","ifrs-full"].flatMap(taxonomy=>annualPeriodTags.flatMap(tag=>facts?.facts?.[taxonomy]?.[tag]?.units?.USD ?? []));
       const annual=annualFacts.filter((x:any)=>x.val!=null && x.start && x.end && ["10-K","20-F","40-F"].includes(x.form) && (Date.parse(x.end)-Date.parse(x.start))/86400000>=330 && (Date.parse(x.end)-Date.parse(x.start))/86400000<=400).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
       const periodEnd=annual[0]?.end ?? "";
       const periodAgeDays=periodEnd ? (Date.now()-Date.parse(periodEnd+"T00:00:00Z"))/86400000 : null;
