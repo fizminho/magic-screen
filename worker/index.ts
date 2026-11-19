@@ -151,7 +151,7 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
   return {value:null,tag:null,filed:null};
 }
 
-async function syncUsFundamentals(env:Env, limit=8) {
+async function syncUsFundamentals(env:Env, limit=10) {
   await ensureSchema(env);
   const mapAge=await env.DB.prepare("SELECT MIN(cm.updated_at) AS updated_at,COUNT(cm.symbol) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
   const missingMap=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.symbol IS NULL").first<any>();
@@ -164,7 +164,7 @@ async function syncUsFundamentals(env:Env, limit=8) {
     const ix={cik:fields.indexOf("cik"),ticker:fields.indexOf("ticker")};
     if (ix.cik<0 || ix.ticker<0) throw new Error("Unexpected SEC ticker map format");
     const now=new Date().toISOString();
-    const active=await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active'").all<any>();
+    const active=await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing'").all<any>();
     const wanted=new Set(active.results.map((x:any)=>String(x.symbol).toUpperCase()));
     const symbolsToMap=[...wanted];
     for(let i=0;i<symbolsToMap.length;i+=80) await env.DB.batch(symbolsToMap.slice(i,i+80).map(symbol=>env.DB.prepare("INSERT INTO sec_company_map(symbol,cik,updated_at) VALUES(?,'UNMAPPED',?) ON CONFLICT(symbol) DO UPDATE SET updated_at=excluded.updated_at").bind(symbol,now)));
@@ -174,8 +174,9 @@ async function syncUsFundamentals(env:Env, limit=8) {
     const mappedSymbols=symbolsToMap.map(symbol=>({symbol,cik:cikByTicker.get(normaliseTicker(symbol))})).filter((row):row is {symbol:string;cik:string}=>!!row.cik);
     for(let i=0;i<mappedSymbols.length;i+=80) await env.DB.batch(mappedSymbols.slice(i,i+80).map(row=>env.DB.prepare("UPDATE sec_company_map SET cik=?,updated_at=? WHERE symbol=?").bind(row.cik,now,row.symbol)));
   }
-  const staleBefore=new Date(Date.now()-30*86400000).toISOString();
-  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR f.updated_at<?) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 ELSE 1 END,f.updated_at,m.symbol LIMIT ?").bind(staleBefore,Math.max(1,Math.min(10,limit))).all<any>();
+  const staleCalculatedBefore=new Date(Date.now()-30*86400000).toISOString();
+  const staleRetryBefore=new Date(Date.now()-7*86400000).toISOString();
+  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR (f.status='calculated' AND f.updated_at<?) OR (f.status!='calculated' AND f.updated_at<?)) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 WHEN f.status!='calculated' THEN 1 ELSE 2 END,f.updated_at,m.symbol LIMIT ?").bind(staleCalculatedBefore,staleRetryBefore,Math.max(1,Math.min(10,limit))).all<any>();
   let processed=0,calculated=0,failed=0;
   for(const item of candidates.results) {
     const now=new Date().toISOString();
@@ -297,6 +298,13 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname==="/api/fundamentals/status" && request.method==="GET") {
+      try {
+        await ensureSchema(env);
+        const status=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        return json({source:"SEC EDGAR Company Facts",...status});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
+    }
     if (url.pathname==="/api/fundamentals/sync" && request.method==="GET") {
       try {
         const limit=Math.min(10,Math.max(1,Number(url.searchParams.get("limit")??8)));
@@ -358,6 +366,11 @@ export default {
     return env.ASSETS.fetch(request);
   },
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (controller.cron === "*/10 * * * *") {
+      // SEC ingestion runs independently from browser visits, in bounded batches.
+      ctx.waitUntil(syncUsFundamentals(env, 10));
+      return;
+    }
     const market = controller.cron.startsWith("17 ") ? "MY" : "US";
     ctx.waitUntil(refreshQuotes(env, market));
   }
