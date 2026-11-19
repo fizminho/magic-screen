@@ -49,3 +49,14 @@ When changing one of these behaviours, update this document and the related inli
 ## Stale fundamentals safeguard
 
 - **Annual SEC periods older than 550 days are stale, not rankable.** Keep the SEC facts and filing dates for diagnosis, but set the calculated ratios to null, mark the record `stale_fiscal_period`, and expose a short `STALE FACTS` stock-card flag. The pipeline retries stale records on the normal incomplete-facts cadence. This is a conservative freshness guard, not a claim that every issuer files on the same schedule.
+
+
+## Gemini-assisted SEC fact discovery
+
+- **Gemini is a tag-mapping assistant, not a financial-data source.** The diagnostic endpoint supplies only SEC Company Facts entries in USD from one annual filing accession and fiscal period. Gemini may select an XBRL concept, but it may not invent values, combine periods, annualize quarters, or calculate missing inputs.
+- **Every selected value must exactly match a supplied SEC fact.** The Worker rejects a selection unless its tag, numeric value, fact type (annual EBIT versus instant balance-sheet fact), accession, period end, and USD unit are represented in the candidate set.
+- **AI extraction is review-only and never rankable.** The endpoint returns `AI_EXTRACTED_REVIEW_REQUIRED` and `eligible_for_magic_formula: false`. A matching tag is not enough to certify accounting meaning or formula suitability. Do not write these results into `stock_fundamentals`, calculate ratios, or publish ranks until a separate deterministic validation and reconciliation stage is implemented.
+- **The Gemini diagnostic is manually invoked and protected.** It requires the existing `UNIVERSE_SYNC_TOKEN` bearer authorization and the Cloudflare Worker secret `GEMINI_API_KEY`. The key must never be placed in frontend code, GitHub, logs, or chat. The endpoint does not run during normal page loads or scheduled ingestion and does not write to D1.
+- **The diagnostic input is bounded.** Only a maximum of 500 same-accession USD concepts are sent to the model, prioritised by financial-statement-related labels. If a required concept is not in that set or cannot be mapped safely, it remains missing.
+- **Short-term AI extraction flags must remain explicit.** If AI-derived data is later surfaced in a stock card, use a short label such as `AI REVIEW` and explain that it is not yet eligible for the Magic Formula. Never label model output as verified solely because it matches a supplied fact.
+
