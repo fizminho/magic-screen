@@ -163,11 +163,13 @@ async function syncUsFundamentals(env:Env, limit=8) {
     const now=new Date().toISOString();
     const active=await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active'").all<any>();
     const wanted=new Set(active.results.map((x:any)=>String(x.symbol).toUpperCase()));
+    const symbolsToMap=[...wanted];
+    for(let i=0;i<symbolsToMap.length;i+=80) await env.DB.batch(symbolsToMap.slice(i,i+80).map(symbol=>env.DB.prepare("INSERT INTO sec_company_map(symbol,cik,updated_at) VALUES(?,'UNMAPPED',?) ON CONFLICT(symbol) DO UPDATE SET updated_at=excluded.updated_at").bind(symbol,now)));
     const mapped=(payload.data??[]).filter((r:any[])=>wanted.has(String(r[ix.ticker]).toUpperCase()) && Number(r[ix.cik])>0);
-    for(let i=0;i<mapped.length;i+=80) await env.DB.batch(mapped.slice(i,i+80).map((r:any[])=>env.DB.prepare("INSERT INTO sec_company_map(symbol,cik,updated_at) VALUES(?,?,?) ON CONFLICT(symbol) DO UPDATE SET cik=excluded.cik,updated_at=excluded.updated_at").bind(String(r[ix.ticker]).toUpperCase(),String(r[ix.cik]).padStart(10,"0"),now)));
+    for(let i=0;i<mapped.length;i+=80) await env.DB.batch(mapped.slice(i,i+80).map((r:any[])=>env.DB.prepare("UPDATE sec_company_map SET cik=?,updated_at=? WHERE symbol=?").bind(String(r[ix.cik]).padStart(10,"0"),now,String(r[ix.ticker]).toUpperCase())));
   }
   const staleBefore=new Date(Date.now()-30*86400000).toISOString();
-  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.cik IS NOT NULL AND (f.updated_at IS NULL OR f.updated_at<?) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 ELSE 1 END,f.updated_at,m.symbol LIMIT ?").bind(staleBefore,Math.max(1,Math.min(10,limit))).all<any>();
+  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR f.updated_at<?) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 ELSE 1 END,f.updated_at,m.symbol LIMIT ?").bind(staleBefore,Math.max(1,Math.min(10,limit))).all<any>();
   let processed=0,calculated=0,failed=0;
   for(const item of candidates.results) {
     const now=new Date().toISOString();
