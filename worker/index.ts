@@ -232,15 +232,21 @@ async function syncUsFundamentals(env:Env, limit=10) {
   let ranked=0;
   // INTENTIONAL: never publish a partial-universe Magic Formula rank. Every active MFI
   // candidate must have complete, usable inputs or all ranks remain blank.
-  // INTENTIONAL: only recalculate the combined ranking after at least one company
-  // was processed. With no new SEC facts, the previous complete ranking is unchanged.
-  if(processed>0 && totals?.total>0 && totals.valid===totals.total) {
-    const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
-    // INTENTIONAL: only write rank rows when the calculated rank actually changes.
-    // The SEC cron runs every thirty minutes; unconditional updates would consume D1's
-    // daily row-write allowance even when the underlying fundamentals are unchanged.
-    for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US' AND magic_formula_rank IS NOT ?").bind(row.combined_rank,row.symbol,row.combined_rank).run();
-    ranked=rankedRows.results.length;
+  if(totals?.total>0 && totals.valid===totals.total) {
+    const unranked=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND q.magic_formula_rank IS NULL").first<any>();
+    // INTENTIONAL: recompute only when at least one active candidate is unranked. This
+    // handles a changed MFI universe even on a run that processes no new SEC facts.
+    if((unranked?.count??0)>0) {
+      const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
+      // INTENTIONAL: only write rank rows when the calculated rank actually changes.
+      // The SEC cron runs every thirty minutes; unchanged ranks do not consume D1 writes.
+      for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US' AND magic_formula_rank IS NOT ?").bind(row.combined_rank,row.symbol,row.combined_rank).run();
+      ranked=rankedRows.results.length;
+    }
+  } else if(processed>0 && totals?.total>0) {
+    // INTENTIONAL: if any active candidate becomes incomplete, clear every rank so the
+    // UI never displays a stale partial ranking as if the full universe were ranked.
+    await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=NULL WHERE market='US' AND magic_formula_rank IS NOT NULL AND symbol IN (SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing')").run();
   }
   const remaining=Math.max(0,(totals?.total??0)-(totals?.valid??0));
   return {source:"SEC EDGAR Company Facts",processed,calculated,failed,remaining,ranked,total:totals?.total??0,note:"Ranks are published only when every active MFI candidate has usable required facts."};
