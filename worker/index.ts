@@ -362,14 +362,14 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const locatorByLabel=new Map(locators.map(x=>[x.label,x.href.split("#").pop()]));
       // INTENTIONAL: retain XBRL arc order and preferred-label metadata. Direct
       // relationships without their ordering can hide the statement's intended hierarchy.
-      const relatedArcs=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\\b([^>]*)\\/?\\s*>/gi)]
+      const relatedArcs=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\b([^>]*)\/?\s*>/gi)]
         .map((m:any)=>{
           const attrs=m[1];
           return {
-            from:attrs.match(/(?:xlink:)?from=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1],
-            to:attrs.match(/(?:xlink:)?to=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1],
-            order:Number(attrs.match(/\\border=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1]??0),
-            preferred_label:attrs.match(/(?:xlink:)?preferredLabel=["\\x27]([^"\\x27]+)["\\x27]/i)?.[1]??null
+            from:attrs.match(/(?:xlink:)?from=["\x27]([^"\x27]+)["\x27]/i)?.[1],
+            to:attrs.match(/(?:xlink:)?to=["\x27]([^"\x27]+)["\x27]/i)?.[1],
+            order:Number(attrs.match(/\border=["\x27]([^"\x27]+)["\x27]/i)?.[1]??0),
+            preferred_label:attrs.match(/(?:xlink:)?preferredLabel=["\x27]([^"\x27]+)["\x27]/i)?.[1]??null
           };
         })
         .filter((x:any)=>!!x.from&&!!x.to&&(x.from===target.label||x.to===target.label))
