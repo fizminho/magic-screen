@@ -10,7 +10,7 @@ const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";curren
     {symbol:"8869.KL",name:"Press Metal",market:"MY",currency:"MYR"},{symbol:"1082.KL",name:"Hong Leong Financial",market:"MY",currency:"MYR"},
     {symbol:"6012.KL",name:"Maxis",market:"MY",currency:"MYR"},{symbol:"1961.KL",name:"IOI Corporation",market:"MY",currency:"MYR"},
     {symbol:"7277.KL",name:"Dialog Group",market:"MY",currency:"MYR"},{symbol:"5681.KL",name:"Petronas Dagangan",market:"MY",currency:"MYR"},
-    {symbol:"5285.KL",name:"Sime Darby Plantation",market:"MY",currency:"MYR"},{symbol:"5211.KL",name:"Sunway",market:"MY",currency:"MYR"}
+    {symbol:"5285.KL",name:"Sime Darby Plantation",market:"MY",currency:"MYR"},{symbol:"5211.KL",name:"Sunway",market:"MY",currency:"MYR"},\n    {symbol:"1818.KL",name:"Bursa Malaysia",market:"MY",currency:"MYR"},{symbol:"5209.KL",name:"Farm Fresh",market:"MY",currency:"MYR"},\n    {symbol:"5296.KL",name:"MR D.I.Y. Group",market:"MY",currency:"MYR"},{symbol:"5168.KL",name:"AMMB Holdings",market:"MY",currency:"MYR"},\n    {symbol:"4197.KL",name:"Sime Darby",market:"MY",currency:"MYR"},{symbol:"5878.KL",name:"KPJ Healthcare",market:"MY",currency:"MYR"},\n    {symbol:"5227.KL",name:"IGB Real Estate Investment Trust",market:"MY",currency:"MYR"},{symbol:"5398.KL",name:"Gamuda",market:"MY",currency:"MYR"},\n    {symbol:"5288.KL",name:"UEM Sunrise",market:"MY",currency:"MYR"},{symbol:"5218.KL",name:"Vantris Energy",market:"MY",currency:"MYR"}
   ],
   US: [
     {symbol:"AAPL",name:"Apple",market:"US",currency:"USD"},{symbol:"MSFT",name:"Microsoft",market:"US",currency:"USD"},{symbol:"NVDA",name:"NVIDIA",market:"US",currency:"USD"},
