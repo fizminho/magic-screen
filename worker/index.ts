@@ -306,10 +306,12 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   }).filter((row): row is {symbol:string;name:string;marketCapMillions:number;priceDate:string;quarterDate:string} => !!row && !!row.name);
   if (!rows.length) throw new Error("Magic Formula returned no parseable stock rows.");
   const now = new Date().toISOString();
-  const previousUniverse = await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing' ORDER BY symbol").all<any>();
+  const previousUniverse = await env.DB.prepare("SELECT m.symbol,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.symbol").all<any>();
+  const previousCaps = new Map<string,number|null>(previousUniverse.results.map((row:any)=>[String(row.symbol),row.market_cap==null?null:Number(row.market_cap)]));
   const previousSymbols = previousUniverse.results.map((row:any)=>String(row.symbol)).sort();
   const nextSymbols = rows.map(row=>row.symbol).sort();
   const universeChanged = previousSymbols.length!==nextSymbols.length || previousSymbols.some((symbol:string,index:number)=>symbol!==nextSymbols[index]);
+  const marketCapChanged = rows.some(row=>previousCaps.has(row.symbol) && previousCaps.get(row.symbol)!==row.marketCapMillions*1000000);
   for (let i=0;i<rows.length;i+=40) {
     await env.DB.batch(rows.slice(i,i+40).flatMap(row=>[
       env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD','Magic Formula Investing','active','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,listing_status='active',source=excluded.source,source_updated_at=excluded.source_updated_at WHERE stock_master.company_name IS NOT excluded.company_name OR stock_master.exchange IS NOT excluded.exchange OR stock_master.listing_status IS NOT 'active' OR stock_master.source IS NOT 'Magic Formula Investing'").bind(row.symbol,row.name,now),
