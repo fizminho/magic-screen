@@ -225,7 +225,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
   const totals=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN f.status='calculated' THEN 1 ELSE 0 END) AS valid FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
   let ranked=0;
   if(totals?.total>0 && totals.valid===totals.total) {
-    const rankedRows=await env.DB.prepare("SELECT symbol,ROW_NUMBER() OVER(ORDER BY earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY return_on_capital DESC) AS combined_rank FROM stock_fundamentals WHERE market='US' AND status='calculated'").all<any>();
+    const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
     for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US'").bind(row.combined_rank,row.symbol).run();
     ranked=rankedRows.results.length;
   }
