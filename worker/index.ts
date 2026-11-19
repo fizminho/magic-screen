@@ -379,14 +379,23 @@ export default {
     }
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
+      let refresh: any = null;
       try {
-        let refresh = null;
-        if (url.searchParams.get("refresh")==="1") refresh = await refreshQuotes(env, market);
-        else await ensureSchema(env);
+        await ensureSchema(env);
+        if (url.searchParams.get("refresh")==="1") {
+          try {
+            refresh = await refreshQuotes(env, market);
+          } catch (error) {
+            // INTENTIONAL: D1 write-quota exhaustion or quote-provider failure must not block cached reads.
+            refresh = {updated:0,failed:0,remaining:null,error:String(error)};
+          }
+        }
         const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,q.earnings_yield,q.return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,COALESCE(q.data_status,'awaiting_quote') AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
         return json({market,stocks:result.results,updatedAt:latest?.updated_at ?? null,sourceStatus:result.results.some((row:any)=>row.price!=null)?"Quote cache connected":"Waiting for scheduled quote sync",refresh});
-      } catch { return json({market,stocks:[],updatedAt:null,sourceStatus:"Database not initialised"}); }
+      } catch (error) {
+        return json({market,stocks:[],updatedAt:null,sourceStatus:"Cached stock read failed",error:String(error),refresh},503);
+      }
     }
     return env.ASSETS.fetch(request);
   },
