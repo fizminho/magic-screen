@@ -49,14 +49,16 @@ async function ensureSchema(env: Env) {
   ]);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS stock_master (symbol TEXT NOT NULL, market TEXT NOT NULL, company_name TEXT NOT NULL, currency TEXT NOT NULL, exchange TEXT, sector TEXT, listing_status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL, source_updated_at TEXT NOT NULL, PRIMARY KEY(symbol,market))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market,company_name)").run();
-  const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master").first<{count:number}>();
-  if (!existing?.count) {
-    const now = new Date().toISOString();
-    const seed = (["MY","US"] as const).flatMap(market => symbols[market].map(item =>
-      env.DB.prepare("INSERT OR IGNORE INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,?,?,?,?,'active','curated-starter-universe',?)")
-        .bind(item.symbol,item.market,item.name,item.currency,market==="MY"?"BURSA":"NASDAQ/NYSE",now)
-    ));
-    await env.DB.batch(seed);
+  const now = new Date().toISOString();
+  for (const market of ["MY","US"] as const) {
+    const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master WHERE market=?").bind(market).first<{count:number}>();
+    if (!existing?.count) {
+      const seed = symbols[market].map(item =>
+        env.DB.prepare("INSERT OR IGNORE INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,?,?,?,?,'active','curated-starter-universe',?)")
+          .bind(item.symbol,item.market,item.name,item.currency,market==="MY"?"BURSA":"NASDAQ/NYSE",now)
+      );
+      await env.DB.batch(seed);
+    }
   }
 }
 async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
@@ -141,11 +143,12 @@ export default {
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
       try {
-        if (url.searchParams.get("refresh")==="1") await refreshQuotes(env, market);
+        let refresh = null;
+        if (url.searchParams.get("refresh")==="1") refresh = await refreshQuotes(env, market);
         else await ensureSchema(env);
         const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,q.earnings_yield,q.return_on_capital,q.magic_formula_rank,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,COALESCE(q.data_status,'awaiting_quote') AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
-        return json({market,stocks:result.results,updatedAt:latest?.updated_at ?? null,sourceStatus:result.results.length?"Quote cache connected":"Waiting for scheduled quote sync"});
+        return json({market,stocks:result.results,updatedAt:latest?.updated_at ?? null,sourceStatus:result.results.some((row:any)=>row.price!=null)?"Quote cache connected":"Waiting for scheduled quote sync",refresh});
       } catch { return json({market,stocks:[],updatedAt:null,sourceStatus:"Database not initialised"}); }
     }
     return env.ASSETS.fetch(request);
