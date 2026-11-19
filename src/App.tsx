@@ -4,6 +4,8 @@ import { universe } from "./data/universe";
 import type { ApiResponse, Market, Stock } from "./types";
 
 type Tab = "all" | "shariah" | "watchlist";
+type PipelineStatus = {last_quote_sync?:string|null;mfi_last_sync?:string|null;mfi_price_date?:string|null;mfi_quarter_date?:string|null;mfi_count?:number;sec?:{total?:number;calculated?:number;last_updated?:string|null;incomplete?:number;provider_error?:number;unmapped?:number}};
+const dateTime = (value?:string|null) => value ? new Date(value).toLocaleString("en-MY",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Not available";
 const money = (value: number | null, currency: string) => value == null ? "—" : new Intl.NumberFormat("en-US", {style:"currency",currency,maximumFractionDigits:2}).format(value);
 const pct = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 const ratioPct = (value: number | null) => value == null ? "—" : `${(value * 100).toFixed(2)}%`;
@@ -17,6 +19,7 @@ export default function App() {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [marketUniverse, setMarketUniverse] = useState(universe);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -49,6 +52,8 @@ export default function App() {
         if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
       }
       setUpdatedAt(data.updatedAt);
+      const pipelineResponse = await fetch("/api/pipeline/status?market=" + market);
+      if (pipelineResponse.ok) setPipeline(await pipelineResponse.json() as PipelineStatus);
       let fundamentalsStatus = "";
       if (market === "US") {
         const fundamentalsResponse = await fetch("/api/fundamentals/status");
@@ -155,6 +160,12 @@ export default function App() {
           <div className="stat-card"><div className="stat-top">LIVE QUOTES <span className="stat-icon green"><TrendingUp size={16}/></span></div><div className="stat-value">{available}<small> / {rows.length}</small></div><div className="stat-foot">{available ? "Quotes received" : "Waiting for market data"}</div></div>
           <div className="stat-card"><div className="stat-top">FORMULA RANKED <span className="stat-icon violet"><Sparkles size={16}/></span></div><div className="stat-value">{ranked}<small> stocks</small></div><div className="stat-foot">Needs verified fundamentals</div></div>
           <div className="stat-card"><div className="stat-top">LAST UPDATED <span className="stat-icon"><Clock3 size={16}/></span></div><div className="stat-value time-value">{updatedAt ? new Date(updatedAt).toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"}) : "—"}</div><div className="stat-foot">{updatedAt ? new Date(updatedAt).toLocaleDateString("en-MY") : "No successful sync yet"}</div></div>
+        </div>
+        <div className="pipeline-meta">
+          {market==="US" ? <>
+            <div><span>MFI UNIVERSE SYNC</span><b>{dateTime(pipeline?.mfi_last_sync)}</b><small>{pipeline?.mfi_count ?? 0} candidates · Price date {pipeline?.mfi_price_date ?? "—"} · Quarter data {pipeline?.mfi_quarter_date ?? "—"}</small></div>
+            <div><span>SEC FUNDAMENTALS</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} calculated · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.unmapped ?? 0} unmapped</small></div>
+          </> : <div><span>QUOTE CACHE</span><b>{dateTime(pipeline?.last_quote_sync)}</b><small>Latest stored Bursa quote timestamp</small></div>}
         </div>
         <div className="section-title"><div><div className="eyebrow">DISCOVER OPPORTUNITIES</div><h2>{market==="MY"?"Bursa Malaysia":"US Equities"} <span className="sub-count">{rows.length} companies</span></h2></div><div className="method-tag"><Sparkles size={14}/> MAGIC FORMULA</div></div>
         <div className="toolbar"><div className="tabs"><button className={tab==="all"?"selected":""} onClick={()=>setTab("all")}>All stocks</button><button className={tab==="shariah"?"selected":""} onClick={()=>setTab("shariah")}> <ShieldCheck size={14}/> Shariah verified</button><button className={tab==="watchlist"?"selected":""} onClick={()=>setTab("watchlist")}>Watchlist</button></div><div className="tools"><div className="searchbox"><Search size={15}/><input placeholder="Search company or ticker..." value={query} onChange={e=>setQuery(e.target.value)}/></div><button className="sort-btn" onClick={()=>setSort(s=>s==="rank"?"name":s==="name"?"change":"rank")}><ArrowDownUp size={14}/> Sort: {sort==="rank"?"Formula":sort==="name"?"Name":"Change"}</button></div></div>
