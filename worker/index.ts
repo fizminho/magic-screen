@@ -269,9 +269,11 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   const filingBase="https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/";
   const indexResponse=await fetch(filingBase+"index.json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json"}});
   let instancePath="";
+  let filingFiles:any[]=[];
   if(indexResponse.ok) {
     const indexPayload:any=await indexResponse.json();
     const files=indexPayload?.directory?.item??[];
+    filingFiles=files;
     const instanceFile=files.find((x:any)=>/_htm\.xml$/i.test(String(x.name??"")))
       ?? files.find((x:any)=>/extracted xbrl instance document/i.test(String(x.description??"")));
     if(instanceFile?.name) instancePath=String(instanceFile.name);
@@ -315,6 +317,24 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
     }
     instanceOperatingFacts=instanceOperatingFacts.slice(0,200);
   }
+  // INTENTIONAL: inspect presentation linkbase placement as diagnostic evidence only.
+  // A concept role helps establish accounting meaning; reconciliation alone is insufficient.
+  const presentationFile=filingFiles.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_pre.xml"));
+  const presentationResponse=presentationFile?.name
+    ? await fetch(filingBase+encodeURIComponent(String(presentationFile.name)),{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}})
+    : new Response("SEC presentation linkbase not found",{status:404});
+  const costsAndExpensesPresentation:any[]=[];
+  if(presentationResponse.ok) {
+    const presentationXml=await presentationResponse.text();
+    for(const linkMatch of presentationXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationLink\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?presentationLink>/gi)) {
+      const role=linkMatch[1].match(/(?:xlink:)?role=["\x27]([^"\x27]+)["\x27]/i)?.[1]??null;
+      const body=linkMatch[2];
+      const locators=[...body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\b([^>]*)\/?\s*>/gi)].map((m:any)=>({label:m[1].match(/(?:xlink:)?label=["\x27]([^"\x27]+)["\x27]/i)?.[1]??"",href:m[1].match(/(?:xlink:)?href=["\x27]([^"\x27]+)["\x27]/i)?.[1]??""}));
+      const target=locators.findIndex(x=>/#(?:us-gaap_)?CostsAndExpenses(?:$|[^A-Za-z])/i.test(x.href));
+      if(target<0) continue;
+      costsAndExpensesPresentation.push({role,concept:locators[target].href.split("#").pop(),nearby_concepts:locators.slice(Math.max(0,target-3),Math.min(locators.length,target+4)).map(x=>x.href.split("#").pop())});
+    }
+  }
   // INTENTIONAL: diagnostic reconciliation only, never a production EBIT input.
   // Require exact concepts from one non-dimensional context and reconcile through
   // reported non-operating income, interest expense and pretax income.
@@ -357,7 +377,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
       return score(a)-score(b)||a.tag.localeCompare(b.tag);
     }).slice(0,100);
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,presentation_document:presentationFile?.name??null,presentation_status:presentationResponse.ok?"loaded":"unavailable_http_"+presentationResponse.status,costs_and_expenses_presentation:costsAndExpensesPresentation,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
