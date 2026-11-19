@@ -1,4 +1,4 @@
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
     {symbol:"1155.KL",name:"Maybank",market:"MY",currency:"MYR"},{symbol:"1295.KL",name:"Public Bank",market:"MY",currency:"MYR"},
@@ -47,6 +47,10 @@ async function ensureSchema(env: Env) {
       id INTEGER PRIMARY KEY AUTOINCREMENT, started_at TEXT NOT NULL, completed_at TEXT, status TEXT NOT NULL, message TEXT
     )`)
   ]);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS stock_master (symbol TEXT NOT NULL, market TEXT NOT NULL, company_name TEXT NOT NULL, currency TEXT NOT NULL, exchange TEXT, sector TEXT, listing_status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL, source_updated_at TEXT NOT NULL, PRIMARY KEY(symbol,market))").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market,company_name)").run();
+  const now = new Date().toISOString();
+  for (const market of ["MY","US"] as const) { for (const item of symbols[market]) { await env.DB.prepare("INSERT OR IGNORE INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,?,?,?,?,'active','curated-starter-universe',?)").bind(item.symbol,item.market,item.name,item.currency,market==="MY"?"BURSA":"NASDAQ/NYSE",now).run(); } }
 }
 async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   await ensureSchema(env);
