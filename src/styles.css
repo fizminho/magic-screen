@@ -261,3 +261,18 @@
   .source-cell a { gap:4px; font-size:10px; }
   .source-url { font-size:8px; }
 }
+
+/* Fundamental metrics added to the US Magic Formula screener. */
+.metric-cell { font:10px "DM Mono"; color:#c4cede; white-space:nowrap; }
+@media (min-width:761px) {
+  table { min-width:1160px; }
+}
+@media (max-width:760px) {
+  tbody td:nth-child(6)::before { content:"EARNINGS YIELD"; display:block; margin-bottom:5px; color:#71819c; font:500 8px "DM Mono"; letter-spacing:.8px; }
+  tbody td:nth-child(7)::before { content:"RETURN ON CAPITAL"; display:block; margin-bottom:5px; color:#71819c; font:500 8px "DM Mono"; letter-spacing:.8px; }
+  tbody td:nth-child(8)::before { content:"FORMULA RANK"; display:block; margin-bottom:5px; color:#71819c; font:500 8px "DM Mono"; letter-spacing:.8px; }
+  tbody td:nth-child(9) { grid-column:1 / -1; padding-top:2px; padding-right:30px; }
+  tbody td:nth-child(9)::before { content:"SOURCE"; display:block; margin-bottom:5px; color:#71819c; font:500 8px "DM Mono"; letter-spacing:.8px; }
+  .source-cell { max-width:none; }
+  .metric-cell { font-size:11px; }
+}
