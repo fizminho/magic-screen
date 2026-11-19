@@ -272,7 +272,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   if(indexResponse.ok) {
     const indexPayload:any=await indexResponse.json();
     const files=indexPayload?.directory?.item??[];
-    const instanceFile=files.find((x:any)=>/_htm\\.xml$/i.test(String(x.name??"")))
+    const instanceFile=files.find((x:any)=>/_htm\.xml$/i.test(String(x.name??"")))
       ?? files.find((x:any)=>/extracted xbrl instance document/i.test(String(x.description??"")));
     if(instanceFile?.name) instancePath=String(instanceFile.name);
   }
