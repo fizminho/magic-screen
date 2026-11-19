@@ -61,7 +61,8 @@ export default function App() {
           const fundamentals = await fundamentalsResponse.json() as {calculated?:number;total?:number;unmapped?:number;incomplete?:number;provider_error?:number;stale_market_cap?:number};
           fundamentalsStatus = " · SEC fundamentals " + (fundamentals.calculated ?? 0) + "/" + (fundamentals.total ?? 0) + " ready";
           if (fundamentals.unmapped) fundamentalsStatus += ", " + fundamentals.unmapped + " unmapped";
-          if (fundamentals.incomplete) fundamentalsStatus += ", " + fundamentals.incomplete + " incomplete";\n          if (fundamentals.stale_market_cap) fundamentalsStatus += ", " + fundamentals.stale_market_cap + " valuation refresh pending";
+          if (fundamentals.incomplete) fundamentalsStatus += ", " + fundamentals.incomplete + " incomplete";
+          if (fundamentals.stale_market_cap) fundamentalsStatus += ", " + fundamentals.stale_market_cap + " valuation refresh pending";
           if (fundamentals.provider_error) fundamentalsStatus += ", " + fundamentals.provider_error + " errors";
         }
       }
