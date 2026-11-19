@@ -237,7 +237,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
   if(processed>0 && totals?.total>0 && totals.valid===totals.total) {
     const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
     // INTENTIONAL: only write rank rows when the calculated rank actually changes.
-    // The SEC cron runs every ten minutes; unconditional updates would consume D1's
+    // The SEC cron runs every thirty minutes; unconditional updates would consume D1's
     // daily row-write allowance even when the underlying fundamentals are unchanged.
     for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US' AND magic_formula_rank IS NOT ?").bind(row.combined_rank,row.symbol,row.combined_rank).run();
     ranked=rankedRows.results.length;
@@ -383,7 +383,7 @@ export default {
     return env.ASSETS.fetch(request);
   },
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    if (controller.cron === "*/10 * * * *") {
+    if (controller.cron === "*/30 * * * *") {
       // INTENTIONAL: SEC ingestion is its own cron lane. Return after scheduling it so this
       // invocation does not also trigger a quote refresh for an unrelated market.
       // SEC ingestion runs independently from browser visits, in bounded batches.
