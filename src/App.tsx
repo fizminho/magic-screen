@@ -23,6 +23,10 @@ export default function App() {
   async function load(refresh = false) {
     setLoading(true);
     try {
+      if (refresh && market === "US") {
+        const syncResponse = await fetch("/api/universe?market=US&sync=1");
+        if (!syncResponse.ok) throw new Error("US universe sync failed");
+      }
       const response = await fetch(`/api/stocks?market=${market}${refresh ? "&refresh=1" : ""}`);
       if (!response.ok) throw new Error("API unavailable");
       const data = await response.json() as ApiResponse;
@@ -79,7 +83,7 @@ export default function App() {
         {showInfo && <div className="info-banner"><ShieldCheck size={18}/><div><b>Data integrity comes first.</b><p>Prices, fundamentals and Shariah status are only shown when a source is available and verified. Unknown is not the same as compliant. This first build is awaiting its initial Cloudflare data sync.</p></div><button onClick={()=>setShowInfo(false)}>×</button></div>}
         <div className="stats-grid">
           <div className="stat-card"><div className="stat-top">UNIVERSE <span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">{marketUniverse.filter(x=>x.market===market).length}<small> stocks tracked</small></div><div className="stat-foot">Initial watch universe</div></div>
-          <div className="stat-card"><div className="stat-top">LIVE QUOTES <span className="stat-icon green"><TrendingUp size={16}/></span></div><div className="stat-value">{available}<small> / {universe.filter(x=>x.market===market).length}</small></div><div className="stat-foot">{available ? "Quotes received" : "Waiting for market data"}</div></div>
+          <div className="stat-card"><div className="stat-top">LIVE QUOTES <span className="stat-icon green"><TrendingUp size={16}/></span></div><div className="stat-value">{available}<small> / {marketUniverse.filter(x=>x.market===market).length}</small></div><div className="stat-foot">{available ? "Quotes received" : "Waiting for market data"}</div></div>
           <div className="stat-card"><div className="stat-top">FORMULA RANKED <span className="stat-icon violet"><Sparkles size={16}/></span></div><div className="stat-value">{ranked}<small> stocks</small></div><div className="stat-foot">Needs verified fundamentals</div></div>
           <div className="stat-card"><div className="stat-top">LAST UPDATED <span className="stat-icon"><Clock3 size={16}/></span></div><div className="stat-value time-value">{updatedAt ? new Date(updatedAt).toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"}) : "—"}</div><div className="stat-foot">{updatedAt ? new Date(updatedAt).toLocaleDateString("en-MY") : "No successful sync yet"}</div></div>
         </div>
