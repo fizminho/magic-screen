@@ -129,9 +129,11 @@ async function syncUsUniverse(env: Env) {
 }
 
 function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean): {value:number|null;tag:string|null;filed:string|null} {
-  const gaap=facts?.facts?.["us-gaap"] ?? {};
+  const taxonomies=["us-gaap","ifrs-full"];
+  for (const taxonomy of taxonomies) {
+  const concepts=facts?.facts?.[taxonomy] ?? {};
   for (const tag of tags) {
-    const units=gaap[tag]?.units ?? {};
+    const units=concepts[tag]?.units ?? {};
     const entries=Object.values(units).flat() as any[];
     const eligible=entries.filter((x:any)=>{
       if (typeof x.val!=="number" || !x.end || !x.filed || !["10-K","20-F","40-F","10-Q"].includes(x.form)) return false;
@@ -144,6 +146,7 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean
       return !x.start && (Date.parse(periodEnd)-Date.parse(x.end))/86400000<=120;
     }).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
     if (eligible.length) return {value:eligible[0].val,tag,filed:eligible[0].filed};
+  }
   }
   return {value:null,tag:null,filed:null};
 }
@@ -180,20 +183,20 @@ async function syncUsFundamentals(env:Env, limit=8) {
       const response=await fetch("https://data.sec.gov/api/xbrl/companyfacts/CIK"+item.cik+".json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json"}});
       if(!response.ok) throw new Error("SEC company facts HTTP "+response.status);
       const facts:any=await response.json();
-      const annualFacts=facts?.facts?.["us-gaap"]?.OperatingIncomeLoss?.units?.USD ?? [];
+      const annualFacts=["us-gaap","ifrs-full"].flatMap(taxonomy=>["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"].flatMap(tag=>facts?.facts?.[taxonomy]?.[tag]?.units?.USD ?? []));
       const annual=annualFacts.filter((x:any)=>x.val!=null && x.start && x.end && ["10-K","20-F","40-F"].includes(x.form) && (Date.parse(x.end)-Date.parse(x.start))/86400000>=330 && (Date.parse(x.end)-Date.parse(x.start))/86400000<=400).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
       const periodEnd=annual[0]?.end ?? "";
-      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss"],periodEnd,true) : {value:null,tag:null,filed:null};
-      const assets=periodEnd ? secFactValue(facts,["AssetsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"],periodEnd,true) : {value:null,tag:null,filed:null};
+      const assets=periodEnd ? secFactValue(facts,["AssetsCurrent","CurrentAssets"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent","CurrentLiabilities"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const ppe=periodEnd ? secFactValue(facts,["PropertyPlantAndEquipmentNet","PropertyPlantAndEquipment"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents","CashAndCashEquivalents"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","BorrowingsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
       const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
       const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
       const leaseLong=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsNoncurrent"],periodEnd,false) : {value:null,tag:null,filed:null};
-      const debtTotal=periodEnd ? secFactValue(facts,["LongTermDebt"],periodEnd,false) : {value:null,tag:null,filed:null};
+      const debtTotal=periodEnd ? secFactValue(facts,["LongTermDebt","Borrowings"],periodEnd,false) : {value:null,tag:null,filed:null};
       const cap=Number(item.market_cap);
       const splitDebtKnown=debtCurrent.value!=null || shortDebt.value!=null || debtLong.value!=null;
       const leaseDebtKnown=leaseCurrent.value!=null || leaseLong.value!=null;
