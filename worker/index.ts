@@ -159,10 +159,14 @@ async function syncUsFundamentals(env:Env, limit=10) {
   }
   const staleCalculatedBefore=new Date(Date.now()-30*86400000).toISOString();
   const staleRetryBefore=new Date(Date.now()-7*86400000).toISOString();
+  // INTENTIONAL: annual fundamentals older than 550 days are not eligible for current screening.
+  // The 18-month guard catches stale XBRL tag selection while allowing normal filing-cycle delays.
+  const maxAnnualPeriodAgeDays=550;
+  const maxAnnualPeriodEnd=new Date(Date.now()-maxAnnualPeriodAgeDays*86400000).toISOString().slice(0,10);
   // INTENTIONAL: wait for the MFI market-cap snapshot before attempting SEC calculations.
   // This avoids recording a false incomplete result during the gap between MFI import and quote sync.
-  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR f.market_cap IS NOT q.market_cap OR (f.status='calculated' AND f.updated_at<?) OR (f.status!='calculated' AND f.updated_at<?)) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 WHEN f.status!='calculated' THEN 1 ELSE 2 END,f.updated_at,m.symbol LIMIT ?").bind(staleCalculatedBefore,staleRetryBefore,Math.max(1,Math.min(10,limit))).all<any>();
-  let processed=0,calculated=0,failed=0;
+  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR f.market_cap IS NOT q.market_cap OR (f.status='calculated' AND (f.updated_at<? OR f.fiscal_period<?)) OR (f.status!='calculated' AND f.updated_at<?)) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 WHEN f.status!='calculated' THEN 1 ELSE 2 END,f.updated_at,m.symbol LIMIT ?").bind(staleCalculatedBefore,maxAnnualPeriodEnd,staleRetryBefore,Math.max(1,Math.min(10,limit))).all<any>();
+  let processed=0,calculated=0,stale=0,failed=0;
   for(const item of candidates.results) {
     const now=new Date().toISOString();
     try {
@@ -172,6 +176,9 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const annualFacts=["us-gaap","ifrs-full"].flatMap(taxonomy=>["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"].flatMap(tag=>facts?.facts?.[taxonomy]?.[tag]?.units?.USD ?? []));
       const annual=annualFacts.filter((x:any)=>x.val!=null && x.start && x.end && ["10-K","20-F","40-F"].includes(x.form) && (Date.parse(x.end)-Date.parse(x.start))/86400000>=330 && (Date.parse(x.end)-Date.parse(x.start))/86400000<=400).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
       const periodEnd=annual[0]?.end ?? "";
+      const periodAgeDays=periodEnd ? (Date.now()-Date.parse(periodEnd+"T00:00:00Z"))/86400000 : null;
+      // INTENTIONAL: keep old SEC facts for diagnostics, but never calculate or rank them as current fundamentals.
+      const staleFiscalPeriod=periodAgeDays!=null && periodAgeDays>maxAnnualPeriodAgeDays;
       const ebit=periodEnd ? secFactValue(facts,["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities"],periodEnd,true) : {value:null,tag:null,filed:null};
       const assets=periodEnd ? secFactValue(facts,["AssetsCurrent","CurrentAssets"],periodEnd,false) : {value:null,tag:null,filed:null};
       const liabilities=periodEnd ? secFactValue(facts,["LiabilitiesCurrent","CurrentLiabilities"],periodEnd,false) : {value:null,tag:null,filed:null};
@@ -192,14 +199,15 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
       const investedCapital=netWorkingCapital+(ppe.value??0);
       const enterpriseValue=cap+totalDebt-(cash.value??0);
-      const complete=ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
+      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
       const ey=complete ? (ebit.value as number)/enterpriseValue : null;
       const roc=complete ? (ebit.value as number)/investedCapital : null;
-      const status=complete ? "calculated" : "missing_required_facts";
+      const status=staleFiscalPeriod ? "stale_fiscal_period" : complete ? "calculated" : "missing_required_facts";
       await env.DB.prepare("INSERT INTO stock_fundamentals(symbol,market,cik,ebit,current_assets,current_liabilities,net_ppe,total_debt,cash,market_cap,earnings_yield,return_on_capital,fiscal_period,filed_at,status,source,updated_at) VALUES(?,'US',?,?,?,?,?,?,?,?,?,?,?,?,?,'SEC EDGAR Company Facts',?) ON CONFLICT(symbol,market) DO UPDATE SET cik=excluded.cik,ebit=excluded.ebit,current_assets=excluded.current_assets,current_liabilities=excluded.current_liabilities,net_ppe=excluded.net_ppe,total_debt=excluded.total_debt,cash=excluded.cash,market_cap=excluded.market_cap,earnings_yield=excluded.earnings_yield,return_on_capital=excluded.return_on_capital,fiscal_period=excluded.fiscal_period,filed_at=excluded.filed_at,status=excluded.status,source=excluded.source,updated_at=excluded.updated_at")
         .bind(item.symbol,item.cik,ebit.value,assets.value,liabilities.value,ppe.value,totalDebt,cash.value,item.market_cap,ey,roc,periodEnd||null,ebit.filed,status,now).run();
-      await env.DB.prepare("UPDATE stock_snapshot SET earnings_yield=?,return_on_capital=?,magic_formula_rank=NULL,data_status=? WHERE symbol=? AND market='US'").bind(ey,roc,complete?"fundamentals_calculated":"fundamentals_incomplete",item.symbol).run();
+      await env.DB.prepare("UPDATE stock_snapshot SET earnings_yield=?,return_on_capital=?,magic_formula_rank=NULL,data_status=? WHERE symbol=? AND market='US'").bind(ey,roc,staleFiscalPeriod?"fundamentals_stale":complete?"fundamentals_calculated":"fundamentals_incomplete",item.symbol).run();
       if(complete) calculated++;
+      if(staleFiscalPeriod) stale++;
       processed++;
     } catch(error) {
       failed++;
@@ -228,7 +236,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
     await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=NULL WHERE market='US' AND magic_formula_rank IS NOT NULL AND symbol IN (SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing')").run();
   }
   const remaining=Math.max(0,(totals?.total??0)-(totals?.valid??0));
-  return {source:"SEC EDGAR Company Facts",processed,calculated,failed,remaining,ranked,total:totals?.total??0,note:"Ranks are published only when every active MFI candidate has usable required facts."};
+  return {source:"SEC EDGAR Company Facts",processed,calculated,stale,failed,remaining,ranked,total:totals?.total??0,note:"Ranks are published only when every active MFI candidate has usable required facts."};
 }
 
 async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true, forceRefresh=false) {
@@ -318,7 +326,7 @@ export default {
         const quotes=await env.DB.prepare("SELECT MAX(updated_at) AS last_updated FROM stock_snapshot WHERE market=?").bind(market).first<any>();
         if (market==="MY") return json({market,last_quote_sync:quotes?.last_updated??null});
         const mfi=await env.DB.prepare("SELECT source_updated_at,price_date,quarter_date,result_count,minimum_market_cap,selected_count FROM mfi_screening_meta WHERE id=1").first<any>();
-        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='stale_fiscal_period' THEN 1 ELSE 0 END),0) AS stale_fiscal_period,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
         return json({market,last_quote_sync:quotes?.last_updated??null,mfi_last_sync:mfi?.source_updated_at??null,mfi_price_date:mfi?.price_date??null,mfi_quarter_date:mfi?.quarter_date??null,mfi_count:mfi?.result_count??0,mfi_minimum_market_cap:mfi?.minimum_market_cap??null,mfi_selected_count:mfi?.selected_count??null,sec});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
