@@ -30,7 +30,7 @@ export const universe: UniverseEntry[] = [
   {symbol:"5227.KL",name:"IGB Real Estate Investment Trust",market:"MY",currency:"MYR"},
   {symbol:"5398.KL",name:"Gamuda",market:"MY",currency:"MYR"},
   {symbol:"5288.KL",name:"UEM Sunrise",market:"MY",currency:"MYR"},
-  {symbol:"5185.KL",name:"Sapura Energy",market:"MY",currency:"MYR"},
+  {symbol:"5218.KL",name:"Vantris Energy",market:"MY",currency:"MYR"},
   {symbol:"AAPL",name:"Apple",market:"US",currency:"USD"},
   {symbol:"MSFT",name:"Microsoft",market:"US",currency:"USD"},
   {symbol:"NVDA",name:"NVIDIA",market:"US",currency:"USD"},
