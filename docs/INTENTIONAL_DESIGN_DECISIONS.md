@@ -21,8 +21,8 @@ This document records deliberate behaviour in Magic Screen. These are guardrails
 
 ## Background processing
 
-- **SEC fundamentals sync runs every ten minutes**, independently of browser page loads, processing at most ten candidates per invocation. The UI reads progress; it does not drive the ingestion job.
-- **The SEC cron is a separate lane from quote refresh.** Its scheduled handler returns after starting the fundamentals job so the same invocation does not also refresh quotes.
+- **SEC fundamentals sync runs every thirty minutes**, independently of browser page loads, processing at most ten candidates per invocation. This allows the initial 30-stock batch to complete in roughly one hour while reducing idle scheduled work. The UI reads progress; it does not drive the ingestion job.
+- **The SEC cron is a separate lane from quote refresh.** Its scheduled handler returns after starting the fundamentals job so the same invocation does not also refresh quotes. Ranking is recalculated only in a run that processed at least one company; idle runs preserve the previous complete ranking.
 - **Successful calculations refresh after 30 days; incomplete/provider-error rows retry after seven days.** This balances freshness against repeated requests for issuers whose tagging or provider response has not changed.
 - The manual `/api/fundamentals/sync` endpoint remains for controlled diagnostics. Normal UI usage should not call it.
 
