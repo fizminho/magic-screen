@@ -128,6 +128,8 @@ async function syncUsUniverse(env: Env) {
   return {imported,total:total?.count ?? imported,source:"SEC company_tickers_exchange.json",asOf:now,note:"SEC states this directory does not guarantee accuracy or complete exchange coverage."};
 }
 
+// INTENTIONAL: MFI market cap is USD. Keep SEC inputs USD-only until explicit FX conversion
+// (with a dated, auditable rate source) exists; missing local-currency facts must stay unavailable.
 function secFactValue(facts:any, tags:string[], periodEnd:string, annual:boolean): {value:number|null;tag:string|null;filed:string|null} {
   const taxonomies=["us-gaap","ifrs-full"];
   for (const taxonomy of taxonomies) {
@@ -178,6 +180,8 @@ async function syncUsFundamentals(env:Env, limit=10) {
   }
   const staleCalculatedBefore=new Date(Date.now()-30*86400000).toISOString();
   const staleRetryBefore=new Date(Date.now()-7*86400000).toISOString();
+  // INTENTIONAL: wait for the MFI market-cap snapshot before attempting SEC calculations.
+  // This avoids recording a false incomplete result during the gap between MFI import and quote sync.
   const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR (f.status='calculated' AND f.updated_at<?) OR (f.status!='calculated' AND (f.updated_at<? OR f.market_cap IS NULL))) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 WHEN f.status!='calculated' THEN 1 ELSE 2 END,f.updated_at,m.symbol LIMIT ?").bind(staleCalculatedBefore,staleRetryBefore,Math.max(1,Math.min(10,limit))).all<any>();
   let processed=0,calculated=0,failed=0;
   for(const item of candidates.results) {
@@ -226,6 +230,8 @@ async function syncUsFundamentals(env:Env, limit=10) {
   }
   const totals=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN f.status='calculated' THEN 1 ELSE 0 END) AS valid FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
   let ranked=0;
+  // INTENTIONAL: never publish a partial-universe Magic Formula rank. Every active MFI
+  // candidate must have complete, usable inputs or all ranks remain blank.
   if(totals?.total>0 && totals.valid===totals.total) {
     const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
     for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US'").bind(row.combined_rank,row.symbol).run();
@@ -241,6 +247,8 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
 
   // Reuse the last successful MFI result for six hours when the screen settings match.
   // This avoids a login/session round-trip every time someone opens the screener.
+  // INTENTIONAL: cache successful MFI sessions for six hours; normal page loads should
+  // not repeatedly scrape the authenticated site. The explicit refresh path can bypass this.
   if (!forceRefresh) {
     const cached = await env.DB.prepare("SELECT minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date FROM mfi_screening_meta WHERE id=1").first<any>();
     const cacheAge = cached?.source_updated_at ? Date.now() - Date.parse(cached.source_updated_at) : Infinity;
@@ -273,6 +281,8 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   if (/Account\/LogOn|name=["']Email["']|>\s*Login\s*</i.test(response.url+" "+html)) throw new Error("Magic Formula rejected the session. Refresh MFI_SESSION_COOKIE.");
   const table = html.match(/<table\b[^>]*class=["'][^"']*screeningdata[^"']*["'][^>]*>([\s\S]*?)<\/table>/i)?.[1];
   if (!table) throw new Error("Could not find the screening results table in Magic Formula response.");
+  // INTENTIONAL: the provider's screening table is alphabetically sorted and does not
+  // contain EY/ROC ranks. Preserve it as a candidate universe, never as a ranking order.
   const rows = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(match => {
     const cells = [...match[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(cell =>
       cell[1].replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/\s+/g," ").trim()
@@ -369,6 +379,8 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (controller.cron === "*/10 * * * *") {
+      // INTENTIONAL: SEC ingestion is its own cron lane. Return after scheduling it so this
+      // invocation does not also trigger a quote refresh for an unrelated market.
       // SEC ingestion runs independently from browser visits, in bounded batches.
       ctx.waitUntil(syncUsFundamentals(env, 10));
       return;
