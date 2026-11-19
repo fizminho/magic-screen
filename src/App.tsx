@@ -46,10 +46,14 @@ export default function App() {
       if (!response.ok) throw new Error("API unavailable");
       const data = await response.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number}};
       setStocks(data.stocks ?? []);
-      const universeResponse = await fetch("/api/universe?market=" + market);
-      if (universeResponse.ok) {
-        const master = await universeResponse.json() as { stocks?: Array<{symbol:string;company_name:string;currency:string;market:Market}> };
-        if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
+      // INTENTIONAL: the US screener is driven exclusively by the MFI results returned through /api/stocks.
+      // Fetch the imported master universe only for Malaysia; avoid an unused US universe request.
+      if (market === "MY") {
+        const universeResponse = await fetch("/api/universe?market=MY");
+        if (universeResponse.ok) {
+          const master = await universeResponse.json() as { stocks?: Array<{symbol:string;company_name:string;currency:string;market:Market}> };
+          if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
+        }
       }
       setUpdatedAt(data.updatedAt);
       const pipelineResponse = await fetch("/api/pipeline/status?market=" + market);
