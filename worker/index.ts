@@ -320,9 +320,23 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   // INTENTIONAL: inspect presentation linkbase placement as diagnostic evidence only.
   // A concept role helps establish accounting meaning; reconciliation alone is insufficient.
   const presentationFile=filingFiles.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_pre.xml"));
+  const labelFile=filingFiles.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_lab.xml"));
   const presentationResponse=presentationFile?.name
     ? await fetch(filingBase+encodeURIComponent(String(presentationFile.name)),{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}})
     : new Response("SEC presentation linkbase not found",{status:404});
+  const labelResponse=labelFile?.name
+    ? await fetch(filingBase+encodeURIComponent(String(labelFile.name)),{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/xml,text/xml"}})
+    : new Response("SEC label linkbase not found",{status:404});
+  const costsAndExpensesLabels:any[]=[];
+  if(labelResponse.ok) {
+    const labelXml=await labelResponse.text();
+    for(const resource of labelXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?label\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?label>/gi)) {
+      const attrs=resource[1];
+      const role=attrs.match(/(?:xlink:)?role=["\x27]([^"\x27]+)["\x27]/i)?.[1]??null;
+      const textValue=resource[2].replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+      if(textValue) costsAndExpensesLabels.push({role,label:textValue});
+    }
+  }
   const costsAndExpensesPresentation:any[]=[];
   if(presentationResponse.ok) {
     const presentationXml=await presentationResponse.text();
@@ -379,7 +393,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
       const score=(x:AiFactCandidate)=>/total revenue|revenues|revenue|total operating expenses|operating income|operating expenses/i.test(x.label+" "+x.tag)?0:1;
       return score(a)-score(b)||a.tag.localeCompare(b.tag);
     }).slice(0,100);
-  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,presentation_document:presentationFile?.name??null,presentation_status:presentationResponse.ok?"loaded":"unavailable_http_"+presentationResponse.status,costs_and_expenses_presentation:costsAndExpensesPresentation,candidate_count:bounded.length};
+  return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,presentation_document:presentationFile?.name??null,presentation_status:presentationResponse.ok?"loaded":"unavailable_http_"+presentationResponse.status,label_document:labelFile?.name??null,label_status:labelResponse.ok?"loaded":"unavailable_http_"+labelResponse.status,costs_and_expenses_labels:costsAndExpensesLabels,costs_and_expenses_presentation:costsAndExpensesPresentation,candidate_count:bounded.length};
 }
 
 async function syncUsFundamentals(env:Env, limit=10) {
