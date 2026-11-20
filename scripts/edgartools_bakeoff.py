@@ -666,6 +666,78 @@ def filing_specific_review(
             "guardrail": "Filing-specific validation only. Do not treat this as approval of any broad taxonomy mapping or production update.",
         }
 
+    # INTENTIONAL: SGHC uses IFRS and its FY2025 statement does not
+    # present a direct operating-profit subtotal. Reconstruct this one filing
+    # from its exact signed statement rows; never generalize the mapping.
+    if symbol == "SGHC" and accession == "0001628280-26-025609":
+        facts = {
+            "revenue": ("Revenue", r"^Revenue$"),
+            "direct_and_marketing_expenses": ("SalesAndMarketingExpense", r"^Direct and marketing expenses$"),
+            "general_and_administrative_expenses": ("GeneralAndAdministrativeExpense", r"^General and administrative expenses$"),
+            "depreciation_and_amortization": ("DepreciationAndAmortisationExpense", r"^Depreciation and amortization expense$"),
+            "impairment_of_assets": ("ImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss", r"^Impairment of assets$"),
+            "other_operating_income": ("MiscellaneousOtherOperatingIncome", r"^Other operating income$"),
+            "finance_income": ("FinanceIncome", r"^Finance income$"),
+            "finance_expense": ("FinanceCosts", r"^Finance expense$"),
+            "change_in_fair_value_of_options": ("GainsLossesOnFinancialLiabilitiesAtFairValueThroughProfitOrLossDesignatedAsUponInitialRecognition", r"^Change in fair value of options$"),
+            "share_of_post_tax_profit_of_equity_accounted_investments": ("ShareOfProfitLossOfAssociatesAccountedForUsingEquityMethod", r"^Share of post-tax profit of equity accounted investments$"),
+            "profit_before_taxation": ("ProfitLossBeforeTax", r"^Profit before taxation$"),
+        }
+        inputs = {
+            name: statement_fact_amount(
+                statements, "income_statement", suffix, label, period,
+            )
+            for name, (suffix, label) in facts.items()
+        }
+        missing = [name for name, value in inputs.items() if value is None]
+        if missing:
+            return {
+                "status": "review_required",
+                "method": "ifrs_statement_subtotal_reconstructed",
+                "automation_status": "manual_review_only",
+                "filing_accession": accession,
+                "fiscal_period": period,
+                "inputs": inputs,
+                "missing_inputs": missing,
+                "reason": "Exact consolidated IFRS statement rows were not all found for the selected fiscal period.",
+            }
+        operating_components = (
+            "revenue",
+            "direct_and_marketing_expenses",
+            "general_and_administrative_expenses",
+            "depreciation_and_amortization",
+            "impairment_of_assets",
+            "other_operating_income",
+        )
+        ebit = sum(float(inputs[name]) for name in operating_components)
+        pretax_reconciliation = (
+            ebit
+            + float(inputs["finance_income"])
+            + float(inputs["finance_expense"])
+            + float(inputs["change_in_fair_value_of_options"])
+            + float(inputs["share_of_post_tax_profit_of_equity_accounted_investments"])
+        )
+        return {
+            "status": "review_only",
+            "method": "ifrs_statement_subtotal_reconstructed",
+            "automation_status": "manual_review_only",
+            "filing_accession": accession,
+            "fiscal_period": period,
+            "source_context": "FY2025 Form 20-F, consolidated statement of profit or loss and Note 5",
+            **inputs,
+            "ebit_candidate": round(ebit, 2),
+            "cross_checks": {
+                "sum_of_operating_statement_components": round(ebit, 2),
+                "operating_profit_plus_separately_presented_non_operating_items": round(pretax_reconciliation, 2),
+                "reported_profit_before_taxation": round(float(inputs["profit_before_taxation"]), 2),
+                "difference_to_reported_profit_before_taxation": round(pretax_reconciliation - float(inputs["profit_before_taxation"]), 2),
+                "reconciles_within_1": abs(pretax_reconciliation - float(inputs["profit_before_taxation"])) <= 1.0,
+            },
+            "formula": "revenue + signed direct/marketing expenses + signed G&A + signed D&A + signed impairment + other operating income",
+            "classification_note": "The 20-F does not present a direct operating-profit subtotal. Direct and marketing expenses include cost of revenues (Note 5). Finance income, finance expense, change in fair value of options and the share of post-tax profit of equity-accounted investments are kept outside the reconstructed operating subtotal and used only for the pretax reconciliation.",
+            "guardrail": "Filing-specific IFRS manual review only. Do not generalize these concepts, labels or amounts to other issuers/periods, and do not promote this reconstruction into production fundamentals or rankings.",
+        }
+
     # INTENTIONAL: the PBI note below is restricted to its exact 2025 10-K.
     # The filing allocates part of total interest expense into Cost of financing and other.
     if symbol != "PBI" or accession != "0001628280-26-009650":
