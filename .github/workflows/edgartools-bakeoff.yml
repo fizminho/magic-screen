@@ -128,6 +128,30 @@ jobs:
               raise SystemExit("Resolver preview did not confirm production and ranking immutability.")
           print(f"Resolver: {report.get('resolver')}; rows: {len(report.get('resolutions', []))}")
           PY
+      - name: Run read-only MFI ranking preview
+        if: hashFiles('edgartools-resolver-preview.json') != '' && vars.EDGARTOOLS_INGEST_URL != ''
+        env:
+          EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
+          UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
+        run: |
+          if [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
+            echo "::warning::UNIVERSE_SYNC_TOKEN is not configured; ranking preview skipped."
+            exit 0
+          fi
+          BASE_URL="${EDGARTOOLS_INGEST_URL%/api/fundamentals/edgartools/ingest}"
+          set +x
+          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+            -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
+            "$BASE_URL/api/fundamentals/edgartools/ranking-preview" > edgartools-mfi-ranking-preview.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("edgartools-mfi-ranking-preview.json").read_text())
+          print("Shadow MFI ranking summary:", report.get("summary", {}))
+          if report.get("production_fundamentals_changed") is not False or report.get("rankings_changed") is not False or report.get("production_write") is not False:
+              raise SystemExit("Ranking preview did not confirm production immutability.")
+          print("Preview-only ranking rows:", len(report.get("rankings", [])))
+          PY
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
@@ -141,5 +165,6 @@ jobs:
             edgartools-resolver-preview.json
             accounting-review-queue.json
             accounting-review-queue.csv
+            edgartools-mfi-ranking-preview.json
           if-no-files-found: warn
           retention-days: 7
