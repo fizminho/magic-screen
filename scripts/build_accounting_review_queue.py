@@ -140,7 +140,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
 
 DEBT_SCOPE_PATTERNS = (
     "debt", "borrow", "loan", "lease liabilit", "royalt", "sale lease-back",
-    "sale leaseback", "financing", "note payable",
+    "sale leaseback", "financing", "note payable", "notes payable", "notes payables", "notespayable",
 )
 
 
