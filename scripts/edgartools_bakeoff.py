@@ -93,6 +93,11 @@ def mfi_market_cap_usd_millions(symbol: str) -> float | None:
     """Return the snapshot's USD market cap in millions, with an optional run override."""
     values = dict(DEFAULT_MFI_MARKET_CAPS_MILLIONS)
     raw_override = os.environ.get("MFI_MARKET_CAPS_JSON", "").strip()
+    requested_price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
+    # INTENTIONAL: never reuse an old market-cap snapshot with a newly selected
+    # quote date. A new date requires a matching explicit market_caps_json map.
+    if not raw_override and requested_price_date != MFI_SNAPSHOT_PRICE_DATE:
+        return None
     if raw_override:
         parsed = json.loads(raw_override)
         if not isinstance(parsed, dict):
