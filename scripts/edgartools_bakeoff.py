@@ -1307,7 +1307,7 @@ def non_sec_issuer_review_case(symbol: str) -> dict[str, Any] | None:
 
 
 def extract_company(symbol: str) -> dict[str, Any]:
-    result: dict[str, Any] = {"symbol": symbol, "status": "error"}
+    result: dict[str, Any] = {"symbol": symbol, "status": "error", "provider_status": "extraction_error"}
     try:
         company = Company(symbol)
         # INTENTIONAL: mirror the annual filing families used by the SEC pipeline.
@@ -1341,6 +1341,8 @@ def extract_company(symbol: str) -> dict[str, Any]:
 
         result.update({
             "status": "extracted",
+            "provider_status": "supported",
+            "provider": "EdgarTools",
             "filing": filing_metadata(filing),
             "financials_source": financials_source,
             "statements": {
@@ -1466,6 +1468,8 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # Record this as a coverage outcome, not a failure of other issuers.
         if type(exc).__name__ == "CompanyNotFoundError":
             result["status"] = "not_found_in_sec_company_index"
+            result["provider_status"] = "unsupported_provider"
+            result["provider"] = "EdgarTools"
             # INTENTIONAL: preserve separately sourced audited issuer reports
             # for MFI OTC tickers without an SEC company-index match. These
             # manual cases remain outside the SEC facts and production pipeline.
@@ -1539,6 +1543,8 @@ def main() -> int:
         "edgartools_version": None,
         "symbols": list(symbols),
         "production_data_modified": False,
+        "primary_provider": "EdgarTools",
+        "provider_policy": "EdgarTools is primary. unsupported_provider tickers remain in the MFI universe and are not sent to a fallback provider; fallback selection is deferred.",
         "companies": [],
     }
     try:
@@ -1564,9 +1570,9 @@ def main() -> int:
             print(f"  filing metadata: {json.dumps(company.get('filing', {}), default=str)}")
 
     extracted = sum(item["status"] == "extracted" for item in report["companies"])
-    coverage_gaps = sum(item["status"] == "not_found_in_sec_company_index" for item in report["companies"])
+    coverage_gaps = sum(item.get("provider_status") == "unsupported_provider" for item in report["companies"])
     unexpected_errors = sum(item["status"] == "error" for item in report["companies"])
-    print(f"Summary: {extracted} extracted, {coverage_gaps} not in SEC company index, {unexpected_errors} unexpected errors")
+    print(f"Summary: {extracted} extracted, {coverage_gaps} unsupported_provider, {unexpected_errors} unexpected errors")
     print(f"JSON report written to {output}")
     # INTENTIONAL: expected SEC coverage gaps stay visible but do not invalidate
     # successful extractions; unexpected errors still fail the workflow.
