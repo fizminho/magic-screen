@@ -19,6 +19,8 @@ on:
         required: false
         default: "2026-11-18"
         type: string
+      # INTENTIONAL: changing the quote date without a matching market-cap map
+      # causes the script to withhold the pinned market caps rather than reuse stale values.
       market_caps_json:
         description: "Optional JSON object of ticker to MFI market cap in USD millions; blank uses the pinned 2026-11-20 snapshot"
         required: false
