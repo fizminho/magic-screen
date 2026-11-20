@@ -1009,6 +1009,50 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC EDGAR Company Facts"},503); }
     }
 
+    if (url.pathname==="/api/fundamentals/edgartools/ingest" && request.method==="POST") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        const declaredLength=Number(request.headers.get("Content-Length")??0);
+        if (declaredLength>8*1024*1024) return json({error:"Payload exceeds 8 MiB limit"},413);
+        const raw=await request.text();
+        if (new TextEncoder().encode(raw).byteLength>8*1024*1024) return json({error:"Payload exceeds 8 MiB limit"},413);
+        const payload:any=JSON.parse(raw);
+        if (payload?.primary_provider!=="EdgarTools" || !Array.isArray(payload?.companies) || payload.companies.length>100) return json({error:"Expected an EdgarTools report with at most 100 companies"},400);
+        await ensureSchema(env);
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))").run();
+        const now=new Date().toISOString();
+        const accepted=payload.companies.map((company:any)=>{
+          const symbol=String(company?.symbol??"").trim().toUpperCase();
+          if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) throw new Error("Invalid ticker in EdgarTools report");
+          const providerStatus=company?.provider_status ?? (company?.status==="extracted" ? "supported" : company?.status==="not_found_in_sec_company_index" ? "unsupported_provider" : "extraction_error");
+          if (!["supported","unsupported_provider","extraction_error"].includes(providerStatus)) throw new Error("Invalid provider status for "+symbol);
+          const filing=company?.filing??{};
+          const accession=filing?.accession_number ? String(filing.accession_number) : filing?.accession ? String(filing.accession) : null;
+          if (providerStatus==="supported" && (!accession || !(filing?.period_of_report??filing?.period))) throw new Error("Supported issuer "+symbol+" is missing filing accession or fiscal period");
+          const accessionKey=accession??("STATUS:"+symbol);
+          const serialized=JSON.stringify(company);
+          if (serialized.length>2*1024*1024) throw new Error("Company payload too large for "+symbol);
+          return {symbol,providerStatus,accession,accessionKey,filing,company,serialized};
+        });
+        let ingested=0;
+        for(let i=0;i<accepted.length;i+=40) {
+          const batch=accepted.slice(i,i+40).map((item:any)=>env.DB.prepare("INSERT INTO edgartools_filing_evidence (symbol,accession_key,market,cik,accession,fiscal_period,form,filed_at,reporting_currency,provider_status,provider,provider_version,generated_at,payload_json,ingested_at) VALUES (?, ?, 'US', ?, ?, ?, ?, ?, ?, ?, 'EdgarTools', ?, ?, ?, ?) ON CONFLICT(symbol,accession_key) DO UPDATE SET cik=excluded.cik,accession=excluded.accession,fiscal_period=excluded.fiscal_period,form=excluded.form,filed_at=excluded.filed_at,reporting_currency=excluded.reporting_currency,provider_status=excluded.provider_status,provider_version=excluded.provider_version,generated_at=excluded.generated_at,payload_json=excluded.payload_json,ingested_at=excluded.ingested_at").bind(item.symbol,item.accessionKey,item.company?.filing?.cik??null,item.accession,item.filing?.period_of_report??item.filing?.period??null,item.filing?.form??null,item.filing?.filing_date??item.filing?.filed_at??null,item.company?.reporting_currency_review?.currency??null,item.providerStatus,payload.edgartools_version??null,payload.generated_at??null,item.serialized,now));
+          await env.DB.batch(batch);
+          ingested+=batch.length;
+        }
+        return json({source:"EdgarTools",primary_provider:"EdgarTools",received:accepted.length,ingested,production_fundamentals_changed:false,rankings_changed:false,unsupported_provider:accepted.filter((x:any)=>x.providerStatus==="unsupported_provider").map((x:any)=>x.symbol),note:"Raw filing evidence only. No production fundamentals, ratios, eligibility or rankings were changed."});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools ingestion"},400); }
+    }
+    if (url.pathname==="/api/fundamentals/edgartools/status" && request.method==="GET") {
+      try {
+        await ensureSchema(env);
+        await env.DB.prepare("CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))").run();
+        const summary=await env.DB.prepare("SELECT provider_status,COUNT(*) AS count,MAX(ingested_at) AS last_ingested_at FROM edgartools_filing_evidence GROUP BY provider_status ORDER BY provider_status").all<any>();
+        const latest=await env.DB.prepare("SELECT symbol,provider_status,accession,fiscal_period,form,filed_at,reporting_currency,provider_version,ingested_at FROM edgartools_filing_evidence e WHERE accession_key=(SELECT MAX(e2.accession_key) FROM edgartools_filing_evidence e2 WHERE e2.symbol=e.symbol) ORDER BY symbol").all<any>();
+        return json({primary_provider:"EdgarTools",storage:"raw filing evidence only",production_fundamentals_changed:false,summary:summary.results,latest:latest.results});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
+    }
     if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
