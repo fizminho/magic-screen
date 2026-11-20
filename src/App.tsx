@@ -10,7 +10,7 @@ const money = (value: number | null, currency: string) => value == null ? "—" 
 const pct = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 const ratioPct = (value: number | null) => value == null ? "—" : `${(value * 100).toFixed(2)}%`;
 
-type MfiPreviewRow = {symbol:string;company_name:string|null;market_cap:number|null;earnings_yield:number|null;return_on_capital:number|null;earnings_yield_rank:number|null;return_on_capital_rank:number|null;magic_formula_score:number|null;magic_formula_rank:number|null;ranking_eligible:boolean;review_flags:string[]};
+type MfiPreviewRow = {symbol:string;company_name:string|null;market_cap:number|null;earnings_yield:number|null;return_on_capital:number|null;earnings_yield_rank:number|null;return_on_capital_rank:number|null;magic_formula_score:number|null;magic_formula_rank:number|null;ranking_eligible:boolean;exclusion_reasons:string[];review_flags:string[]};
 type MfiPreview = {as_of:string;summary:{universe:number;eligible:number;ranked:number;excluded:number};rankings:MfiPreviewRow[];production_write:boolean;guardrail:string};
 
 const MFI_SOURCE_URL = "https://www.magicformulainvesting.com/Screening/StockScreening";
@@ -26,6 +26,7 @@ export default function App() {
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [mfiPreview,setMfiPreview]=useState<MfiPreview|null>(null);
   const [mfiPreviewError,setMfiPreviewError]=useState("");
+  const [showMfiExcluded,setShowMfiExcluded]=useState(false);
 
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
@@ -245,7 +246,11 @@ export default function App() {
             <div className="table-wrap"><table className="preview-table"><thead><tr><th>RANK</th><th>COMPANY</th><th>EARNINGS YIELD</th><th>RETURN ON CAPITAL</th><th>EY PERCENTILE</th><th>ROC PERCENTILE</th><th>REVIEW FLAGS</th></tr></thead><tbody>
               {mfiPreview.rankings.filter(row=>row.magic_formula_rank!==null).map(row=><tr key={row.symbol}><td className="formula-score">#{row.magic_formula_rank}</td><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td>{ratioPct(row.earnings_yield)}</td><td><span title={row.return_on_capital!==null && row.return_on_capital>5?"Candidate ROC exceeds 500%. Review working capital, lease classification and net PP&E scope before relying on this value.": "Candidate ROC, not accounting-approved."}>{ratioPct(row.return_on_capital)}</span>{row.return_on_capital!==null && row.return_on_capital>5 && <small className="preview-warning">Outlier · verify denominator</small>}</td><td>{row.earnings_yield_rank?.toFixed(1)??"—"}</td><td>{row.return_on_capital_rank?.toFixed(1)??"—"}</td><td><span className="preview-warning" title={row.review_flags.join(", ") || "No review flags"}>{row.review_flags.length} flags · hover for details</span></td></tr>)}
             </tbody></table></div>
-            <p className="preview-footnote">Every ranked row with accounting flags remains review-required. Candidate ROC above 500% is highlighted as an outlier for denominator validation, not automatically rejected. Hover over each flag count to inspect the exact issues. {mfiPreview.guardrail} Production write: {String(mfiPreview.production_write)}.</p>
+            <button className="import-btn mfi-excluded-toggle" onClick={()=>setShowMfiExcluded(value=>!value)}>{showMfiExcluded?"Hide":"Show"} excluded companies ({mfiPreview.summary.excluded})</button>
+            {showMfiExcluded && <div className="table-wrap mfi-excluded-wrap"><table className="preview-table"><thead><tr><th>COMPANY</th><th>WHY IT IS EXCLUDED</th></tr></thead><tbody>
+              {mfiPreview.rankings.filter(row=>!row.ranking_eligible).map(row=><tr key={row.symbol}><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td><small className="mfi-exclusion-reasons">{row.exclusion_reasons.join(" · ") || "No reason returned"}</small></td></tr>)}
+            </tbody></table></div>}
+            <p className="preview-footnote">Every ranked row with accounting flags remains review-required. Candidate ROC above 500% is highlighted as an outlier for denominator validation, not automatically rejected. Hover over each flag count to inspect the exact issues. Exclusion reasons are screening guardrails, not accounting conclusions. {mfiPreview.guardrail} Production write: {String(mfiPreview.production_write)}.</p>
           </>}
         </section>}
 
