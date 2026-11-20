@@ -989,9 +989,59 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
     if gross_debt is not None and unrestricted_cash is not None:
         net_debt = round(gross_debt - unrestricted_cash, 2)
 
+    # INTENTIONAL: explicit candidate-selection policy, not accounting approval.
+    # Only unique conventional debt components and separately reported unrestricted
+    # cash enter this diagnostic bridge. Other scopes remain visible but excluded.
+    debt_selection_status = (
+        "withheld_aggregate_debt_present"
+        if aggregate_debt_count
+        else "identified_from_unique_current_and_noncurrent_components"
+        if current_debt is not None and noncurrent_debt is not None
+        else "incomplete_or_ambiguous_debt_inputs"
+    )
+    selection_policy = {
+        "conventional_debt": {
+            "status": debt_selection_status,
+            "included_candidate": gross_debt,
+            "rule": "Use current plus noncurrent conventional debt only when both are unique and no aggregate debt candidate is present. If an aggregate is present, withhold the component sum; reconciliation is diagnostic only.",
+        },
+        "unrestricted_cash": {
+            "status": "identified_unrestricted_cash_candidate_review_only" if unrestricted_cash is not None else "unrestricted_cash_unknown",
+            "included_candidate": unrestricted_cash,
+            "rule": "Deduct only one uniquely identified, separately reported unrestricted cash and cash equivalents fact. Missing or ambiguous cash remains unknown.",
+        },
+        "restricted_cash": {
+            "treatment": "excluded_pending_policy",
+            "candidate_count": categories.get("cash_restricted_candidates", {}).get("candidate_count", 0),
+        },
+        "short_term_investments": {
+            "treatment": "excluded_pending_liquidity_and_policy_review",
+            "candidate_count": categories.get("short_term_investment_candidates", {}).get("candidate_count", 0),
+        },
+        "combined_cash_restricted_cash_or_investment_totals": {
+            "treatment": "excluded_to_prevent_scope_overlap",
+            "candidate_count": categories.get("cash_combined_or_investment_candidates", {}).get("candidate_count", 0),
+        },
+        "lease_liabilities": {
+            "treatment": "excluded_from_conventional_debt_bridge_pending_policy",
+            "current_candidate_count": categories.get("current_lease_liability_candidates", {}).get("candidate_count", 0),
+            "noncurrent_candidate_count": categories.get("noncurrent_lease_liability_candidates", {}).get("candidate_count", 0),
+        },
+        "noncontrolling_interest": {
+            "treatment": "excluded_from_base_bridge_pending_consolidated_ebit_alignment_review",
+            "candidate_count": categories.get("noncontrolling_interest_candidates", {}).get("candidate_count", 0),
+        },
+        "separate_financing_obligations": {
+            "treatment": "excluded_from_conventional_debt_bridge_pending_instrument_review",
+            "candidate_count": categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0),
+        },
+        "approval_status": "review_only_no_production_ev_or_earnings_yield",
+    }
+
     # INTENTIONAL: completeness diagnostic only. Missing facts are unknown, never zero.
     return {
         "status": "review_required" if flags else "candidate_inputs_identified_review_only",
+        "selection_policy_review": selection_policy,
         "current_debt_candidate": current_debt,
         "noncurrent_debt_candidate": noncurrent_debt,
         "aggregate_debt_candidate_count": aggregate_debt_count,
