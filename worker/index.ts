@@ -715,7 +715,14 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
         for(const m of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?labelArc\b([^>]*)\/?\s*>/gi)){
           const from=m[1].match(/xlink:from=["']([^"']+)["']/i)?.[1],to=m[1].match(/xlink:to=["']([^"']+)["']/i)?.[1];
           const concept=from?locators.get(from):null,label=to?resources.get(to):null;
-          if(concept&&label&&!labels.has(concept)) labels.set(concept,label);
+          if(concept&&label) {
+            // INTENTIONAL: XBRL linkbase locators identify extension concepts as namespace_localName
+            // (for example, issuer_Revenue), while instance elements expose the local XML name
+            // (Revenue). Index both forms so filing labels are not silently lost.
+            if(!labels.has(concept)) labels.set(concept,label);
+            const localName=concept.replace(/^[^_]+_/,"");
+            if(localName!==concept&&!labels.has(localName)) labels.set(localName,label);
+          }
         }
       }
     } else labelStatus="http_"+lr.status;
