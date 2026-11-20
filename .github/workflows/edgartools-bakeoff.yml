@@ -74,8 +74,6 @@ jobs:
             --data-binary @edgartools-bakeoff.json \
             "$EDGARTOOLS_INGEST_URL"
       - name: Upload test report
-
-      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
