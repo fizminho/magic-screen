@@ -729,6 +729,12 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     const contextId=attrs.match(/\bcontextRef=["']([^"']+)["']/i)?.[1],unitId=attrs.match(/\bunitRef=["']([^"']+)["']/i)?.[1];
     const context=contextId?contexts.get(contextId):null;
     if(!context||context.end!==anchor.end) continue;
+    // INTENTIONAL: expose only instant facts and full-year duration facts for this filing period.
+    // Same end date alone can also match quarterly durations and would blur annual context.
+    if(context.start){
+      const days=(Date.parse(context.end)-Date.parse(context.start))/86400000;
+      if(days<330||days>400) continue;
+    }
     const valueText=raw.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
     if(!/^-?\d+(?:\.\d+)?$/.test(valueText)) continue;
     const scale=Number(attrs.match(/\bscale=["'](-?\d+)["']/i)?.[1]??0),sign=attrs.match(/\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
