@@ -6,6 +6,8 @@ on:
     paths:
       - "scripts/edgartools_bakeoff.py"
       - "scripts/test_edgartools_bakeoff.py"
+      - "scripts/build_accounting_review_queue.py"
+      - "scripts/test_accounting_review_queue.py"
       - ".github/workflows/edgartools-bakeoff.yml"
   schedule:
     - cron: "20 6 * * *"
@@ -47,8 +49,10 @@ jobs:
           python-version: "3.11"
       - name: Install EdgarTools
         run: python -m pip install --upgrade pip "edgartools==6.3.0"
-      - name: Run balance-sheet candidate regression tests
-        run: python -m unittest discover -s scripts -p "test_edgartools_bakeoff.py" -v
+      - name: Run accounting candidate regression tests
+        run: |
+          python -m unittest discover -s scripts -p "test_edgartools_bakeoff.py" -v
+          python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
       - name: Resolve active MFI universe
         id: universe
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '')
@@ -124,6 +128,9 @@ jobs:
               raise SystemExit("Resolver preview did not confirm production and ranking immutability.")
           print(f"Resolver: {report.get('resolver')}; rows: {len(report.get('resolutions', []))}")
           PY
+      - name: Build accounting exception queue
+        if: always() && hashFiles('edgartools-resolver-preview.json') != ''
+        run: python scripts/build_accounting_review_queue.py
       - name: Upload test and resolver reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -132,5 +139,7 @@ jobs:
           path: |
             edgartools-bakeoff.json
             edgartools-resolver-preview.json
+            accounting-review-queue.json
+            accounting-review-queue.csv
           if-no-files-found: warn
           retention-days: 7
