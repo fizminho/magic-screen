@@ -553,7 +553,9 @@ async function syncUsFundamentals(env:Env, limit=10) {
     // INTENTIONAL: recompute only when at least one active candidate is unranked. This
     // handles a changed MFI universe even on a run that processes no new SEC facts.
     if((unranked?.count??0)>0) {
-      const rankedRows=await env.DB.prepare("SELECT f.symbol,ROW_NUMBER() OVER(ORDER BY f.earnings_yield DESC)+ROW_NUMBER() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
+      // INTENTIONAL: equal EY or ROC values share the same component rank. RANK() avoids
+      // arbitrary row-number differences between financially tied candidates.
+      const rankedRows=await env.DB.prepare("SELECT f.symbol,RANK() OVER(ORDER BY f.earnings_yield DESC)+RANK() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
       // INTENTIONAL: only write rank rows when the calculated rank actually changes.
       // The SEC cron runs every thirty minutes; unchanged ranks do not consume D1 writes.
       for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US' AND magic_formula_rank IS NOT ?").bind(row.combined_rank,row.symbol,row.combined_rank).run();
