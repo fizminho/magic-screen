@@ -120,6 +120,10 @@ The extraction report also includes a read-only statement identity diagnostic. I
 - Differences within a small scale-relative rounding tolerance are marked `reconciled`; larger differences are marked `difference`.
 - A reconciled statement is a data-quality signal only. It does not approve EBIT, debt, cash, invested capital, EV, ROC or ranking inputs, and it does not change eligibility or production data.
 
+The 2026-11-20 regression cohort produced 29 extracted statements and 29 `reconciled` results, all with a zero reported difference; two tickers (`AFMJF`, `EGHSF`) were unsupported by the EdgarTools SEC-company-index path and therefore had no reconciliation result. This is a sample-level data-quality result, not evidence that all underlying line-item classifications are correct.
+
+The accounting exception queue carries this diagnostic forward only when the raw extraction accession exactly matches the Worker resolver preview accession. A non-reconciled status (`difference`, `ambiguous_inputs` or `insufficient_inputs`) is promoted to P1 triage. Mismatched filing accessions are never mixed; the queue records the stored-preview source and leaves the raw reconciliation unavailable. Reconciled statements do not create an exception or imply policy approval.
+
 #### Candidate confidence is not policy approval
 
 The resolver review queue reports two separate dimensions:
