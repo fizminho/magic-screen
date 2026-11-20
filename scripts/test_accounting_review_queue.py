@@ -135,6 +135,84 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(evidence["current_debt"]["automatic_aggregation"])
         self.assertEqual(evidence["current_debt"]["candidates"][1]["value"], 0)
 
+    def test_queue_enriches_debt_evidence_from_matching_fresh_accession(self):
+        preview = {
+            "resolver": "test",
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "SBC",
+                "accession": "0001193125-26-127557",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "balance_sheet_candidate_review": {
+                    "current_debt": {"status": "ambiguous_candidates", "candidate_count": 2},
+                },
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "SBC",
+                "filing": {"accession_number": "0001193125-26-127557"},
+                "balance_sheet_fact_review": {
+                    "categories": {
+                        "current_debt_candidates": {
+                            "status": "ambiguous_candidates",
+                            "candidate_count": 2,
+                            "resolution_hint": "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
+                            "automatic_aggregation": False,
+                            "candidates": [
+                                {"concept": "us-gaap_LoansPayableCurrent", "parent_concept": "us-gaap_LiabilitiesCurrent", "value": 9_000_000},
+                                {"concept": "us-gaap_NotesPayableCurrent", "parent_concept": "us-gaap_LiabilitiesCurrent", "value": 0},
+                            ],
+                        },
+                    },
+                },
+            }],
+        }
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["debt_instrument_evidence_source"], "fresh_extraction_artifact_same_accession")
+        self.assertEqual(
+            item["debt_instrument_evidence"]["current_debt"]["resolution_hint"],
+            "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
+        )
+        self.assertFalse(item["debt_instrument_evidence"]["current_debt"]["automatic_aggregation"])
+
+    def test_queue_does_not_mix_debt_evidence_from_different_accessions(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "SBC",
+                "accession": "old-accession",
+                "provider_status": "supported",
+                "balance_sheet_candidate_review": {
+                    "current_debt": {"status": "not_found", "candidate_count": 0},
+                },
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "SBC",
+                "filing": {"accession_number": "new-accession"},
+                "balance_sheet_fact_review": {
+                    "categories": {
+                        "current_debt_candidates": {
+                            "status": "unique_candidate",
+                            "candidate_count": 1,
+                            "candidates": [{"concept": "us-gaap_LoansPayableCurrent", "value": 9_000_000}],
+                        },
+                    },
+                },
+            }],
+        }
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["debt_instrument_evidence_source"], "stored_resolver_preview")
+        self.assertEqual(item["debt_instrument_evidence"]["current_debt"]["candidate_count"], 0)
+
     def test_ambiguous_classification_stays_ambiguous_and_unapproved(self):
         item = classify({
             "symbol": "AMB",
