@@ -137,8 +137,46 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "production_write": False,
     }
 
-def build_queue(report: dict[str, Any]) -> dict[str, Any]:
-    rows = [classify(row) for row in report.get("resolutions", [])]
+def build_queue(
+    report: dict[str, Any],
+    raw_evidence: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    raw_by_symbol = {
+        str(company.get("symbol")): company
+        for company in (raw_evidence or {}).get("companies", [])
+        if company.get("symbol")
+    }
+    rows = []
+    raw_category_names = {
+        "current_debt": "current_debt_candidates",
+        "noncurrent_debt": "noncurrent_debt_candidates",
+        "aggregate_debt": "aggregate_debt_candidates",
+    }
+    for resolution in report.get("resolutions", []):
+        item = classify(resolution)
+        raw_company = raw_by_symbol.get(item["symbol"])
+        raw_accession = (
+            (raw_company or {}).get("filing", {}).get("accession_number")
+            or (raw_company or {}).get("filing", {}).get("accession_no")
+        )
+        # Only enrich when the extracted filing is exactly the same accession
+        # as the Worker preview. This prevents mixing different filing periods.
+        if raw_company and raw_accession and raw_accession == resolution.get("accession"):
+            categories = (raw_company.get("balance_sheet_fact_review") or {}).get("categories", {})
+            item["debt_instrument_evidence"] = {
+                name: categories.get(raw_name, {
+                    "status": "not_found",
+                    "candidate_count": 0,
+                    "resolution_hint": "no_candidate_identified",
+                    "automatic_aggregation": False,
+                    "candidates": [],
+                })
+                for name, raw_name in raw_category_names.items()
+            }
+            item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
+        else:
+            item["debt_instrument_evidence_source"] = "stored_resolver_preview"
+        rows.append(item)
     order = {"P1": 0, "P2": 1, "P3": 2}
     rows.sort(key=lambda row: (order.get(row["priority"], 9), row["symbol"]))
     counts = Counter(row["priority"] for row in rows)
@@ -163,22 +201,28 @@ def build_queue(report: dict[str, Any]) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="edgartools-resolver-preview.json")
+    parser.add_argument("--raw-evidence", default="edgartools-bakeoff.json")
     parser.add_argument("--json-output", default="accounting-review-queue.json")
     parser.add_argument("--csv-output", default="accounting-review-queue.csv")
     args = parser.parse_args()
 
     report = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    raw_evidence = None
+    raw_path = Path(args.raw_evidence)
+    if raw_path.exists():
+        raw_evidence = json.loads(raw_path.read_text(encoding="utf-8"))
     if not isinstance(report.get("resolutions"), list):
         raise SystemExit("Resolver preview JSON must contain a resolutions array.")
     if report.get("production_fundamentals_changed") is not False or report.get("rankings_changed") is not False:
         raise SystemExit("Refusing to build queue: preview did not confirm production/ranking immutability.")
 
-    queue = build_queue(report)
+    queue = build_queue(report, raw_evidence)
     Path(args.json_output).write_text(json.dumps(queue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     fields = [
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
-        "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence", "candidate_vs_policy_assessment", "production_write",
+        "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
+        "debt_instrument_evidence_source", "candidate_vs_policy_assessment", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
