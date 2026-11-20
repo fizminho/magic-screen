@@ -788,18 +788,44 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       statementCandidates.push(fact);
     } else candidates.push(fact);
   }
-  // INTENTIONAL: default to a compact review payload. Full context detail is omitted
-  // so the diagnostic is readable in browser/API clients without a huge JSON response.
-  candidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
-  // INTENTIONAL: prioritize company-wide standard statement facts; dimensional breakdowns
-  // remain visible when relevant, but should not crowd out primary statement values.
-  statementCandidates.sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+  // INTENTIONAL: deduplicate repeated non-dimensional facts that appear in multiple
+  // contexts/presentation roles. Keep dimensional facts separate because they may represent
+  // genuinely different members even when their displayed values happen to match.
+  const dedupe=(items:any[])=>{
+    const seen=new Set<string>();
+    return items.filter(f=>{
+      if(f.dimensions) return true;
+      const key=[f.tag,f.unit,f.value,f.kind,f.start??"",f.end].join("|");
+      if(seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  };
+  const standardUnique=dedupe(statementCandidates);
+  const extensionUnique=dedupe(candidates);
+  const priority=(tag:string)=>{
+    const t=tag.toLowerCase().replace(/^.*:/,"");
+    if(/operating(income|profit|loss)|profitlossfromoperatingactivities/.test(t)) return 1;
+    if(/^revenues?$|revenuefromcontract|salesrevenuenet|salesrevenue/.test(t)) return 2;
+    if(/longtermdebt|shorttermdebt|debtcurrent|debtnoncurrent|borrowingscurrent|borrowingsnoncurrent|totaldebt/.test(t)) return 3;
+    if(/cashandcash equivalents|cashandcashequivalents|cashcash equivalents|cashcash/.test(t)) return 4;
+    if(/assetscurrent|liabilitiescurrent/.test(t)) return 5;
+    if(/propertyplantandequipment(net|)|propertyplantandequipment/.test(t)) return 6;
+    if(/costsandexpenses|operatingexpenses|costofgoodsandservicessold/.test(t)) return 7;
+    if(/interestexpense/.test(t)) return 8;
+    return 99;
+  };
+  // INTENTIONAL: prioritize Magic Formula input candidates, rather than alphabetical tags.
+  // This makes the small response useful for reviewing EBIT, EV and invested-capital inputs.
+  const relevantStandard=standardUnique.filter(f=>priority(f.tag)<99)
+    .sort((a,b)=>priority(a.tag)-priority(b.tag)||Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+  const relevantExtensions=extensionUnique
+    .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
   const compact=(fact:any)=>({
     tag:fact.tag,label:fact.label,value:fact.value,unit:fact.unit,kind:fact.kind,
     dimensions:fact.dimensions,
-    presentation:fact.presentation.slice(0,2).map((p:any)=>({parent:p.parent,role:p.role}))
+    presentation:fact.presentation.slice(0,1).map((p:any)=>({parent:p.parent,role:p.role}))
   });
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:candidates.length,standard:statementCandidates.length},extension_facts:candidates.slice(0,30).map(compact),statement_facts:statementCandidates.slice(0,40).map(compact),truncated:candidates.length>30||statementCandidates.length>40,eligible_for_magic_formula:false,note:"Compact diagnostic only. Facts are not mapped to production metrics or used for ranking. Review filing context and accounting meaning before approving any mapping."};
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,12).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),truncated:relevantExtensions.length>12||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates, not approved accounting mappings. Verify filing context and accounting meaning before using any fact. No production ratios or rankings are changed."};
 }
 
 export default {
