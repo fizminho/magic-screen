@@ -583,7 +583,7 @@ type MfiPreviewRow = {
   ebit_candidate:number|null; invested_capital_candidate:number|null; ebit_status:string;
   invested_capital_status:string; enterprise_value_candidate_review:any; review_flags:string[];
 };
-function percentileRanks(rows:MfiPreviewRow[], key:"earnings_yield"|"return_on_capital") {
+function percentileRanks(rows:any[], key:"earnings_yield"|"return_on_capital") {
   const sorted=[...rows].sort((a:any,b:any)=>a[key]-b[key] || a.symbol.localeCompare(b.symbol));
   const result=new Map<string,number>();
   for(let i=0;i<sorted.length;) {
@@ -600,7 +600,9 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
   const evaluated=rows.map(row=>{
     const ev=row.market_cap!==null && row.market_cap>0
       && typeof row.enterprise_value_candidate_review?.conventional_gross_debt_candidate==="number"
+      && row.enterprise_value_candidate_review.conventional_gross_debt_candidate>=0
       && typeof row.enterprise_value_candidate_review?.unrestricted_cash_candidate==="number"
+      && row.enterprise_value_candidate_review.unrestricted_cash_candidate>=0
       ? row.market_cap+row.enterprise_value_candidate_review.conventional_gross_debt_candidate-row.enterprise_value_candidate_review.unrestricted_cash_candidate
       : null;
     const eligible=row.ebit_status==="direct_reported_candidate_review_only"
