@@ -17,7 +17,7 @@ from typing import Any
 
 from edgar import Company, set_identity
 
-DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE", "AFMJF", "HPQ", "OTEX", "PRDO", "PLTK", "UPWK", "SNDK")
+DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE", "AFMJF", "HPQ", "OTEX", "PRDO", "PLTK", "UPWK", "SNDK", "SGHC")
 ROW_PATTERN = re.compile(
     r"operating income|operating profit|income from operations|profit from operations|"
     r"earnings before interest|\bebit\b|property|plant|equipment|fixed assets|"
@@ -496,7 +496,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
 
         filing_obj = filing.obj()
         financials = getattr(filing_obj, "financials", None)
-        financials_source = "selected_10k_filing"
+        financials_source = f"selected_{filing_metadata(filing).get('form', 'annual')}_filing"
         if financials is None:
             # INTENTIONAL FALLBACK: expose this clearly; don't silently claim
             # that a company-level financials object belongs to this accession.
@@ -533,8 +533,28 @@ def extract_company(symbol: str) -> dict[str, Any]:
         result["filing_specific_review"] = filing_specific_review(
             symbol, result["filing"], result["ebit_bridge"], result["statements"]
         )
+        # INTENTIONAL: expose only an exact, consolidated OperatingIncomeLoss
+        # fact for this annual period. This is diagnostic, not production EBIT.
+        fiscal_period = str(result["filing"].get("period_of_report") or "")
+        direct_operating_income = statement_fact_amount(
+            result["statements"], "income_statement", "OperatingIncomeLoss",
+            r"operating income|income from operations|operating profit|earnings from operations",
+            fiscal_period,
+        )
+        result["direct_operating_income_review"] = {
+            "status": "review_only" if direct_operating_income is not None else "review_required",
+            "method": "direct_reported_operating_income" if direct_operating_income is not None else None,
+            "automation_status": "direct_fact_review_only",
+            "fiscal_period": fiscal_period,
+            "ebit_candidate": direct_operating_income,
+            "guardrail": "Exact non-dimensional OperatingIncomeLoss statement fact only; review fiscal period, currency, classification and filing before use. Never writes production ratios or rankings.",
+        }
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
+        # INTENTIONAL: an MFI OTC/foreign ticker may not be an SEC registrant.
+        # Record this as a coverage outcome, not a failure of other issuers.
+        if type(exc).__name__ == "CompanyNotFoundError":
+            result["status"] = "not_found_in_sec_company_index"
     return result
 
 
@@ -581,8 +601,14 @@ def main() -> int:
                 )
             print(f"  filing metadata: {json.dumps(company.get('filing', {}), default=str)}")
 
+    extracted = sum(item["status"] == "extracted" for item in report["companies"])
+    coverage_gaps = sum(item["status"] == "not_found_in_sec_company_index" for item in report["companies"])
+    unexpected_errors = sum(item["status"] == "error" for item in report["companies"])
+    print(f"Summary: {extracted} extracted, {coverage_gaps} not in SEC company index, {unexpected_errors} unexpected errors")
     print(f"JSON report written to {output}")
-    return 0 if all(item["status"] == "extracted" for item in report["companies"]) else 1
+    # INTENTIONAL: expected SEC coverage gaps stay visible but do not invalidate
+    # successful extractions; unexpected errors still fail the workflow.
+    return 1 if unexpected_errors else 0
 
 
 if __name__ == "__main__":
