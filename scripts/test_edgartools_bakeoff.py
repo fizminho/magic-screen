@@ -107,6 +107,7 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         balance_review = {
             "categories": {
                 "rental_equipment_net_candidates": {"candidate_count": 1},
+                "right_of_use_asset_candidates": {"candidate_count": 2},
                 "nondebt_financing_obligation_candidates": {"candidate_count": 1},
                 "current_lease_liability_candidates": {"candidate_count": 2},
                 "noncurrent_lease_liability_candidates": {"candidate_count": 2},
@@ -121,7 +122,7 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "calculated_review_only")
         self.assertAlmostEqual(result["roc"], 30.512, places=3)
-        self.assertEqual(len(result["review_flags"]), 4)
+        self.assertEqual(len(result["review_flags"]), 5)
 
     def test_sale_leaseback_financing_is_not_misclassified_as_debt(self):
         categories = self.review(
