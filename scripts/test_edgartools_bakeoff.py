@@ -116,7 +116,7 @@ class CurrencyNormalizationTests(unittest.TestCase):
 
     def test_same_currency_does_not_require_fx(self):
         result = currency_normalization_review("USD", 100_000_000, "2026-11-18")
-        self.assertEqual(result["status"], "market_cap_converted_review_only")
+        self.assertEqual(result["status"], "market_cap_same_currency")
         self.assertEqual(result["market_cap_in_reporting_currency"], 100_000_000)
         self.assertEqual(result["fx_rate_review"]["rate"], 1.0)
 
