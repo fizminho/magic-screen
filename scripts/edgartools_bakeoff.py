@@ -11,7 +11,9 @@ import math
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 from pathlib import Path
 from typing import Any
 
@@ -63,6 +65,209 @@ def safe_value(value: Any) -> Any:
     except (ImportError, TypeError, ValueError):
         pass
     return str(value)
+
+
+SEC_COMPANY_FACTS_CACHE: dict[str, dict[str, Any]] = {}
+FRANKFURTER_RATE_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+
+def sec_company_facts(cik: Any) -> dict[str, Any]:
+    """Fetch accession-scoped SEC Company Facts once per CIK for currency-unit review."""
+    cik_digits = re.sub(r"\\D", "", str(cik or ""))
+    if not cik_digits:
+        raise ValueError("Missing SEC CIK")
+    cik_key = cik_digits.zfill(10)
+    if cik_key not in SEC_COMPANY_FACTS_CACHE:
+        url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_key}.json"
+        request = Request(
+            url,
+            headers={
+                "User-Agent": os.environ.get(
+                    "EDGAR_IDENTITY", "Magic Screen research support@binalah.co"
+                ),
+                "Accept": "application/json",
+            },
+        )
+        with urlopen(request, timeout=30) as response:
+            SEC_COMPANY_FACTS_CACHE[cik_key] = json.loads(response.read().decode("utf-8"))
+    return SEC_COMPANY_FACTS_CACHE[cik_key]
+
+
+def reporting_currency_unit_review(
+    companyfacts: dict[str, Any], accession: str, fiscal_period: str
+) -> dict[str, Any]:
+    """Infer filing currency only from monetary ISO-unit facts in this exact accession."""
+    counts: dict[str, int] = {}
+    tags: dict[str, set[str]] = {}
+    for taxonomy in (companyfacts.get("facts") or {}).values():
+        for tag, fact in taxonomy.items():
+            for unit, observations in (fact.get("units") or {}).items():
+                if not re.fullmatch(r"[A-Z]{3}", str(unit)):
+                    continue
+                matching = [
+                    item for item in observations
+                    if item.get("accn") == accession
+                    and item.get("end") == fiscal_period
+                ]
+                if matching:
+                    counts[unit] = counts.get(unit, 0) + len(matching)
+                    tags.setdefault(unit, set()).add(tag)
+    if not counts:
+        return {
+            "status": "currency_unit_not_found",
+            "currency": None,
+            "unit_counts": {},
+            "guardrail": "No ISO currency-unit facts were found for the exact accession and fiscal period. Do not infer USD from the issuer's US listing or filing form.",
+        }
+    ordered = sorted(counts.items(), key=lambda item: item[1], reverse=True)
+    top_currency, top_count = ordered[0]
+    second_count = ordered[1][1] if len(ordered) > 1 else 0
+    if top_count < 3 or top_count <= second_count:
+        return {
+            "status": "currency_unit_ambiguous",
+            "currency": None,
+            "unit_counts": counts,
+            "distinct_concepts_by_unit": {unit: len(values) for unit, values in tags.items()},
+            "guardrail": "Currency units are tied or have too few accession-scoped observations. Do not choose a reporting currency automatically.",
+        }
+    return {
+        "status": "identified_from_accession_facts",
+        "currency": top_currency,
+        "unit_counts": counts,
+        "distinct_concepts_by_unit": {unit: len(values) for unit, values in tags.items()},
+        "guardrail": "Dominant ISO currency unit among standard SEC Company Facts matching this exact accession and fiscal period. Review issuer presentation before production use.",
+    }
+
+
+def fetch_frankfurter_rate(
+    base_currency: str, quote_currency: str, requested_date: str
+) -> dict[str, Any]:
+    """Fetch the latest daily reference rate on or before the requested valuation date."""
+    base = base_currency.upper()
+    quote = quote_currency.upper()
+    key = (base, quote, requested_date)
+    if key in FRANKFURTER_RATE_CACHE:
+        return FRANKFURTER_RATE_CACHE[key]
+    if base == quote:
+        result = {
+            "status": "same_currency",
+            "base": base,
+            "quote": quote,
+            "rate": 1.0,
+            "date": requested_date,
+            "provider": "same-currency identity",
+        }
+        FRANKFURTER_RATE_CACHE[key] = result
+        return result
+    try:
+        target = date.fromisoformat(requested_date)
+        start = target - timedelta(days=7)
+        params = urlencode({
+            "from": start.isoformat(),
+            "to": target.isoformat(),
+            "base": base,
+            "quotes": quote,
+        })
+        url = f"https://api.frankfurter.dev/v2/rates?{params}"
+        request = Request(url, headers={"Accept": "application/json"})
+        with urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        rows = payload if isinstance(payload, list) else payload.get("data", [])
+        matches = [
+            row for row in rows
+            if row.get("base") == base and row.get("quote") == quote
+            and row.get("date") and row.get("date") <= requested_date
+            and isinstance(row.get("rate"), (int, float))
+        ]
+        if not matches:
+            result = {
+                "status": "rate_not_found",
+                "base": base,
+                "quote": quote,
+                "requested_date": requested_date,
+                "provider": "Frankfurter blended daily reference rates",
+            }
+        else:
+            selected = max(matches, key=lambda row: row["date"])
+            result = {
+                "status": "rate_available",
+                "base": base,
+                "quote": quote,
+                "rate": float(selected["rate"]),
+                "date": selected["date"],
+                "requested_date": requested_date,
+                "provider": "Frankfurter blended daily reference rates",
+                "is_previous_business_day": selected["date"] != requested_date,
+            }
+    except Exception as exc:
+        result = {
+            "status": "rate_fetch_error",
+            "base": base,
+            "quote": quote,
+            "requested_date": requested_date,
+            "provider": "Frankfurter blended daily reference rates",
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    FRANKFURTER_RATE_CACHE[key] = result
+    return result
+
+
+def currency_normalization_review(
+    reporting_currency: str | None,
+    market_cap_usd: float | None,
+    mfi_price_date: str | None,
+    fx_rate_review: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Convert USD MFI market cap to reporting currency using the quote-date FX rate."""
+    reporting = (reporting_currency or "").upper() or None
+    market_cap_currency = "USD"
+    if not reporting:
+        return {
+            "status": "reporting_currency_unknown",
+            "reporting_currency": None,
+            "market_cap_currency": market_cap_currency,
+            "market_cap_usd": market_cap_usd,
+            "market_cap_in_reporting_currency": None,
+            "mfi_price_date": mfi_price_date,
+            "guardrail": "No market-cap conversion is attempted until the filing currency is identified.",
+        }
+    rate_review = fx_rate_review or {}
+    if reporting == market_cap_currency:
+        rate_review = {
+            "status": "same_currency",
+            "base": "USD",
+            "quote": "USD",
+            "rate": 1.0,
+            "date": mfi_price_date,
+            "provider": "same-currency identity",
+        }
+    rate = rate_review.get("rate")
+    if not isinstance(rate, (int, float)):
+        return {
+            "status": "fx_rate_unavailable",
+            "reporting_currency": reporting,
+            "market_cap_currency": market_cap_currency,
+            "market_cap_usd": market_cap_usd,
+            "market_cap_in_reporting_currency": None,
+            "mfi_price_date": mfi_price_date,
+            "fx_rate_review": rate_review,
+            "guardrail": "Do not mix USD market capitalization with reporting-currency debt/cash. No fallback to latest FX is allowed when a quote-date rate is missing.",
+        }
+    converted_market_cap = (
+        round(float(market_cap_usd) * float(rate), 2)
+        if isinstance(market_cap_usd, (int, float)) else None
+    )
+    return {
+        "status": "fx_rate_available_market_cap_missing" if converted_market_cap is None else "market_cap_converted_review_only",
+        "reporting_currency": reporting,
+        "market_cap_currency": market_cap_currency,
+        "market_cap_usd": market_cap_usd,
+        "market_cap_in_reporting_currency": converted_market_cap,
+        "mfi_price_date": mfi_price_date,
+        "fx_rate_review": rate_review,
+        "conversion_formula": "USD market cap × reporting-currency units per USD at the MFI price date",
+        "guardrail": "Reference-rate conversion only. Debt and cash remain in their filing currency and at their fiscal-period balance-sheet date. This is not an approved EV or Earnings Yield calculation.",
+    }
 
 
 def filing_metadata(filing: Any) -> dict[str, Any]:
@@ -1074,6 +1279,28 @@ def extract_company(symbol: str) -> dict[str, Any]:
         result["enterprise_value_scope_review"] = enterprise_value_scope_review(
             result["balance_sheet_fact_review"],
         )
+        # INTENTIONAL: infer reporting currency from exact-accession SEC units,
+        # never from listing country, ticker suffix or filing form.
+        accession = str(result["filing"].get("accession_number") or "")
+        cik = getattr(company, "cik", None)
+        try:
+            result["reporting_currency_review"] = reporting_currency_unit_review(
+                sec_company_facts(cik), accession, fiscal_period
+            )
+        except Exception as currency_error:
+            result["reporting_currency_review"] = {
+                "status": "currency_lookup_error",
+                "currency": None,
+                "error": f"{type(currency_error).__name__}: {currency_error}",
+            }
+        reporting_currency = result["reporting_currency_review"].get("currency")
+        mfi_price_date = os.environ.get("MFI_PRICE_DATE", "2026-11-18")
+        fx_review = None
+        if reporting_currency and reporting_currency != "USD":
+            fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
+        result["currency_normalization_review"] = currency_normalization_review(
+            reporting_currency, None, mfi_price_date, fx_review
+        )
         # INTENTIONAL: these accession-scoped notes preserve filing context
         # that broad XBRL label matching cannot safely infer or generalize.
         accession = str(result["filing"].get("accession_number") or "")
@@ -1108,6 +1335,16 @@ def extract_company(symbol: str) -> dict[str, Any]:
             manual_case = non_sec_issuer_review_case(symbol)
             if manual_case is not None:
                 result["non_sec_issuer_review"] = manual_case
+                # INTENTIONAL: manual issuer-report currencies are explicit
+                # source metadata, not guessed from the OTC ticker or exchange.
+                mfi_price_date = os.environ.get("MFI_PRICE_DATE", "2026-11-18")
+                reporting_currency = manual_case.get("currency")
+                fx_review = None
+                if reporting_currency and reporting_currency != "USD":
+                    fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
+                manual_case["currency_normalization_review"] = currency_normalization_review(
+                    reporting_currency, None, mfi_price_date, fx_review
+                )
     return result
 
 
@@ -1127,6 +1364,8 @@ def main() -> int:
         "symbol_input": raw_symbols,
         "symbol_input_source": "workflow_dispatch_or_environment" if os.environ.get("BAKEOFF_SYMBOLS") else "default_control_cases",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mfi_price_date": os.environ.get("MFI_PRICE_DATE", "2026-11-18"),
+        "fx_policy": "USD market cap is translated into filing currency at the MFI quote date; reported debt/cash stay in filing currency at fiscal-period end; ROC remains a same-currency ratio. No EV/EY is approved by this review.",
         "edgartools_version": None,
         "symbols": list(symbols),
         "production_data_modified": False,
