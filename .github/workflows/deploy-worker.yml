@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "worker/**"
+      - "src/**"
       - "wrangler.toml"
       - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
