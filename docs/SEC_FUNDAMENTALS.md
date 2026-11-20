@@ -135,3 +135,10 @@ The read-only EdgarTools bakeoff now emits both:
 - `rows`: the existing label-filtered subset, retained for convenient navigation.
 
 This change addresses cases where an income statement contains an operating-income subtotal under an unexpected label, causing the previous filter to return only interest expense. The full rows are evidence for manual review, not automatic EBIT selection. The script also flags the need to inspect dimensions and statement presentation before combining multiple PP&E concepts. It does not calculate invested capital, debt, EV, Earnings Yield or ROC, and it does not change production data.
+
+
+## EdgarTools bakeoff: compact output and EBIT review bridge
+
+The read-only artifact stores each detailed statement row once. A boolean `candidate` marks rows matching the broad review filter, avoiding duplicated full and filtered arrays. The broad financial-metrics dump is omitted to keep the artifact compact; statement values and filing metadata remain available.
+
+The script also emits an `ebit_bridge` review section. It lists same-statement, non-dimensional revenue and pretax anchors, operating-expense candidates, ambiguous classifications and alternative scenarios. Scenarios reconcile reconstructed pretax income against reported pretax income, but reconciliation alone does not establish whether a line belongs above or below operating income. Treat every scenario as `review_required`; it is never used by the production Worker or Magic Formula calculations.
