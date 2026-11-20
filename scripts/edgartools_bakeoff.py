@@ -127,69 +127,102 @@ def _row_amount(row: dict[str, Any]) -> float | None:
 def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
     rows = income_statement.get("rows", [])
 
-    def find(pattern: str) -> dict[str, Any] | None:
-        regex = re.compile(pattern, re.IGNORECASE)
+    def find(pattern: str, label_pattern: str | None = None,
+             exclude_pattern: str | None = None) -> dict[str, Any] | None:
+        concept_re = re.compile(pattern, re.IGNORECASE)
+        label_re = re.compile(label_pattern, re.IGNORECASE) if label_pattern else None
+        exclude_re = re.compile(exclude_pattern, re.IGNORECASE) if exclude_pattern else None
         matches = [
             row for row in rows
             if not row.get("abstract") and not row.get("dimension")
-            and regex.search(str(row.get("concept", ""))) and _row_amount(row) is not None
+            and concept_re.search(str(row.get("concept", "")))
+            and (label_re is None or label_re.search(str(row.get("label", ""))))
+            and (exclude_re is None or not exclude_re.search(str(row.get("concept", ""))))
+            and _row_amount(row) is not None
         ]
         return matches[0] if matches else None
 
-    def item(name: str, pattern: str, treatment: str) -> dict[str, Any] | None:
-        row = find(pattern)
+    used_concepts: dict[str, str] = {}
+
+    def item(name: str, pattern: str, treatment: str,
+             label_pattern: str | None = None,
+             exclude_pattern: str | None = None) -> dict[str, Any] | None:
+        row = find(pattern, label_pattern, exclude_pattern)
         if row is None:
             return None
-        return {"item": name, "concept": row.get("concept"), "label": row.get("label"),
+        concept = str(row.get("concept", ""))
+        # INTENTIONAL: one XBRL concept can only fill one bridge category.
+        # Prevent broad taxonomy patterns from assigning a row twice.
+        if concept in used_concepts:
+            return None
+        used_concepts[concept] = name
+        return {"item": name, "concept": concept, "label": row.get("label"),
                 "amount": _row_amount(row), "treatment": treatment,
                 "parent": row.get("parent_concept")}
 
-    revenue = item("revenue", r"RevenueFromContractWithCustomerExcludingAssessedTax|^Revenues$", "anchor")
-    if revenue is None:
-        revenue = item("revenue", r"^Revenue$", "anchor")
-    pretax = item("pretax_income", r"IncomeLossFromContinuingOperationsBeforeIncomeTaxes", "reconciliation_anchor")
+    revenue = item(
+        "revenue",
+        r"(?:^|_)(?:RevenueFromContractWithCustomerExcludingAssessedTax|Revenues|Revenue)$",
+        "anchor",
+    )
+    pretax = item(
+        "pretax_income",
+        r"(?:^|_)IncomeLossFromContinuingOperationsBeforeIncomeTaxes(?:ExtraordinaryItemsNoncontrollingInterest|MinorityInterestAndIncomeLossFromEquityMethodInvestments)?$",
+        "reconciliation_anchor",
+    )
 
     category_patterns = [
-        ("cost_of_revenue", r"CostOfGoodsAndServicesSold|CostOfRevenue", "operating_candidate"),
-        ("selling_general_admin", r"SellingGeneralAndAdministrativeExpense", "operating_candidate"),
-        ("research_development", r"ResearchAndDevelopmentExpense", "operating_candidate"),
-        ("restructuring", r"RestructuringCostsAndAssetImpairmentCharges|RestructuringCharges", "operating_candidate_review"),
-        ("financing_and_other", r"FinancingInterestExpense", "ambiguous_review"),
-        ("interest_expense", r"InterestIncomeExpenseNet|InterestExpense", "non_operating_candidate"),
-        ("pension_non_service", r"NonoperatingIncomeExpense", "non_operating_candidate"),
-        ("other_expense", r"OtherNonrecurringIncomeExpense", "ambiguous_review"),
+        ("cost_of_revenue", r"(?:^|_)(?:CostOfGoodsAndServicesSold|CostOfRevenue)$", "operating_candidate", None, None),
+        ("selling_general_admin", r"(?:^|_)SellingGeneralAndAdministrativeExpense$", "operating_candidate", None, None),
+        ("research_development", r"(?:^|_)ResearchAndDevelopmentExpense$", "operating_candidate", None, None),
+        ("restructuring", r"(?:^|_)RestructuringCostsAndAssetImpairmentCharges$", "operating_candidate_review", None, None),
+        ("financing_and_other", r"(?:^|_)FinancingInterestExpense$", "ambiguous_review", None, None),
+        # Prefer the distinct interest-expense row by its statement label.
+        # Exclude FinancingInterestExpense even though its concept contains
+        # the suffix "InterestExpense".
+        ("interest_expense", r"(?:^|_)(?:InterestIncomeExpenseNet|InterestExpense)$",
+         "non_operating_candidate", r"^Interest expense$", r"FinancingInterestExpense"),
+        ("pension_non_service", r"(?:^|_)NonoperatingIncomeExpense$", "non_operating_candidate", r"pension", None),
+        ("other_expense", r"(?:^|_)OtherNonrecurringIncomeExpense$", "ambiguous_review", r"other expense", None),
     ]
-    expenses = [entry for name, pattern, treatment in category_patterns
-                if (entry := item(name, pattern, treatment))]
+    expenses = [
+        entry for name, pattern, treatment, label_pattern, exclude_pattern in category_patterns
+        if (entry := item(name, pattern, treatment, label_pattern, exclude_pattern))
+    ]
     by_name = {entry["item"]: entry for entry in expenses}
     required = ["cost_of_revenue", "selling_general_admin", "research_development"]
     if revenue is None or pretax is None or any(name not in by_name for name in required):
-        return {"status": "insufficient_rows", "revenue": revenue, "pretax_income": pretax,
-                "expense_candidates": expenses,
-                "note": "Required non-dimensional rows were not all identified; no EBIT candidate calculated."}
+        return {
+            "status": "insufficient_rows", "revenue": revenue, "pretax_income": pretax,
+            "expense_candidates": expenses,
+            "unmatched_required": [name for name in (["revenue", "pretax_income"] if revenue is None or pretax is None else []) + required if name not in (["revenue"] if revenue else []) + (["pretax_income"] if pretax else []) + list(by_name)],
+            "note": "Required non-dimensional statement rows were not all identified; no EBIT candidate calculated.",
+        }
 
-    # INTENTIONAL: the EdgarTools statement values are treated as positive
-    # expense magnitudes for these review scenarios only, never as production facts.
+    # INTENTIONAL: these alternative scenarios are diagnostic only. Rows with
+    # uncertain presentation are not silently assigned to operating/non-operating.
     core_names = required + (["restructuring"] if "restructuring" in by_name else [])
     core_total = sum(by_name[name]["amount"] for name in core_names)
     financing = by_name.get("financing_and_other", {}).get("amount", 0.0)
-    nonop_names = ["interest_expense", "pension_non_service", "other_expense"]
-    nonop_total = sum(by_name[name]["amount"] for name in nonop_names if name in by_name)
+    interest = by_name.get("interest_expense", {}).get("amount", 0.0)
+    pension = by_name.get("pension_non_service", {}).get("amount", 0.0)
+    other = by_name.get("other_expense", {}).get("amount", 0.0)
     scenarios = []
     for scenario, include_financing in [
         ("financing_cost_treated_as_operating", True),
         ("financing_cost_treated_as_non_operating", False),
     ]:
         candidate = revenue["amount"] - core_total - (financing if include_financing else 0.0)
-        reconciliation = candidate - nonop_total - (0.0 if include_financing else financing)
+        nonop_adjustments = interest + pension + other + (0.0 if include_financing else financing)
+        reconstructed = candidate - nonop_adjustments
         scenarios.append({
             "scenario": scenario,
             "candidate_operating_income": round(candidate, 2),
             "assumption": "Cost of financing and other is operating" if include_financing else "Cost of financing and other is non-operating",
-            "non_operating_adjustments": nonop_total + (0.0 if include_financing else financing),
-            "reconstructed_pretax_income": round(reconciliation, 2),
+            "non_operating_adjustments": round(nonop_adjustments, 2),
+            "reconstructed_pretax_income": round(reconstructed, 2),
             "reported_pretax_income": pretax["amount"],
-            "reconciles_within_1": abs(reconciliation - pretax["amount"]) <= 1.0,
+            "reconciles_within_1": abs(reconstructed - pretax["amount"]) <= 1.0,
             "status": "review_required",
         })
     return {
