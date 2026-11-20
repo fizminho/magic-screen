@@ -126,3 +126,12 @@ When current assets minus current liabilities plus net PP&E is negative or zero,
 A GitHub Actions workflow that can be manually triggered and also runs when its test harness changes, `.github/workflows/edgartools-bakeoff.yml`, runs `scripts/edgartools_bakeoff.py` for HRB, PBI and ADBE using the open-source EdgarTools Python package. It selects the latest non-amended 10-K for each issuer and extracts income statement, balance sheet and cash-flow statement rows whose labels may identify operating income, PP&E, current assets/liabilities, cash, debt, leases and interest. It also attempts to include EdgarTools' financial metrics with their period metadata and filing metadata where exposed by the installed version.
 
 **This is a review-only experiment.** It does not call the production Worker, write D1, update `stock_fundamentals`, calculate Magic Formula ratios, or publish ranks. Candidate rows are label-filtered; a missing candidate is not proof that the underlying filing has no equivalent fact. Confirm the exact filing accession and periods before comparing results with the existing SEC diagnostic. The workflow uploads `edgartools-bakeoff.json` as a seven-day GitHub Actions artifact.
+
+
+## EdgarTools full-statement review output
+
+The read-only EdgarTools bakeoff now emits both:
+- `all_rows`: every detailed row returned by EdgarTools for the selected filing's statement.
+- `rows`: the existing label-filtered subset, retained for convenient navigation.
+
+This change addresses cases where an income statement contains an operating-income subtotal under an unexpected label, causing the previous filter to return only interest expense. The full rows are evidence for manual review, not automatic EBIT selection. The script also flags the need to inspect dimensions and statement presentation before combining multiple PP&E concepts. It does not calculate invested capital, debt, EV, Earnings Yield or ROC, and it does not change production data.
