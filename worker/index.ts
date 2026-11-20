@@ -830,7 +830,33 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     dimensions:fact.dimensions,
     presentation:fact.presentation.slice(0,1).map((p:any)=>({parent:p.parent,role:p.role}))
   });
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,12).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),truncated:relevantExtensions.length>12||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates, not approved accounting mappings. Verify filing context and accounting meaning before using any fact. No production ratios or rankings are changed."};
+  // INTENTIONAL: provide a filing-specific arithmetic lead for review when both
+  // consolidated annual revenue and total costs/expenses are explicitly tagged.
+  // This is NOT an EBIT mapping: issuers can classify non-operating items differently,
+  // and the result must be reconciled to the primary statements before any production use.
+  const reviewFact=(tag:string)=>standardUnique.find(f=>
+    f.tag.toLowerCase()===("us-gaap:"+tag).toLowerCase() &&
+    !f.dimensions && f.unit==="iso4217:USD" && f.kind==="duration" &&
+    f.end===anchor.end &&
+    f.presentation.some((p:any)=>String(p.role??"").toLowerCase().includes("consolidatedstatementsofoperations"))
+  );
+  const reviewRevenue=reviewFact("RevenueFromContractWithCustomerExcludingAssessedTax");
+  const reviewCosts=reviewFact("CostsAndExpenses");
+  const explicitOperatingIncome=standardUnique.some(f=>
+    /^us-gaap:(OperatingIncomeLoss|OperatingProfitLoss)$/i.test(f.tag) &&
+    !f.dimensions && f.unit==="iso4217:USD" && f.kind==="duration" && f.end===anchor.end
+  );
+  const reviewOnlyChecks={
+    explicit_operating_income_fact_found:explicitOperatingIncome,
+    revenue_less_costs_and_expenses:reviewRevenue&&reviewCosts?{
+      revenue:reviewRevenue.value,
+      costs_and_expenses:reviewCosts.value,
+      arithmetic_result:reviewRevenue.value-reviewCosts.value,
+      status:"review_only_not_approved_ebit",
+      note:"Arithmetic candidate only. Confirm that CostsAndExpenses represents operating expenses for this issuer and reconcile non-operating items before treating the result as EBIT."
+    }:null
+  };
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,12).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>12||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates and explicitly labelled arithmetic review checks, not approved accounting mappings. No production ratios or rankings are changed."};
 }
 
 export default {
