@@ -515,20 +515,24 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashAndCashEquivalents"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","BorrowingsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
-      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent","LongTermDebt"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const leaseLong=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
-      const debtTotal=periodEnd ? secFactValue(facts,["LongTermDebt","Borrowings"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const cap=Number(item.market_cap);
-      const splitDebtKnown=debtCurrent.value!=null || shortDebt.value!=null || debtLong.value!=null;
-      const leaseDebtKnown=leaseCurrent.value!=null || leaseLong.value!=null;
-      const debtKnown=splitDebtKnown || leaseDebtKnown || debtTotal.value!=null;
+      // INTENTIONAL: debt is usable only when a current-debt component and a non-current
+      // component are both reported in the same filing. Never turn a missing component into zero.
+      // Prefer the borrowing split; use the finance-lease split only when no borrowing split exists.
+      const currentBorrowingKnown=debtCurrent.value!=null || shortDebt.value!=null;
+      const splitDebtKnown=currentBorrowingKnown && debtLong.value!=null;
+      const anyBorrowingFacts=currentBorrowingKnown || debtLong.value!=null;
+      const leaseDebtKnown=leaseCurrent.value!=null && leaseLong.value!=null;
+      const debtKnown=splitDebtKnown || (!anyBorrowingFacts && leaseDebtKnown);
       const totalDebt=splitDebtKnown ? (debtCurrent.value??0)+(shortDebt.value??0)+(debtLong.value??0)
-        : leaseDebtKnown ? (leaseCurrent.value??0)+(leaseLong.value??0) : (debtTotal.value??0);
+        : !anyBorrowingFacts && leaseDebtKnown ? leaseCurrent.value!+leaseLong.value! : null;
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
       const investedCapital=netWorkingCapital+(ppe.value??0);
       const enterpriseValue=cap+totalDebt-(cash.value??0);
-      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
+      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && totalDebt!=null && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
       const ey=complete ? (ebit.value as number)/enterpriseValue : null;
       const roc=complete ? (ebit.value as number)/investedCapital : null;
       const status=staleFiscalPeriod ? "stale_fiscal_period" : complete ? "calculated" : "missing_required_facts";
