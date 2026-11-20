@@ -97,11 +97,40 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @edgartools-bakeoff.json \
             "$EDGARTOOLS_INGEST_URL"
-      - name: Upload test report
+      - name: Run read-only accounting resolver preview
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
+        env:
+          EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
+          UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
+        run: |
+          if [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
+            echo "::warning::UNIVERSE_SYNC_TOKEN is not configured; resolver preview skipped."
+            exit 0
+          fi
+          BASE_URL="${EDGARTOOLS_INGEST_URL%/api/fundamentals/edgartools/ingest}"
+          set +x
+          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+            -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
+            "$BASE_URL/api/fundamentals/edgartools/resolve-preview" > edgartools-resolver-preview.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("edgartools-resolver-preview.json").read_text())
+          summary = report.get("summary", {})
+          print("Read-only resolver preview summary:")
+          for key, value in summary.items():
+              print(f"  {key}: {value}")
+          if report.get("production_fundamentals_changed") is not False or report.get("rankings_changed") is not False:
+              raise SystemExit("Resolver preview did not confirm production and ranking immutability.")
+          print(f"Resolver: {report.get('resolver')}; rows: {len(report.get('resolutions', []))}")
+          PY
+      - name: Upload test and resolver reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: edgartools-bakeoff
-          path: edgartools-bakeoff.json
+          path: |
+            edgartools-bakeoff.json
+            edgartools-resolver-preview.json
           if-no-files-found: warn
           retention-days: 7
