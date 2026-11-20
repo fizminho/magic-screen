@@ -448,6 +448,21 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(item["debt_scope_evidence_source"], "stored_resolver_preview")
 
 
+    def test_mntn_and_spro_note_reviews_are_accession_bound(self):
+        from build_accounting_review_queue import filing_debt_note_review
+
+        mntn = filing_debt_note_review("MNTN", "0001891027-26-000019")
+        self.assertEqual(mntn["method"], "convertible_note_settlement_and_revolver_zero_review")
+        self.assertIn("Do not classify employee promissory notes receivable as company borrowing.", mntn["prohibited_inferences"])
+        self.assertFalse(mntn["production_approved"])
+
+        spro = filing_debt_note_review("SPRO", "0001193125-26-126192")
+        self.assertEqual(spro["method"], "explicit_no_debt_and_lease_liability_scope_review")
+        self.assertIn("Do not include lease liabilities or the 91k other long-term liability as conventional debt without separate policy/evidence.", spro["prohibited_inferences"])
+        self.assertFalse(spro["resolver_input"])
+
+        self.assertIsNone(filing_debt_note_review("MNTN", "wrong-accession"))
+        self.assertIsNone(filing_debt_note_review("SPRO", "wrong-accession"))
     def test_filing_debt_note_review_is_accession_bound_and_never_promotes_debt(self):
         from build_accounting_review_queue import filing_debt_note_review
 
