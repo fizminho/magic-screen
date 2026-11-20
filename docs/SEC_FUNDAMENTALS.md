@@ -240,3 +240,12 @@ Regression tests ensure these categories remain distinct. No production ratios, 
 Review-only ROC previews also carry `review_flags` when the issuer has separate rental equipment, sale-leaseback/construction financing, lease liabilities, or restricted/combined cash. The flags identify accounting scope requiring manual review; they do not alter the reported candidate values or apply automatic adjustments to invested capital or enterprise value.
 
 Right-of-use assets are now surfaced as a separate balance-sheet candidate category and add a `right_of_use_assets_present_review_invested_capital_scope` flag to the review-only ROC output. The current denominator formula does not silently fold ROU assets into net PP&E or adjust lease liabilities. Manual review is required to decide whether/how lease assets and liabilities belong in the chosen Magic Formula implementation.
+
+
+## SGHC FY2025 IFRS EBIT research case
+
+The SGHC FY2025 20-F (accession `0001628280-26-025609`) does not present a direct operating-profit subtotal in the extracted consolidated statement. A filing-specific review-only reconstruction now uses the signed IFRS statement values: revenue $2,231m, direct and marketing expenses -$1,565m, general and administrative expenses -$176m, depreciation and amortization -$74m, impairment -$68m, and other operating income +$9m. This produces an EBIT candidate of $357m.
+
+The filing's pretax bridge reconciles exactly: $357m operating subtotal + $11m finance income - $11m finance expense + $0m change in fair value of options - $1m share of post-tax profit of equity-accounted investments = $356m reported profit before taxation. Note 5 states that direct and marketing expenses include cost of revenues, so no separate cost-of-revenue deduction is added.
+
+This is an accession-specific manual-review reconstruction, not a reusable IFRS taxonomy rule. It is deliberately separate from the direct US-GAAP `OperatingIncomeLoss` review path and does not feed production fundamentals, ratios, eligibility or rankings.
