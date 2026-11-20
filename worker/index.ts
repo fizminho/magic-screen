@@ -660,6 +660,86 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,cached:false,stocks:rows};
 }
 
+async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
+  const stock=await env.DB.prepare("SELECT m.symbol,m.company_name,cm.cik FROM stock_master m JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.symbol=? AND m.listing_status='active' AND cm.cik!='UNMAPPED'").bind(symbol).first<any>();
+  if(!stock) throw new Error("Active MFI ticker or SEC CIK mapping not found");
+  const headers={"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json,application/xml,text/xml"};
+  const factsResponse=await fetch("https://data.sec.gov/api/xbrl/companyfacts/CIK"+stock.cik+".json",{headers});
+  if(!factsResponse.ok) throw new Error("SEC Company Facts HTTP "+factsResponse.status);
+  const facts:any=await factsResponse.json();
+  const anchorTags=["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities","Revenues","Revenue","RevenueFromContractWithCustomerExcludingAssessedTax","RevenueFromContractWithCustomerIncludingAssessedTax","SalesRevenueNet"];
+  const annual=["us-gaap","ifrs-full"].flatMap(t=>anchorTags.flatMap(tag=>facts?.facts?.[t]?.[tag]?.units?.USD??[])).filter((x:any)=>x.val!=null&&x.start&&x.end&&["10-K","20-F","40-F"].includes(x.form)&&(Date.parse(x.end)-Date.parse(x.start))/86400000>=330&&(Date.parse(x.end)-Date.parse(x.start))/86400000<=400).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
+  const anchor=annual[0];
+  if(!anchor?.accn) throw new Error("No annual USD filing anchor found in standard SEC Company Facts");
+  const base="https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/";
+  const indexResponse=await fetch(base+"index.json",{headers});
+  if(!indexResponse.ok) throw new Error("SEC filing index HTTP "+indexResponse.status);
+  const index:any=await indexResponse.json();
+  const files=index?.directory?.item??[];
+  const instance=files.find((x:any)=>/_htm\.xml$/i.test(String(x.name??"")))??files.find((x:any)=>/extracted xbrl instance document/i.test(String(x.description??"")));
+  if(!instance?.name) throw new Error("SEC extracted XBRL instance not found");
+  const instanceResponse=await fetch(base+encodeURIComponent(instance.name),{headers});
+  if(!instanceResponse.ok) throw new Error("SEC XBRL instance HTTP "+instanceResponse.status);
+  const xml=await instanceResponse.text();
+  const contexts=new Map<string,{start:string|null;end:string;dimensions:boolean}>();
+  for(const m of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?context\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?context>/gi)){
+    const id=m[1].match(/\bid=["']([^"']+)["']/i)?.[1],body=m[2];
+    const start=body.match(/<(?:[A-Za-z0-9_-]+:)?startDate>([^<]+)</i)?.[1]??null;
+    const end=body.match(/<(?:[A-Za-z0-9_-]+:)?endDate>([^<]+)</i)?.[1]??body.match(/<(?:[A-Za-z0-9_-]+:)?instant>([^<]+)</i)?.[1];
+    if(id&&end) contexts.set(id,{start,end,dimensions:/<(?:[A-Za-z0-9_-]+:)?(?:explicitMember|typedMember)\b/i.test(body)});
+  }
+  const units=new Map<string,string>();
+  for(const m of xml.matchAll(/<(?:[A-Za-z0-9_-]+:)?unit\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?unit>/gi)){
+    const id=m[1].match(/\bid=["']([^"']+)["']/i)?.[1];
+    const measure=m[2].replace(/<[^>]*>/g,"").trim();
+    if(id) units.set(id,measure);
+  }
+  const labelFile=files.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_lab.xml"));
+  const labels=new Map<string,string>();
+  let labelStatus="not_found";
+  if(labelFile?.name){
+    const lr=await fetch(base+encodeURIComponent(labelFile.name),{headers});
+    if(lr.ok){
+      labelStatus="loaded";
+      const labelXml=await lr.text();
+      for(const link of labelXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?labelLink\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?labelLink>/gi)){
+        const body=link[1],locators=new Map<string,string>(),resources=new Map<string,string>();
+        for(const m of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\b([^>]*)\/?\s*>/gi)){
+          const lab=m[1].match(/xlink:label=["']([^"']+)["']/i)?.[1],href=m[1].match(/xlink:href=["']([^"']+)["']/i)?.[1];
+          const concept=href?.split("#").pop(); if(lab&&concept) locators.set(lab,concept);
+        }
+        for(const m of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?label\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?label>/gi)){
+          const lab=m[1].match(/xlink:label=["']([^"']+)["']/i)?.[1],value=m[2].replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+          if(lab&&value) resources.set(lab,value);
+        }
+        for(const m of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?labelArc\b([^>]*)\/?\s*>/gi)){
+          const from=m[1].match(/xlink:from=["']([^"']+)["']/i)?.[1],to=m[1].match(/xlink:to=["']([^"']+)["']/i)?.[1];
+          const concept=from?locators.get(from):null,label=to?resources.get(to):null;
+          if(concept&&label&&!labels.has(concept)) labels.set(concept,label);
+        }
+      }
+    } else labelStatus="http_"+lr.status;
+  }
+  const candidates:any[]=[];
+  const relevant=/(revenue|sales|operating|expense|cost|income|debt|borrow|cash|property|plant|asset|liabilit|lease|capital)/i;
+  const excludedPrefixes=new Set(["us-gaap","ifrs-full","dei","srt","ecd","country","currency","stpr","exch"]);
+  for(const m of xml.matchAll(/<([A-Za-z][\w.-]*):([A-Za-z][\w.-]*)\b([^>]*)>([\s\S]*?)<\/\1:\2>/g)){
+    const prefix=m[1],tag=m[2],attrs=m[3],raw=m[4];
+    if(excludedPrefixes.has(prefix.toLowerCase())||!relevant.test(tag)) continue;
+    const contextId=attrs.match(/\bcontextRef=["']([^"']+)["']/i)?.[1],unitId=attrs.match(/\bunitRef=["']([^"']+)["']/i)?.[1];
+    const context=contextId?contexts.get(contextId):null;
+    if(!context||context.end!==anchor.end) continue;
+    const valueText=raw.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+    if(!/^-?\d+(?:\.\d+)?$/.test(valueText)) continue;
+    const scale=Number(attrs.match(/\bscale=["'](-?\d+)["']/i)?.[1]??0),sign=attrs.match(/\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
+    const value=Number(valueText)*Math.pow(10,scale)*sign;
+    if(!Number.isFinite(value)) continue;
+    candidates.push({tag:prefix+":"+tag,label:labels.get(tag)??null,value,start:context.start,end:context.end,kind:context.start?"duration":"instant",unit:unitId?units.get(unitId)??null:null,dimensions:context.dimensions,context:contextId});
+  }
+  candidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL extension taxonomy",accession:anchor.accn,fiscal_period:anchor.end,form:anchor.form,filed_at:anchor.filed,filing_url:base+"index.html",instance_document:instance.name,label_document:labelFile?.name??null,label_status:labelStatus,extension_fact_count:candidates.length,extension_facts:candidates.slice(0,100),truncated:candidates.length>100,eligible_for_magic_formula:false,note:"Diagnostic only. Extension tags are not automatically mapped to financial concepts, stored in D1, used for ratios, or ranked. Review labels, contexts, units, dimensions, and the filing presentation before approving any mapping."};
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -688,6 +768,16 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC EDGAR Company Facts"},503); }
     }
 
+    if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        const payload:any=await request.json();
+        const symbol=String(payload.symbol??"").trim().toUpperCase();
+        if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
+        return json(await diagnoseSecExtensionFacts(env,symbol));
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC filing XBRL extension diagnostic"},503); }
+    }
     if (url.pathname==="/api/ai/fundamentals/extract" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
