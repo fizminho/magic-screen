@@ -80,3 +80,18 @@ The FY2025 20-F presents $17m of interest-bearing loans and borrowings under non
 The FY2025 10-K's debt note describes term loans maturing on the fifth anniversary of the closing date. The debt table reconciles $63.608m principal less $1.680m of unamortized discount, issuance costs and paid-in-kind interest to **$61.928m long-term debt**. The future principal schedule shows no scheduled principal in 2026, 2027 or 2028, with $63.608m due in 2029. This supports the noncurrent classification of the year-end carrying amount and indicates no scheduled principal maturity within the next 12 months. Retain the $61.928m noncurrent candidate as review-only; do not convert the current bucket to zero in the generic resolver without an explicit rule for maturity-note evidence and any acceleration/on-demand provisions. See [ZVRA FY2025 Form 10-K](https://www.sec.gov/Archives/edgar/data/1434647/000143464726000011/zvra-20251231.htm), Debt Disclosure and Term Loan note.
 
 These filing-note checks improve evidence quality, but all three cases remain review-only. They do not change production calculations or ranking eligibility.
+
+
+## Further credit-facility note checks
+
+### PXED — revolving facility exists, but no borrowings were drawn
+
+The selected FY2026 10-K discloses a $100m senior secured revolving facility entered into on November 13, 2025, maturing November 13, 2030. At August 31, 2026, the issuer explicitly reports **no outstanding borrowings**. It did have a **$28.4m letter of credit** supporting a sublease; this reduces facility availability but is not a drawn borrowing. The letter of credit replaced a cash-collateralized letter of credit and released the related restricted cash. For conventional-debt review, this supports no drawn balance under this specific facility at the selected date, but the letter of credit remains a contingent commitment and should not be added to gross debt automatically. The restricted-cash movement must also not be confused with unrestricted cash. See [PXED FY2026 Form 10-K](https://www.sec.gov/Archives/edgar/data/1600222/000119312526445323/pxed-20260831.htm), Note 10 and Note 15.
+
+### STRA — $250m revolver, no outstanding borrowings at FY2025 year-end
+
+The FY2025 10-K describes a $250m senior secured revolving credit facility, but explicitly states that no borrowings were outstanding at December 31, 2025. The face balance sheet separately reports operating lease liabilities. This is useful negative evidence for the named revolver only; it does not justify setting every possible conventional-debt category to zero without checking other financing arrangements and the complete debt note. See [STRA FY2025 Form 10-K](https://www.sec.gov/Archives/edgar/data/1013934/000101393426000006/stra-20251231.htm).
+
+### FHTX and NRIX — no conventional debt row surfaced in the selected face statements
+
+FHTX's FY2025 balance sheet reports operating lease liabilities and other operating liabilities but no separate conventional-debt line; its filing also states it had no off-balance-sheet arrangements. NRIX's FY2025 balance sheet similarly reports operating lease liabilities and deferred revenue, without a separately presented conventional-debt line. These are useful face-statement observations, not sufficient proof that no borrowing exists. Keep the debt bucket unresolved unless a complete filing-note review confirms that no outstanding conventional borrowing or debt-like financing arrangement is disclosed. See [FHTX FY2025 Form 10-K](https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm) and [NRIX FY2025 Form 10-K](https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm).
