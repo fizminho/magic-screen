@@ -24,6 +24,23 @@ DIRECT_OPERATING_INCOME_LABEL_PATTERN = r"(?:operating (?:income|loss|earnings)|
 from edgar import Company, set_identity
 
 DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE", "AFMJF", "HPQ", "OTEX", "PRDO", "PLTK", "UPWK", "SNDK", "SGHC")
+
+# INTENTIONAL: these USD market caps are the exact 2026-11-20 MFI snapshot
+# (price date 2026-11-18), expressed in USD millions. ADBE is a historical
+# control and intentionally has no MFI market-cap value in this cohort.
+DEFAULT_MFI_MARKET_CAPS_MILLIONS = {
+    "ALEC": 288.55, "AFMJF": 991.59, "BCRX": 1869.66, "BMBL": 795.92,
+    "EGHSF": 643.04, "FHTX": 107.33, "HRB": 5880.36, "HRMY": 1944.22,
+    "HPQ": 25879.98, "IRWD": 789.85, "MGTX": 812.19, "MNTN": 344.71,
+    "NRIX": 1540.43, "OTEX": 5445.96, "PRDO": 1811.68, "PXED": 746.33,
+    "PBI": 2065.32, "PLTK": 980.20, "QTTB": 202.48, "RGS": 50.60,
+    "SNDK": 111775.70, "SBC": 643.16, "SSTK": 86.13, "SPRO": 50.82,
+    "STRA": 1170.51, "SGHC": 5534.19, "UPWK": 1160.96, "VXRT": 86.21,
+    "ZVRA": 551.60, "GTM": 861.38,
+}
+MFI_SNAPSHOT_AS_OF = "2026-11-20T09:14:01.782Z"
+MFI_SNAPSHOT_PRICE_DATE = "2026-11-18"
+MFI_SNAPSHOT_QUARTER_DATE = "2026-09-30"
 ROW_PATTERN = re.compile(
     r"operating income|operating profit|income from operations|profit from operations|"
     r"earnings before interest|\bebit\b|property|plant|equipment|fixed assets|"
@@ -70,6 +87,23 @@ def safe_value(value: Any) -> Any:
 
 SEC_COMPANY_FACTS_CACHE: dict[str, dict[str, Any]] = {}
 FRANKFURTER_RATE_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
+
+
+def mfi_market_cap_usd_millions(symbol: str) -> float | None:
+    """Return the snapshot's USD market cap in millions, with an optional run override."""
+    values = dict(DEFAULT_MFI_MARKET_CAPS_MILLIONS)
+    raw_override = os.environ.get("MFI_MARKET_CAPS_JSON", "").strip()
+    if raw_override:
+        parsed = json.loads(raw_override)
+        if not isinstance(parsed, dict):
+            raise ValueError("MFI_MARKET_CAPS_JSON must be a JSON object of ticker to USD market-cap millions")
+        for ticker, amount in parsed.items():
+            if not isinstance(ticker, str) or not isinstance(amount, (int, float)):
+                raise ValueError("MFI_MARKET_CAPS_JSON values must be numeric USD millions")
+            if not math.isfinite(float(amount)) or float(amount) < 0:
+                raise ValueError(f"Invalid MFI market cap for {ticker}")
+            values[ticker.upper()] = float(amount)
+    return values.get(symbol.upper())
 
 
 def sec_company_facts(cik: Any) -> dict[str, Any]:
@@ -1328,12 +1362,21 @@ def extract_company(symbol: str) -> dict[str, Any]:
             if filing_currency_override is not None:
                 result["reporting_currency_review"] = filing_currency_override
         reporting_currency = result["reporting_currency_review"].get("currency")
-        mfi_price_date = os.environ.get("MFI_PRICE_DATE", "2026-11-18")
+        mfi_price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
+        market_cap_millions = mfi_market_cap_usd_millions(symbol)
+        market_cap_usd = market_cap_millions * 1_000_000 if market_cap_millions is not None else None
+        result["mfi_market_cap_input"] = {
+            "value_usd_millions": market_cap_millions,
+            "currency": "USD",
+            "price_date": mfi_price_date,
+            "snapshot_as_of": MFI_SNAPSHOT_AS_OF if mfi_price_date == MFI_SNAPSHOT_PRICE_DATE else None,
+            "source": "Magic Formula Investing MFI screen snapshot",
+        }
         fx_review = None
         if reporting_currency and reporting_currency != "USD":
             fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
         result["currency_normalization_review"] = currency_normalization_review(
-            reporting_currency, None, mfi_price_date, fx_review
+            reporting_currency, market_cap_usd, mfi_price_date, fx_review
         )
         # INTENTIONAL: these accession-scoped notes preserve filing context
         # that broad XBRL label matching cannot safely infer or generalize.
@@ -1373,11 +1416,20 @@ def extract_company(symbol: str) -> dict[str, Any]:
                 # source metadata, not guessed from the OTC ticker or exchange.
                 mfi_price_date = os.environ.get("MFI_PRICE_DATE", "2026-11-18")
                 reporting_currency = manual_case.get("currency")
+                market_cap_millions = mfi_market_cap_usd_millions(symbol)
+                market_cap_usd = market_cap_millions * 1_000_000 if market_cap_millions is not None else None
+                manual_case["mfi_market_cap_input"] = {
+                    "value_usd_millions": market_cap_millions,
+                    "currency": "USD",
+                    "price_date": mfi_price_date,
+                    "snapshot_as_of": MFI_SNAPSHOT_AS_OF if mfi_price_date == MFI_SNAPSHOT_PRICE_DATE else None,
+                    "source": "Magic Formula Investing MFI screen snapshot",
+                }
                 fx_review = None
                 if reporting_currency and reporting_currency != "USD":
                     fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
                 manual_case["currency_normalization_review"] = currency_normalization_review(
-                    reporting_currency, None, mfi_price_date, fx_review
+                    reporting_currency, market_cap_usd, mfi_price_date, fx_review
                 )
     return result
 
@@ -1398,7 +1450,15 @@ def main() -> int:
         "symbol_input": raw_symbols,
         "symbol_input_source": "workflow_dispatch_or_environment" if os.environ.get("BAKEOFF_SYMBOLS") else "default_control_cases",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "mfi_price_date": os.environ.get("MFI_PRICE_DATE", "2026-11-18"),
+        "mfi_price_date": os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE),
+        "mfi_market_cap_snapshot": {
+            "source": "Magic Formula Investing",
+            "as_of": MFI_SNAPSHOT_AS_OF if os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE) == MFI_SNAPSHOT_PRICE_DATE else None,
+            "price_date": os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE),
+            "quarter_date": MFI_SNAPSHOT_QUARTER_DATE,
+            "market_cap_unit": "USD millions",
+            "override_supported": "MFI_MARKET_CAPS_JSON",
+        },
         "fx_policy": "USD market cap is translated into filing currency at the MFI quote date; reported debt/cash stay in filing currency at fiscal-period end; ROC remains a same-currency ratio. No EV/EY is approved by this review.",
         "edgartools_version": None,
         "symbols": list(symbols),
