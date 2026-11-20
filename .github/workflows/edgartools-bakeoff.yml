@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       symbols:
-        description: "Comma-separated tickers from the current MFI universe (default runs the latest full 30-stock MFI snapshot plus ADBE as a historical control)"
+        description: "Optional comma-separated ticker override. Leave blank to fetch the active US MFI universe and append ADBE as a regression control."
         required: false
         default: ""
         type: string
@@ -79,8 +79,8 @@ jobs:
           MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '2026-11-18' }}"
           MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || '' }}"
         run: python scripts/edgartools_bakeoff.py
-      # INTENTIONAL: never ingest on push-based regression runs. Manual runs can
-      # post raw EdgarTools evidence only when the Worker URL is configured.
+      # INTENTIONAL: push-based runs are regression-only. Scheduled and manual runs
+      # post raw EdgarTools evidence after dynamic universe discovery.
       - name: Ingest EdgarTools filing evidence (raw, no ranking changes)
         if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
         env:
