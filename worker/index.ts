@@ -1009,6 +1009,15 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC EDGAR Company Facts"},503); }
     }
 
+    if (url.pathname==="/api/fundamentals/edgartools/universe" && request.method==="GET") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        await ensureSchema(env);
+        const rows=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.symbol").all<any>();
+        return json({primary_provider:"EdgarTools",market:"US",source:"active Magic Formula Investing stock_master",count:rows.results.length,symbols:rows.results.map((row:any)=>row.symbol),stocks:rows.results,note:"Active US MFI universe only. Market caps are informational and are not accounting approval."});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools universe discovery"},503); }
+    }
     if (url.pathname==="/api/fundamentals/edgartools/ingest" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
