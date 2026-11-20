@@ -7,6 +7,7 @@ It never calls Magic Screen APIs, writes D1, calculates production ratios, or ra
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -34,8 +35,10 @@ METADATA_FIELDS = (
 
 def safe_value(value: Any) -> Any:
     """Convert pandas/numpy/date/container values into JSON-safe primitives."""
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, int, bool)):
         return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
     if isinstance(value, dict):
         return {str(key): safe_value(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
