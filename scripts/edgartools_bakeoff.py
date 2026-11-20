@@ -351,7 +351,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "concept": re.compile(r"(?:^|_)LiabilitiesCurrent$", re.I),
         },
         "net_ppe_candidates": {
-            "label": re.compile(r"^(?:property|plant|fixed assets)", re.I),
+            "label": re.compile(r"^(?:property|plant|fixed assets|rental property)", re.I),
             "concept": re.compile(r"PropertyPlantAndEquipment(?:Net)?$", re.I),
         },
         "current_debt_candidates": {
