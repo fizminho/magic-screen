@@ -226,5 +226,93 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(assessment["production_approved"])
 
 
+
+    def test_queue_enriches_reconciliation_from_matching_accession(self):
+        preview = {
+            "resolver": "test",
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "BAD",
+                "accession": "same-accession",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "BAD",
+                "filing": {"accession_number": "same-accession"},
+                "balance_sheet_reconciliation_review": {
+                    "status": "difference",
+                    "fiscal_period": "2025-12-31",
+                    "difference_assets_less_liabilities_and_equity": 250000,
+                },
+                "balance_sheet_fact_review": {"categories": {}},
+            }],
+        }
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["balance_sheet_reconciliation_evidence_source"],
+                         "fresh_extraction_artifact_same_accession")
+        self.assertEqual(item["balance_sheet_reconciliation_review"]["status"], "difference")
+        self.assertEqual(item["priority"], "P1")
+        self.assertIn("balance_sheet_reconciliation_difference", item["issues"])
+
+    def test_queue_does_not_mix_reconciliation_from_different_accessions(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "SAFE",
+                "accession": "old-accession",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "SAFE",
+                "filing": {"accession_number": "new-accession"},
+                "balance_sheet_reconciliation_review": {"status": "difference"},
+                "balance_sheet_fact_review": {"categories": {}},
+            }],
+        }
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["balance_sheet_reconciliation_review"])
+        self.assertEqual(item["balance_sheet_reconciliation_evidence_source"],
+                         "stored_resolver_preview")
+        self.assertNotIn("balance_sheet_reconciliation_difference", item["issues"])
+
+    def test_reconciled_balance_sheet_does_not_create_exception(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "GOOD",
+                "accession": "same-accession",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "GOOD",
+                "filing": {"accession_number": "same-accession"},
+                "balance_sheet_reconciliation_review": {"status": "reconciled"},
+                "balance_sheet_fact_review": {"categories": {}},
+            }],
+        }
+        queue = build_queue(preview, raw)
+        item = queue["items"][0]
+        self.assertEqual(item["balance_sheet_reconciliation_review"]["status"], "reconciled")
+        self.assertNotIn("balance_sheet_reconciliation_difference", item["issues"])
+        self.assertEqual(queue["summary"]["balance_sheet_reconciliation"], {"reconciled": 1})
+
 if __name__ == "__main__":
     unittest.main()
