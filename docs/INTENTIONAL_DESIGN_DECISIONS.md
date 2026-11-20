@@ -165,3 +165,11 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - INTENTIONAL: company_tickers_exchange.json is fetched as an in-memory CIK lookup only. Its full directory must never be inserted into stock_master or treated as the US screener universe. Only active MFI candidates are eligible for persistent CIK mappings and SEC fundamentals.
 - On a mapping refresh, resolve each active MFI ticker first, then perform one upsert per ticker into sec_company_map, storing either the CIK or UNMAPPED. Never write a placeholder row and then update it in a second D1 operation.
 - This bounds mapping writes to the active MFI list (normally 30 or 50 candidates), not the SEC directory's approximately 95,000 companies. The in-memory SEC directory download itself does not create D1 row writes.
+
+
+## SEC directory row cleanup
+
+- The protected `/api/admin/cleanup-sec-universe` route can preview or delete only US `stock_master` rows whose source is exactly `SEC company_tickers_exchange.json`.
+- **INTENTIONAL:** protect any row whose matching `stock_snapshot.provider` is `Magic Formula Investing`, because an earlier SEC upsert may have overwritten the original `stock_master.source` on a legitimate MFI symbol.
+- Cleanup runs one bounded batch (maximum 5,000 rows) per request and does not call `ensureSchema`; this avoids unrelated schema/seed writes. Preview is read-only. Do not delete `stock_snapshot`, `stock_fundamentals`, or `sec_company_map` rows as part of this cleanup.
+- D1 DELETE operations count toward daily rows-written quota. On Workers Free, wait until the daily reset if the write quota has already been exhausted, and run small batches while monitoring remaining quota.
