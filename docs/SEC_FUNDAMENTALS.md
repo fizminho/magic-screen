@@ -284,3 +284,16 @@ Two MFI OTC symbols in the 2026-11-20 cohort were not found in the SEC company i
 - **EGHSF / Enghouse Systems Limited (TSX: ENGH):** audited FY2025 IFRS statements in CAD, published December 15, 2025. The $84.862m EBIT candidate is reconstructed from $114.354m results from operating activities less $29.492m acquired-software/customer-relationship amortization, and reconciles exactly to reported pretax income. The review keeps ROU assets and lease liabilities separate and flags the CAD/USD mismatch against the MFI market-cap input.
 
 These are manually transcribed, accession-free issuer-report cases. They do not create SEC CIK mappings, feed the SEC fundamentals sync, or change D1/production rankings. The Enghouse EV candidate remains unavailable until a documented FX conversion and aligned market-cap date are supplied.
+
+
+## Filing currency and FX normalization
+
+The research bakeoff now infers a filing's reporting currency from ISO currency-unit observations in SEC Company Facts that match the exact accession and fiscal-period end. Tied or insufficient evidence stays unknown. It does not assume that a US-listed issuer reports in USD.
+
+The MFI market-cap snapshot is denominated in USD. For a non-USD filer, the review fetches the daily Frankfurter reference rate with USD as base and the filing currency as quote, selecting the latest available rate on or before the MFI price date. The requested price date is an explicit workflow input (defaulting to the 2026-11-18 cohort date). The rate and its actual observation date are retained in the artifact. No latest-rate fallback is allowed.
+
+For future Earnings Yield calculations, translate the USD MFI market cap into the filing currency at the MFI quote-date FX rate, then combine it with debt/cash candidates from the latest annual balance sheet in that reporting currency. Preserve both the market-cap date and the balance-sheet fiscal-period date in the output. This is a review convention for currency comparability, not a claim that the two underlying observations share a date.
+
+ROC remains a same-currency calculation: EBIT and invested capital from the same filing are already denominated in the same reporting currency, so no FX conversion is required. Do not convert only one side of the ROC fraction.
+
+Frankfurter is a free daily reference-rate service without an API key; its blended rates are not live trading quotes and can be revised. This bakeoff step only emits a conversion candidate. The current artifact does not contain MFI market-cap values, so the CAD rate for EGHSF can be shown without fabricating a converted market cap, EV or Earnings Yield. No production calculations or rankings are changed.
