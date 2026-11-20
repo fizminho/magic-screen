@@ -214,3 +214,6 @@ The artifact also includes a review-only invested-capital denominator preview us
 
 
 Restricted cash can be signalled by the XBRL concept even when the human-readable label is neutral (for example, SGHC's `Amounts segregated for users` mapped to `CurrentRestrictedCashAndCashEquivalents`). The unrestricted-cash filter excludes both restricted labels and concepts containing `RestrictedCash`.
+
+
+A review-only ROC preview is calculated when a unique direct consolidated annual `OperatingIncomeLoss` fact and a unique positive invested-capital denominator are both available for the same issuer filing and fiscal period. Filing-specific reconstructed EBIT cases (HRB/PBI) are not automatically promoted into this direct-fact path. Missing/ambiguous inputs and nonpositive invested capital are reported without calculating ROC. No production ratios, eligibility or ranks are changed.
