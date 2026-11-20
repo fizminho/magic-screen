@@ -241,3 +241,11 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **Pin the research dependency.** The bakeoff uses `edgartools==6.3.0`, the version recorded in the successful three-company artifact. This avoids silent changes to statement extraction between runs.
 - **Ticker membership is explicit input.** The script accepts comma-separated `BAKEOFF_SYMBOLS`; the manual GitHub workflow exposes this as a `symbols` input. The default HRB/PBI/ADBE set remains the control set. Additional symbols must be copied from a verified current MFI screen response; the script must not infer MFI membership from SEC's ticker directory or unrelated stored rows.
 - **The validation script remains read-only.** Arbitrary supplied symbols only add SEC filing extraction to the local artifact. They do not write D1, change production fundamentals, or update Magic Formula rankings.
+
+
+## Expanded MFI EdgarTools sample
+
+- The default read-only sample is HRB, PBI and ADBE as control issuers plus seven symbols copied from the 2026-11-20 MFI screen response: AFMJF, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK. This covers foreign issuer filing formats, mature hardware/software, education, gaming, marketplace and semiconductor reporting styles.
+- **INTENTIONAL:** sample membership is grounded in the supplied MFI screen snapshot, not SEC directory membership. The sample is a technical extraction test, not a representative statistical sample or investment recommendation.
+- The extractor now checks annual 10-K, 20-F and 40-F filings and chooses the most recently filed annual report. Interim 10-Q/6-K reports remain excluded to keep the initial comparison annual and accession-aligned.
+- The package is pinned to EdgarTools 6.3.0. The artifact remains isolated from production data and calculations.
