@@ -182,7 +182,7 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
         # the suffix "InterestExpense".
         ("interest_expense", r"(?:^|_)(?:InterestIncomeExpenseNet|InterestExpense)$",
          "non_operating_candidate", r"^Interest expense$", r"FinancingInterestExpense"),
-        ("pension_non_service", r"(?:^|_)NonoperatingIncomeExpense$", "non_operating_candidate", r"pension", None),
+        ("pension_non_service", r"NonoperatingIncomeExpense|Pension|Postretirement", "non_operating_candidate", r"pension|postretirement|non.?service", None),
         ("other_expense", r"(?:^|_)OtherNonrecurringIncomeExpense$", "ambiguous_review", r"other expense", None),
     ]
     expenses = [
@@ -205,8 +205,12 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
     core_total = sum(by_name[name]["amount"] for name in core_names)
     financing = by_name.get("financing_and_other", {}).get("amount", 0.0)
     interest = by_name.get("interest_expense", {}).get("amount", 0.0)
-    pension = by_name.get("pension_non_service", {}).get("amount", 0.0)
+    pension_entry = by_name.get("pension_non_service")
+    pension = pension_entry["amount"] if pension_entry else 0.0
     other = by_name.get("other_expense", {}).get("amount", 0.0)
+    # INTENTIONAL: do not silently treat a missing pension/non-operating row as zero.
+    # Keep the arithmetic visible, but mark the scenario incomplete and expose the gap.
+    missing_adjustments = [name for name in ("interest_expense", "pension_non_service", "other_expense") if name not in by_name]
     scenarios = []
     for scenario, include_financing in [
         ("financing_cost_treated_as_operating", True),
@@ -222,14 +226,17 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
             "non_operating_adjustments": round(nonop_adjustments, 2),
             "reconstructed_pretax_income": round(reconstructed, 2),
             "reported_pretax_income": pretax["amount"],
-            "reconciles_within_1": abs(reconstructed - pretax["amount"]) <= 1.0,
-            "status": "review_required",
+            "reconciliation_difference": round(reconstructed - pretax["amount"], 2),
+            "reconciles_within_1": abs(reconstructed - pretax["amount"]) <= 1.0 if not missing_adjustments else None,
+            "missing_adjustments": missing_adjustments,
+            "status": "review_required" if not missing_adjustments else "missing_adjustment_rows",
         })
     return {
         "status": "review_required", "revenue": revenue, "pretax_income": pretax,
         "operating_expense_candidates": [by_name[name] for name in core_names],
         "ambiguous_expense_candidates": [by_name[name] for name in ("financing_and_other", "other_expense") if name in by_name],
         "non_operating_candidates": [by_name[name] for name in ("interest_expense", "pension_non_service") if name in by_name],
+        "missing_adjustments": missing_adjustments,
         "scenarios": scenarios,
         "guardrail": "Reconciliation does not prove classification. Review filing presentation and notes; never promote this candidate automatically into production EBIT.",
     }
