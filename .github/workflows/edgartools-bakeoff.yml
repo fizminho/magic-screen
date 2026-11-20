@@ -82,7 +82,7 @@ jobs:
       # INTENTIONAL: push-based runs are regression-only. Scheduled and manual runs
       # post raw EdgarTools evidence after dynamic universe discovery.
       - name: Ingest EdgarTools filing evidence (raw, no ranking changes)
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
         env:
           EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
           UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
@@ -98,7 +98,7 @@ jobs:
             --data-binary @edgartools-bakeoff.json \
             "$EDGARTOOLS_INGEST_URL"
       - name: Run read-only accounting resolver preview
-        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
         env:
           EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
           UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
