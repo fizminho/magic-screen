@@ -456,7 +456,7 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
 
 type EdgarToolsResolution = {
   symbol:string; provider_status:string; accession:string|null; fiscal_period:string|null;
-  ebit_candidate:number|null; ebit_method:string|null; ebit_status:string;
+  ebit_candidate:number|null; ebit_method:string|null; ebit_concept:string|null; ebit_label:string|null; ebit_status:string;
   invested_capital_candidate:number|null; invested_capital_status:string;
   reporting_currency:string|null; candidate_roc:number|null; review_flags:string[];
   overall_status:"review_required"|"unsupported_provider"|"awaiting_evidence";
@@ -465,7 +465,7 @@ type EdgarToolsResolution = {
 function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, accession:string|null, fiscalPeriod:string|null, company:any):EdgarToolsResolution {
   if (!company || providerStatus!=="supported") return {
     symbol,provider_status:providerStatus??"awaiting_evidence",accession,fiscal_period:fiscalPeriod,
-    ebit_candidate:null,ebit_method:null,ebit_status:"not_resolved",
+    ebit_candidate:null,ebit_method:null,ebit_concept:null,ebit_label:null,ebit_status:"not_resolved",
     invested_capital_candidate:null,invested_capital_status:"not_resolved",
     reporting_currency:null,candidate_roc:null,review_flags:[],
     overall_status:providerStatus==="unsupported_provider"?"unsupported_provider":"awaiting_evidence",production_write:false
@@ -528,7 +528,9 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
   const candidateRoc=ebit!==null && investedCapital!==null && investedCapital>0 ? Number((ebit/investedCapital*100).toFixed(4)) : null;
   return {
     symbol,provider_status:providerStatus,accession,fiscal_period:fiscalPeriod,
-    ebit_candidate:ebit,ebit_method:ebit!==null?"direct_reported_operating_income":null,ebit_status:ebitStatus,
+    ebit_candidate:ebit,ebit_method:ebit!==null?"direct_reported_operating_income":null,
+    ebit_concept:ebit!==null?String(directRows[0]?.concept??""):null,
+    ebit_label:ebit!==null?String(directRows[0]?.label??""):null,ebit_status:ebitStatus,
     invested_capital_candidate:investedCapital,invested_capital_status:investedStatus,
     reporting_currency:currency,candidate_roc:candidateRoc,review_flags:uniqueFlags,
     overall_status:"review_required",production_write:false
