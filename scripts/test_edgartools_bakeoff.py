@@ -402,6 +402,10 @@ class FilingSpecificEBITReviewTests(unittest.TestCase):
         self.assertEqual(result["ebit_candidate"], 341_680_000)
         self.assertEqual(result["total_interest_expense_for_EBIT_reconciliation"], 149_156_000)
         self.assertEqual(result["allocated_finance_interest_embedded_in_cost_of_financing"], 47_696_000)
+        self.assertEqual(result["interest_income_included_in_reported_net_interest_expense"], 8_000_000)
+        self.assertEqual(result["fiscal_period"], PERIOD)
+        self.assertTrue(result["cross_checks"]["reconciles_with_reported_components"])
+        self.assertEqual(result["cross_checks"]["pretax_plus_interest_net_of_interest_income"], 341_680_000)
         self.assertEqual(result["automation_status"], "manual_review_only")
 
     def test_pbi_reconstruction_is_not_reused_for_another_accession(self):
