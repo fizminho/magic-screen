@@ -420,6 +420,49 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
     }
 
 
+
+def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
+    """Calculate the existing ROC denominator only when all three inputs are unique."""
+    categories = balance_review.get("categories", {})
+    required = (
+        "current_assets_candidates",
+        "current_liabilities_candidates",
+        "net_ppe_candidates",
+    )
+    inputs: dict[str, float] = {}
+    unresolved = []
+    for name in required:
+        category = categories.get(name, {})
+        candidates = category.get("candidates", [])
+        if category.get("status") != "unique_candidate" or len(candidates) != 1:
+            unresolved.append(name)
+            continue
+        inputs[name] = float(candidates[0]["value"])
+    if unresolved:
+        return {
+            "status": "review_required",
+            "method": "current_assets_minus_current_liabilities_plus_net_ppe",
+            "value": None,
+            "inputs": inputs,
+            "unresolved_inputs": unresolved,
+            "guardrail": "No denominator is calculated unless current assets, current liabilities and net PP&E each have exactly one candidate. This review value never feeds production ROC or ranking.",
+        }
+    value = (
+        inputs["current_assets_candidates"]
+        - inputs["current_liabilities_candidates"]
+        + inputs["net_ppe_candidates"]
+    )
+    return {
+        "status": "calculated_review_only",
+        "method": "current_assets_minus_current_liabilities_plus_net_ppe",
+        "value": round(value, 2),
+        "sign": "positive" if value > 0 else "negative" if value < 0 else "zero",
+        "inputs": inputs,
+        "unresolved_inputs": [],
+        "guardrail": "Review-only denominator using unique label/concept candidates. This does not approve PP&E scope, EBIT, ROC, eligibility or ranking and never feeds production data.",
+    }
+
+
 def filing_specific_review(
     symbol: str, filing: dict[str, Any], bridge: dict[str, Any],
     statements: dict[str, Any],
@@ -630,6 +673,11 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # issuer, including IFRS filers. This remains review-only and never feeds D1.
         result["balance_sheet_fact_review"] = balance_sheet_fact_review(
             result["statements"], fiscal_period
+        )
+        # INTENTIONAL: preview the existing ROC denominator only when each
+        # required balance-sheet component has one unique consolidated candidate.
+        result["invested_capital_review"] = invested_capital_review(
+            result["balance_sheet_fact_review"]
         )
         # INTENTIONAL: expose only an exact, consolidated OperatingIncomeLoss
         # fact for this annual period. This is diagnostic, not production EBIT.
