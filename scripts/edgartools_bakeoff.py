@@ -336,12 +336,16 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
         "cash_unrestricted_candidates": {
             "label": re.compile(r"cash and cash equivalents|^cash$", re.I),
             "concept": re.compile(r"CashAndCashEquivalentsAtCarryingValue|CashAndCashEquivalents$", re.I),
-            "exclude_label": re.compile(r"\brestricted\b", re.I),
-            "exclude_concept": re.compile(r"RestrictedCash", re.I),
+            "exclude_label": re.compile(r"\brestricted\b|short.?term investments", re.I),
+            "exclude_concept": re.compile(r"RestrictedCash|CashCashEquivalentsRestrictedCash", re.I),
         },
         "cash_restricted_candidates": {
-            "label": re.compile(r"restricted cash", re.I),
-            "concept": re.compile(r"RestrictedCash", re.I),
+            "label": re.compile(r"^restricted cash$", re.I),
+            "concept": re.compile(r"(?:RestrictedCashCurrent|RestrictedCashNoncurrent)$", re.I),
+        },
+        "cash_combined_or_investment_candidates": {
+            "label": re.compile(r"cash.*restricted cash|restricted cash.*cash|cash.*short.?term investments", re.I),
+            "concept": re.compile(r"CashCashEquivalentsRestrictedCash|CashCashEquivalentsRestrictedCashAndShortTermInvestments", re.I),
         },
         "current_assets_candidates": {
             "label": re.compile(r"^total current assets$", re.I),
@@ -384,6 +388,10 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
                 continue
             label_match = bool(rules["label"].search(label))
             concept_match = bool(rules["concept"].search(concept))
+            # INTENTIONAL: "noncurrent" contains the substring "current".
+            # Do not let a noncurrent lease label enter the current category.
+            if category == "current_lease_liability_candidates" and re.search(r"\\bnon.?current\\b", label, re.I):
+                label_match = False
             if not (label_match or concept_match):
                 continue
             if ((rules.get("exclude_label") and rules["exclude_label"].search(label))
