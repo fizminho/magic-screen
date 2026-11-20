@@ -869,6 +869,114 @@ def filing_specific_review(
         "guardrail": "Filing-specific manual review only. Do not generalize these values or this extraction to other issuers/periods, and do not write production fundamentals or rankings.",
     }
 
+def non_sec_issuer_review_case(symbol: str) -> dict[str, Any] | None:
+    """Return tightly scoped manual annual-report cases for MFI OTC symbols absent from SEC index."""
+    cases: dict[str, dict[str, Any]] = {
+        "AFMJF": {
+            "status": "review_only_non_sec_source",
+            "issuer": "Alphamin Resources Corp.",
+            "primary_listings": ["TSX Venture: AFM", "JSE AltX: APH"],
+            "otc_symbol": "AFMJF",
+            "source_type": "issuer_published_audited_consolidated_financial_statements",
+            "source_url": "https://www.alphaminresources.com/wp-content/uploads/2026/03/Alpha_Financials_2025-Signed-incl-signed-audit-opinion-Final.pdf",
+            "published_date": "2026-03-11",
+            "fiscal_period": "2025-12-31",
+            "currency": "USD",
+            "accounting_framework": "IFRS",
+            "audited": True,
+            "revenue": 620_888_174,
+            "ebit_candidate": 273_665_327,
+            "ebit_method": "direct_reported_ifrs_operating_profit",
+            "current_assets": 193_759_626,
+            "current_liabilities": 82_315_662,
+            "net_ppe": 324_518_709,
+            "right_of_use_assets_included_in_net_ppe": 15_919_442,
+            "exploration_and_evaluation_assets_separate": 22_181_982,
+            "invested_capital_candidate": 435_962_673,
+            "invested_capital_candidate_including_exploration_assets": 458_144_655,
+            "candidate_roc": 62.7727,
+            "candidate_roc_including_exploration_assets": 59.7334,
+            "cash_and_cash_equivalents": 56_088_248,
+            "current_bank_overdraft": 23_286_126,
+            "current_related_party_debt": 3_241_751,
+            "current_external_debt": 7_959_459,
+            "noncurrent_related_party_debt": 0,
+            "noncurrent_external_debt": 6_081_751,
+            "conventional_gross_debt_candidate": 40_569_087,
+            "conventional_net_debt_candidate": -15_519_161,
+            "current_lease_liabilities": 2_386_503,
+            "noncurrent_lease_liabilities": 1_171_456,
+            "noncontrolling_interest": 65_738_168,
+            "conventional_net_debt_plus_nci_candidate": 50_219_007,
+            "ownership_scope_note": "The Group owns 84.14% of Alphamin Bisie Mining SA; consolidated operating profit includes the controlled subsidiary, while noncontrolling interest is material.",
+            "review_flags": [
+                "not_found_in_sec_company_index_manual_issuer_report_source",
+                "right_of_use_assets_are_included_in_reported_plant_and_equipment",
+                "separate_exploration_and_evaluation_assets_may_belong_in_invested_capital",
+                "lease_liabilities_require_enterprise_value_policy_decision",
+                "material_noncontrolling_interest_requires_enterprise_value_adjustment",
+                "market_cap_and_usd_market_snapshot_not_attached_no_enterprise_value_calculated",
+            ],
+            "guardrail": "Manual issuer-report research only. Values are transcribed from the exact audited FY2025 statements; ROC and net-debt figures are candidates with scope flags, not production-approved mappings. No SEC ingestion, D1 write, ratios or ranking are changed.",
+        },
+        "EGHSF": {
+            "status": "review_only_non_sec_source",
+            "issuer": "Enghouse Systems Limited",
+            "primary_listing": "TSX: ENGH",
+            "otc_symbol": "EGHSF",
+            "source_type": "issuer_published_audited_annual_report",
+            "source_url": "https://www.enghouse.com/wp-content/uploads/2025/12/20251215-Q4-2025-Message-to-shareholders.pdf",
+            "published_date": "2025-12-15",
+            "fiscal_period": "2025-10-31",
+            "currency": "CAD",
+            "accounting_framework": "IFRS",
+            "audited": True,
+            "revenue": 498_878_000,
+            "results_from_operating_activities": 114_354_000,
+            "acquired_software_and_customer_relationship_amortization": -29_492_000,
+            "ebit_candidate": 84_862_000,
+            "ebit_method": "issuer_statement_operating_subtotal_less_acquired_intangible_amortization",
+            "pretax_income": 91_539_000,
+            "pretax_reconciliation": {
+                "ebit_candidate": 84_862_000,
+                "foreign_exchange_loss": -2_378_000,
+                "lease_interest_expense": -505_000,
+                "finance_income": 8_041_000,
+                "finance_expenses": -98_000,
+                "other_income": 1_617_000,
+                "reported_pretax_income": 91_539_000,
+                "difference": 0,
+            },
+            "current_assets": 375_067_000,
+            "current_liabilities": 218_733_000,
+            "net_ppe": 3_890_000,
+            "right_of_use_assets_separate": 11_453_000,
+            "invested_capital_candidate": 160_224_000,
+            "invested_capital_candidate_including_right_of_use_assets": 171_677_000,
+            "candidate_roc": 52.9646,
+            "candidate_roc_including_right_of_use_assets": 49.4312,
+            "cash_and_cash_equivalents": 269_061_000,
+            "short_term_investments_separate": 25_000,
+            "conventional_gross_debt_candidate": 0,
+            "conventional_net_debt_candidate": -269_061_000,
+            "current_lease_liabilities": 5_197_000,
+            "noncurrent_lease_liabilities": 5_944_000,
+            "noncontrolling_interest": 0,
+            "ownership_scope_note": "The FY2025 MD&A describes the consolidated subsidiaries as wholly owned and states that the company has no outstanding external debt financing.",
+            "review_flags": [
+                "not_found_in_sec_company_index_manual_issuer_report_source",
+                "right_of_use_assets_are_separate_from_property_and_equipment",
+                "lease_liabilities_require_enterprise_value_policy_decision",
+                "cash_and_short_term_investments_are_separately_reported",
+                "financial_statements_are_cad_while_mfi_market_cap_is_usd_fx_conversion_required",
+                "market_cap_and_usd_market_snapshot_not_attached_no_enterprise_value_calculated",
+            ],
+            "guardrail": "Manual issuer-report research only. EBIT is reconstructed by subtracting acquired-intangible amortization from the issuer's operating subtotal and reconciles to reported pretax income. ROC and net-debt figures remain candidates with scope flags; no SEC ingestion, D1 write, ratios or ranking is changed.",
+        },
+    }
+    return cases.get(symbol)
+
+
 def extract_company(symbol: str) -> dict[str, Any]:
     result: dict[str, Any] = {"symbol": symbol, "status": "error"}
     try:
@@ -994,6 +1102,12 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # Record this as a coverage outcome, not a failure of other issuers.
         if type(exc).__name__ == "CompanyNotFoundError":
             result["status"] = "not_found_in_sec_company_index"
+            # INTENTIONAL: preserve separately sourced audited issuer reports
+            # for MFI OTC tickers without an SEC company-index match. These
+            # manual cases remain outside the SEC facts and production pipeline.
+            manual_case = non_sec_issuer_review_case(symbol)
+            if manual_case is not None:
+                result["non_sec_issuer_review"] = manual_case
     return result
 
 
