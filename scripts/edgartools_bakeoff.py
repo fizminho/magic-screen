@@ -488,6 +488,64 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
 
 
 
+def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict[str, Any]:
+    """Summarize debt/cash candidates without claiming an approved enterprise value."""
+    categories = (balance_review or {}).get("categories", {})
+
+    def unique_value(name: str) -> float | None:
+        category = categories.get(name, {})
+        candidates = category.get("candidates", [])
+        if category.get("candidate_count") != 1 or len(candidates) != 1:
+            return None
+        value = candidates[0].get("value")
+        return float(value) if isinstance(value, (int, float)) else None
+
+    current_debt = unique_value("current_debt_candidates")
+    noncurrent_debt = unique_value("noncurrent_debt_candidates")
+    unrestricted_cash = unique_value("cash_unrestricted_candidates")
+    flags = []
+    if current_debt is None:
+        flags.append("current_debt_not_uniquely_identified_not_assumed_zero")
+    if noncurrent_debt is None:
+        flags.append("noncurrent_debt_not_uniquely_identified_not_assumed_zero")
+    if unrestricted_cash is None:
+        flags.append("unrestricted_cash_not_uniquely_identified")
+    if any(categories.get(name, {}).get("candidate_count", 0) for name in (
+        "current_lease_liability_candidates", "noncurrent_lease_liability_candidates",
+    )):
+        flags.append("lease_liabilities_separate_from_conventional_debt_require_policy_decision")
+    if categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0):
+        flags.append("separate_financing_obligation_requires_enterprise_value_policy_decision")
+    if any(categories.get(name, {}).get("candidate_count", 0) for name in (
+        "cash_restricted_candidates", "cash_combined_or_investment_candidates",
+    )):
+        flags.append("restricted_cash_or_short_term_investments_require_cash_scope_review")
+
+    gross_debt = None
+    if current_debt is not None and noncurrent_debt is not None:
+        gross_debt = round(current_debt + noncurrent_debt, 2)
+    net_debt = None
+    if gross_debt is not None and unrestricted_cash is not None:
+        net_debt = round(gross_debt - unrestricted_cash, 2)
+
+    # INTENTIONAL: completeness diagnostic only. Missing facts are unknown, never zero.
+    return {
+        "status": "review_required" if flags else "candidate_inputs_identified_review_only",
+        "current_debt_candidate": current_debt,
+        "noncurrent_debt_candidate": noncurrent_debt,
+        "gross_debt_candidate": gross_debt,
+        "unrestricted_cash_candidate": unrestricted_cash,
+        "net_debt_candidate": net_debt,
+        "lease_liabilities": {
+            "current_candidate_count": categories.get("current_lease_liability_candidates", {}).get("candidate_count", 0),
+            "noncurrent_candidate_count": categories.get("noncurrent_lease_liability_candidates", {}).get("candidate_count", 0),
+        },
+        "separate_financing_obligation_candidate_count": categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0),
+        "review_flags": flags,
+        "guardrail": "Candidate debt/cash bridge only, not Enterprise Value. Lease liabilities, separate financing obligations, restricted cash and investments require explicit policy. Missing inputs are unknown, not zero. No production ratios or rankings are changed.",
+    }
+
+
 def roc_review(
     direct_ebit: dict[str, Any],
     invested_capital: dict[str, Any],
@@ -498,9 +556,8 @@ def roc_review(
     capital = invested_capital.get("value")
     categories = (balance_review or {}).get("categories", {})
     review_flags = []
-    # INTENTIONAL: these are review prompts, not automatic accounting adjustments.
-    # The diagnostic ROC is retained but visibly flagged when other relevant
-    # asset/liability classes are present outside its simple denominator formula.
+    # INTENTIONAL: unresolved accounting-scope flags prevent a numerical
+    # candidate from being presented as an approved diagnostic ROC.
     if categories.get("rental_equipment_net_candidates", {}).get("candidate_count", 0):
         review_flags.append("separate_rental_equipment_requires_invested_capital_scope_review")
     if categories.get("right_of_use_asset_candidates", {}).get("candidate_count", 0):
@@ -540,16 +597,27 @@ def roc_review(
             "ebit": ebit,
             "review_flags": review_flags,
         }
-    # INTENTIONAL: EBIT and invested capital come from the same issuer filing
-    # and fiscal period, so the ratio is currency-neutral. This is still review-only.
+    candidate_roc = round((float(ebit) / float(capital)) * 100, 4)
+    if review_flags:
+        return {
+            "status": "review_required_scope_flags",
+            "roc": None,
+            "candidate_roc": candidate_roc,
+            "ebit": ebit,
+            "invested_capital": capital,
+            "method": "direct_operating_income_over_reviewed_invested_capital",
+            "review_flags": review_flags,
+            "guardrail": "Numerical ROC is a research candidate only. Scope flags prevent it from being presented as calculated ROC. Resolve issuer-specific asset, lease, financing and cash treatment before approving the ratio.",
+        }
+    # INTENTIONAL: even unflagged ratios remain review-only, never production inputs.
     return {
         "status": "calculated_review_only",
-        "roc": round((float(ebit) / float(capital)) * 100, 4),
+        "roc": candidate_roc,
         "ebit": ebit,
         "invested_capital": capital,
         "method": "direct_operating_income_over_reviewed_invested_capital",
-        "review_flags": review_flags,
-        "guardrail": "Diagnostic ROC only. Direct EBIT and unique denominator candidates are not production-approved mappings; review_flags identify additional asset/liability classes that may affect scope. This result never feeds D1, eligibility or ranking.",
+        "review_flags": [],
+        "guardrail": "Diagnostic ROC only. Direct EBIT and unique denominator candidates are not production-approved mappings; this result never feeds D1, eligibility or ranking.",
     }
 
 
@@ -861,6 +929,9 @@ def extract_company(symbol: str) -> dict[str, Any]:
         result["roc_review"] = roc_review(
             result["direct_operating_income_review"],
             result["invested_capital_review"],
+            result["balance_sheet_fact_review"],
+        )
+        result["enterprise_value_scope_review"] = enterprise_value_scope_review(
             result["balance_sheet_fact_review"],
         )
         # INTENTIONAL: these accession-scoped notes preserve filing context
