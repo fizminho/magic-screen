@@ -65,7 +65,7 @@ Safety rules:
 
 Example response fields include the symbol, SEC accession, fiscal period, filing URL, per-field validation status, and whether each selected value exactly matched a supplied SEC fact.
 
-The US screener also exposes an **AI fact diagnostic** button. Enter the existing `UNIVERSE_SYNC_TOKEN` in its dialog and select a ticker such as `HRB`. The token is held only in component state for the request and is cleared after success or when the dialog closes. Never enter the Gemini API key in the browser.
+The AI fact diagnostic remains a protected, manually invoked Worker endpoint, but its frontend button and dialog are intentionally hidden while Gemini API access is on hold. The endpoint does not run during normal screener loads or cron. Do not invoke it until the user explicitly resumes Gemini work.
 
 ## Important limitations
 
