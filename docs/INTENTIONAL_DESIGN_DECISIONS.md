@@ -188,3 +188,6 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **INTENTIONAL:** issuer-extension facts are sorted by likely Magic Formula input meaning (operating income, revenue, current assets/liabilities, PP&E, cash, debt/borrowings, interest and operating costs) after consolidated non-dimensional facts are placed ahead of dimensional breakdowns.
 - The diagnostic returns up to 30 extension facts instead of 12 so relevant balance-sheet tags are less likely to be hidden by alphabetic ordering.
 - This is a discovery and review aid only. Tag names, labels and presentation placement do not establish accounting equivalence; no extension fact is automatically mapped into production calculations or rankings.
+
+- The diagnostic additionally returns `targeted_candidates` groups for operating income, PP&E, current assets, current liabilities, cash and debt. Each group is selected independently of the top-30 extension preview and reports its own count/truncation state, so a relevant fact cannot be hidden solely by the compact preview limit.
+- Candidate output includes fact period/context and up to three presentation relationships to support filing review. This is still evidence gathering only: neither tag names nor presentation relationships authorize production mappings.
