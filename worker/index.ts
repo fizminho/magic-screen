@@ -453,6 +453,88 @@ async function extractSecFactsWithGemini(env:Env,symbol:string) {
   return {symbol,company_name:stock.company_name,source:"SEC EDGAR Company Facts + Gemini tag mapping",model,model_attempts:modelAttempts,accession:anchor.accn,fiscal_period:anchor.end,filing_url:"https://www.sec.gov/Archives/edgar/data/"+String(Number(stock.cik))+"/"+anchor.accn.replace(/-/g,"")+"/"+"index.html",status:"AI_EXTRACTED_REVIEW_REQUIRED",eligible_for_magic_formula:false,validated,derived_ebit_candidate:derivedEbitCandidate,related_operating_facts:relatedOperatingFacts,instance_operating_facts:instanceOperatingFacts,instance_operating_facts_count:instanceOperatingFacts.length,instance_document:instancePath||null,instance_facts_status:instanceResponse.ok?"loaded":"unavailable_http_"+instanceResponse.status,presentation_document:presentationFile?.name??null,presentation_status:presentationResponse.ok?"loaded":"unavailable_http_"+presentationResponse.status,schema_document:schemaFile?.name??null,schema_status:schemaResponse.ok?"loaded":"unavailable_http_"+schemaResponse.status,label_document:labelFile?.name??null,label_status:labelResponse.ok?"loaded":"unavailable_http_"+labelResponse.status,costs_and_expenses_labels:costsAndExpensesLabels,costs_and_expenses_presentation:costsAndExpensesPresentation,candidate_count:bounded.length};
 }
 
+
+type EdgarToolsResolution = {
+  symbol:string; provider_status:string; accession:string|null; fiscal_period:string|null;
+  ebit_candidate:number|null; ebit_method:string|null; ebit_status:string;
+  invested_capital_candidate:number|null; invested_capital_status:string;
+  reporting_currency:string|null; candidate_roc:number|null; review_flags:string[];
+  overall_status:"review_required"|"unsupported_provider"|"awaiting_evidence";
+  production_write:false;
+};
+function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, accession:string|null, fiscalPeriod:string|null, company:any):EdgarToolsResolution {
+  if (!company || providerStatus!=="supported") return {
+    symbol,provider_status:providerStatus??"awaiting_evidence",accession,fiscal_period:fiscalPeriod,
+    ebit_candidate:null,ebit_method:null,ebit_status:"not_resolved",
+    invested_capital_candidate:null,invested_capital_status:"not_resolved",
+    reporting_currency:null,candidate_roc:null,review_flags:[],
+    overall_status:providerStatus==="unsupported_provider"?"unsupported_provider":"awaiting_evidence",production_write:false
+  };
+  const filing=company.filing??{};
+  const period=String(filing.period_of_report??filing.period??"");
+  const filingAccession=String(filing.accession_number??filing.accession??"");
+  const form=String(filing.form??"");
+  const flags:string[]=[];
+  if (!accession || filingAccession!==accession) flags.push("filing_accession_mismatch");
+  if (!fiscalPeriod || period!==fiscalPeriod) flags.push("fiscal_period_mismatch");
+  if (!["10-K","20-F","40-F"].includes(form)) flags.push("ineligible_annual_form");
+  const statementRows=company.statements?.income_statement?.rows??[];
+  const directRows=statementRows.filter((row:any)=>{
+    const concept=String(row?.concept??"");
+    return row?.dimension===false && !row?.abstract
+      && /(?:^|_)(?:OperatingIncomeLoss|OperatingProfitLoss|ProfitLossFromOperatingActivities)$/.test(concept);
+  });
+  const directReview=company.direct_operating_income_review??{};
+  let ebit:number|null=null;
+  let ebitStatus="review_required";
+  if (directRows.length===1) {
+    const values=directRows[0]?.values??{};
+    const periodValues=Object.entries(values).filter(([key,value]:any)=>
+      (key===period || key.startsWith(period+" ")) && typeof value==="number" && Number.isFinite(value)
+    );
+    const rowValue=periodValues.length===1 ? Number(periodValues[0][1]) : null;
+    const reviewedValue=typeof directReview.ebit_candidate==="number" ? directReview.ebit_candidate : null;
+    if (rowValue!==null && reviewedValue!==null && Math.abs(rowValue-reviewedValue)<=0.01
+      && directReview.method==="direct_reported_operating_income" && directReview.status==="review_only"
+      && String(directReview.fiscal_period??"")===period) {
+      ebit=rowValue;
+      ebitStatus="direct_reported_candidate_review_only";
+    } else {
+      flags.push("direct_ebit_row_and_review_did_not_reconcile");
+    }
+  } else {
+    flags.push(directRows.length===0?"direct_operating_income_not_found":"multiple_direct_operating_income_rows");
+  }
+  const invested=company.invested_capital_review??{};
+  const investedCapital=typeof invested.value==="number" && Number.isFinite(invested.value) ? invested.value : null;
+  let investedStatus="review_required";
+  if (invested.status==="calculated_review_only" && investedCapital!==null && investedCapital>0
+    && invested.method==="current_assets_minus_current_liabilities_plus_net_ppe") {
+    investedStatus="positive_denominator_candidate_review_only";
+  } else {
+    flags.push(investedCapital!==null && investedCapital<=0?"non_positive_invested_capital":"invested_capital_not_resolved");
+  }
+  const currencyReview=company.reporting_currency_review??{};
+  const currency=typeof currencyReview.currency==="string" ? currencyReview.currency : null;
+  if (currencyReview.status!=="identified_from_accession_facts" || !currency) flags.push("reporting_currency_not_confirmed");
+  for (const flag of (Array.isArray(currencyReview.review_flags)?currencyReview.review_flags:[])) flags.push("currency:"+String(flag));
+  const rocReview=company.roc_review??{};
+  for (const flag of (Array.isArray(rocReview.review_flags)?rocReview.review_flags:[])) flags.push(String(flag));
+  const evReview=company.enterprise_value_scope_review??{};
+  for (const flag of (Array.isArray(evReview.review_flags)?evReview.review_flags:[])) flags.push(String(flag));
+  const balanceReview=company.balance_sheet_fact_review??{};
+  for (const category of (Array.isArray(balanceReview.unresolved_categories)?balanceReview.unresolved_categories:[])) flags.push("balance_sheet:"+String(category));
+  const uniqueFlags=[...new Set(flags)];
+  const candidateRoc=ebit!==null && investedCapital!==null && investedCapital>0 ? Number((ebit/investedCapital*100).toFixed(4)) : null;
+  return {
+    symbol,provider_status:providerStatus,accession,fiscal_period:fiscalPeriod,
+    ebit_candidate:ebit,ebit_method:ebit!==null?"direct_reported_operating_income":null,ebit_status:ebitStatus,
+    invested_capital_candidate:investedCapital,invested_capital_status:investedStatus,
+    reporting_currency:currency,candidate_roc:candidateRoc,review_flags:uniqueFlags,
+    overall_status:"review_required",production_write:false
+  };
+}
+
 async function syncUsFundamentals(env:Env, limit=10) {
   await ensureSchema(env);
   const mapAge=await env.DB.prepare("SELECT MIN(cm.updated_at) AS updated_at,COUNT(cm.symbol) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
@@ -1067,6 +1149,45 @@ export default {
         return json({primary_provider:"EdgarTools",storage:"raw filing evidence only",production_fundamentals_changed:false,summary:summary.results,latest:latest.results});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
+
+    if (url.pathname==="/api/fundamentals/edgartools/resolve-preview" && request.method==="GET") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        // INTENTIONAL: read-only resolver preview. It never writes stock_fundamentals,
+        // stock_snapshot ratios, eligibility, or rankings.
+        const rows=await env.DB.prepare(`SELECT m.symbol,m.company_name,e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json,e.ingested_at
+          FROM stock_master m
+          LEFT JOIN edgartools_filing_evidence e ON e.symbol=m.symbol AND e.accession_key=(
+            SELECT e2.accession_key FROM edgartools_filing_evidence e2
+            WHERE e2.symbol=m.symbol AND e2.market='US'
+            ORDER BY e2.ingested_at DESC,e2.accession_key DESC LIMIT 1
+          )
+          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'
+          ORDER BY m.symbol`).all<any>();
+        const resolutions=rows.results.map((row:any)=>{
+          let company:any=null;
+          if(row.payload_json) {
+            try { company=JSON.parse(row.payload_json); }
+            catch { company=null; }
+          }
+          const result=resolveEdgarToolsEvidence(row.symbol,row.provider_status??null,row.accession??null,row.fiscal_period??null,company);
+          return {...result,company_name:row.company_name,filing_form:row.form??null,evidence_ingested_at:row.ingested_at??null};
+        });
+        const summary={
+          active_universe:resolutions.length,
+          supported:resolutions.filter((x:any)=>x.provider_status==="supported").length,
+          unsupported_provider:resolutions.filter((x:any)=>x.overall_status==="unsupported_provider").length,
+          awaiting_evidence:resolutions.filter((x:any)=>x.overall_status==="awaiting_evidence").length,
+          direct_ebit_candidates:resolutions.filter((x:any)=>x.ebit_status==="direct_reported_candidate_review_only").length,
+          review_required:resolutions.filter((x:any)=>x.overall_status==="review_required").length
+        };
+        return json({primary_provider:"EdgarTools",resolver:"deterministic-preview-v1",summary,resolutions,
+          production_fundamentals_changed:false,rankings_changed:false,
+          note:"Preview only. Direct EBIT and invested-capital candidates remain review-only; accounting scope flags are preserved. No production values or rankings are written."});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools resolver preview"},503); }
+    }
+
     if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
