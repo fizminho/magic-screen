@@ -349,3 +349,7 @@
 .preview-empty{padding:20px 0;color:#8795ae;font-size:11px}
 .preview-footnote{margin-top:12px}
 @media(max-width:760px){.mfi-preview-panel{padding:14px;margin:18px 0 28px}.mfi-preview-head{display:block}.preview-updated{margin-top:10px}.preview-stats{gap:6px}.preview-stats div{min-width:0;flex:1;padding:9px}.preview-stats b{font-size:17px}}
+
+.mfi-excluded-toggle{margin-top:12px}
+.mfi-excluded-wrap{margin-top:10px}
+.mfi-exclusion-reasons{display:block;color:#a7b3c7;font-size:10px;line-height:1.6;max-width:760px}
