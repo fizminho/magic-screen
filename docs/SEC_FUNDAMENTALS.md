@@ -205,3 +205,6 @@ The expanded sample exposed three classification edge cases now guarded in the r
 
 
 For IFRS lease concepts, the current matcher requires an exact taxonomy boundary before `CurrentLeaseLiabilities`; it must not match the substring inside `NoncurrentLeaseLiabilities`. This prevents a noncurrent lease liability from appearing in both categories.
+
+
+The unrestricted-cash filter uses a whole-word restricted check so that `unrestricted` is not accidentally excluded as a substring match. A combined cash-and-restricted-cash total remains separate from the unrestricted cash candidate.
