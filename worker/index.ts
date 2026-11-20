@@ -735,20 +735,20 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     if(pr.ok){
       presentationStatus="loaded";
       const presentationXml=await pr.text();
-      for(const link of presentationXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationLink\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?presentationLink>/gi)){
+      for(const link of presentationXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationLink\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?presentationLink>/gi)){
         const linkAttrs=link[1],body=link[2];
         const role=linkAttrs.match(/xlink:role=["']([^"']+)["']/i)?.[1]??null;
         const locators=new Map<string,string>();
-        for(const loc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\\b([^>]*)\\/?\\s*>/gi)){
+        for(const loc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\b([^>]*)\/?\s*>/gi)){
           const attrs=loc[1],label=attrs.match(/xlink:label=["']([^"']+)["']/i)?.[1],href=attrs.match(/xlink:href=["']([^"']+)["']/i)?.[1];
           const concept=href?.split("#").pop()?.replace(/^[^_]+_/,"");
           if(label&&concept) locators.set(label,concept);
         }
-        for(const arc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\\b([^>]*)\\/?\\s*>/gi)){
+        for(const arc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\b([^>]*)\/?\s*>/gi)){
           const attrs=arc[1],from=attrs.match(/xlink:from=["']([^"']+)["']/i)?.[1],to=attrs.match(/xlink:to=["']([^"']+)["']/i)?.[1];
           const parent=from?locators.get(from):null,child=to?locators.get(to):null;
           if(!parent||!child) continue;
-          const order=attrs.match(/\\border=["']([^"']+)["']/i)?.[1]??null;
+          const order=attrs.match(/\border=["']([^"']+)["']/i)?.[1]??null;
           const preferredLabel=attrs.match(/preferredLabel=["']([^"']+)["']/i)?.[1]??null;
           // INTENTIONAL: presentation arcs are structural evidence only. They do not establish that a fact is a complete balance or income-statement total.
           const entry={role,parent,child,order,preferred_label:preferredLabel};
