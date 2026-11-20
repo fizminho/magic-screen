@@ -889,6 +889,86 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
 
 
 
+def balance_sheet_reconciliation_review(
+    statements: dict[str, Any], period: str
+) -> dict[str, Any]:
+    """Compare reported consolidated assets with the reported liabilities/equity total."""
+    statement = statements.get("balance_sheet") or {}
+    rows = statement.get("rows", [])
+    definitions = {
+        "total_assets": {
+            "concept": re.compile(r"(?:^|_)Assets$", re.I),
+            "label": re.compile(r"^total assets$", re.I),
+        },
+        "total_liabilities_and_equity": {
+            "concept": re.compile(
+                r"(?:^|_)(?:LiabilitiesAndStockholdersEquity|EquityAndLiabilities)$", re.I
+            ),
+            "label": re.compile(
+                r"^(?:total liabilities and stockholders'? equity|"
+                r"total equity and liabilities)$", re.I
+            ),
+        },
+    }
+    selected: dict[str, list[dict[str, Any]]] = {}
+    for key, rules in definitions.items():
+        candidates = []
+        for row in rows:
+            if row.get("dimension") is not False or row.get("abstract"):
+                continue
+            concept = str(row.get("concept") or "")
+            label = str(row.get("label") or "").strip()
+            if not (rules["concept"].search(concept) or rules["label"].search(label)):
+                continue
+            value = (row.get("values") or {}).get(period)
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                continue
+            candidates.append({
+                "concept": concept,
+                "label": label,
+                "fiscal_period": period,
+                "value": float(value),
+                "row_index": row.get("index"),
+            })
+        selected[key] = candidates
+
+    counts = {key: len(value) for key, value in selected.items()}
+    if any(count > 1 for count in counts.values()):
+        status = "ambiguous_inputs"
+    elif any(count == 0 for count in counts.values()):
+        status = "insufficient_inputs"
+    else:
+        assets = selected["total_assets"][0]["value"]
+        liabilities_equity = selected["total_liabilities_and_equity"][0]["value"]
+        difference = assets - liabilities_equity
+        tolerance = max(1.0, abs(assets) * 0.0001)
+        status = "reconciled" if abs(difference) <= tolerance else "difference"
+        return {
+            "status": status,
+            "fiscal_period": period,
+            "assets": round(assets, 2),
+            "liabilities_and_equity": round(liabilities_equity, 2),
+            "difference_assets_less_liabilities_and_equity": round(difference, 2),
+            "tolerance": round(tolerance, 2),
+            "inputs": selected,
+            "candidate_counts": counts,
+            "method": "reported_total_assets_vs_reported_total_liabilities_and_equity",
+            "guardrail": "Same-period consolidated statement identity diagnostic only. A reconciliation does not approve any line-item classification, invested-capital denominator, EV definition or production ranking.",
+        }
+    return {
+        "status": status,
+        "fiscal_period": period,
+        "assets": None,
+        "liabilities_and_equity": None,
+        "difference_assets_less_liabilities_and_equity": None,
+        "tolerance": None,
+        "inputs": selected,
+        "candidate_counts": counts,
+        "method": "reported_total_assets_vs_reported_total_liabilities_and_equity",
+        "guardrail": "A missing, duplicate or ambiguous reported total is not inferred, derived from components, or treated as zero. Only unique consolidated non-dimensional facts from the requested fiscal period are eligible.",
+    }
+
+
 def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
     """Calculate the existing ROC denominator only when all three inputs are unique."""
     categories = balance_review.get("categories", {})
@@ -1588,6 +1668,9 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # required balance-sheet component has one unique consolidated candidate.
         result["invested_capital_review"] = invested_capital_review(
             result["balance_sheet_fact_review"]
+        )
+        result["balance_sheet_reconciliation_review"] = balance_sheet_reconciliation_review(
+            result["statements"], fiscal_period
         )
         # INTENTIONAL: expose only an exact, consolidated OperatingIncomeLoss
         # fact for this annual period. This is diagnostic, not production EBIT.
