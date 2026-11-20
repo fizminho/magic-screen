@@ -883,6 +883,19 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
         - inputs["current_liabilities_candidates"]
         + inputs["net_ppe_candidates"]
     )
+    scope_review = {
+        "rental_equipment_candidate_count": categories.get("rental_equipment_net_candidates", {}).get("candidate_count", 0),
+        "right_of_use_asset_candidate_count": categories.get("right_of_use_asset_candidates", {}).get("candidate_count", 0),
+        "current_lease_liability_candidate_count": categories.get("current_lease_liability_candidates", {}).get("candidate_count", 0),
+        "noncurrent_lease_liability_candidate_count": categories.get("noncurrent_lease_liability_candidates", {}).get("candidate_count", 0),
+    }
+    scope_flags = []
+    if scope_review["rental_equipment_candidate_count"]:
+        scope_flags.append("separate_rental_equipment_requires_invested_capital_scope_review")
+    if scope_review["right_of_use_asset_candidate_count"]:
+        scope_flags.append("right_of_use_assets_require_invested_capital_scope_review")
+    if scope_review["current_lease_liability_candidate_count"] or scope_review["noncurrent_lease_liability_candidate_count"]:
+        scope_flags.append("lease_liabilities_require_invested_capital_scope_review")
     return {
         "status": "calculated_review_only",
         "method": "current_assets_minus_current_liabilities_plus_net_ppe",
@@ -890,7 +903,9 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
         "sign": "positive" if value > 0 else "negative" if value < 0 else "zero",
         "inputs": inputs,
         "unresolved_inputs": [],
-        "guardrail": "Review-only denominator using unique label/concept candidates. This does not approve PP&E scope, EBIT, ROC, eligibility or ranking and never feeds production data.",
+        "scope_review": scope_review,
+        "scope_flags": scope_flags,
+        "guardrail": "Review-only denominator using unique label/concept candidates. Separate rental equipment, right-of-use assets and lease liabilities are surfaced as scope flags; no accounting policy is inferred. This does not approve PP&E scope, EBIT, ROC, eligibility or ranking and never feeds production data.",
     }
 
 
