@@ -450,6 +450,22 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertEqual(debt["candidates"][0]["concept"], "us-gaap_LongTermDebtNoncurrent")
         self.assertEqual(debt["resolution_hint"], "single_candidate_requires_policy_review")
 
+    def test_generic_custom_long_term_debt_tag_is_not_assumed_noncurrent(self):
+        categories = self.review(
+            row("custom_LongTermDebt", "Long-term debt", 120_000_000),
+        )
+        debt = categories["noncurrent_debt_candidates"]
+        self.assertEqual(debt["candidate_count"], 0)
+        self.assertEqual(debt["status"], "not_found")
+
+    def test_other_long_term_liabilities_are_not_assumed_conventional_debt(self):
+        categories = self.review(
+            row("us-gaap_OtherLongTermDebtNoncurrent", "Other long-term liabilities", 91_000),
+        )
+        debt = categories["noncurrent_debt_candidates"]
+        self.assertEqual(debt["candidate_count"], 0)
+        self.assertEqual(debt["status"], "not_found")
+
     def test_multiple_current_debt_instruments_are_not_automatically_summed(self):
         categories = self.review(
             row("us-gaap_LoansPayableCurrent", "Bank borrowings, current", 9_000_000),
