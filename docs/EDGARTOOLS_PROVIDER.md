@@ -202,3 +202,12 @@ The review-only invested-capital calculation continues to use current assets min
 ### Invested-capital denominator diagnostics in the review queue
 
 The accounting review queue carries the extraction artifact's denominator-composition diagnostics only when the raw filing accession exactly matches the resolver preview accession. It surfaces working capital, net PP&E, the negative-working-capital offset ratio, and the high-offset/near-zero-positive-denominator flags. Mismatched filing vintages are not combined. A >=90% negative-working-capital offset raises the queue item to P1 for manual denominator-scope review. This is a triage escalation, not an automatic exclusion. The diagnostics do not alter the invested-capital formula, change ranking eligibility, approve ROC, or write production data. The queue summary counts cases where negative working capital offsets at least 90% of net PP&E.
+
+
+## Accession-bound filing debt-note evidence
+
+The accounting review queue now attaches curated primary-filing debt-note checks for BCRX, PRDO, VXRT, SBC, SGHC, ZVRA, PXED, STRA, FHTX and NRIX. Each review record is keyed by both ticker and the exact annual-filing accession. A different or missing accession yields no note-review record.
+
+These records are triage evidence only. They are explicitly marked `review_only`, `production_approved=false`, `resolver_input=false` and `debt_candidate_promoted=false`. The queue does not convert a facility's undrawn status into a company-wide zero-debt conclusion, does not infer current debt is zero from a noncurrent maturity schedule, and does not automatically add royalty or sale-leaseback financing to conventional borrowings. CSV output includes the complete note-review record and source URL.
+
+The queue summary exposes `filing_debt_note_manual_reviews_available`; rows with matching note evidence receive `filing_debt_note_review_available_manual_review`. This marker does not itself alter queue priority, resolver output, shadow eligibility or ranking. Regression tests cover exact-accession matching and mismatch rejection.
