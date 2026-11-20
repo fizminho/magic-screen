@@ -122,3 +122,9 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **Fact priority uses complete concept names for core inputs.** EBIT candidates are restricted to explicit operating-income concepts; non-operating income and operating-loss tax-note concepts must not be promoted by substring matches. Revenue, debt, cash, current assets/liabilities, PP&E, operating costs, and interest expense follow in review priority.
 - **Facts are deduplicated using their dimensional signature.** Repeated contexts or presentation roles no longer inflate the response, while genuinely different dimensional members remain distinct.
 - **Priority is not an accounting approval.** The endpoint remains read-only and diagnostic. No facts are mapped into production ratios or rankings without separate review.
+
+
+## SEC diagnostic: consolidated facts before dimensional breakdowns
+
+- **The compact standard-fact list intentionally excludes dimensional facts.** Consolidated, non-dimensional facts are the first review target for company-wide Magic Formula inputs. Segment and other dimensional facts remain outside this short list so they cannot crowd out balance-sheet and income-statement totals.
+- **This is a display-selection rule, not a data deletion or accounting mapping.** The diagnostic remains read-only; dimensional facts are not written to production or used in ratios/rankings.
