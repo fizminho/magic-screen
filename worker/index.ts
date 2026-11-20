@@ -1014,8 +1014,13 @@ export default {
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
         await ensureSchema(env);
+        // INTENTIONAL: refresh the active MFI candidate list at most once per six hours.
+        // This lets the daily EdgarTools job discover newly screened stocks without
+        // requiring someone to open the screener first. Existing universe-change
+        // invalidation rules remain owned by syncMagicFormulaUniverse.
+        const universeSync=await syncMagicFormulaUniverse(env,50,true,false);
         const rows=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.symbol").all<any>();
-        return json({primary_provider:"EdgarTools",market:"US",source:"active Magic Formula Investing stock_master",count:rows.results.length,symbols:rows.results.map((row:any)=>row.symbol),stocks:rows.results,note:"Active US MFI universe only. Market caps are informational and are not accounting approval."});
+        return json({primary_provider:"EdgarTools",market:"US",source:"active Magic Formula Investing stock_master",count:rows.results.length,symbols:rows.results.map((row:any)=>row.symbol),stocks:rows.results,universe_refresh:{cached:universeSync.cached??false,imported:universeSync.imported,priceDate:universeSync.priceDate??null},note:"Active US MFI universe refreshed using the existing six-hour MFI cache. Market caps are informational and are not accounting approval."});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools universe discovery"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/ingest" && request.method==="POST") {
