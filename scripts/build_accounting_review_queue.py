@@ -137,6 +137,73 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "production_write": False,
     }
 
+
+DEBT_SCOPE_PATTERNS = (
+    "debt", "borrow", "loan", "lease liabilit", "royalt", "sale lease-back",
+    "sale leaseback", "financing",
+)
+
+
+def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
+    """Collect filing-face liability rows that explain why debt is or is not resolved.
+
+    This is evidence triage only. It does not infer zero from missing rows, add
+    instruments, or promote leases/other financing obligations into conventional debt.
+    """
+    statement = ((raw_company.get("statements") or {}).get("balance_sheet") or {})
+    fiscal_period = (
+        (raw_company.get("balance_sheet_fact_review") or {}).get("fiscal_period")
+        or (raw_company.get("filing") or {}).get("period_of_report")
+    )
+    rows = []
+    for row in statement.get("rows", []):
+        if row.get("abstract") or row.get("dimension") or row.get("is_breakdown"):
+            continue
+        parent = str(row.get("parent_concept") or "").lower()
+        if "liabilit" not in parent:
+            continue
+        concept = str(row.get("concept") or "")
+        label = str(row.get("label") or "")
+        searchable = (concept + " " + label).lower()
+        if not any(pattern in searchable for pattern in DEBT_SCOPE_PATTERNS):
+            continue
+        values = row.get("values") or {}
+        amount = values.get(fiscal_period) if fiscal_period else None
+        if amount is None:
+            continue
+        if "lease" in searchable and "liabilit" in searchable:
+            classification = "lease_liability"
+        elif any(word in searchable for word in ("royalt", "sale lease", "financing")):
+            classification = "separate_financing_obligation"
+        elif any(word in searchable for word in ("debt", "borrow", "loan", "notes payable", "line of credit")):
+            classification = "conventional_debt_candidate"
+        else:
+            classification = "other_financing_or_liability_review"
+        rows.append({
+            "concept": concept,
+            "label": label,
+            "amount": amount,
+            "fiscal_period": fiscal_period,
+            "parent_concept": row.get("parent_concept"),
+            "classification": classification,
+            "explicit_zero": isinstance(amount, (int, float)) and amount == 0,
+            "source": "selected_annual_filing_balance_sheet_face_row",
+            "dimension": False,
+            "production_approved": False,
+        })
+    rows.sort(key=lambda row: (row["classification"], row["concept"], row["label"]))
+    counts = Counter(row["classification"] for row in rows)
+    return {
+        "status": "evidence_found" if rows else "no_matching_face_liability_rows",
+        "fiscal_period": fiscal_period,
+        "row_count": len(rows),
+        "classification_counts": dict(counts),
+        "rows": rows,
+        "interpretation": "Absence of a matching row is not proof of no debt. Explicit zero is preserved only for the exact reported row. Lease and separate financing rows are not automatically added to conventional debt.",
+        "production_approved": False,
+    }
+
+
 def build_queue(
     report: dict[str, Any],
     raw_evidence: dict[str, Any] | None = None,
@@ -174,6 +241,8 @@ def build_queue(
                 for name, raw_name in raw_category_names.items()
             }
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            item["debt_scope_evidence"] = extract_debt_scope_evidence(raw_company)
+            item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             reconciliation = raw_company.get("balance_sheet_reconciliation_review")
             item["balance_sheet_reconciliation_review"] = reconciliation
             item["balance_sheet_reconciliation_evidence_source"] = (
@@ -206,6 +275,8 @@ def build_queue(
                 item["issue_count"] = len(item["issues"])
         else:
             item["debt_instrument_evidence_source"] = "stored_resolver_preview"
+            item["debt_scope_evidence"] = None
+            item["debt_scope_evidence_source"] = "stored_resolver_preview"
             item["balance_sheet_reconciliation_review"] = None
             item["balance_sheet_reconciliation_evidence_source"] = "stored_resolver_preview"
             item["filing_specific_ebit_review"] = None
@@ -229,6 +300,12 @@ def build_queue(
             "balance_sheet_reconciliation": dict(Counter(
                 str((row.get("balance_sheet_reconciliation_review") or {}).get("status") or "not_available")
                 for row in rows
+            )),
+            "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
+            "debt_scope_classification_rows": dict(Counter(
+                classification
+                for row in rows for evidence in ((row.get("debt_scope_evidence") or {}).get("rows") or [])
+                for classification in [evidence["classification"]]
             )),
             "filing_specific_ebit_manual_review_available": sum(
                 1 for row in rows if row.get("filing_specific_ebit_review")
@@ -264,7 +341,7 @@ def main() -> int:
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
-        "debt_instrument_evidence_source", "balance_sheet_reconciliation_review",
+        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "filing_specific_ebit_review",
         "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
     ]
@@ -276,6 +353,7 @@ def main() -> int:
             row["issues"] = " | ".join(item["issues"])
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
+            row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
             row["balance_sheet_reconciliation_review"] = json.dumps(
                 item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
             )
