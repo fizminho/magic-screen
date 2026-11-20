@@ -425,6 +425,44 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["noncurrent_lease_liability_candidates"]["candidate_count"], 1
         )
 
+    def test_generic_long_term_debt_concept_is_not_assumed_noncurrent(self):
+        categories = self.review(
+            row("us-gaap_LongTermDebt", "Long-term debt", 120_000_000),
+            row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 90_000_000),
+        )
+        debt = categories["noncurrent_debt_candidates"]
+        self.assertEqual(debt["candidate_count"], 1)
+        self.assertEqual(debt["candidates"][0]["concept"], "us-gaap_LongTermDebtNoncurrent")
+        self.assertEqual(debt["resolution_hint"], "single_candidate_requires_policy_review")
+
+    def test_multiple_current_debt_instruments_are_not_automatically_summed(self):
+        categories = self.review(
+            row("us-gaap_LoansPayableCurrent", "Bank borrowings, current", 9_000_000),
+            row("us-gaap_NotesPayableCurrent", "Related-party notes payable, current", 0),
+        )
+        debt = categories["current_debt_candidates"]
+        self.assertEqual(debt["status"], "ambiguous_candidates")
+        self.assertEqual(debt["candidate_count"], 2)
+        self.assertEqual(
+            debt["resolution_hint"],
+            "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
+        )
+        self.assertFalse(debt["automatic_aggregation"])
+        self.assertEqual(sum(item["value"] for item in debt["candidates"]), 9_000_000)
+
+    def test_same_concept_debt_rows_are_flagged_for_overlap_review(self):
+        first = row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 100)
+        second = row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 100)
+        second["parent_concept"] = "us-gaap_Liabilities"
+        categories = self.review(first, second)
+        debt = categories["noncurrent_debt_candidates"]
+        self.assertEqual(debt["candidate_count"], 2)
+        self.assertEqual(
+            debt["resolution_hint"],
+            "possible_duplicate_or_parent_child_overlap_manual_review_no_automatic_sum",
+        )
+        self.assertEqual(debt["candidates"][1]["parent_concept"], "us-gaap_Liabilities")
+
     def test_noncurrent_lease_label_is_not_counted_as_current(self):
         categories = self.review(
             row("custom_LeaseLiabilities", "Lease liabilities, noncurrent", 59_000_000),
