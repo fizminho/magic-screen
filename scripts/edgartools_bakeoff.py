@@ -549,6 +549,17 @@ def extract_company(symbol: str) -> dict[str, Any]:
             "ebit_candidate": direct_operating_income,
             "guardrail": "Exact non-dimensional OperatingIncomeLoss statement fact only; review fiscal period, currency, classification and filing before use. Never writes production ratios or rankings.",
         }
+        if symbol == "SNDK":
+            # INTENTIONAL: annotate the separation context; do not adjust reported EBIT.
+            result["review_notes"].append(
+                "Review pre/post-spin comparability: the issuer became independent on 2025-02-21; pre-spin historical statements were derived from WDC records."
+            )
+        if result["filing"].get("form") == "20-F" and direct_operating_income is None:
+            # INTENTIONAL: absence of a US-GAAP OperatingIncomeLoss concept is
+            # not zero. Review the issuer's IFRS presentation separately.
+            result["review_notes"].append(
+                "20-F statement extraction succeeded, but no direct US-GAAP OperatingIncomeLoss fact was surfaced; inspect IFRS line items and classification rather than treating EBIT as zero."
+            )
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
         # INTENTIONAL: an MFI OTC/foreign ticker may not be an SEC registrant.
