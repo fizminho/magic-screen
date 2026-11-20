@@ -484,21 +484,46 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
 
 
 
-def roc_review(direct_ebit: dict[str, Any], invested_capital: dict[str, Any]) -> dict[str, Any]:
-    """Compute a diagnostic ROC only from direct annual EBIT and positive unique capital."""
+def roc_review(
+    direct_ebit: dict[str, Any],
+    invested_capital: dict[str, Any],
+    balance_review: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Compute review-only ROC and surface accounting-scope flags."""
     ebit = direct_ebit.get("ebit_candidate")
     capital = invested_capital.get("value")
+    categories = (balance_review or {}).get("categories", {})
+    review_flags = []
+    # INTENTIONAL: these are review prompts, not automatic accounting adjustments.
+    # The diagnostic ROC is retained but visibly flagged when other relevant
+    # asset/liability classes are present outside its simple denominator formula.
+    if categories.get("rental_equipment_net_candidates", {}).get("candidate_count", 0):
+        review_flags.append("separate_rental_equipment_requires_invested_capital_scope_review")
+    if categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0):
+        review_flags.append("nondebt_financing_obligation_requires_enterprise_value_scope_review")
+    if any(categories.get(name, {}).get("candidate_count", 0) for name in (
+        "current_lease_liability_candidates",
+        "noncurrent_lease_liability_candidates",
+    )):
+        review_flags.append("lease_liabilities_present_review_debt_and_invested_capital_treatment")
+    if any(categories.get(name, {}).get("candidate_count", 0) for name in (
+        "cash_restricted_candidates",
+        "cash_combined_or_investment_candidates",
+    )):
+        review_flags.append("restricted_or_combined_cash_present_review_enterprise_value_cash_input")
     if direct_ebit.get("status") != "review_only" or not isinstance(ebit, (int, float)):
         return {
             "status": "review_required",
             "roc": None,
             "reason": "No unique direct consolidated annual OperatingIncomeLoss candidate.",
+            "review_flags": review_flags,
         }
     if invested_capital.get("status") != "calculated_review_only" or not isinstance(capital, (int, float)):
         return {
             "status": "review_required",
             "roc": None,
             "reason": "Invested-capital denominator is missing or ambiguous.",
+            "review_flags": review_flags,
         }
     if capital <= 0:
         return {
@@ -507,6 +532,7 @@ def roc_review(direct_ebit: dict[str, Any], invested_capital: dict[str, Any]) ->
             "reason": "Nonpositive invested capital is not used as a ROC denominator.",
             "invested_capital": capital,
             "ebit": ebit,
+            "review_flags": review_flags,
         }
     # INTENTIONAL: EBIT and invested capital come from the same issuer filing
     # and fiscal period, so the ratio is currency-neutral. This is still review-only.
@@ -516,7 +542,8 @@ def roc_review(direct_ebit: dict[str, Any], invested_capital: dict[str, Any]) ->
         "ebit": ebit,
         "invested_capital": capital,
         "method": "direct_operating_income_over_reviewed_invested_capital",
-        "guardrail": "Diagnostic ROC only. Direct EBIT and unique denominator candidates are not production-approved mappings; this result never feeds D1, eligibility or ranking.",
+        "review_flags": review_flags,
+        "guardrail": "Diagnostic ROC only. Direct EBIT and unique denominator candidates are not production-approved mappings; review_flags identify additional asset/liability classes that may affect scope. This result never feeds D1, eligibility or ranking.",
     }
 
 
@@ -756,6 +783,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
         result["roc_review"] = roc_review(
             result["direct_operating_income_review"],
             result["invested_capital_review"],
+            result["balance_sheet_fact_review"],
         )
         if symbol == "SNDK":
             # INTENTIONAL: annotate the separation context; do not adjust reported EBIT.
