@@ -1464,14 +1464,14 @@ export default {
         const invalidRows: {row:number;symbol:string;reason:string}[] = [];
         for (let i=0; i<payload.rows.length; i++) {
           const row = payload.rows[i] ?? {};
-          const rawSymbol = String(row.symbol ?? "").trim().toUpperCase().replace(/\\s+/g,"");
+          const rawSymbol = String(row.symbol ?? "").trim().toUpperCase().replace(/\s+/g,"");
           const symbol = rawSymbol && !rawSymbol.endsWith(".KL") ? rawSymbol + ".KL" : rawSymbol;
           const companyName = String(row.company_name ?? row.name ?? "").trim();
           const exchange = String(row.exchange ?? "BURSA").trim() || "BURSA";
           const sector = String(row.sector ?? "").trim();
           const listingStatus = String(row.listing_status ?? "active").trim().toLowerCase();
           let reason = "";
-          if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\\.KL$/.test(symbol)) reason = "invalid Bursa/Yahoo symbol";
+          if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\.KL$/.test(symbol)) reason = "invalid Bursa/Yahoo symbol";
           else if (!companyName || companyName.length > 200) reason = "company_name is required and must be 200 characters or fewer";
           else if (exchange.length > 100 || sector.length > 100) reason = "exchange and sector must be 100 characters or fewer";
           else if (listingStatus !== "active" && listingStatus !== "inactive") reason = "listing_status must be active or inactive";
