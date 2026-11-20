@@ -75,6 +75,6 @@ The existing production Worker still calculates US fundamentals directly from SE
 ### Accounting candidate guardrails
 
 - Invested capital is surfaced only as a review candidate when current assets, current liabilities and net PP&E each have exactly one consolidated, non-dimensional value for the same annual period. Rental equipment and right-of-use assets remain separately visible; their treatment must be decided before ROC approval.
-- Conventional net debt is calculated only when current debt, noncurrent debt and unrestricted cash are each uniquely identified. Missing components remain unknown, not zero.
+- Conventional net debt is calculated only when current debt, noncurrent debt and unrestricted cash are each uniquely identified. If an aggregate debt total is also surfaced, the resolver withholds the component sum rather than risk double counting. Missing components remain unknown, not zero.
 - EV sensitivity scenarios are emitted only when each required adjustment is known. An explicitly reported zero NCI is different from an unavailable NCI fact; unavailable lease liabilities are not silently treated as zero.
 - Lease liabilities, non-controlling interests, restricted cash, short-term investments and separate financing obligations remain scope flags. No EV/Earnings Yield or ROC candidate is promoted into production.
