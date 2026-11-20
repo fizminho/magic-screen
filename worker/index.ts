@@ -1048,8 +1048,8 @@ export default {
       try {
         await ensureSchema(env);
         await env.DB.prepare("CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))").run();
-        const summary=await env.DB.prepare("SELECT provider_status,COUNT(*) AS count,MAX(ingested_at) AS last_ingested_at FROM edgartools_filing_evidence GROUP BY provider_status ORDER BY provider_status").all<any>();
-        const latest=await env.DB.prepare("SELECT symbol,provider_status,accession,fiscal_period,form,filed_at,reporting_currency,provider_version,ingested_at FROM edgartools_filing_evidence e WHERE accession_key=(SELECT MAX(e2.accession_key) FROM edgartools_filing_evidence e2 WHERE e2.symbol=e.symbol) ORDER BY symbol").all<any>();
+        const summary=await env.DB.prepare("SELECT provider_status,COUNT(DISTINCT symbol) AS count,MAX(ingested_at) AS last_ingested_at FROM edgartools_filing_evidence GROUP BY provider_status ORDER BY provider_status").all<any>();
+        const latest=await env.DB.prepare("SELECT symbol,provider_status,accession,fiscal_period,form,filed_at,reporting_currency,provider_version,ingested_at FROM edgartools_filing_evidence e WHERE ingested_at=(SELECT MAX(e2.ingested_at) FROM edgartools_filing_evidence e2 WHERE e2.symbol=e.symbol) ORDER BY symbol").all<any>();
         return json({primary_provider:"EdgarTools",storage:"raw filing evidence only",production_fundamentals_changed:false,summary:summary.results,latest:latest.results});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
