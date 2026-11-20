@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
+from io import BytesIO
+from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -96,6 +98,45 @@ class CurrencyNormalizationTests(unittest.TestCase):
         result = reporting_currency_unit_review(companyfacts, "A", PERIOD)
         self.assertEqual(result["status"], "currency_unit_ambiguous")
         self.assertIsNone(result["currency"])
+
+    @patch("edgartools_bakeoff.urlopen")
+    def test_fx_fetch_pins_ecb_provider_and_uses_latest_rate_on_or_before_quote_date(self, mocked_urlopen):
+        key = ("USD", "CAD", "2026-11-18")
+        FRANKFURTER_RATE_CACHE.pop(key, None)
+        payload = [
+            {"date": "2026-11-17", "base": "USD", "quote": "CAD", "rate": 1.4280},
+            # INTENTIONAL: never select a rate published after the requested valuation date.
+            {"date": "2026-11-19", "base": "USD", "quote": "CAD", "rate": 1.4400},
+        ]
+        mocked_urlopen.return_value = BytesIO(__import__("json").dumps(payload).encode("utf-8"))
+
+        result = fetch_frankfurter_rate("USD", "CAD", "2026-11-18")
+
+        request = mocked_urlopen.call_args.args[0]
+        parsed_url = urlparse(request.full_url)
+        query = parse_qs(parsed_url.query)
+        self.assertEqual(parsed_url.path, "/v2/providers/ecb/rates")
+        self.assertEqual(query["base"], ["USD"])
+        self.assertEqual(query["quotes"], ["CAD"])
+        self.assertEqual(query["to"], ["2026-11-18"])
+        self.assertEqual(result["date"], "2026-11-17")
+        self.assertEqual(result["rate"], 1.4280)
+        self.assertTrue(result["is_previous_business_day"])
+        self.assertEqual(result["source_attribution"], "Source: ECB statistics")
+
+    @patch("edgartools_bakeoff.urlopen")
+    def test_fx_fetch_does_not_fall_forward_when_no_prior_observation(self, mocked_urlopen):
+        key = ("USD", "CAD", "2026-11-18")
+        FRANKFURTER_RATE_CACHE.pop(key, None)
+        payload = [
+            {"date": "2026-11-19", "base": "USD", "quote": "CAD", "rate": 1.4400},
+        ]
+        mocked_urlopen.return_value = BytesIO(__import__("json").dumps(payload).encode("utf-8"))
+
+        result = fetch_frankfurter_rate("USD", "CAD", "2026-11-18")
+
+        self.assertEqual(result["status"], "rate_not_found")
+        self.assertNotIn("rate", result)
 
     def test_usd_market_cap_converts_to_reporting_currency_at_quote_date(self):
         result = currency_normalization_review(
