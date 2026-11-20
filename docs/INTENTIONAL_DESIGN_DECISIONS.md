@@ -389,7 +389,7 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 ## MFI quote-date market-cap currency alignment (2026-11-20)
 
 - **INTENTIONAL:** the research bakeoff now attaches the exact MFI USD market-cap snapshot dated 2026-11-18 (snapshot as-of 2026-11-20T09:14:01.782Z; quarter date 2026-09-30) to each matching ticker. Values are stored as USD millions and converted to full USD before any currency conversion. ADBE remains a historical control and intentionally has no MFI market-cap value in this cohort.
-- For a non-USD reporting currency, the bakeoff translates the USD market cap into reporting-currency units using the ECB daily reference rate via Frankfurter on the MFI price date (or the latest available observation on/before that date, within the bounded 7-day lookup). The EGHSF CAD example uses USD/CAD 1.4296 on 2026-11-18; USD 643.04m converts to CAD 919.289984m.
+- For a non-USD reporting currency, the bakeoff translates the USD market cap into reporting-currency units using the ECB daily reference rate via Frankfurter on the MFI price date (or the latest available observation on/before that date, within the bounded 7-day lookup). The EGHSF CAD example uses USD/CAD 1.4305 on 2026-11-18; USD 643.04m converts to CAD 919.868720m.
 - **INTENTIONAL:** the snapshot is pinned research input, not a live quote. A workflow-dispatch `market_caps_json` override (ticker to USD millions) is available for a newer MFI snapshot; the matching `mfi_price_date` must be updated at the same time. The report records the snapshot as-of and quote dates.
 - The conversion is still review-only. It does not approve EBIT, debt, cash, lease, NCI or invested-capital classifications, and it does not calculate production EV/Earnings Yield or change D1/ranks. Same-currency USD market caps are passed through without an external FX request.
 
@@ -400,7 +400,7 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 - **INTENTIONAL:** the AFMJF and EGHSF non-SEC issuer-report cases now show four separate manual EV sensitivities: conventional debt only; plus NCI; plus lease liabilities; plus both NCI and leases. Earnings Yield candidates are displayed for each positive EV scenario using the filing-specific EBIT candidate.
 - AFMJF uses USD 991.59m MFI market cap, USD -15.519m conventional net debt, USD 65.738m NCI and USD 3.558m lease liabilities. Candidate EY ranges from 28.04% (conventional debt only) to 26.18% (including both NCI and leases).
-- EGHSF uses CAD 919.290m converted MFI market cap, CAD -269.061m conventional net debt, no NCI and CAD 11.141m lease liabilities. Candidate EY is 13.05% excluding leases and 12.83% including leases.
+- EGHSF uses CAD 919.869m converted MFI market cap, CAD -269.061m conventional net debt, no NCI and CAD 11.141m lease liabilities. Candidate EY is 13.04% excluding leases and 12.82% including leases.
 - **INTENTIONAL:** these are scenario sensitivities, not a chosen EV policy. Cash availability, debt-like financing, lease accounting, minority ownership and the filing-specific EBIT treatment still require review. No production Earnings Yield or ranking is changed.
 
 
