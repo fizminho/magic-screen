@@ -210,6 +210,22 @@ def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
 # Curated filing-note checks. These are attached only to the exact accession
 # below; they are review evidence, never resolver inputs or approved debt values.
 FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
+    "MNTN": {
+        "accession": "0001891027-26-000019",
+        "method": "convertible_note_settlement_and_revolver_zero_review",
+        "observations": ["The 10-K states the convertible notes were fully settled at the May 23, 2025 IPO and had no outstanding balance at December 31, 2025.", "The December 31, 2025 revolving facility had zero borrowings and up to 49.4m available.", "The 0.6m short-term note payable at December 31, 2024 was settled in Q1 2025; the reporting-date balance was zero.", "One remaining partial-recourse promissory note is owed by an employee to the company and is not company borrowing."],
+        "interpretation": "Issuer note evidence supports zero outstanding balance for the identified convertible notes, revolver and short-term holdback at FY2025 year-end; preserve each instrument-specific scope.",
+        "limitations": ["Do not treat employee promissory notes receivable as company debt.", "Do not infer debt-free status beyond the reviewed instruments without complete note coverage."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1891027/000189102726000019/mntn-20251231.htm",
+    },
+    "SPRO": {
+        "accession": "0001193125-26-126192",
+        "method": "explicit_no_debt_and_lease_liability_scope_review",
+        "observations": ["The 10-K states the company has no debt in its lease accounting policy discussion.", "The balance sheet separately reports current and noncurrent operating lease liabilities totaling 2.895m and other long-term liabilities of 91k.", "The contractual-obligations table identifies 3.112m of future operating lease payments, reconciled to 2.895m lease liabilities after imputed interest."],
+        "interpretation": "Explicit no-debt statement supports no conventional borrowings at the reporting date; lease liabilities remain separately identified and other long-term liabilities are not automatically debt.",
+        "limitations": ["Do not include operating lease liabilities in conventional debt without lease policy approval.", "Do not classify the 91k other long-term liability as debt without its own supporting evidence."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1701108/000119312526126192/spro-20251231.htm",
+    },
     "BCRX": {
         "accession": "0001628280-26-012240",
         "method": "royalty_financing_note_review",
@@ -297,6 +313,8 @@ FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
 
 
 FILING_DEBT_REVIEW_ACTIONS: dict[str, dict[str, Any]] = {
+    "MNTN": {"evidence_scope": "identified_convertible_notes_revolver_and_short_term_holdback", "manual_review_questions": ["Confirm the exact reporting-date zero balances for the convertible notes, revolver and short-term holdback against the extracted facts.", "Keep employee promissory notes receivable outside company debt.", "Check for any other debt instruments not covered by these disclosures."], "prohibited_inferences": ["Do not classify employee promissory notes receivable as company borrowing.", "Do not generalize the named instrument balances to all possible financing arrangements without full note review."]},
+    "SPRO": {"evidence_scope": "issuer_no_debt_statement_with_separately_reported_leases", "manual_review_questions": ["Confirm the no-debt statement applies to conventional borrowing at the reporting date.", "Keep 2.895m operating lease liabilities separate from conventional debt.", "Identify the nature of the 91k other long-term liability before any debt classification."], "prohibited_inferences": ["Do not include lease liabilities or the 91k other long-term liability as conventional debt without separate policy/evidence."]},
     "BCRX": {"evidence_scope": "instrument_specific_royalty_financing_and_repaid_term_loan", "manual_review_questions": ["Decide whether the outstanding royalty financing obligation is debt-like for EV.", "Confirm the repaid Pharmakon term loan is not counted at the FY2025 reporting date."], "prohibited_inferences": ["Do not treat the royalty obligation as an ordinary bank loan by default.", "Do not infer all other borrowing categories are zero from the repaid term loan."]},
     "PRDO": {"evidence_scope": "specific_failed_sale_leaseback_financing_arrangement", "manual_review_questions": ["Determine whether the construction financing balance should be included as debt-like financing in EV.", "Keep it distinct from ordinary lease liabilities until policy is approved."], "prohibited_inferences": ["Do not merge this balance into ordinary lease liabilities or conventional borrowings automatically."]},
     "VXRT": {"evidence_scope": "specific_future_royalty_financing_obligation", "manual_review_questions": ["Determine whether the accreting future-royalty obligation is debt-like for EV.", "Check the reporting-date carrying value and avoid double-counting royalty pass-throughs."], "prohibited_inferences": ["Do not treat the obligation as an ordinary bank loan or a lease liability."]},
