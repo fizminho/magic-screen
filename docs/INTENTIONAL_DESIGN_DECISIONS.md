@@ -269,3 +269,6 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - A category is marked `unique_candidate`, `ambiguous_candidates` or `not_found`; even a unique candidate is not an approved accounting mapping. The artifact retains original concept, label, period, value and standard-concept hint.
 - **INTENTIONAL:** restricted cash and lease liabilities are exposed separately; dimensional PP&E breakdowns are excluded from consolidated candidates. Multiple PPE concepts (for example rental equipment) remain visible as ambiguity rather than being added automatically.
 - No candidate is selected for EV, invested capital, Earnings Yield or ROC. This remains a local research artifact and does not write production D1, fundamentals or rankings.
+
+
+- **Balance-sheet candidate matching is taxonomy-aware as well as label-aware.** EdgarTools may label debt generically (for example, `Debt`) while its concept identifies current/noncurrent classification; lease rows may also have generic labels while their concepts carry the current/noncurrent distinction. The review checks both label and concept suffix, excludes restricted cash from unrestricted-cash candidates, and keeps current/noncurrent lease liabilities separate. It still reports all matching rows as candidates and does not resolve accounting scope automatically.
