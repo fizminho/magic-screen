@@ -17,7 +17,7 @@ from typing import Any
 
 from edgar import Company, set_identity
 
-DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE")
+DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE", "AFMJF", "HPQ", "OTEX", "PRDO", "PLTK", "UPWK", "SNDK")
 ROW_PATTERN = re.compile(
     r"operating income|operating profit|income from operations|profit from operations|"
     r"earnings before interest|\bebit\b|property|plant|equipment|fixed assets|"
@@ -477,10 +477,22 @@ def extract_company(symbol: str) -> dict[str, Any]:
     result: dict[str, Any] = {"symbol": symbol, "status": "error"}
     try:
         company = Company(symbol)
-        filings = company.get_filings(form="10-K", amendments=False)
-        filing = filings.latest()
-        if filing is None:
-            raise RuntimeError("No 10-K filing returned by EdgarTools")
+        # INTENTIONAL: mirror the annual filing families used by the SEC pipeline.
+        # Foreign issuers commonly file 20-F or 40-F rather than domestic 10-K.
+        annual_filings = []
+        filing_lookup_errors = []
+        for form in ("10-K", "20-F", "40-F"):
+            try:
+                annual_filings.extend(list(company.get_filings(form=form, amendments=False)))
+            except Exception as lookup_error:
+                filing_lookup_errors.append(f"{form}: {type(lookup_error).__name__}: {lookup_error}")
+        if not annual_filings:
+            detail = "; ".join(filing_lookup_errors) or "no matching annual filing"
+            raise RuntimeError(f"No 10-K, 20-F or 40-F filing returned by EdgarTools ({detail})")
+        filing = max(
+            annual_filings,
+            key=lambda item: str(getattr(item, "filing_date", "") or ""),
+        )
 
         filing_obj = filing.obj()
         financials = getattr(filing_obj, "financials", None)
@@ -509,7 +521,8 @@ def extract_company(symbol: str) -> dict[str, Any]:
                 "Each detailed statement row appears once; candidate=true marks rows matching the broad label filter.",
                 "The EBIT bridge is assumption-based review output only; reconciliation does not prove accounting classification.",
                 "No EBIT, debt, invested-capital, Earnings Yield, or ROC value is approved automatically.",
-                "Confirm the statement fiscal period and filing accession before comparing values.",
+                "Confirm the statement fiscal period, filing form and accession before comparing values.",
+                "Annual filing selection considers 10-K, 20-F and 40-F; interim 10-Q/6-K filings are intentionally excluded.",
                 "Dimensional breakdowns and consolidated totals must not be added together without checking the filing presentation.",
                 "Multiple PP&E concepts are shown separately; the script does not assume they are additive or non-overlapping.",
             ],
