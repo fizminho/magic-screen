@@ -610,8 +610,10 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
       && row.reporting_currency==="USD"
       && row.enterprise_value_candidate_review?.conventional_debt_status==="identified_from_unique_current_and_noncurrent_components"
       && ev!==null && ev>0
-      && typeof row.ebit_candidate==="number" && Number.isFinite(row.ebit_candidate)
-      && typeof row.invested_capital_candidate==="number" && row.invested_capital_candidate>0;
+      && typeof row.ebit_candidate==="number" && Number.isFinite(row.ebit_candidate) && row.ebit_candidate>0
+      && typeof row.invested_capital_candidate==="number" && row.invested_capital_candidate>0
+      && row.ebit_candidate/ev>0
+      && row.ebit_candidate/row.invested_capital_candidate>0;
     return {...row,enterprise_value_candidate:ev,
       earnings_yield:eligible?row.ebit_candidate!/ev!:null,
       return_on_capital:eligible?row.ebit_candidate!/row.invested_capital_candidate!:null,
