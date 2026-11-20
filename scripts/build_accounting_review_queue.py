@@ -296,6 +296,18 @@ FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
 }
 
 
+FILING_DEBT_REVIEW_ACTIONS: dict[str, dict[str, Any]] = {
+    "BCRX": {"evidence_scope": "instrument_specific_royalty_financing_and_repaid_term_loan", "manual_review_questions": ["Decide whether the outstanding royalty financing obligation is debt-like for EV.", "Confirm the repaid Pharmakon term loan is not counted at the FY2025 reporting date."], "prohibited_inferences": ["Do not treat the royalty obligation as an ordinary bank loan by default.", "Do not infer all other borrowing categories are zero from the repaid term loan."]},
+    "PRDO": {"evidence_scope": "specific_failed_sale_leaseback_financing_arrangement", "manual_review_questions": ["Determine whether the construction financing balance should be included as debt-like financing in EV.", "Keep it distinct from ordinary lease liabilities until policy is approved."], "prohibited_inferences": ["Do not merge this balance into ordinary lease liabilities or conventional borrowings automatically."]},
+    "VXRT": {"evidence_scope": "specific_future_royalty_financing_obligation", "manual_review_questions": ["Determine whether the accreting future-royalty obligation is debt-like for EV.", "Check the reporting-date carrying value and avoid double-counting royalty pass-throughs."], "prohibited_inferences": ["Do not treat the obligation as an ordinary bank loan or a lease liability."]},
+    "SBC": {"evidence_scope": "current_and_noncurrent_bank_borrowings_with_maturity_reconciliation", "manual_review_questions": ["Verify current and noncurrent bank-borrowing components against the maturity schedule.", "Confirm related-party notes payable remain separate zero-valued instruments.", "Decide whether distinct bank-borrowing rows can be used as the issuer-specific conventional-debt candidate."], "prohibited_inferences": ["Do not add related-party notes payable to bank borrowings as if they were the same instrument.", "Do not promote the maturity reconciliation to production debt without reviewer approval."]},
+    "SGHC": {"evidence_scope": "noncurrent_facilities_plus_unquantified_on_demand_loans", "manual_review_questions": ["Reconcile the noncurrent facility carrying value to the Waterview facility note.", "Quantify and classify other loans payable on demand, including current/noncurrent treatment."], "prohibited_inferences": ["Do not infer current debt is zero from the 17m noncurrent face-statement row."]},
+    "ZVRA": {"evidence_scope": "term_loan_principal_and_future_maturity_schedule", "manual_review_questions": ["Reconcile principal, unamortized discount/issuance costs and balance-sheet carrying amount.", "Review acceleration and on-demand terms before concluding the current portion is zero."], "prohibited_inferences": ["Do not convert the absence of scheduled 2026-2028 principal into a zero current-debt classification."]},
+    "PXED": {"evidence_scope": "named_revolver_undrawn_status_and_letter_of_credit", "manual_review_questions": ["Confirm whether any other conventional borrowing or financing arrangement exists.", "Keep the sublease letter of credit separate from drawn borrowings.", "Review release of cash collateral before using cash as unrestricted."], "prohibited_inferences": ["Do not infer company-wide zero debt from the undrawn revolver.", "Do not count the letter of credit as a drawn borrowing."]},
+    "STRA": {"evidence_scope": "named_revolver_undrawn_status", "manual_review_questions": ["Confirm whether any other debt instruments exist outside the disclosed revolver.", "Review other financing and lease note disclosures before resolving enterprise value."], "prohibited_inferences": ["Do not infer company-wide zero debt from the undrawn revolver."]},
+    "FHTX": {"evidence_scope": "face_statement_absence_and_off_balance_sheet_disclosure", "manual_review_questions": ["Review all debt, commitment, collaboration and financing notes for instruments not separately presented on the face balance sheet.", "Retain debt as unresolved unless complete note evidence supports a conclusion."], "prohibited_inferences": ["Do not infer zero debt solely because no separate conventional-debt face row is presented."]},
+    "NRIX": {"evidence_scope": "face_statement_absence_only", "manual_review_questions": ["Review the complete annual filing notes for borrowings, credit facilities, financing arrangements and guarantees.", "Retain debt as unresolved until note-level coverage is complete."], "prohibited_inferences": ["Do not infer zero debt solely because no separate conventional-debt face row is presented."]},
+}
 def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
     """Return curated note evidence only for the exact issuer and filing accession."""
     review = FILING_DEBT_NOTE_REVIEWS.get(symbol)
@@ -303,11 +315,12 @@ def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any
         return None
     return {
         **review,
+        **FILING_DEBT_REVIEW_ACTIONS[symbol],
         "status": "review_only",
         "source": "curated_primary_annual_filing_note_review",
         "production_approved": False,
         "resolver_input": False,
-        "debt_candidate_promoted": False,
+        "debt_candidate_promoted": False
     }
 
 
