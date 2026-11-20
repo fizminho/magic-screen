@@ -557,6 +557,27 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["cross_checks"]["difference_to_reported_profit_before_taxation"], 0
         )
 
+    def test_invested_capital_flags_finance_lease_rou_embedded_in_ppe(self):
+        categories = self.review(
+            row("us-gaap_AssetsCurrent", "Total current assets", 500),
+            row("us-gaap_LiabilitiesCurrent", "Total current liabilities", 200),
+            row(
+                "us-gaap_PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAssetAfterAccumulatedDepreciationAndAmortization",
+                "Property, plant and equipment, net",
+                100,
+            ),
+            row("us-gaap_OperatingLeaseRightOfUseAsset", "Operating lease right of use asset", 50),
+        )
+        result = invested_capital_review({"categories": categories})
+        self.assertEqual(result["value"], 400)
+        self.assertEqual(
+            result["scope_review"]["ppe_includes_finance_lease_rou_candidate_count"], 1
+        )
+        self.assertIn(
+            "finance_lease_right_of_use_assets_embedded_in_net_ppe_require_scope_review",
+            result["scope_flags"],
+        )
+
     def test_invested_capital_reports_rental_and_rou_scope(self):
         result = invested_capital_review({
             "categories": {
