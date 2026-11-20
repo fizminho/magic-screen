@@ -358,3 +358,6 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - **INTENTIONAL:** the direct `OperatingIncomeLoss` review accepts consolidated annual statement labels for operating income, operating profit, operating earnings, and losses from operations. Negative numeric values are valid reported EBIT facts and must not be dropped because their labels say "Loss from operations" or "Operating earnings (loss)".
 - The full MFI cohort exposed this gap: ALEC, BMBL, FHTX, MGTX, NRIX and ZVRA each reported a negative direct `OperatingIncomeLoss` fact, but the previous label matcher failed to recognize some of their statement labels.
 - Regression tests now cover both "Loss from operations" and "Operating earnings (loss)" with negative amounts. Negative EBIT remains negative for later eligibility logic; it is never converted to a positive magnitude or treated as missing.
+
+
+- **INTENTIONAL:** the balance-sheet review now identifies noncontrolling/minority interests and adds an enterprise-value scope flag. Consolidated EBIT includes 100% of controlled subsidiaries, so a material noncontrolling interest may need to be reflected in EV to keep numerator/denominator ownership scopes consistent. The bakeoff does not automatically add NCI to debt or EV.
