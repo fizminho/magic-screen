@@ -33,9 +33,13 @@ METADATA_FIELDS = (
 
 
 def safe_value(value: Any) -> Any:
-    """Convert pandas/numpy/date values into JSON-safe primitives."""
+    """Convert pandas/numpy/date/container values into JSON-safe primitives."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, dict):
+        return {str(key): safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [safe_value(item) for item in value]
     if hasattr(value, "item"):
         try:
             return safe_value(value.item())
