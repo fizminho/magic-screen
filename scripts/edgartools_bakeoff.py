@@ -365,6 +365,10 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "label": re.compile(r"^rental property and equipment", re.I),
             "concept": re.compile(r"RentalPropertyAndEquipmentNet$", re.I),
         },
+        "right_of_use_asset_candidates": {
+            "label": re.compile(r"right.?of.?use assets?|operating lease assets|finance lease assets", re.I),
+            "concept": re.compile(r"(?:OperatingLeaseRightOfUseAsset|FinanceLeaseRightOfUseAsset|RightofuseAssets)$", re.I),
+        },
         "nondebt_financing_obligation_candidates": {
             "label": re.compile(r"sale lease.?back financing|construction financing|financing obligation", re.I),
             "concept": re.compile(r"(?:SaleLeaseBackFinancing|ConstructionFinancing|FinancingObligation)$", re.I),
@@ -499,6 +503,8 @@ def roc_review(
     # asset/liability classes are present outside its simple denominator formula.
     if categories.get("rental_equipment_net_candidates", {}).get("candidate_count", 0):
         review_flags.append("separate_rental_equipment_requires_invested_capital_scope_review")
+    if categories.get("right_of_use_asset_candidates", {}).get("candidate_count", 0):
+        review_flags.append("right_of_use_assets_present_review_invested_capital_scope")
     if categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0):
         review_flags.append("nondebt_financing_obligation_requires_enterprise_value_scope_review")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
