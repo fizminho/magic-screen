@@ -107,6 +107,34 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(assessment["balance_sheet"]["current_lease_liabilities"]["production_approved"])
         self.assertFalse(assessment["enterprise_value"]["production_approved"])
 
+    def test_queue_preserves_debt_instrument_evidence_and_resolution_hints(self):
+        item = classify({
+            "symbol": "SBC",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "current_debt": {
+                    "status": "ambiguous_candidates",
+                    "candidate_count": 2,
+                    "resolution_hint": "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
+                    "automatic_aggregation": False,
+                    "candidates": [
+                        {"concept": "us-gaap_LoansPayableCurrent", "label": "Bank borrowings, current", "value": 9_000_000},
+                        {"concept": "us-gaap_NotesPayableCurrent", "label": "Related-party notes payable, current", "value": 0},
+                    ],
+                },
+                "noncurrent_debt": {"status": "not_found", "candidate_count": 0},
+                "aggregate_debt": {"status": "not_found", "candidate_count": 0},
+            },
+        })
+        evidence = item["debt_instrument_evidence"]
+        self.assertEqual(evidence["current_debt"]["candidate_count"], 2)
+        self.assertEqual(
+            evidence["current_debt"]["resolution_hint"],
+            "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
+        )
+        self.assertFalse(evidence["current_debt"]["automatic_aggregation"])
+        self.assertEqual(evidence["current_debt"]["candidates"][1]["value"], 0)
+
     def test_ambiguous_classification_stays_ambiguous_and_unapproved(self):
         item = classify({
             "symbol": "AMB",
