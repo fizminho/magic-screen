@@ -11,6 +11,7 @@ import math
 import os
 import re
 import sys
+import time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -78,6 +79,8 @@ def sec_company_facts(cik: Any) -> dict[str, Any]:
         raise ValueError("Missing SEC CIK")
     cik_key = cik_digits.zfill(10)
     if cik_key not in SEC_COMPANY_FACTS_CACHE:
+        # INTENTIONAL: stay below SEC's 10-requests-per-second ceiling.
+        time.sleep(0.12)
         url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_key}.json"
         request = Request(
             url,
