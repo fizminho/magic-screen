@@ -376,6 +376,10 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "label": re.compile(r"sale lease.?back financing|construction financing|financing obligation", re.I),
             "concept": re.compile(r"(?:SaleLeaseBackFinancing|ConstructionFinancing|FinancingObligation)$", re.I),
         },
+        "noncontrolling_interest_candidates": {
+            "label": re.compile(r"non.?controlling interest|minority interest", re.I),
+            "concept": re.compile(r"(?:NoncontrollingInterestInConsolidatedEntity|NoncontrollingInterests|MinorityInterest)$", re.I),
+        },
         "current_debt_candidates": {
             "label": re.compile(r"current portion of .*debt|current maturities|debt,? current|short.?term borrowings|notes payable and short.?term borrowings", re.I),
             "concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|CurrentBorrowings)$", re.I),
@@ -519,6 +523,8 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
         flags.append("lease_liabilities_separate_from_conventional_debt_require_policy_decision")
     if categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0):
         flags.append("separate_financing_obligation_requires_enterprise_value_policy_decision")
+    if categories.get("noncontrolling_interest_candidates", {}).get("candidate_count", 0):
+        flags.append("noncontrolling_interest_requires_enterprise_value_adjustment_review")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
         "cash_restricted_candidates", "cash_combined_or_investment_candidates",
     )):
@@ -583,6 +589,8 @@ def roc_review(
         review_flags.append("right_of_use_assets_present_review_invested_capital_scope")
     if categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0):
         review_flags.append("nondebt_financing_obligation_requires_enterprise_value_scope_review")
+    if categories.get("noncontrolling_interest_candidates", {}).get("candidate_count", 0):
+        review_flags.append("noncontrolling_interest_present_review_enterprise_value_scope")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
         "current_lease_liability_candidates", "noncurrent_lease_liability_candidates",
     )):
