@@ -643,6 +643,30 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["review_flags"],
         )
 
+    def test_aggregate_debt_prevents_component_sum(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 25}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 125}],
+                },
+                "aggregate_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 150}],
+                },
+                "cash_unrestricted_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 20}],
+                },
+            }
+        })
+        self.assertIsNone(result["conventional_gross_debt_candidate"])
+        self.assertIsNone(result["conventional_net_debt_candidate"])
+        self.assertIn(
+            "aggregate_debt_total_present_do_not_add_to_current_and_noncurrent_components",
+            result["review_flags"],
+        )
+
     def test_noncontrolling_interest_is_an_ev_scope_flag(self):
         result = enterprise_value_scope_review({
             "categories": {
@@ -697,6 +721,18 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             "separate_financing_obligation_requires_enterprise_value_policy_decision",
             result["review_flags"],
         )
+
+    def test_aggregate_debt_total_is_separate_from_components(self):
+        categories = self.review(
+            row("custom_TotalDebt", "Total debt", 150_000_000),
+            row("us-gaap_LongTermDebtCurrent", "Current portion of long-term debt", 25_000_000),
+            row("us-gaap_LongTermDebtNoncurrent", "Long-term debt", 125_000_000),
+        )
+        self.assertEqual(
+            categories["aggregate_debt_candidates"]["candidate_count"], 1
+        )
+        self.assertEqual(categories["current_debt_candidates"]["candidate_count"], 1)
+        self.assertEqual(categories["noncurrent_debt_candidates"]["candidate_count"], 1)
 
     def test_sale_leaseback_financing_is_not_misclassified_as_debt(self):
         categories = self.review(
