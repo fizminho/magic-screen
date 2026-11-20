@@ -341,3 +341,11 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 
 - **INTENTIONAL:** when no direct `OperatingIncomeLoss` fact exists, a filing-specific EBIT candidate may be used to calculate a separately labelled `candidate_roc` for research. It must retain its filing-specific method/source and status `review_required_filing_specific_ebit` or `review_required_scope_flags`; it can never populate the approved `roc` field. This allows HRB, PBI and SGHC manual reconciliations to be compared without pretending they are generic XBRL mappings.
+
+
+## Full MFI universe EdgarTools research coverage (2026-11-20)
+
+- **INTENTIONAL:** the default EdgarTools bakeoff now covers all 30 tickers from the user's MFI snapshot as of `2026-11-20T09:14:01.782Z`, with `minimumMarketCap=50`, `select30=true`, price date `11/18`, and quarter date `09/30`. The 30 tickers are ALEC, AFMJF, BCRX, BMBL, EGHSF, FHTX, HRB, HRMY, HPQ, IRWD, MGTX, MNTN, NRIX, OTEX, PRDO, PXED, PBI, PLTK, QTTB, RGS, SNDK, SBC, SSTK, SPRO, STRA, SGHC, UPWK, VXRT, ZVRA and GTM.
+- ADBE remains included as a 31st historical control because it was used in earlier SEC mapping validation but is not part of that 30-stock MFI snapshot.
+- **INTENTIONAL:** AFMJF remains in the input even though prior extraction found no SEC company-index match. It is a coverage diagnostic, not a reason to substitute another ticker or silently shrink the requested universe.
+- The bakeoff is review-only and does not write D1, alter the MFI universe, or affect production ratios/ranks. The exact snapshot is a research cohort, not a claim that MFI's live list can never change.
