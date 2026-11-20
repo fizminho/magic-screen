@@ -234,3 +234,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 
 
 - **The three bakeoff cases carry explicit method labels, not automatic eligibility.** HRB is `statement_subtotal_reconstructed`; ADBE is `direct_reported_operating_income`; PBI is `filing_specific_interest_reconciliation`. Each remains `review_only`. The labels describe the evidence used in the research artifact and must not be interpreted as approval to populate production EBIT.
+
+
+## Reproducible and configurable EdgarTools validation
+
+- **Pin the research dependency.** The bakeoff uses `edgartools==6.3.0`, the version recorded in the successful three-company artifact. This avoids silent changes to statement extraction between runs.
+- **Ticker membership is explicit input.** The script accepts comma-separated `BAKEOFF_SYMBOLS`; the manual GitHub workflow exposes this as a `symbols` input. The default HRB/PBI/ADBE set remains the control set. Additional symbols must be copied from a verified current MFI screen response; the script must not infer MFI membership from SEC's ticker directory or unrelated stored rows.
+- **The validation script remains read-only.** Arbitrary supplied symbols only add SEC filing extraction to the local artifact. They do not write D1, change production fundamentals, or update Magic Formula rankings.
