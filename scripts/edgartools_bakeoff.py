@@ -609,6 +609,62 @@ def statement_fact_amount(
 
 
 
+def direct_operating_income_fact(
+    statements: dict[str, Any], period: str,
+) -> dict[str, Any]:
+    """Find one exact consolidated annual operating-profit row across US-GAAP and IFRS."""
+    accepted_concepts = (
+        "OperatingIncomeLoss",
+        "OperatingProfitLoss",
+        "ProfitLossFromOperatingActivities",
+    )
+    label_re = re.compile(DIRECT_OPERATING_INCOME_LABEL_PATTERN, re.IGNORECASE)
+    matches = []
+    invalid_period_rows = []
+    for row in (statements.get("income_statement") or {}).get("rows", []):
+        concept = str(row.get("concept", ""))
+        if not concept.endswith(accepted_concepts):
+            continue
+        if row.get("dimension") is not False or row.get("abstract"):
+            continue
+        if not label_re.search(str(row.get("label", ""))):
+            continue
+        period_values = [
+            (str(key), value)
+            for key, value in (row.get("values") or {}).items()
+            if str(key).startswith(period)
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        ]
+        if len(period_values) != 1:
+            invalid_period_rows.append({
+                "concept": concept,
+                "label": str(row.get("label", "")),
+                "period_value_count": len(period_values),
+            })
+            continue
+        matches.append({
+            "concept": concept,
+            "label": str(row.get("label", "")),
+            "fiscal_period": period,
+            "value": float(period_values[0][1]),
+        })
+    if len(matches) == 1 and not invalid_period_rows:
+        return {"status": "unique_candidate", "candidate": matches[0]}
+    if len(matches) > 1 or (matches and invalid_period_rows):
+        return {
+            "status": "ambiguous",
+            "candidate": None,
+            "candidates": matches + invalid_period_rows,
+        }
+    return {
+        "status": "not_found",
+        "candidate": None,
+        "candidates": invalid_period_rows,
+    }
+
+
+
 def balance_sheet_review(
     statements: dict[str, Any], period: str,
     current_debt_concept: str, noncurrent_debt_concept: str,
@@ -1381,18 +1437,22 @@ def extract_company(symbol: str) -> dict[str, Any]:
         )
         # INTENTIONAL: expose only an exact, consolidated OperatingIncomeLoss
         # fact for this annual period. This is diagnostic, not production EBIT.
-        direct_operating_income = statement_fact_amount(
-            result["statements"], "income_statement", "OperatingIncomeLoss",
-            DIRECT_OPERATING_INCOME_LABEL_PATTERN,
-            fiscal_period,
+        direct_operating_income = direct_operating_income_fact(
+            result["statements"], fiscal_period,
         )
+        direct_candidate = direct_operating_income.get("candidate")
         result["direct_operating_income_review"] = {
-            "status": "review_only" if direct_operating_income is not None else "review_required",
-            "method": "direct_reported_operating_income" if direct_operating_income is not None else None,
+            "status": "review_only" if direct_candidate is not None else (
+                "ambiguous" if direct_operating_income["status"] == "ambiguous" else "review_required"
+            ),
+            "method": "direct_reported_operating_income" if direct_candidate is not None else None,
             "automation_status": "direct_fact_review_only",
             "fiscal_period": fiscal_period,
-            "ebit_candidate": direct_operating_income,
-            "guardrail": "Exact non-dimensional OperatingIncomeLoss statement fact only; review fiscal period, currency, classification and filing before use. Never writes production ratios or rankings.",
+            "concept": direct_candidate["concept"] if direct_candidate else None,
+            "label": direct_candidate["label"] if direct_candidate else None,
+            "ebit_candidate": direct_candidate["value"] if direct_candidate else None,
+            "candidate_review": direct_operating_income,
+            "guardrail": "Exact non-dimensional direct operating-income/profit statement fact from an accepted US-GAAP or IFRS concept only; review fiscal period, currency, classification and filing before use. Never writes production ratios or rankings.",
         }
         # INTENTIONAL: only direct annual EBIT plus a unique positive denominator
         # may produce a diagnostic ROC. This never feeds production calculations.
@@ -1456,7 +1516,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
             result["review_notes"].append(
                 "Review pre/post-spin comparability: the issuer became independent on 2025-02-21; pre-spin historical statements were derived from WDC records."
             )
-        if result["filing"].get("form") == "20-F" and direct_operating_income is None:
+        if result["filing"].get("form") == "20-F" and direct_candidate is None:
             # INTENTIONAL: absence of a US-GAAP OperatingIncomeLoss concept is
             # not zero. Review the issuer's IFRS presentation separately.
             result["review_notes"].append(
