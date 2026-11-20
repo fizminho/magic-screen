@@ -853,10 +853,28 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
   const relevantExtensions=extensionUnique
     .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||extensionPriority(a)-extensionPriority(b)||a.tag.localeCompare(b.tag));
   const compact=(fact:any)=>({
-    tag:fact.tag,label:fact.label,value:fact.value,unit:fact.unit,kind:fact.kind,
-    dimensions:fact.dimensions,
-    presentation:fact.presentation.slice(0,1).map((p:any)=>({parent:p.parent,role:p.role}))
+    tag:fact.tag,label:fact.label,value:fact.value,start:fact.start??null,end:fact.end,
+    unit:fact.unit,kind:fact.kind,context:fact.context??null,dimensions:fact.dimensions,
+    presentation:fact.presentation.slice(0,3).map((p:any)=>({parent:p.parent,role:p.role}))
   });
+  // INTENTIONAL: return targeted accounting candidates independently of the compact
+  // top-30 extension preview. A relevant PP&E or EBIT fact must not disappear merely
+  // because unrelated issuer extensions sort ahead of it. These are review candidates,
+  // not approved mappings; presentation and label evidence still require human review.
+  const allReviewFacts=[...standardUnique,...extensionUnique];
+  const targetedPatterns:Record<string,RegExp>={
+    operating_income:/(operating.?income|operating.?profit|profit.?loss.?from.?operating|income.?loss.?from.?continuing.?operations.?before.?interest|\bebit\b|earnings.?before.?interest.?and.?tax)/i,
+    ppe:/(property.?plant.?and.?equipment|plant.?and.?machinery|machinery.?and.?equipment|fixed.?assets|net.?ppe|accumulated.?depreciation|depreciation.?depletion.?and.?amortization.?property)/i,
+    current_assets:/(assets.?current|current.?assets)/i,
+    current_liabilities:/(liabilities.?current|current.?liabilities)/i,
+    cash:/(cash.?and.?cash.?equivalent|cash.?and.?bank|cash.?balance)/i,
+    debt:/(long.?term.?debt|short.?term.?debt|debt.?current|debt.?noncurrent|borrowings|loans.?payable|total.?debt)/i
+  };
+  const targetedCandidates=Object.fromEntries(Object.entries(targetedPatterns).map(([key,pattern])=>{
+    const matches=allReviewFacts.filter(f=>pattern.test(String(f.tag+" "+(f.label??""))))
+      .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+    return [key,{count:matches.length,returned:Math.min(matches.length,25),truncated:matches.length>25,facts:matches.slice(0,25).map(compact)}];
+  }));
   // INTENTIONAL: provide a filing-specific arithmetic lead for review when both
   // consolidated annual revenue and total costs/expenses are explicitly tagged.
   // This is NOT an EBIT mapping: issuers can classify non-operating items differently,
@@ -922,7 +940,7 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       note:"Cross-check only. Exact arithmetic reconciliation supports the issuer-specific interpretation but does not automatically approve an EBIT mapping."
     }:null
   };
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,30).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>30||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates and explicitly labelled arithmetic review checks, not approved accounting mappings. No production ratios or rankings are changed."};
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,30).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),targeted_candidates:targetedCandidates,review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>30||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates and explicitly labelled arithmetic review checks, not approved accounting mappings. No production ratios or rankings are changed."};
 }
 
 export default {
