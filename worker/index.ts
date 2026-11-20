@@ -788,14 +788,14 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       statementCandidates.push(fact);
     } else candidates.push(fact);
   }
-  // INTENTIONAL: deduplicate repeated non-dimensional facts that appear in multiple
-  // contexts/presentation roles. Keep dimensional facts separate because they may represent
-  // genuinely different members even when their displayed values happen to match.
+  // INTENTIONAL: deduplicate facts by their complete dimensional signature. The same
+  // fact can be repeated through multiple contexts or presentation roles; dimensional
+  // members remain distinct only when their actual dimension members differ.
   const dedupe=(items:any[])=>{
     const seen=new Set<string>();
     return items.filter(f=>{
-      if(f.dimensions) return true;
-      const key=[f.tag,f.unit,f.value,f.kind,f.start??"",f.end].join("|");
+      const dimensionKey=f.dimensions?JSON.stringify(f.dimensions):"";
+      const key=[f.tag,f.unit,f.value,f.kind,f.start??"",f.end,dimensionKey].join("|");
       if(seen.has(key)) return false;
       seen.add(key); return true;
     });
@@ -804,14 +804,16 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
   const extensionUnique=dedupe(candidates);
   const priority=(tag:string)=>{
     const t=tag.toLowerCase().replace(/^.*:/,"");
-    if(/operating(income|profit|loss)|profitlossfromoperatingactivities/.test(t)) return 1;
-    if(/^revenues?$|revenuefromcontract|salesrevenuenet|salesrevenue/.test(t)) return 2;
-    if(/longtermdebt|shorttermdebt|debtcurrent|debtnoncurrent|borrowingscurrent|borrowingsnoncurrent|totaldebt/.test(t)) return 3;
-    if(/cashandcash equivalents|cashandcashequivalents|cashcash equivalents|cashcash/.test(t)) return 4;
-    if(/assetscurrent|liabilitiescurrent/.test(t)) return 5;
-    if(/propertyplantandequipment(net|)|propertyplantandequipment/.test(t)) return 6;
-    if(/costsandexpenses|operatingexpenses|costofgoodsandservicessold/.test(t)) return 7;
-    if(/interestexpense/.test(t)) return 8;
+    // INTENTIONAL: match complete accounting concepts, not loose substrings.
+    // In particular, "nonoperating income" must never be mistaken for EBIT.
+    if(/^(operatingincomeloss|operatingprofitloss|profitlossfromoperatingactivities|incomelossfromcontinuingoperationsbeforeinterestexpenseoperatingincome)$/.test(t)) return 1;
+    if(/^(revenues|revenuefromcontractwithcustomerexcludingassessedtax|salesrevenuenet|salesrevenuegoodsnet|salesrevenueservicesnet)$/.test(t)) return 2;
+    if(/(longtermdebt|shorttermdebt|debtcurrent|debtnoncurrent|borrowingscurrent|borrowingsnoncurrent|totaldebt)/.test(t)) return 3;
+    if(/^(cashandcashequivalentsatcarryingvalue|cashcash equivalents|cashcash equivalentsatcarryingvalue|cashandcash equivalentsatcarryingvalue|cashandcashequivalentsincludingrestrictedcashandcashequivalents)$/.test(t)) return 4;
+    if(/^(assetscurrent|liabilitiescurrent)$/.test(t)) return 5;
+    if(/^(propertyplantandequipmentnet|propertyplantandequipment)$/.test(t)) return 6;
+    if(/^(costsandexpenses|operatingexpenses|costofgoodsandservicessold)$/.test(t)) return 7;
+    if(/^interestexpense/.test(t)) return 8;
     return 99;
   };
   // INTENTIONAL: prioritize Magic Formula input candidates, rather than alphabetical tags.
