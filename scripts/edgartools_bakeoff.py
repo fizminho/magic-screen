@@ -356,8 +356,18 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "concept": re.compile(r"(?:^|_)LiabilitiesCurrent$", re.I),
         },
         "net_ppe_candidates": {
-            "label": re.compile(r"^(?:property|plant|fixed assets|rental property)", re.I),
+            "label": re.compile(r"^(?:property,? plant and equipment|property and equipment|fixed assets)", re.I),
             "concept": re.compile(r"PropertyPlantAndEquipment(?:Net)?$", re.I),
+            "exclude_label": re.compile(r"^rental property and equipment", re.I),
+            "exclude_concept": re.compile(r"RentalPropertyAndEquipmentNet$", re.I),
+        },
+        "rental_equipment_net_candidates": {
+            "label": re.compile(r"^rental property and equipment", re.I),
+            "concept": re.compile(r"RentalPropertyAndEquipmentNet$", re.I),
+        },
+        "nondebt_financing_obligation_candidates": {
+            "label": re.compile(r"sale lease.?back financing|construction financing|financing obligation", re.I),
+            "concept": re.compile(r"(?:SaleLeaseBackFinancing|ConstructionFinancing|FinancingObligation)$", re.I),
         },
         "current_debt_candidates": {
             "label": re.compile(r"current portion of .*debt|current maturities|debt,? current|short.?term borrowings|notes payable and short.?term borrowings", re.I),
