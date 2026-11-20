@@ -404,6 +404,28 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["noncurrent_lease_liability_candidates"]["candidate_count"], 1
         )
 
+    def test_noncurrent_lease_label_is_not_counted_as_current(self):
+        categories = self.review(
+            row("custom_LeaseLiabilities", "Lease liabilities, noncurrent", 59_000_000),
+        )
+        self.assertEqual(
+            categories["current_lease_liability_candidates"]["candidate_count"], 0
+        )
+        self.assertEqual(
+            categories["noncurrent_lease_liability_candidates"]["candidate_count"], 1
+        )
+
+    def test_current_lease_label_is_classified_as_current(self):
+        categories = self.review(
+            row("custom_CurrentLeaseLiabilities", "Lease liabilities, current", 5_000_000),
+        )
+        self.assertEqual(
+            categories["current_lease_liability_candidates"]["candidate_count"], 1
+        )
+        self.assertEqual(
+            categories["noncurrent_lease_liability_candidates"]["candidate_count"], 0
+        )
+
     def test_cash_with_footnote_label_remains_unrestricted_candidate(self):
         categories = self.review(
             row(
