@@ -669,6 +669,46 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertIsNone(result["roc"])
         self.assertEqual(result["candidate_roc"], 50.0)
 
+    def test_ev_selection_policy_makes_cash_and_debt_rules_explicit(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {"candidate_count": 1, "candidates": [{"value": 25}]},
+                "noncurrent_debt_candidates": {"candidate_count": 1, "candidates": [{"value": 125}]},
+                "cash_unrestricted_candidates": {"candidate_count": 1, "candidates": [{"value": 20}]},
+                "cash_restricted_candidates": {"candidate_count": 1},
+                "short_term_investment_candidates": {"candidate_count": 1},
+                "cash_combined_or_investment_candidates": {"candidate_count": 1},
+                "current_lease_liability_candidates": {"candidate_count": 1},
+                "noncurrent_lease_liability_candidates": {"candidate_count": 1},
+                "noncontrolling_interest_candidates": {"candidate_count": 1},
+                "nondebt_financing_obligation_candidates": {"candidate_count": 1},
+            }
+        })
+        policy = result["selection_policy_review"]
+        self.assertEqual(policy["conventional_debt"]["included_candidate"], 150)
+        self.assertEqual(policy["unrestricted_cash"]["included_candidate"], 20)
+        self.assertEqual(policy["restricted_cash"]["treatment"], "excluded_pending_policy")
+        self.assertEqual(policy["short_term_investments"]["treatment"], "excluded_pending_liquidity_and_policy_review")
+        self.assertEqual(policy["combined_cash_restricted_cash_or_investment_totals"]["treatment"], "excluded_to_prevent_scope_overlap")
+        self.assertEqual(policy["lease_liabilities"]["treatment"], "excluded_from_conventional_debt_bridge_pending_policy")
+        self.assertEqual(policy["noncontrolling_interest"]["treatment"], "excluded_from_base_bridge_pending_consolidated_ebit_alignment_review")
+        self.assertEqual(policy["separate_financing_obligations"]["treatment"], "excluded_from_conventional_debt_bridge_pending_instrument_review")
+        self.assertEqual(policy["approval_status"], "review_only_no_production_ev_or_earnings_yield")
+
+    def test_ev_selection_policy_withholds_ambiguous_aggregate_debt(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {"candidate_count": 1, "candidates": [{"value": 25}]},
+                "noncurrent_debt_candidates": {"candidate_count": 1, "candidates": [{"value": 125}]},
+                "aggregate_debt_candidates": {"candidate_count": 2, "candidates": [{"value": 150}, {"value": 151}]},
+                "cash_unrestricted_candidates": {"candidate_count": 1, "candidates": [{"value": 20}]},
+            }
+        })
+        policy = result["selection_policy_review"]
+        self.assertIsNone(policy["conventional_debt"]["included_candidate"])
+        self.assertEqual(policy["conventional_debt"]["status"], "withheld_aggregate_debt_present")
+        self.assertIsNone(result["conventional_net_debt_candidate"])
+
     def test_enterprise_value_scope_keeps_missing_debt_unknown(self):
         result = enterprise_value_scope_review({
             "categories": {
