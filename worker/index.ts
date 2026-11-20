@@ -459,6 +459,12 @@ type EdgarToolsResolution = {
   ebit_candidate:number|null; ebit_method:string|null; ebit_concept:string|null; ebit_label:string|null; ebit_status:string;
   invested_capital_candidate:number|null; invested_capital_status:string;
   reporting_currency:string|null; candidate_roc:number|null; review_flags:string[];
+  balance_sheet_candidate_review:Record<string,{status:string;candidate_count:number}>;
+  enterprise_value_candidate_review:{
+    status:string; conventional_debt_status:string; conventional_gross_debt_candidate:number|null;
+    unrestricted_cash_candidate:number|null; conventional_net_debt_candidate:number|null;
+    debt_reconciliation_status:string; approval_status:string;
+  };
   overall_status:"review_required"|"unsupported_provider"|"awaiting_evidence";
   production_write:false;
 };
@@ -467,7 +473,10 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
     symbol,provider_status:providerStatus??"awaiting_evidence",accession,fiscal_period:fiscalPeriod,
     ebit_candidate:null,ebit_method:null,ebit_concept:null,ebit_label:null,ebit_status:"not_resolved",
     invested_capital_candidate:null,invested_capital_status:"not_resolved",
-    reporting_currency:null,candidate_roc:null,review_flags:[],
+    reporting_currency:null,candidate_roc:null,review_flags:[],balance_sheet_candidate_review:{},
+    enterprise_value_candidate_review:{status:"not_resolved",conventional_debt_status:"not_resolved",
+      conventional_gross_debt_candidate:null,unrestricted_cash_candidate:null,conventional_net_debt_candidate:null,
+      debt_reconciliation_status:"not_resolved",approval_status:"review_only_no_production_ev_or_earnings_yield"},
     overall_status:providerStatus==="unsupported_provider"?"unsupported_provider":"awaiting_evidence",production_write:false
   };
   const filing=company.filing??{};
@@ -524,6 +533,35 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
   for (const flag of (Array.isArray(evReview.review_flags)?evReview.review_flags:[])) flags.push(String(flag));
   const balanceReview=company.balance_sheet_fact_review??{};
   for (const category of (Array.isArray(balanceReview.unresolved_categories)?balanceReview.unresolved_categories:[])) flags.push("balance_sheet:"+String(category));
+  const categoryNames={
+    current_debt:"current_debt_candidates",noncurrent_debt:"noncurrent_debt_candidates",
+    aggregate_debt:"aggregate_debt_candidates",unrestricted_cash:"cash_unrestricted_candidates",
+    restricted_cash:"cash_restricted_candidates",short_term_investments:"short_term_investment_candidates",
+    current_lease_liabilities:"current_lease_liability_candidates",noncurrent_lease_liabilities:"noncurrent_lease_liability_candidates"
+  };
+  const balanceSheetCandidateReview:Record<string,{status:string;candidate_count:number}>={};
+  for (const [key,name] of Object.entries(categoryNames)) {
+    const category=balanceReview.categories?.[name]??{};
+    balanceSheetCandidateReview[key]={
+      status:typeof category.status==="string"?category.status:"not_found",
+      candidate_count:Number.isInteger(category.candidate_count)?category.candidate_count:0
+    };
+  }
+  const candidateNumber=(value:any):number|null=>
+    typeof value==="number" && Number.isFinite(value)?value:null;
+  const selectionPolicy=evReview.selection_policy_review??{};
+  const debtReconciliation=evReview.debt_reconciliation_review??{};
+  const enterpriseValueCandidateReview={
+    status:typeof evReview.status==="string"?evReview.status:"not_resolved",
+    conventional_debt_status:typeof selectionPolicy.conventional_debt?.status==="string"
+      ? selectionPolicy.conventional_debt.status:"not_resolved",
+    conventional_gross_debt_candidate:candidateNumber(evReview.conventional_gross_debt_candidate),
+    unrestricted_cash_candidate:candidateNumber(evReview.unrestricted_cash_candidate),
+    conventional_net_debt_candidate:candidateNumber(evReview.conventional_net_debt_candidate),
+    debt_reconciliation_status:typeof debtReconciliation.status==="string"?debtReconciliation.status:"not_resolved",
+    approval_status:typeof selectionPolicy.approval_status==="string"
+      ? selectionPolicy.approval_status:"review_only_no_production_ev_or_earnings_yield"
+  };
   const uniqueFlags=[...new Set(flags)];
   const candidateRoc=ebit!==null && investedCapital!==null && investedCapital>0 ? Number((ebit/investedCapital*100).toFixed(4)) : null;
   return {
@@ -533,6 +571,8 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
     ebit_label:ebit!==null?String(directRows[0]?.label??""):null,ebit_status:ebitStatus,
     invested_capital_candidate:investedCapital,invested_capital_status:investedStatus,
     reporting_currency:currency,candidate_roc:candidateRoc,review_flags:uniqueFlags,
+    balance_sheet_candidate_review:balanceSheetCandidateReview,
+    enterprise_value_candidate_review:enterpriseValueCandidateReview,
     overall_status:"review_required",production_write:false
   };
 }
@@ -1182,6 +1222,9 @@ export default {
           unsupported_provider:resolutions.filter((x:any)=>x.overall_status==="unsupported_provider").length,
           awaiting_evidence:resolutions.filter((x:any)=>x.overall_status==="awaiting_evidence").length,
           direct_ebit_candidates:resolutions.filter((x:any)=>x.ebit_status==="direct_reported_candidate_review_only").length,
+          conventional_debt_candidates:resolutions.filter((x:any)=>x.enterprise_value_candidate_review?.conventional_debt_status==="identified_from_unique_current_and_noncurrent_components").length,
+          net_debt_candidates:resolutions.filter((x:any)=>x.enterprise_value_candidate_review?.conventional_net_debt_candidate!==null).length,
+          ambiguous_debt_inputs:resolutions.filter((x:any)=>x.enterprise_value_candidate_review?.conventional_debt_status==="incomplete_or_ambiguous_debt_inputs").length,
           review_required:resolutions.filter((x:any)=>x.overall_status==="review_required").length
         };
         return json({primary_provider:"EdgarTools",resolver:"deterministic-preview-v1",summary,resolutions,
