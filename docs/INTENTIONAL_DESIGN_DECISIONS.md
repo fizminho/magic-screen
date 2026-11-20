@@ -329,3 +329,12 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - The candidate is $357m. It reconciles to reported profit before taxation of $356m after separately including finance income (+$11m), finance expense (-$11m), change in fair value of options ($0m), and share of post-tax profit of equity-accounted investments (-$1m).
 - Note 5 states direct and marketing expenses include cost of revenues. This is important to avoid subtracting an invented second cost-of-revenue line.
 - **INTENTIONAL:** this is a filing-specific manual-review method, not an IFRS-wide mapping. It never enters production EBIT, Earnings Yield, ROC, eligibility or ranking. A regression test verifies the arithmetic and pretax reconciliation.
+
+
+## ROC publication gate and enterprise-value input completeness (2026-11-20)
+
+- **INTENTIONAL:** a numeric ROC candidate is no longer emitted in the `roc` field when the issuer has unresolved scope flags for rental equipment, right-of-use assets, leases, separate financing obligations, restricted cash or combined cash/investments. The mathematical candidate remains in `candidate_roc` for audit, while status becomes `review_required_scope_flags`.
+- **INTENTIONAL:** the bakeoff now produces an `enterprise_value_scope_review` candidate bridge. Current debt, noncurrent debt and unrestricted cash must each have exactly one candidate before gross/net debt candidates are computed. Missing or ambiguous values remain null and are never coerced to zero.
+- Lease liabilities and separate financing obligations remain separate from conventional borrowings. Restricted cash and combined cash/short-term-investment totals remain separate from unrestricted cash pending explicit EV policy.
+- This changes only the research artifact's review status and diagnostic fields. It does not change production EV, EBIT, Earnings Yield, ROC, eligibility or ranking.
+- Regression tests cover the OTEX-style small-denominator/lease-scope problem and SGHC-style missing current-debt candidate. A mathematical ROC candidate can no longer masquerade as a resolved ROC when scope flags exist.
