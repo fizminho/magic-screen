@@ -791,6 +791,17 @@ def extract_company(symbol: str) -> dict[str, Any]:
             result["invested_capital_review"],
             result["balance_sheet_fact_review"],
         )
+        # INTENTIONAL: these accession-scoped notes preserve filing context
+        # that broad XBRL label matching cannot safely infer or generalize.
+        accession = str(result["filing"].get("accession_number") or "")
+        if symbol == "PRDO" and accession == "0001193125-26-059331":
+            result["review_notes"].append(
+                "PRDO FY2025 10-K: the $56.992m sale lease-back financing liability is separately presented from conventional debt and lease liabilities. The filing describes it as a failed sale-leaseback transaction, reports $154.1m of future minimum payments due under that transaction, and separately reports operating/finance lease liabilities and right-of-use assets. Treat the diagnostic 30.512% ROC as scope-sensitive review output, not a production ratio."
+            )
+        if symbol == "PBI" and accession == "0001628280-26-009650":
+            result["review_notes"].append(
+                "PBI FY2025 10-K Note 8 separately details PP&E net of $185.913m and rental property/equipment net of $24.054m. The current denominator using standard PP&E is -$261.427m; including the separate rental-equipment asset would make it -$237.373m. Both are nonpositive, so PBI remains ineligible for a positive ROC denominator under this formula. The extractor keeps the asset classes separate and does not sum them automatically."
+            )
         if symbol == "SNDK":
             # INTENTIONAL: annotate the separation context; do not adjust reported EBIT.
             result["review_notes"].append(
