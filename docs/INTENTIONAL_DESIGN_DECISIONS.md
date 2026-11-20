@@ -278,3 +278,6 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 
 - **IFRS lease concept suffixes require an exact current/noncurrent boundary.** `NoncurrentLeaseLiabilities` contains the substring `CurrentLeaseLiabilities`; the current-category matcher therefore requires a taxonomy boundary before `CurrentLeaseLiabilities`, not a loose suffix substring.
+
+
+- **Unrestricted is not restricted cash.** The cash-exclusion rule uses a whole-word `restricted` match so labels such as `Cash and cash equivalents, unrestricted` remain eligible for the unrestricted-cash candidate category.
