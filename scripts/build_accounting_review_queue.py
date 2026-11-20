@@ -245,6 +245,12 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["debt_scope_evidence"] = extract_debt_scope_evidence(raw_company)
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            invested_review = raw_company.get("invested_capital_review") or {}
+            denominator_diagnostics = invested_review.get("denominator_diagnostics")
+            item["invested_capital_denominator_diagnostics"] = denominator_diagnostics
+            item["invested_capital_denominator_diagnostics_source"] = (
+                "fresh_extraction_artifact_same_accession" if denominator_diagnostics else "not_available"
+            )
             reconciliation = raw_company.get("balance_sheet_reconciliation_review")
             item["balance_sheet_reconciliation_review"] = reconciliation
             item["balance_sheet_reconciliation_evidence_source"] = (
@@ -279,6 +285,8 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "stored_resolver_preview"
             item["debt_scope_evidence"] = None
             item["debt_scope_evidence_source"] = "stored_resolver_preview"
+            item["invested_capital_denominator_diagnostics"] = None
+            item["invested_capital_denominator_diagnostics_source"] = "stored_resolver_preview"
             item["balance_sheet_reconciliation_review"] = None
             item["balance_sheet_reconciliation_evidence_source"] = "stored_resolver_preview"
             item["filing_specific_ebit_review"] = None
@@ -313,6 +321,12 @@ def build_queue(
                 1 for row in rows if row.get("filing_specific_ebit_review")
                 and isinstance(row["filing_specific_ebit_review"].get("ebit_candidate"), (int, float))
             ),
+            "negative_working_capital_offset_high_risk": sum(
+                1 for row in rows
+                if (row.get("invested_capital_denominator_diagnostics") or {}).get(
+                    "negative_working_capital_offsets_at_least_90pct_of_net_ppe"
+                )
+            ),
         },
         "items": rows,
         "guardrail": "Triage only. Candidate values and classifications remain unapproved; missing values are unknown, never zero.",
@@ -344,7 +358,8 @@ def main() -> int:
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "balance_sheet_reconciliation_review",
-        "balance_sheet_reconciliation_evidence_source", "filing_specific_ebit_review",
+        "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
+        "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
         "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
@@ -358,6 +373,9 @@ def main() -> int:
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
             row["balance_sheet_reconciliation_review"] = json.dumps(
                 item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
+            )
+            row["invested_capital_denominator_diagnostics"] = json.dumps(
+                item.get("invested_capital_denominator_diagnostics"), separators=(",", ":")
             )
             row["filing_specific_ebit_review"] = json.dumps(
                 item.get("filing_specific_ebit_review"), separators=(",", ":")
