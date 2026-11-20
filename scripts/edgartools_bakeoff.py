@@ -231,7 +231,7 @@ def fetch_frankfurter_rate(
             "base": base,
             "quotes": quote,
         })
-        url = f"https://api.frankfurter.dev/v2/rates?{params}"
+        url = f"https://api.frankfurter.dev/v2/providers/ecb/rates?{params}"
         request = Request(url, headers={"Accept": "application/json"})
         with urlopen(request, timeout=20) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -248,7 +248,8 @@ def fetch_frankfurter_rate(
                 "base": base,
                 "quote": quote,
                 "requested_date": requested_date,
-                "provider": "Frankfurter blended daily reference rates",
+                "provider": "ECB reference rates via Frankfurter",
+                "source_attribution": "Source: ECB statistics",
             }
         else:
             selected = max(matches, key=lambda row: row["date"])
@@ -259,7 +260,7 @@ def fetch_frankfurter_rate(
                 "rate": float(selected["rate"]),
                 "date": selected["date"],
                 "requested_date": requested_date,
-                "provider": "Frankfurter blended daily reference rates",
+                "provider": "ECB daily reference rates via Frankfurter",
                 "is_previous_business_day": selected["date"] != requested_date,
             }
     except Exception as exc:
@@ -268,7 +269,8 @@ def fetch_frankfurter_rate(
             "base": base,
             "quote": quote,
             "requested_date": requested_date,
-            "provider": "Frankfurter blended daily reference rates",
+            "provider": "ECB reference rates via Frankfurter",
+            "source_attribution": "Source: ECB statistics",
             "error": f"{type(exc).__name__}: {exc}",
         }
     FRANKFURTER_RATE_CACHE[key] = result
@@ -335,7 +337,7 @@ def currency_normalization_review(
         "mfi_price_date": mfi_price_date,
         "fx_rate_review": rate_review,
         "conversion_formula": "USD market cap × reporting-currency units per USD at the MFI price date",
-        "guardrail": "Reference-rate conversion only. Debt and cash remain in their filing currency and at their fiscal-period balance-sheet date. This is not an approved EV or Earnings Yield calculation.",
+        "guardrail": "ECB reference-rate conversion only (Source: ECB statistics). Debt and cash remain in their filing currency and at their fiscal-period balance-sheet date. This is not an approved EV or Earnings Yield calculation.",
     }
 
 
@@ -1532,7 +1534,7 @@ def main() -> int:
             "market_cap_unit": "USD millions",
             "override_supported": "MFI_MARKET_CAPS_JSON",
         },
-        "fx_policy": "USD market cap is translated into filing currency at the MFI quote date; reported debt/cash stay in filing currency at fiscal-period end; ROC remains a same-currency ratio. No EV/EY is approved by this review.",
+        "fx_policy": "USD market cap is translated into filing currency at the MFI quote date using the ECB daily reference series via Frankfurter; the latest ECB observation on or before the quote date is selected within a bounded 7-day lookback. Reported debt/cash stay in filing currency at fiscal-period end; ROC remains a same-currency ratio. No EV/EY is approved by this review.",
         "edgartools_version": None,
         "symbols": list(symbols),
         "production_data_modified": False,
