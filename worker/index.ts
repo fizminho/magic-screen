@@ -969,6 +969,50 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Magic Formula Investing"},503); }
     }
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
+    if (url.pathname==="/api/admin/cleanup-sec-universe" && request.method==="POST") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        // INTENTIONAL: do not call ensureSchema here. This is a targeted cleanup against
+        // existing production tables and must not trigger unrelated schema/seed writes.
+        const payload:any=await request.json();
+        const action=String(payload.action??"preview");
+        if(action==="preview") {
+          const counts=await env.DB.prepare(`SELECT
+            COUNT(*) AS sec_source_rows,
+            COALESCE(SUM(CASE WHEN EXISTS (
+              SELECT 1 FROM stock_snapshot q WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
+            ) THEN 1 ELSE 0 END),0) AS protected_mfi_rows,
+            COALESCE(SUM(CASE WHEN NOT EXISTS (
+              SELECT 1 FROM stock_snapshot q WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
+            ) THEN 1 ELSE 0 END),0) AS deletion_candidates
+            FROM stock_master m
+            WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json'`).first<any>();
+          return json({action:"preview",...counts,delete_filter:"US stock_master rows with SEC source, excluding rows whose stock_snapshot provider is Magic Formula Investing",note:"No rows changed. MFI-marked rows are protected."});
+        }
+        if(action==="delete") {
+          const batchSize=Math.min(5000,Math.max(100,Math.floor(Number(payload.batchSize??5000))));
+          const result=await env.DB.prepare(`DELETE FROM stock_master
+            WHERE rowid IN (
+              SELECT m.rowid FROM stock_master m
+              WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json'
+                AND NOT EXISTS (
+                  SELECT 1 FROM stock_snapshot q
+                  WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
+                )
+              LIMIT ?
+            )`).bind(batchSize).run();
+          const remaining=await env.DB.prepare(`SELECT COUNT(*) AS count FROM stock_master m
+            WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json'
+              AND NOT EXISTS (
+                SELECT 1 FROM stock_snapshot q
+                WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
+              )`).first<any>();
+          return json({action:"delete",deleted:result.meta.changes??0,remaining:remaining?.count??null,batchSize,note:"One bounded batch only. Repeat after reviewing the result; protected MFI rows are excluded."});
+        }
+        return json({error:"action must be preview or delete"},400);
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC universe cleanup"},503); }
+    }
     if (url.pathname==="/api/universe/import-my" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
