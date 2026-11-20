@@ -394,3 +394,11 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - The conversion is still review-only. It does not approve EBIT, debt, cash, lease, NCI or invested-capital classifications, and it does not calculate production EV/Earnings Yield or change D1/ranks. Same-currency USD market caps are passed through without an external FX request.
 
 - **INTENTIONAL safety check:** if `mfi_price_date` is changed without also supplying a matching `market_caps_json` override, the bakeoff withholds all pinned market-cap values. It must not pair an old USD market-cap snapshot with a newer FX valuation date.
+
+
+## Manual issuer EV/Earnings Yield scope sensitivity (2026-11-20)
+
+- **INTENTIONAL:** the AFMJF and EGHSF non-SEC issuer-report cases now show four separate manual EV sensitivities: conventional debt only; plus NCI; plus lease liabilities; plus both NCI and leases. Earnings Yield candidates are displayed for each positive EV scenario using the filing-specific EBIT candidate.
+- AFMJF uses USD 991.59m MFI market cap, USD -15.519m conventional net debt, USD 65.738m NCI and USD 3.558m lease liabilities. Candidate EY ranges from 28.04% (conventional debt only) to 26.18% (including both NCI and leases).
+- EGHSF uses CAD 919.290m converted MFI market cap, CAD -269.061m conventional net debt, no NCI and CAD 11.141m lease liabilities. Candidate EY is 13.05% excluding leases and 12.83% including leases.
+- **INTENTIONAL:** these are scenario sensitivities, not a chosen EV policy. Cash availability, debt-like financing, lease accounting, minority ownership and the filing-specific EBIT treatment still require review. No production Earnings Yield or ranking is changed.
