@@ -276,8 +276,8 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
                 "nondebt_financing_obligation_candidates": {"candidate_count": 1},
             }
         })
-        self.assertEqual(result["gross_debt_candidate"], 100)
-        self.assertEqual(result["net_debt_candidate"], 75)
+        self.assertEqual(result["conventional_gross_debt_candidate"], 100)
+        self.assertEqual(result["conventional_net_debt_candidate"], 75)
         self.assertEqual(result["separate_financing_obligation_candidate_count"], 1)
         self.assertIn(
             "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
