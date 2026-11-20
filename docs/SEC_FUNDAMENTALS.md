@@ -208,3 +208,6 @@ For IFRS lease concepts, the current matcher requires an exact taxonomy boundary
 
 
 The unrestricted-cash filter uses a whole-word restricted check so that `unrestricted` is not accidentally excluded as a substring match. A combined cash-and-restricted-cash total remains separate from the unrestricted cash candidate.
+
+
+The artifact also includes a review-only invested-capital denominator preview using `current assets - current liabilities + net PP&E`. It calculates only when each of those three inputs has exactly one consolidated candidate for the selected fiscal period. Missing or ambiguous inputs produce a null value with an unresolved-input list. This preview is diagnostic only and does not approve ROC, eligibility or ranking.
