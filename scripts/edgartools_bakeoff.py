@@ -786,7 +786,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
         },
         "noncurrent_debt_candidates": {
             "label": re.compile(r"^long.?term debt$|^debt,? noncurrent$|^non.?current borrowings$|borrowings,?\s*non.?current|notes? payables?,?\s*non.?current", re.I),
-            "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings|LongTermLoansPayable|LongTermNotesPayable|LongTermLineOfCredit|LineOfCreditNoncurrent|LongTermConvertibleDebt|ConvertibleDebtNoncurrent)$", re.I),
+            "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongtermBorrowings|NoncurrentBorrowings|LongTermLoansPayable|LongTermNotesPayable|LongTermLineOfCredit|LineOfCreditNoncurrent|LongTermConvertibleDebt|ConvertibleDebtNoncurrent)$", re.I),
             "exclude_label": re.compile(r"(?<!net of )(?<!non[- ])\bcurrent\b", re.I),
             "exclude_concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|(?:^|_)CurrentBorrowings)$", re.I),
         },
@@ -834,21 +834,46 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
                 "label": label,
                 "fiscal_period": period,
                 "value": value,
+                "row_index": row.get("index"),
+                "parent_concept": row.get("parent_concept"),
+                "parent_abstract_concept": row.get("parent_abstract_concept"),
+                "level": row.get("level"),
+                "balance": row.get("balance"),
             })
+        candidate_concepts = [str(item.get("concept") or "") for item in candidates]
+        candidate_labels = [re.sub(r"\\s+", " ", str(item.get("label") or "").strip().lower()) for item in candidates]
+        parent_links = [
+            (str(item.get("concept") or ""), str(item.get("parent_concept") or ""))
+            for item in candidates if item.get("parent_concept")
+        ]
+        if len(candidates) <= 1:
+            resolution_hint = "single_candidate_requires_policy_review" if candidates else "no_candidate_identified"
+        elif len(set(candidate_concepts)) == len(candidates) and len(set(candidate_labels)) == len(candidates) and not parent_links:
+            resolution_hint = "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum"
+        else:
+            resolution_hint = "possible_duplicate_or_parent_child_overlap_manual_review_no_automatic_sum"
         result[category] = {
             "status": "unique_candidate" if len(candidates) == 1 else (
                 "ambiguous_candidates" if candidates else "not_found"
             ),
             "candidate_count": len(candidates),
             "candidates": candidates,
+            "resolution_hint": resolution_hint,
+            "automatic_aggregation": False,
         }
     unresolved = [
         key for key, value in result.items()
         if value["status"] != "unique_candidate"
     ]
-    # INTENTIONAL: label and taxonomy matching only surfaces candidates. It does
-    # not resolve aggregate-vs-component debt, lease scope, restricted cash, or
-    # issuer-specific PP&E overlap. No candidate is promoted into production.
+    # INTENTIONAL: debt mappings follow the conservative distinction used in
+    # crible's MIT-licensed SEC provider (src/crible/providers/edgar.py):
+    # LongTermDebtNoncurrent is a safer noncurrent fact, while generic
+    # LongTermDebt can include current maturities and is deliberately excluded.
+    # DebtCurrent is surfaced as a current aggregate. Multiple instruments are
+    # retained with hierarchy metadata; no automatic sum or first-row selection.
+    # This borrows the mapping insight, not crible's broader accounting policy.
+    # Label/taxonomy matching still does not resolve aggregate-vs-component
+    # debt, lease scope, restricted cash, or issuer-specific PP&E overlap.
     return {
         "status": "review_only" if not unresolved else "review_required",
         "fiscal_period": period,
