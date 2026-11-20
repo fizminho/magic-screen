@@ -321,3 +321,11 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - **INTENTIONAL:** review-only ROC previews now include explicit scope flags when separate rental equipment, sale-leaseback/construction financing, lease liabilities, or restricted/combined cash are present. The numerical diagnostic remains visible, but the flags make it harder to mistake the simple denominator/EV inputs for a complete issuer-specific accounting review. Flags never apply automatic adjustments.
 
 - **INTENTIONAL:** right-of-use assets are surfaced separately from net PP&E and generate an ROC scope flag. Lease accounting can create both ROU assets and lease liabilities; the current diagnostic denominator does not silently add/subtract either category.
+
+
+## SGHC IFRS operating-profit reconstruction (2026-11-20)
+
+- **INTENTIONAL:** SGHC FY2025 is handled only for accession `0001628280-26-025609`. Its 20-F does not present a direct operating-profit subtotal. The research artifact reconstructs an EBIT candidate from the exact signed statement rows: revenue, direct/marketing expenses, G&A, D&A, impairment and other operating income.
+- The candidate is $357m. It reconciles to reported profit before taxation of $356m after separately including finance income (+$11m), finance expense (-$11m), change in fair value of options ($0m), and share of post-tax profit of equity-accounted investments (-$1m).
+- Note 5 states direct and marketing expenses include cost of revenues. This is important to avoid subtracting an invented second cost-of-revenue line.
+- **INTENTIONAL:** this is a filing-specific manual-review method, not an IFRS-wide mapping. It never enters production EBIT, Earnings Yield, ROC, eligibility or ranking. A regression test verifies the arithmetic and pretax reconciliation.
