@@ -129,8 +129,9 @@ function secFactValue(facts:any, tags:string[], periodEnd:string, accession:stri
         const days=(Date.parse(x.end)-Date.parse(x.start))/86400000;
         return days>=330 && days<=400 && ["10-K","20-F","40-F"].includes(x.form);
       }
-      if (x.end>periodEnd) return false;
-      return !x.start && (Date.parse(periodEnd)-Date.parse(x.end))/86400000<=120;
+      // INTENTIONAL: balance-sheet inputs must match the selected annual filing's exact
+      // fiscal year-end. Do not substitute an earlier quarter-end or comparative balance sheet.
+      return x.end===periodEnd && !x.start;
     }).sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
     if (eligible.length) return {value:eligible[0].val,tag,filed:eligible[0].filed};
   }
