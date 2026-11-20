@@ -842,16 +842,21 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             })
         candidate_concepts = [str(item.get("concept") or "") for item in candidates]
         candidate_labels = [re.sub(r"\s+", " ", str(item.get("label") or "").strip().lower()) for item in candidates]
-        parent_links = [
-            (str(item.get("concept") or ""), str(item.get("parent_concept") or ""))
-            for item in candidates if item.get("parent_concept")
-        ]
+        candidate_concept_set = set(candidate_concepts)
+        parent_child_overlap = any(
+            str(item.get("parent_concept") or "") in candidate_concept_set
+            for item in candidates
+        )
+        duplicate_concept_or_label = (
+            len(set(candidate_concepts)) != len(candidates)
+            or len(set(candidate_labels)) != len(candidates)
+        )
         if len(candidates) <= 1:
             resolution_hint = "single_candidate_requires_policy_review" if candidates else "no_candidate_identified"
-        elif len(set(candidate_concepts)) == len(candidates) and len(set(candidate_labels)) == len(candidates) and not parent_links:
-            resolution_hint = "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum"
-        else:
+        elif duplicate_concept_or_label or parent_child_overlap:
             resolution_hint = "possible_duplicate_or_parent_child_overlap_manual_review_no_automatic_sum"
+        else:
+            resolution_hint = "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum"
         result[category] = {
             "status": "unique_candidate" if len(candidates) == 1 else (
                 "ambiguous_candidates" if candidates else "not_found"
