@@ -50,7 +50,7 @@ The existing bakeoff is both the extraction regression harness and the scheduled
 - Preserve original concept, label, amount, unit, period, accession, and source context.
 - Do not add dimensional breakdowns to consolidated totals.
 - Do not treat missing values as zero.
-- Do not assume standard PP&E, rental equipment, right-of-use assets, lease liabilities, restricted cash, short-term investments, noncontrolling interests, or separate financing obligations are interchangeable.
+- Do not assume standard PP&E, rental equipment, right-of-use assets, lease liabilities, restricted cash, short-term investments, noncontrolling interests, or separate financing obligations are interchangeable. Restricted cash variants and short-term investments are tracked separately from unrestricted cash and are never deducted from EV as cash equivalents by this candidate resolver.
 - Direct reported operating income is preferred. The extraction review recognises the exact consolidated US-GAAP concepts `OperatingIncomeLoss` and IFRS concepts `OperatingProfitLoss` / `ProfitLossFromOperatingActivities`, but only when exactly one non-dimensional, non-abstract row has one value for the selected annual period. Multiple candidate rows remain ambiguous.
 - A direct operating-profit row is still a review-only candidate, not an approved EBIT value. Filing-specific reconstructions remain review-required until an explicit resolver and regression suite approve them.
 - EBIT reconstruction is never generalized from a successful reconciliation alone. The statement's operating/non-operating classification and filing presentation must independently support the bridge.
