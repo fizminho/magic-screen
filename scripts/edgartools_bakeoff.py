@@ -841,7 +841,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
                 "balance": row.get("balance"),
             })
         candidate_concepts = [str(item.get("concept") or "") for item in candidates]
-        candidate_labels = [re.sub(r"\\s+", " ", str(item.get("label") or "").strip().lower()) for item in candidates]
+        candidate_labels = [re.sub(r"\s+", " ", str(item.get("label") or "").strip().lower()) for item in candidates]
         parent_links = [
             (str(item.get("concept") or ""), str(item.get("parent_concept") or ""))
             for item in candidates if item.get("parent_concept")
