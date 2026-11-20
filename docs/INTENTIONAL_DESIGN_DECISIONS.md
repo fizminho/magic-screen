@@ -100,3 +100,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **Standard taxonomy facts are displayed beside issuer extensions, but both remain diagnostic-only.** The filing inspector now returns a separate `statement_facts` collection for relevant US-GAAP and IFRS concepts found in the extracted XBRL instance, including their labels when available, value, unit, period, dimensions, context, and presentation relationships. Extension facts remain in `extension_facts`.
 - **No diagnostic fact is promoted automatically.** The combined view helps reviewers reconcile reported operating income, revenue, costs, debt, cash, and asset concepts against the filing's presentation structure. It does not write facts to D1, change production EBIT selection, calculate ratios, or create rankings.
 - **The diagnostic is intentionally bounded.** It includes instant facts and full-year duration facts ending on the selected annual filing period, filters to relevant financial concept names, and caps returned statement facts at 150 and extension facts at 100. The `truncated` flag indicates when either cap is exceeded.
+
+
+## SEC filing diagnostic response size
+
+- **The default diagnostic response is intentionally compact.** It returns at most 30 extension facts and 40 standard statement facts, with only concise presentation parent/role hints. This keeps the response usable in browser clients and avoids flooding the user with repeated context and relationship metadata.
+- **Standard statement facts are prioritized without dimensional breakdowns first.** This makes primary company-wide values easier to spot; extension facts retain dimensional-first ordering to support discovery.
+- **Counts and truncation are explicit.** The response reports total fact counts and a `truncated` flag. Production calculations, D1 storage, and ranking remain unchanged.
