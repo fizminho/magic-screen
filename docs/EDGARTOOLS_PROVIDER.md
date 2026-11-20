@@ -80,6 +80,18 @@ The existing production Worker still calculates US fundamentals directly from SE
 - Lease liabilities, non-controlling interests, restricted cash, short-term investments and separate financing obligations remain scope flags. No EV/Earnings Yield or ROC candidate is promoted into production.
 
 
+#### Explicit enterprise-value candidate selection policy
+
+The read-only EV scope review now reports the treatment of each balance-sheet category:
+
+- Conventional debt enters the diagnostic bridge only when current and noncurrent components are each unique and no aggregate debt candidate is present. Any aggregate candidate, including multiple ambiguous aggregate rows, withholds the component sum. A matching reconciliation is diagnostic only.
+- Only one separately identified unrestricted cash and cash-equivalents candidate may be deducted. Missing or ambiguous unrestricted cash stays unknown.
+- Restricted cash, short-term investments, and combined cash/restricted-cash/investment totals are excluded from the base bridge. Short-term investments require separate liquidity and cash-equivalent policy review.
+- Lease liabilities, noncontrolling interest, and separate financing obligations are excluded from the conventional base bridge pending explicit policy and instrument-scope review. NCI also requires alignment between consolidated EBIT and enterprise value.
+- The output exposes a `selection_policy_review` object with each category's treatment and the overall `review_only_no_production_ev_or_earnings_yield` boundary.
+
+This is a conservative candidate-selection policy for diagnostics, not a final Magic Formula EV definition. No value is written to production fundamentals or rankings.
+
 #### Classification guardrails added after issuer bakeoff
 
 Current and noncurrent lease liabilities are separated using both taxonomy concepts and labels. A noncurrent concept remains excluded from the current bucket even when its label says "net of current portion" or uses unusual spacing. Combined cash/restricted-cash/short-term-investment totals are not counted as short-term investments, and noncurrent marketable securities remain outside that bucket. These are candidate-classification safeguards only; they do not establish EV policy.
