@@ -906,7 +906,29 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
     current_debt = unique_value("current_debt_candidates")
     noncurrent_debt = unique_value("noncurrent_debt_candidates")
     unrestricted_cash = unique_value("cash_unrestricted_candidates")
-    aggregate_debt_count = categories.get("aggregate_debt_candidates", {}).get("candidate_count", 0)
+    aggregate_debt_category = categories.get("aggregate_debt_candidates", {})
+    aggregate_debt_count = aggregate_debt_category.get("candidate_count", 0)
+    aggregate_debt = unique_value("aggregate_debt_candidates")
+    debt_component_sum = (
+        round(current_debt + noncurrent_debt, 2)
+        if current_debt is not None and noncurrent_debt is not None else None
+    )
+    debt_reconciliation = {
+        "aggregate_debt_candidate": aggregate_debt,
+        "current_plus_noncurrent_candidate": debt_component_sum,
+        "difference": (
+            round(aggregate_debt - debt_component_sum, 2)
+            if aggregate_debt is not None and debt_component_sum is not None else None
+        ),
+        "status": (
+            "reconciles_within_1"
+            if aggregate_debt is not None and debt_component_sum is not None
+            and abs(aggregate_debt - debt_component_sum) <= 1.0
+            else "does_not_reconcile"
+            if aggregate_debt is not None and debt_component_sum is not None
+            else "insufficient_unique_inputs"
+        ),
+    }
     flags = []
     if current_debt is None:
         flags.append("current_debt_not_uniquely_identified_not_assumed_zero")
@@ -942,6 +964,7 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
         "current_debt_candidate": current_debt,
         "noncurrent_debt_candidate": noncurrent_debt,
         "aggregate_debt_candidate_count": aggregate_debt_count,
+        "debt_reconciliation_review": debt_reconciliation,
         "conventional_gross_debt_candidate": gross_debt,
         "unrestricted_cash_candidate": unrestricted_cash,
         "conventional_net_debt_candidate": net_debt,
