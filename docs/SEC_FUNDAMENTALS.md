@@ -162,3 +162,8 @@ The bakeoff adds two accession-scoped cases alongside the PBI note:
 - **ADBE FY2025 10-K** (`0000796343-26-000003`): reads the directly reported `OperatingIncomeLoss` fact of $8.706B and cross-checks it against pretax income of $8.734B less net non-operating income of $28M. This is the direct-fact control case.
 
 Both cases require a unique non-dimensional statement row and the exact selected filing period. The output also includes a review-only balance-sheet comparison (current assets/liabilities, cash, net PP&E, current and noncurrent debt, working capital, invested capital and net debt excluding leases). No balance-sheet or EBIT review output is used by the production Worker, production ratios or rankings. Missing or ambiguous inputs return `review_required` rather than falling back to another period or a dimensional fact.
+
+
+### Explicit EBIT review-method labels
+
+The research artifact labels the evidence path for each manually reviewed issuer: HRB `statement_subtotal_reconstructed`, ADBE `direct_reported_operating_income`, and PBI `filing_specific_interest_reconciliation`. These labels are descriptive metadata only. Every result remains `review_only`; the script does not automatically select a method for arbitrary issuers, write production fundamentals, or affect Magic Formula rankings. A future production hierarchy would require broader issuer coverage, explicit classification tests, and a separate approval step.
