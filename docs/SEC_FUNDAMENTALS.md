@@ -217,3 +217,12 @@ Restricted cash can be signalled by the XBRL concept even when the human-readabl
 
 
 A review-only ROC preview is calculated when a unique direct consolidated annual `OperatingIncomeLoss` fact and a unique positive invested-capital denominator are both available for the same issuer filing and fiscal period. Filing-specific reconstructed EBIT cases (HRB/PBI) are not automatically promoted into this direct-fact path. Missing/ambiguous inputs and nonpositive invested capital are reported without calculating ROC. No production ratios, eligibility or ranks are changed.
+
+
+## Balance-sheet candidate classification regression guardrails
+
+The review-only EdgarTools candidate extractor distinguishes unrestricted cash, explicitly restricted cash, and combined cash/restricted-cash/short-term-investment totals. A combined total must not be treated as unrestricted cash. Restricted cash may be identified from an IFRS concept such as `CurrentRestrictedCashAndCashEquivalents` even when the statement label is neutral (for example, "Amounts segregated for users").
+
+Current lease candidates explicitly exclude noncurrent labels because the word `noncurrent` contains the substring `current`. IFRS `LongtermBorrowings` is surfaced as a noncurrent-debt candidate. These are candidate-discovery rules only, not accounting approvals or production mappings.
+
+The EdgarTools workflow runs regression tests for IFRS borrowings, current/noncurrent lease separation, unrestricted versus restricted cash, annotated cash labels and combined cash totals before extracting the issuer sample. The tests and review artifact do not write D1 or alter production ratios/ranks.
