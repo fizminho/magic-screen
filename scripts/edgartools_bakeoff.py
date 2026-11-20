@@ -735,8 +735,12 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "exclude_concept": re.compile(r"RestrictedCash|CashCashEquivalentsRestrictedCash", re.I),
         },
         "cash_restricted_candidates": {
-            "label": re.compile(r"^restricted cash$", re.I),
+            "label": re.compile(r"restricted cash|restricted cash equivalents", re.I),
             "concept": re.compile(r"(?:RestrictedCashCurrent|RestrictedCashNoncurrent|CurrentRestrictedCashAndCashEquivalents)$", re.I),
+        },
+        "short_term_investment_candidates": {
+            "label": re.compile(r"short.?term investments?|marketable securities", re.I),
+            "concept": re.compile(r"(?:ShortTermInvestments|MarketableSecuritiesCurrent|AvailableForSaleSecuritiesCurrent)$", re.I),
         },
         "cash_combined_or_investment_candidates": {
             "label": re.compile(r"cash.*restricted cash|restricted cash.*cash|cash.*short.?term investments", re.I),
@@ -945,7 +949,8 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
     if categories.get("noncontrolling_interest_candidates", {}).get("candidate_count", 0):
         flags.append("noncontrolling_interest_requires_enterprise_value_adjustment_review")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
-        "cash_restricted_candidates", "cash_combined_or_investment_candidates",
+        "cash_restricted_candidates", "short_term_investment_candidates",
+        "cash_combined_or_investment_candidates",
     )):
         flags.append("restricted_cash_or_short_term_investments_require_cash_scope_review")
 
@@ -1019,7 +1024,8 @@ def roc_review(
     )):
         review_flags.append("lease_liabilities_present_review_debt_and_invested_capital_treatment")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
-        "cash_restricted_candidates", "cash_combined_or_investment_candidates",
+        "cash_restricted_candidates", "short_term_investment_candidates",
+        "cash_combined_or_investment_candidates",
     )):
         review_flags.append("restricted_or_combined_cash_present_review_enterprise_value_cash_input")
 
