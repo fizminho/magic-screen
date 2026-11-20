@@ -199,3 +199,6 @@ A unique candidate is still review-only, not an approved production mapping. Res
 
 
 The balance-sheet review matches both statement labels and XBRL concept suffixes. This is necessary because some issuers use generic labels such as `Debt` or `Lease liabilities`, while the taxonomy concept identifies current versus noncurrent classification. Restricted cash is excluded from unrestricted-cash candidates. The review still preserves ambiguity and does not infer an approved debt, cash or lease total from candidate matching alone.
+
+
+The expanded sample exposed three classification edge cases now guarded in the review matcher: (1) `noncurrent` contains the substring `current`, so current lease candidates explicitly exclude noncurrent labels/concepts; (2) IFRS restricted-cash concepts can contain both `RestrictedCash` and `CashAndCashEquivalents`, so restricted concepts are excluded from unrestricted cash; and (3) rental property/equipment is surfaced as a separate PP&E candidate rather than silently added to standard PP&E. These are regression guardrails for review output only.
