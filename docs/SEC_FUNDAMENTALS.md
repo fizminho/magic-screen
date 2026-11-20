@@ -271,3 +271,6 @@ The debt/cash bridge labels are explicitly `conventional_gross_debt_candidate` a
 
 
 The full 30-stock MFI research cohort exposed a label-matching defect: some issuers presented negative `OperatingIncomeLoss` using labels such as "Loss from operations" or "Operating earnings (loss)". The direct-fact matcher now recognizes those labels while still requiring the exact standard concept, consolidated non-dimensional row and matching annual fiscal period. Negative amounts remain negative. They are not treated as missing or converted to positive values.
+
+
+The balance-sheet review also surfaces noncontrolling/minority interests. Where consolidated EBIT includes controlled subsidiaries that are not wholly owned, the enterprise-value bridge may need a noncontrolling-interest adjustment. The bakeoff flags this scope issue but does not automatically add NCI to debt or EV.
