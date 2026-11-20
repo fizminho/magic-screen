@@ -73,7 +73,7 @@ FRANKFURTER_RATE_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
 
 def sec_company_facts(cik: Any) -> dict[str, Any]:
     """Fetch accession-scoped SEC Company Facts once per CIK for currency-unit review."""
-    cik_digits = re.sub(r"\\D", "", str(cik or ""))
+    cik_digits = re.sub(r"\D", "", str(cik or ""))
     if not cik_digits:
         raise ValueError("Missing SEC CIK")
     cik_key = cik_digits.zfill(10)
