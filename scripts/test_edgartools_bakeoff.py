@@ -85,6 +85,38 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["cash_combined_or_investment_candidates"]["candidate_count"], 1
         )
 
+    def test_rental_equipment_is_separate_from_standard_ppe(self):
+        categories = self.review(
+            row(
+                "us-gaap_PropertyPlantAndEquipmentNet",
+                "Property, plant and equipment, net",
+                185_913_000,
+            ),
+            row(
+                "pbi_RentalPropertyAndEquipmentNet",
+                "Rental property and equipment, net",
+                24_054_000,
+            ),
+        )
+        self.assertEqual(categories["net_ppe_candidates"]["candidate_count"], 1)
+        self.assertEqual(
+            categories["rental_equipment_net_candidates"]["candidate_count"], 1
+        )
+
+    def test_sale_leaseback_financing_is_not_misclassified_as_debt(self):
+        categories = self.review(
+            row(
+                "prdo_SaleLeaseBackFinancing",
+                "Sale lease-back financing",
+                56_992_000,
+            )
+        )
+        self.assertEqual(categories["current_debt_candidates"]["candidate_count"], 0)
+        self.assertEqual(categories["noncurrent_debt_candidates"]["candidate_count"], 0)
+        self.assertEqual(
+            categories["nondebt_financing_obligation_candidates"]["candidate_count"], 1
+        )
+
     def test_restricted_cash_and_unrestricted_cash_are_separate(self):
         categories = self.review(
             row("us-gaap_CashAndCashEquivalentsAtCarryingValue", "Cash and cash equivalents, unrestricted", 110_970_000),
