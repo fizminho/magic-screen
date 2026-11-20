@@ -351,3 +351,10 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - The bakeoff is review-only and does not write D1, alter the MFI universe, or affect production ratios/ranks. The exact snapshot is a research cohort, not a claim that MFI's live list can never change.
 
 - **INTENTIONAL:** the debt bridge fields are named `conventional_gross_debt_candidate` and `conventional_net_debt_candidate` to make clear that they include only identified conventional current/noncurrent borrowings. They exclude lease liabilities and separate financing obligations unless a future, explicitly documented policy says otherwise.
+
+
+## Negative direct EBIT facts are retained (2026-11-20)
+
+- **INTENTIONAL:** the direct `OperatingIncomeLoss` review accepts consolidated annual statement labels for operating income, operating profit, operating earnings, and losses from operations. Negative numeric values are valid reported EBIT facts and must not be dropped because their labels say "Loss from operations" or "Operating earnings (loss)".
+- The full MFI cohort exposed this gap: ALEC, BMBL, FHTX, MGTX, NRIX and ZVRA each reported a negative direct `OperatingIncomeLoss` fact, but the previous label matcher failed to recognize some of their statement labels.
+- Regression tests now cover both "Loss from operations" and "Operating earnings (loss)" with negative amounts. Negative EBIT remains negative for later eligibility logic; it is never converted to a positive magnitude or treated as missing.
