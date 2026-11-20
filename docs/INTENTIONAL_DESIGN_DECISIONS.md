@@ -66,6 +66,7 @@ When changing one of these behaviours, update this document and the related inli
 
 - **Gemini JSON must satisfy the full extraction contract.** A response is not accepted merely because it parses as a JSON object. All six required fields must be present with the expected nullable tag/value and reason shape; partial or malformed objects are retried and then passed to the next Flash-Lite model. This prevents an empty or truncated-but-parseable response from being reported as a successful diagnostic.
 
+- **Debt must have a complete current/non-current split.** Require at least one current borrowing component and a non-current borrowing component from the same filing accession. Only when no borrowing components are reported may a complete current/non-current finance-lease pair be used. Never coerce a missing component to zero or treat a lone long-term debt fact as total debt; incomplete debt keeps Enterprise Value and ratios unavailable.
 - **Restricted cash is not treated as available cash for Enterprise Value.** The SEC fundamentals pipeline and Gemini diagnostic accept unrestricted cash and cash-equivalent concepts only. Concepts whose XBRL tag includes restricted cash are rejected, even if they match the filing accession and period. If an issuer reports only combined restricted and unrestricted cash, leave cash unresolved rather than overstating cash available to repay debt.
 
 
