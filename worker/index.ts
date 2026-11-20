@@ -849,15 +849,34 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
   const reviewInterest=reviewDurationFact(["InterestExpenseDebt","InterestAndDebtExpense"]);
   const reviewOtherNonOperating=reviewDurationFact(["OtherNonoperatingIncomeExpense"]);
   const reviewPretax=reviewDurationFact(["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest","IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"]);
-  const explicitOperatingIncome=standardUnique.some(f=>
-    /^us-gaap:(OperatingIncomeLoss|OperatingProfitLoss)$/i.test(f.tag) &&
+  // INTENTIONAL: mirror the production parser's direct operating-income concepts across
+  // both supported standard taxonomies. Do not treat generic profit, pretax income, or
+  // non-operating income concepts as EBIT.
+  const directOperatingIncomeTags=new Set([
+    "us-gaap:OperatingIncomeLoss",
+    "us-gaap:OperatingProfitLoss",
+    "us-gaap:ProfitLossFromOperatingActivities",
+    "ifrs-full:OperatingProfitLoss",
+    "ifrs-full:ProfitLossFromOperatingActivities"
+  ]);
+  const explicitOperatingIncomeFact=standardUnique.find(f=>
+    directOperatingIncomeTags.has(f.tag) &&
     !f.dimensions && f.unit==="iso4217:USD" && f.kind==="duration" && f.end===anchor.end
-  );
+  )??null;
+  const explicitOperatingIncome=explicitOperatingIncomeFact!==null;
   const arithmeticEbit=reviewRevenue&&reviewCosts?reviewRevenue.value-reviewCosts.value:null;
   const reconciledPretax=arithmeticEbit!==null&&reviewInterest&&reviewOtherNonOperating
     ? arithmeticEbit-reviewInterest.value+reviewOtherNonOperating.value : null;
   const reviewOnlyChecks={
     explicit_operating_income_fact_found:explicitOperatingIncome,
+    explicit_operating_income_fact:explicitOperatingIncomeFact?{
+      tag:explicitOperatingIncomeFact.tag,
+      label:explicitOperatingIncomeFact.label,
+      value:explicitOperatingIncomeFact.value,
+      unit:explicitOperatingIncomeFact.unit,
+      kind:explicitOperatingIncomeFact.kind,
+      presentation:explicitOperatingIncomeFact.presentation.slice(0,1).map((p:any)=>({parent:p.parent,role:p.role}))
+    }:null,
     revenue_less_costs_and_expenses:reviewRevenue&&reviewCosts?{
       revenue:reviewRevenue.value,
       costs_and_expenses:reviewCosts.value,
