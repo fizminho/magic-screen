@@ -291,3 +291,10 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 
 - **Restricted cash may be identified only by taxonomy concept.** For example, SGHC's `Amounts segregated for users` label does not say restricted, while its IFRS concept is `CurrentRestrictedCashAndCashEquivalents`. The unrestricted-cash filter therefore excludes both whole-word restricted labels and any concept containing `RestrictedCash`.
+
+
+## Review-only ROC preview
+
+- **INTENTIONAL:** the bakeoff computes a diagnostic ROC only when a unique direct consolidated annual `OperatingIncomeLoss` candidate and a unique positive invested-capital denominator are both available for the same filing and fiscal period.
+- Reconstructed HRB/PBI EBIT candidates are not silently promoted into this direct-fact path. Missing or ambiguous inputs return `review_required`; nonpositive invested capital returns `not_calculated_nonpositive_invested_capital`.
+- This ratio is a research comparison only. It does not approve EBIT or balance-sheet mappings and never feeds production D1, eligibility or ranking.
