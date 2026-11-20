@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import balance_sheet_fact_review, roc_review
+from edgartools_bakeoff import balance_sheet_fact_review, filing_specific_review, roc_review
 
 
 PERIOD = "2025-12-31"
@@ -101,6 +101,37 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertEqual(categories["net_ppe_candidates"]["candidate_count"], 1)
         self.assertEqual(
             categories["rental_equipment_net_candidates"]["candidate_count"], 1
+        )
+
+    def test_sghc_ifrs_ebit_reconstruction_reconciles_to_pretax(self):
+        filing = {
+            "accession_number": "0001628280-26-025609",
+            "period_of_report": PERIOD,
+        }
+        statements = {
+            "income_statement": {
+                "rows": [
+                    row("ifrs-full_Revenue", "Revenue", 2_231_000_000),
+                    row("ifrs-full_SalesAndMarketingExpense", "Direct and marketing expenses", -1_565_000_000),
+                    row("ifrs-full_GeneralAndAdministrativeExpense", "General and administrative expenses", -176_000_000),
+                    row("ifrs-full_DepreciationAndAmortisationExpense", "Depreciation and amortization expense", -74_000_000),
+                    row("ifrs-full_ImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss", "Impairment of assets", -68_000_000),
+                    row("ifrs-full_MiscellaneousOtherOperatingIncome", "Other operating income", 9_000_000),
+                    row("ifrs-full_FinanceIncome", "Finance income", 11_000_000),
+                    row("ifrs-full_FinanceCosts", "Finance expense", -11_000_000),
+                    row("ifrs-full_GainsLossesOnFinancialLiabilitiesAtFairValueThroughProfitOrLossDesignatedAsUponInitialRecognition", "Change in fair value of options", 0),
+                    row("ifrs-full_ShareOfProfitLossOfAssociatesAccountedForUsingEquityMethod", "Share of post-tax profit of equity accounted investments", -1_000_000),
+                    row("ifrs-full_ProfitLossBeforeTax", "Profit before taxation", 356_000_000),
+                ]
+            }
+        }
+        result = filing_specific_review("SGHC", filing, {}, statements)
+        self.assertEqual(result["status"], "review_only")
+        self.assertEqual(result["method"], "ifrs_statement_subtotal_reconstructed")
+        self.assertEqual(result["ebit_candidate"], 357_000_000)
+        self.assertTrue(result["cross_checks"]["reconciles_within_1"])
+        self.assertEqual(
+            result["cross_checks"]["difference_to_reported_profit_before_taxation"], 0
         )
 
     def test_roc_preview_flags_separate_rental_ppe_and_financing(self):
