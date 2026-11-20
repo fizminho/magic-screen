@@ -514,8 +514,8 @@ async function syncUsFundamentals(env:Env, limit=10) {
       // INTENTIONAL: exclude combined restricted/unrestricted cash concepts from EV.
       // If unrestricted cash is not separately reported, leave the input missing rather than overstate liquidity.
       const cash=periodEnd ? secFactValue(facts,["CashAndCashEquivalentsAtCarryingValue","CashAndCashEquivalents"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
-      const currentDebtAggregate=periodEnd ? secFactValue(facts,["DebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
-      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent","BorrowingsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const currentDebtAggregate=periodEnd ? secFactValue(facts,["DebtCurrent","BorrowingsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent","BorrowingsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
@@ -525,12 +525,12 @@ async function syncUsFundamentals(env:Env, limit=10) {
       // borrowings and current maturities. Otherwise use separately reported current components.
       // A current component and non-current component must both exist in the same filing; never
       // turn an absent fact into zero. Do not add an aggregate to its component facts.
-      const currentBorrowingKnown=currentDebtAggregate.value!=null || debtCurrent.value!=null || shortDebt.value!=null;
+      const currentBorrowingKnown=currentDebtAggregate.value!=null || (debtCurrent.value!=null && shortDebt.value!=null);
       const splitDebtKnown=currentBorrowingKnown && debtLong.value!=null;
       const anyBorrowingFacts=currentBorrowingKnown || debtLong.value!=null;
       const leaseDebtKnown=leaseCurrent.value!=null && leaseLong.value!=null;
       const debtKnown=splitDebtKnown || (!anyBorrowingFacts && leaseDebtKnown);
-      const currentBorrowingTotal=currentDebtAggregate.value!=null ? currentDebtAggregate.value : (debtCurrent.value??0)+(shortDebt.value??0);
+      const currentBorrowingTotal=currentDebtAggregate.value!=null ? currentDebtAggregate.value : debtCurrent.value!+shortDebt.value!;
       const totalDebt=splitDebtKnown ? currentBorrowingTotal+debtLong.value!
         : !anyBorrowingFacts && leaseDebtKnown ? leaseCurrent.value!+leaseLong.value! : null;
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
