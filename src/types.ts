@@ -5,7 +5,7 @@ export interface Stock {
   price: number | null; change_percent: number | null; market_cap: number | null;
   earnings_yield: number | null; return_on_capital: number | null;
   magic_formula_rank: number | null; fiscal_period?: string | null; filed_at?: string | null;
-  fundamentals_status?: string | null; fundamentals_source?: string | null; shariah_status: ShariahStatus;
+  fundamentals_status?: string | null; fundamentals_source?: string | null; fundamentals_missing_fields?: string[]; fundamentals_zero_fields?: string[]; shariah_status: ShariahStatus;
   shariah_source: string | null; shariah_as_of: string | null;
   data_status: string; provider: string | null; updated_at: string;
 }
