@@ -33,7 +33,7 @@ The current application backend is a Cloudflare Worker (TypeScript) with D1. Edg
 The production integration therefore uses a Python execution lane:
 
 1. A daily scheduled or manually dispatched GitHub Actions job installs a pinned EdgarTools version.
-2. The job fetches the current active US MFI ticker list from the protected Worker `/api/fundamentals/edgartools/universe` endpoint. A manual ticker override remains available for focused tests; push-triggered regression runs retain a fixed control cohort.
+2. The job fetches the current active US MFI ticker list from the protected Worker `/api/fundamentals/edgartools/universe` endpoint. That endpoint refreshes the existing MFI screen using its six-hour cache, so newly screened stocks are picked up without someone first opening the screener. A manual ticker override remains available for focused tests; push-triggered regression runs retain a fixed control cohort.
 3. The job extracts each issuer's latest eligible annual filing (10-K, 20-F or 40-F).
 4. The job emits a versioned JSON report with ticker, filing metadata, reporting currency, statement facts, provider status, and source provenance.
 5. Scheduled and manually dispatched runs POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
