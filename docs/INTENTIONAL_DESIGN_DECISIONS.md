@@ -338,3 +338,6 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - Lease liabilities and separate financing obligations remain separate from conventional borrowings. Restricted cash and combined cash/short-term-investment totals remain separate from unrestricted cash pending explicit EV policy.
 - This changes only the research artifact's review status and diagnostic fields. It does not change production EV, EBIT, Earnings Yield, ROC, eligibility or ranking.
 - Regression tests cover the OTEX-style small-denominator/lease-scope problem and SGHC-style missing current-debt candidate. A mathematical ROC candidate can no longer masquerade as a resolved ROC when scope flags exist.
+
+
+- **INTENTIONAL:** when no direct `OperatingIncomeLoss` fact exists, a filing-specific EBIT candidate may be used to calculate a separately labelled `candidate_roc` for research. It must retain its filing-specific method/source and status `review_required_filing_specific_ebit` or `review_required_scope_flags`; it can never populate the approved `roc` field. This allows HRB, PBI and SGHC manual reconciliations to be compared without pretending they are generic XBRL mappings.
