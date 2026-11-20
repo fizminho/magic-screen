@@ -36,7 +36,9 @@ Example request body:
 }
 ```
 
-Allowed optional fields: `exchange`, `sector`, `listing_status`. Required fields: `symbol`, `company_name`. Maximum 5,000 rows per request. Invalid rows are skipped. Re-importing updates matching symbols.
+Allowed optional fields: `exchange`, `sector`, `listing_status`. Required fields: `symbol`, `company_name`. Maximum 5,000 rows per request. Symbols are normalised to uppercase Yahoo format with the `.KL` suffix. Duplicate symbols collapse to one row (last occurrence wins). Invalid rows are reported and skipped during a normal import.
+
+The frontend's **Complete official directory snapshot** option sends `complete_snapshot: true`. Use it only when the CSV contains the entire current Bursa listed-company directory. In this mode, any invalid row rejects the whole request before writes; after all valid rows are imported, previously active MY symbols absent from the file are marked inactive. Leave this option off for partial lists or watchlists. A normal import never deactivates missing symbols. Existing quote and fundamentals history is retained when a listing becomes inactive.
 
 ## Quote refresh
 
