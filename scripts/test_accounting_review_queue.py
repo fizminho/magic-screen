@@ -476,6 +476,9 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(item["invested_capital_denominator_diagnostics_source"],
                          "fresh_extraction_artifact_same_accession")
         self.assertEqual(queue["summary"]["negative_working_capital_offset_high_risk"], 1)
+        self.assertEqual(item["priority"], "P1")
+        self.assertIn("invested_capital_negative_working_capital_offset_high_risk_manual_review",
+                      item["issues"])
         self.assertFalse(item["production_write"])
 
     def test_queue_does_not_mix_denominator_diagnostics_from_different_accessions(self):
