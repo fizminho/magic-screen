@@ -256,6 +256,29 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["review_flags"],
         )
 
+    def test_noncontrolling_interest_is_an_ev_scope_flag(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 10}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 90}],
+                },
+                "cash_unrestricted_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 25}],
+                },
+                "noncontrolling_interest_candidates": {"candidate_count": 1},
+            }
+        })
+        self.assertIn(
+            "noncontrolling_interest_requires_enterprise_value_adjustment_review",
+            result["review_flags"],
+        )
+
     def test_enterprise_value_scope_reports_separate_lease_and_financing(self):
         result = enterprise_value_scope_review({
             "categories": {
