@@ -550,9 +550,25 @@ def roc_review(
     direct_ebit: dict[str, Any],
     invested_capital: dict[str, Any],
     balance_review: dict[str, Any] | None = None,
+    filing_specific_ebit: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Compute review-only ROC and surface accounting-scope flags."""
-    ebit = direct_ebit.get("ebit_candidate")
+    """Compute review-only ROC while preserving the source and scope of EBIT."""
+    direct_value = direct_ebit.get("ebit_candidate")
+    specific_value = (filing_specific_ebit or {}).get("ebit_candidate")
+    ebit_source = "direct_reported_operating_income"
+    ebit = direct_value
+    is_filing_specific = False
+    if direct_ebit.get("status") != "review_only" or not isinstance(direct_value, (int, float)):
+        # INTENTIONAL: issuer-specific reconstructions are allowed only as
+        # separately labelled research candidates, never as direct EBIT.
+        if (
+            (filing_specific_ebit or {}).get("status") == "review_only"
+            and isinstance(specific_value, (int, float))
+        ):
+            ebit = specific_value
+            ebit_source = str((filing_specific_ebit or {}).get("method") or "filing_specific_manual_review")
+            is_filing_specific = True
+
     capital = invested_capital.get("value")
     categories = (balance_review or {}).get("categories", {})
     review_flags = []
@@ -565,20 +581,19 @@ def roc_review(
     if categories.get("nondebt_financing_obligation_candidates", {}).get("candidate_count", 0):
         review_flags.append("nondebt_financing_obligation_requires_enterprise_value_scope_review")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
-        "current_lease_liability_candidates",
-        "noncurrent_lease_liability_candidates",
+        "current_lease_liability_candidates", "noncurrent_lease_liability_candidates",
     )):
         review_flags.append("lease_liabilities_present_review_debt_and_invested_capital_treatment")
     if any(categories.get(name, {}).get("candidate_count", 0) for name in (
-        "cash_restricted_candidates",
-        "cash_combined_or_investment_candidates",
+        "cash_restricted_candidates", "cash_combined_or_investment_candidates",
     )):
         review_flags.append("restricted_or_combined_cash_present_review_enterprise_value_cash_input")
-    if direct_ebit.get("status") != "review_only" or not isinstance(ebit, (int, float)):
+
+    if not isinstance(ebit, (int, float)):
         return {
             "status": "review_required",
             "roc": None,
-            "reason": "No unique direct consolidated annual OperatingIncomeLoss candidate.",
+            "reason": "No direct or filing-specific EBIT candidate is available.",
             "review_flags": review_flags,
         }
     if invested_capital.get("status") != "calculated_review_only" or not isinstance(capital, (int, float)):
@@ -586,6 +601,7 @@ def roc_review(
             "status": "review_required",
             "roc": None,
             "reason": "Invested-capital denominator is missing or ambiguous.",
+            "ebit_source": ebit_source,
             "review_flags": review_flags,
         }
     if capital <= 0:
@@ -595,31 +611,35 @@ def roc_review(
             "reason": "Nonpositive invested capital is not used as a ROC denominator.",
             "invested_capital": capital,
             "ebit": ebit,
+            "ebit_source": ebit_source,
             "review_flags": review_flags,
         }
+
     candidate_roc = round((float(ebit) / float(capital)) * 100, 4)
-    if review_flags:
+    if review_flags or is_filing_specific:
+        status = "review_required_scope_flags" if review_flags else "review_required_filing_specific_ebit"
         return {
-            "status": "review_required_scope_flags",
+            "status": status,
             "roc": None,
             "candidate_roc": candidate_roc,
             "ebit": ebit,
+            "ebit_source": ebit_source,
             "invested_capital": capital,
-            "method": "direct_operating_income_over_reviewed_invested_capital",
+            "method": "filing_specific_manual_review_ebit_over_reviewed_invested_capital" if is_filing_specific else "direct_operating_income_over_reviewed_invested_capital",
             "review_flags": review_flags,
-            "guardrail": "Numerical ROC is a research candidate only. Scope flags prevent it from being presented as calculated ROC. Resolve issuer-specific asset, lease, financing and cash treatment before approving the ratio.",
+            "guardrail": "Numerical ROC is a research candidate only. Filing-specific EBIT reconstructions and/or unresolved accounting-scope flags prevent it from being presented as calculated ROC.",
         }
     # INTENTIONAL: even unflagged ratios remain review-only, never production inputs.
     return {
         "status": "calculated_review_only",
         "roc": candidate_roc,
         "ebit": ebit,
+        "ebit_source": ebit_source,
         "invested_capital": capital,
         "method": "direct_operating_income_over_reviewed_invested_capital",
         "review_flags": [],
         "guardrail": "Diagnostic ROC only. Direct EBIT and unique denominator candidates are not production-approved mappings; this result never feeds D1, eligibility or ranking.",
     }
-
 
 def filing_specific_review(
     symbol: str, filing: dict[str, Any], bridge: dict[str, Any],
@@ -930,6 +950,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
             result["direct_operating_income_review"],
             result["invested_capital_review"],
             result["balance_sheet_fact_review"],
+            result.get("filing_specific_review"),
         )
         result["enterprise_value_scope_review"] = enterprise_value_scope_review(
             result["balance_sheet_fact_review"],
