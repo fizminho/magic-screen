@@ -138,8 +138,29 @@ def reporting_currency_unit_review(
         "currency": top_currency,
         "unit_counts": counts,
         "distinct_concepts_by_unit": {unit: len(values) for unit, values in tags.items()},
-        "guardrail": "Dominant ISO currency unit among standard SEC Company Facts matching this exact accession and fiscal period. Review issuer presentation before production use.",
+        "review_flags": (
+            ["secondary_currency_unit_observations_present"]
+            if len(counts) > 1 else []
+        ),
+        "guardrail": "Dominant ISO currency unit among standard SEC Company Facts matching this exact accession and fiscal period. Secondary units are retained as review flags; review issuer presentation before production use.",
     }
+
+
+def filing_specific_currency_override(
+    symbol: str, accession: str
+) -> dict[str, Any] | None:
+    # INTENTIONAL: the SGHC 20-F uses USD but its IFRS facts were not exposed
+    # as ISO currency units in standard Company Facts. Restrict this override
+    # to the exact issuer and accession already manually reviewed.
+    if symbol == "SGHC" and accession == "0001628280-26-025609":
+        return {
+            "status": "identified_from_filing_specific_review",
+            "currency": "USD",
+            "evidence": "FY2025 Form 20-F consolidated financial statements are presented in US dollars",
+            "review_flags": ["currency_identified_from_exact_filing_not_companyfacts_units"],
+            "guardrail": "Issuer-specific currency override for this exact filing only. Do not generalize to other SGHC filings or other IFRS issuers.",
+        }
+    return None
 
 
 def fetch_frankfurter_rate(
@@ -235,7 +256,8 @@ def currency_normalization_review(
             "guardrail": "No market-cap conversion is attempted until the filing currency is identified.",
         }
     rate_review = fx_rate_review or {}
-    if reporting == market_cap_currency:
+    same_currency = reporting == market_cap_currency
+    if same_currency:
         rate_review = {
             "status": "same_currency",
             "base": "USD",
@@ -260,8 +282,13 @@ def currency_normalization_review(
         round(float(market_cap_usd) * float(rate), 2)
         if isinstance(market_cap_usd, (int, float)) else None
     )
+    result_status = (
+        ("same_currency_market_cap_missing" if converted_market_cap is None else "market_cap_same_currency")
+        if same_currency else
+        ("fx_rate_available_market_cap_missing" if converted_market_cap is None else "market_cap_converted_review_only")
+    )
     return {
-        "status": "fx_rate_available_market_cap_missing" if converted_market_cap is None else "market_cap_converted_review_only",
+        "status": result_status,
         "reporting_currency": reporting,
         "market_cap_currency": market_cap_currency,
         "market_cap_usd": market_cap_usd,
@@ -1296,6 +1323,10 @@ def extract_company(symbol: str) -> dict[str, Any]:
                 "currency": None,
                 "error": f"{type(currency_error).__name__}: {currency_error}",
             }
+        if not result["reporting_currency_review"].get("currency"):
+            filing_currency_override = filing_specific_currency_override(symbol, accession)
+            if filing_currency_override is not None:
+                result["reporting_currency_review"] = filing_currency_override
         reporting_currency = result["reporting_currency_review"].get("currency")
         mfi_price_date = os.environ.get("MFI_PRICE_DATE", "2026-11-18")
         fx_review = None
