@@ -1454,22 +1454,68 @@ export default {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
-        await ensureSchema(env);
         const payload: any = await request.json();
-        if (!Array.isArray(payload.rows) || payload.rows.length > 5000) return json({error:"Expected rows array, maximum 5000"},400);
-        const now = new Date().toISOString();
-        let imported = 0;
-        for (let i=0; i<payload.rows.length; i+=80) {
-          const batch = payload.rows.slice(i,i+80).map((r: any) => {
-            const rawSymbol = String(r.symbol || "").trim().toUpperCase();
-            const symbol = rawSymbol && !rawSymbol.endsWith(".KL") ? rawSymbol + ".KL" : rawSymbol;
-            const companyName = String(r.company_name || r.name || "").trim();
-            if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\.KL$/.test(symbol) || !companyName) return null;
-            return env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,sector,listing_status,source,source_updated_at) VALUES (?, 'MY', ?, 'MYR', ?, ?, ?, ?, ?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,sector=excluded.sector,listing_status=excluded.listing_status,source=excluded.source,source_updated_at=excluded.source_updated_at").bind(symbol,companyName,String(r.exchange || "BURSA"),r.sector || null,r.listing_status || "active",String(payload.source || "Bursa directory import"),now);
-          }).filter(Boolean) as D1PreparedStatement[];
-          if (batch.length) { await env.DB.batch(batch); imported += batch.length; }
+        if (!payload || typeof payload !== "object" || !Array.isArray(payload.rows) || payload.rows.length === 0 || payload.rows.length > 5000) {
+          return json({error:"Expected a non-empty rows array, maximum 5000"},400);
         }
-        return json({imported,source:payload.source || "Bursa directory import",asOf:now});
+        const completeSnapshot = payload.complete_snapshot === true;
+        const source = String(payload.source || "Bursa directory import").trim().slice(0,160) || "Bursa directory import";
+        const normalized = new Map<string,{symbol:string;companyName:string;exchange:string;sector:string|null;listingStatus:"active"|"inactive"}>();
+        const invalidRows: {row:number;symbol:string;reason:string}[] = [];
+        for (let i=0; i<payload.rows.length; i++) {
+          const row = payload.rows[i] ?? {};
+          const rawSymbol = String(row.symbol ?? "").trim().toUpperCase().replace(/\\s+/g,"");
+          const symbol = rawSymbol && !rawSymbol.endsWith(".KL") ? rawSymbol + ".KL" : rawSymbol;
+          const companyName = String(row.company_name ?? row.name ?? "").trim();
+          const exchange = String(row.exchange ?? "BURSA").trim() || "BURSA";
+          const sector = String(row.sector ?? "").trim();
+          const listingStatus = String(row.listing_status ?? "active").trim().toLowerCase();
+          let reason = "";
+          if (!/^[0-9A-Z][0-9A-Z.-]{0,14}\\.KL$/.test(symbol)) reason = "invalid Bursa/Yahoo symbol";
+          else if (!companyName || companyName.length > 200) reason = "company_name is required and must be 200 characters or fewer";
+          else if (exchange.length > 100 || sector.length > 100) reason = "exchange and sector must be 100 characters or fewer";
+          else if (listingStatus !== "active" && listingStatus !== "inactive") reason = "listing_status must be active or inactive";
+          if (reason) {
+            invalidRows.push({row:i+1,symbol:rawSymbol.slice(0,30),reason});
+            continue;
+          }
+          normalized.set(symbol,{symbol,companyName,exchange:exchange.slice(0,100),sector:sector?sector.slice(0,100):null,listingStatus:listingStatus as "active"|"inactive"});
+        }
+        if (completeSnapshot && invalidRows.length) {
+          return json({error:"Complete snapshot rejected because one or more rows are invalid. Correct the source file and retry; no rows were imported or deactivated.",invalid_rows:invalidRows.length,invalid_row_samples:invalidRows.slice(0,20)},400);
+        }
+        if (!normalized.size) return json({error:"No valid Bursa company rows were found.",invalid_rows:invalidRows.length,invalid_row_samples:invalidRows.slice(0,20)},400);
+
+        await ensureSchema(env);
+        const now = new Date().toISOString();
+        const rows = [...normalized.values()];
+        for (let i=0; i<rows.length; i+=80) {
+          const batch = rows.slice(i,i+80).map(row =>
+            env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,sector,listing_status,source,source_updated_at) VALUES (?, 'MY', ?, 'MYR', ?, ?, ?, ?, ?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,currency=excluded.currency,exchange=excluded.exchange,sector=excluded.sector,listing_status=excluded.listing_status,source=excluded.source,source_updated_at=excluded.source_updated_at")
+              .bind(row.symbol,row.companyName,row.exchange,row.sector,row.listingStatus,source,now)
+          );
+          await env.DB.batch(batch);
+        }
+
+        let deactivated = 0;
+        if (completeSnapshot) {
+          // Only an explicitly confirmed, fully valid directory snapshot can retire absent listings.
+          const active = await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='MY' AND listing_status='active'").all<{symbol:string}>();
+          const incoming = new Set(rows.map(row=>row.symbol));
+          const missing = active.results.map(row=>row.symbol).filter(symbol=>!incoming.has(symbol));
+          for (let i=0; i<missing.length; i+=80) {
+            const batch = missing.slice(i,i+80).map(symbol =>
+              env.DB.prepare("UPDATE stock_master SET listing_status='inactive',source_updated_at=? WHERE market='MY' AND symbol=? AND listing_status='active'").bind(now,symbol)
+            );
+            if (batch.length) await env.DB.batch(batch);
+            deactivated += batch.length;
+          }
+        }
+        return json({
+          imported:rows.length,duplicates_collapsed:payload.rows.length-invalidRows.length-rows.length,
+          invalid_rows:invalidRows.length,invalid_row_samples:invalidRows.slice(0,20),
+          complete_snapshot:completeSnapshot,deactivated,source,asOf:now
+        });
       } catch (e) { return json({error:String(e)},400); }
     }
     if (url.pathname==="/api/universe") {
