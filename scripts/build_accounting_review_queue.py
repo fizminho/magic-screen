@@ -140,7 +140,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
 
 DEBT_SCOPE_PATTERNS = (
     "debt", "borrow", "loan", "lease liabilit", "royalt", "sale lease-back",
-    "sale leaseback", "financing",
+    "sale leaseback", "financing", "note payable",
 )
 
 
@@ -175,7 +175,9 @@ def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             classification = "lease_liability"
         elif any(word in searchable for word in ("royalt", "sale lease", "financing")):
             classification = "separate_financing_obligation"
-        elif any(word in searchable for word in ("debt", "borrow", "loan", "notes payable", "line of credit")):
+        elif "otherlongtermdebtnoncurrent" in concept.lower() and "other long-term liabilities" in label.lower():
+            classification = "other_financing_or_liability_review"
+        elif any(word in searchable for word in ("debt", "borrow", "loan", "note payable", "line of credit")):
             classification = "conventional_debt_candidate"
         else:
             classification = "other_financing_or_liability_review"
