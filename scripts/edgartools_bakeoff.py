@@ -538,7 +538,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
         fiscal_period = str(result["filing"].get("period_of_report") or "")
         direct_operating_income = statement_fact_amount(
             result["statements"], "income_statement", "OperatingIncomeLoss",
-            r"operating income|income from operations|operating profit|earnings from operations",
+            r"operating income|income.*from operations|operating profit|earnings from operations",
             fiscal_period,
         )
         result["direct_operating_income_review"] = {
