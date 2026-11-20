@@ -152,3 +152,13 @@ The diagnostic bridge uses suffix-aware XBRL concept matching to accommodate tax
 ## PBI 2025 EdgarTools filing review
 
 The PBI 2025 bakeoff now emits a filing-specific, review-only note for accession `0001628280-26-009650`. The 10-K says a portion of total interest expense is allocated into consolidated "Cost of financing and other". The review derives allocated finance interest of $47.696M from $61.503M consolidated financing cost less $13.807M SendTech segment financing cost excluding the allocation. Adding this to $101.460M reported interest expense gives $149.156M total interest expense; pretax income of $192.524M plus that interest gives an EBIT reconciliation candidate of $341.680M. This is hard-scoped to that PBI filing, remains review-only, and is not a production mapping or ranking input.
+
+
+## HRB and ADBE filing-specific review cases
+
+The bakeoff adds two accession-scoped cases alongside the PBI note:
+
+- **HRB FY2026 10-K** (`0000012659-26-000026`): no direct operating-income row was surfaced in the EdgarTools statement. The review calculates a $907.686M operating-income candidate from revenue less total operating expenses and independently reconciles it to pretax income less other non-operating income and signed interest expense. Both methods must match within $1. This is a filing-specific reconstruction, not a general XBRL mapping.
+- **ADBE FY2025 10-K** (`0000796343-26-000003`): reads the directly reported `OperatingIncomeLoss` fact of $8.706B and cross-checks it against pretax income of $8.734B less net non-operating income of $28M. This is the direct-fact control case.
+
+Both cases require a unique non-dimensional statement row and the exact selected filing period. The output also includes a review-only balance-sheet comparison (current assets/liabilities, cash, net PP&E, current and noncurrent debt, working capital, invested capital and net debt excluding leases). No balance-sheet or EBIT review output is used by the production Worker, production ratios or rankings. Missing or ambiguous inputs return `review_required` rather than falling back to another period or a dimensional fact.
