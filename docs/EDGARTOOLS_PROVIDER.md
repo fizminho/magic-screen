@@ -211,3 +211,8 @@ The accounting review queue now attaches curated primary-filing debt-note checks
 These records are triage evidence only. They are explicitly marked `review_only`, `production_approved=false`, `resolver_input=false` and `debt_candidate_promoted=false`. The queue does not convert a facility's undrawn status into a company-wide zero-debt conclusion, does not infer current debt is zero from a noncurrent maturity schedule, and does not automatically add royalty or sale-leaseback financing to conventional borrowings. CSV output includes the complete note-review record and source URL.
 
 The queue summary exposes `filing_debt_note_manual_reviews_available`; rows with matching note evidence receive `filing_debt_note_review_available_manual_review`. This marker does not itself alter queue priority, resolver output, shadow eligibility or ranking. Regression tests cover exact-accession matching and mismatch rejection.
+
+
+### Actionable scope review metadata
+
+Each accession-bound filing debt-note record also carries an explicit `evidence_scope`, `manual_review_questions` and `prohibited_inferences` list. This separates instrument-level evidence (for example, an undrawn revolver or royalty financing arrangement) from issuer-wide debt conclusions. Reviewers receive exact follow-up questions and unsafe inferences to avoid. These fields remain descriptive triage metadata only: no priority escalation, debt amount adjustment, resolver input, eligibility change or production write is triggered by them.
