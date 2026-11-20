@@ -5,7 +5,7 @@ from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
 
 
 PERIOD = "2025-12-31"
@@ -333,6 +333,53 @@ class DirectOperatingIncomeLabelTests(unittest.TestCase):
             PERIOD,
         )
         self.assertEqual(value, -805_778_000)
+
+
+    def test_ifrs_operating_profit_is_direct_candidate(self):
+        result = direct_operating_income_fact(
+            {"income_statement": {"rows": [
+                row("ifrs-full_OperatingProfitLoss", "Operating profit", 357_000_000),
+            ]}},
+            PERIOD,
+        )
+        self.assertEqual(result["status"], "unique_candidate")
+        self.assertEqual(result["candidate"]["concept"], "ifrs-full_OperatingProfitLoss")
+        self.assertEqual(result["candidate"]["value"], 357_000_000)
+
+    def test_ifrs_profit_from_operating_activities_is_direct_candidate(self):
+        result = direct_operating_income_fact(
+            {"income_statement": {"rows": [
+                row(
+                    "ifrs-full_ProfitLossFromOperatingActivities",
+                    "Profit (loss) from operating activities",
+                    125_500_000,
+                ),
+            ]}},
+            PERIOD,
+        )
+        self.assertEqual(result["status"], "unique_candidate")
+        self.assertEqual(result["candidate"]["value"], 125_500_000)
+
+    def test_multiple_direct_operating_profit_rows_remain_ambiguous(self):
+        result = direct_operating_income_fact(
+            {"income_statement": {"rows": [
+                row("us-gaap_OperatingIncomeLoss", "Operating income", 100),
+                row("ifrs-full_OperatingProfitLoss", "Operating profit", 100),
+            ]}},
+            PERIOD,
+        )
+        self.assertEqual(result["status"], "ambiguous")
+        self.assertIsNone(result["candidate"])
+
+    def test_dimensional_operating_profit_is_not_selected(self):
+        dimensional = row("ifrs-full_OperatingProfitLoss", "Operating profit", 100)
+        dimensional["dimension"] = True
+        result = direct_operating_income_fact(
+            {"income_statement": {"rows": [dimensional]}},
+            PERIOD,
+        )
+        self.assertEqual(result["status"], "not_found")
+        self.assertIsNone(result["candidate"])
 
 
 class BalanceSheetFactReviewTests(unittest.TestCase):
