@@ -108,3 +108,14 @@ Current and noncurrent lease liabilities are separated using both taxonomy conce
 The expanded payable and credit-line patterns were rerun against the 29 supported issuers in the 2026-11-20 cohort. Current debt classification produced 17 unique candidates, 2 ambiguous buckets and 10 with no candidate; noncurrent debt produced 21 unique candidates, 1 ambiguous bucket and 7 with no candidate. The new patterns surfaced IRWD convertible notes, MGTX notes payable and QTTB venture credit lines. MNTN and SBC remain ambiguous because multiple debt rows exist in the same maturity bucket; those rows are not summed. No aggregate-debt candidate was identified. Unrestricted cash was uniquely identified for 27 of 29 supported issuers; HPQ and VXRT report combined cash/restricted-cash facts and therefore remain unresolved for the base cash deduction.
 
 This cohort snapshot is extraction evidence only. It does not approve debt aggregation, cash scope, EV, Earnings Yield, ROC, or production ranking.
+
+#### Candidate confidence is not policy approval
+
+The resolver review queue reports two separate dimensions:
+
+- **Classification confidence** describes the evidence: unique candidate, ambiguous candidates, no candidate identified, or unresolved.
+- **Policy status** describes whether the accounting treatment has been approved for the Magic Formula calculation. A unique row can still be excluded or held pending policy review.
+
+In particular, uniquely classified current/noncurrent debt is not automatically approved as conventional debt; lease liabilities remain excluded pending a lease policy; restricted cash and short-term investments remain excluded pending their respective liquidity policies. EBIT and invested-capital candidates also retain separate approval requirements. Every assessment is explicitly marked production_approved=false, and queue output remains read-only.
+
+This separation prevents a stronger extraction/classification result from silently becoming an accounting-policy decision or a production value.
