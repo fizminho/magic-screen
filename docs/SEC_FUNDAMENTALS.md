@@ -202,3 +202,6 @@ The balance-sheet review matches both statement labels and XBRL concept suffixes
 
 
 The expanded sample exposed three classification edge cases now guarded in the review matcher: (1) `noncurrent` contains the substring `current`, so current lease candidates explicitly exclude noncurrent labels/concepts; (2) IFRS restricted-cash concepts can contain both `RestrictedCash` and `CashAndCashEquivalents`, so restricted concepts are excluded from unrestricted cash; and (3) rental property/equipment is surfaced as a separate PP&E candidate rather than silently added to standard PP&E. These are regression guardrails for review output only.
+
+
+For IFRS lease concepts, the current matcher requires an exact taxonomy boundary before `CurrentLeaseLiabilities`; it must not match the substring inside `NoncurrentLeaseLiabilities`. This prevents a noncurrent lease liability from appearing in both categories.
