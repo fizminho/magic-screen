@@ -363,7 +363,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings)$", re.I),
         },
         "current_lease_liability_candidates": {
-            "label": re.compile(r"current.*lease liabilities?|lease liabilities?.*current", re.I),
+            "label": re.compile(r"^(?!non.?current).*current.*lease liabilities?|^(?!non.?current).*lease liabilities?.*current", re.I),
             "concept": re.compile(r"(?:OperatingLeaseLiabilityCurrent|FinanceLeaseLiabilityCurrent|CurrentLeaseLiabilities)$", re.I),
         },
         "noncurrent_lease_liability_candidates": {
@@ -385,7 +385,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             concept_match = bool(rules["concept"].search(concept))
             if not (label_match or concept_match):
                 continue
-            if rules.get("exclude") and rules["exclude"].search(label):
+            if rules.get("exclude") and (rules["exclude"].search(label) or rules["exclude"].search(concept)):
                 continue
             values = row.get("values") or {}
             value = values.get(period)
