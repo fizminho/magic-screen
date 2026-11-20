@@ -349,3 +349,5 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - ADBE remains included as a 31st historical control because it was used in earlier SEC mapping validation but is not part of that 30-stock MFI snapshot.
 - **INTENTIONAL:** AFMJF remains in the input even though prior extraction found no SEC company-index match. It is a coverage diagnostic, not a reason to substitute another ticker or silently shrink the requested universe.
 - The bakeoff is review-only and does not write D1, alter the MFI universe, or affect production ratios/ranks. The exact snapshot is a research cohort, not a claim that MFI's live list can never change.
+
+- **INTENTIONAL:** the debt bridge fields are named `conventional_gross_debt_candidate` and `conventional_net_debt_candidate` to make clear that they include only identified conventional current/noncurrent borrowings. They exclude lease liabilities and separate financing obligations unless a future, explicitly documented policy says otherwise.
