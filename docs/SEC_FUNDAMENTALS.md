@@ -167,3 +167,8 @@ Both cases require a unique non-dimensional statement row and the exact selected
 ### Explicit EBIT review-method labels
 
 The research artifact labels the evidence path for each manually reviewed issuer: HRB `statement_subtotal_reconstructed`, ADBE `direct_reported_operating_income`, and PBI `filing_specific_interest_reconciliation`. These labels are descriptive metadata only. Every result remains `review_only`; the script does not automatically select a method for arbitrary issuers, write production fundamentals, or affect Magic Formula rankings. A future production hierarchy would require broader issuer coverage, explicit classification tests, and a separate approval step.
+
+
+## Configurable EdgarTools validation sample
+
+The read-only EdgarTools bakeoff pins `edgartools==6.3.0` and accepts a comma-separated `BAKEOFF_SYMBOLS` environment variable. The manual GitHub Actions workflow exposes a `symbols` input for testing additional issuers. HRB/PBI/ADBE remain the default control cases. For a broader Magic Screen validation sample, pass only tickers copied from the current verified MFI screen response. Do not infer current MFI membership from SEC's company ticker directory or old stock-master rows. The script extracts filings into a temporary GitHub Actions artifact only; it does not access D1 or change production calculations.
