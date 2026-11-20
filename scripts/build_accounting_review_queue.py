@@ -10,6 +10,29 @@ from pathlib import Path
 from typing import Any
 
 
+def candidate_confidence(status: str, count: Any) -> str:
+    """Describe evidence uniqueness without implying accounting-policy approval."""
+    if status in ("unique", "unique_candidate") and count == 1:
+        return "unique_candidate"
+    if status in ("ambiguous", "ambiguous_candidates") or (isinstance(count, int) and count > 1):
+        return "ambiguous_candidates"
+    if status in ("not_found", "not_identified"):
+        return "no_candidate_identified"
+    return "unresolved"
+
+
+BALANCE_POLICY_STATUS = {
+    "current_debt": "pending_conventional_debt_policy_and_EV_approval",
+    "noncurrent_debt": "pending_conventional_debt_policy_and_EV_approval",
+    "aggregate_debt": "pending_aggregate_debt_policy_and_reconciliation",
+    "unrestricted_cash": "pending_cash_scope_and_EV_approval",
+    "restricted_cash": "excluded_pending_restricted_cash_policy",
+    "short_term_investments": "excluded_pending_liquidity_and_cash_equivalent_policy",
+    "current_lease_liabilities": "excluded_pending_lease_policy",
+    "noncurrent_lease_liabilities": "excluded_pending_lease_policy",
+}
+
+
 def classify(row: dict[str, Any]) -> dict[str, Any]:
     symbol = str(row.get("symbol") or "UNKNOWN")
     flags = [str(x) for x in row.get("review_flags", [])]
@@ -116,7 +139,7 @@ def main() -> int:
     fields = [
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
-        "issue_count", "issues", "balance_sheet_exceptions", "production_write",
+        "issue_count", "issues", "balance_sheet_exceptions", "candidate_vs_policy_assessment", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
