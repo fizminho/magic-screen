@@ -467,14 +467,18 @@ async function syncUsFundamentals(env:Env, limit=10) {
     if (ix.cik<0 || ix.ticker<0) throw new Error("Unexpected SEC ticker map format");
     const now=new Date().toISOString();
     const active=await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing'").all<any>();
-    const wanted=new Set(active.results.map((x:any)=>String(x.symbol).toUpperCase()));
-    const symbolsToMap=[...wanted];
-    for(let i=0;i<symbolsToMap.length;i+=80) await env.DB.batch(symbolsToMap.slice(i,i+80).map(symbol=>env.DB.prepare("INSERT INTO sec_company_map(symbol,cik,updated_at) VALUES(?,'UNMAPPED',?) ON CONFLICT(symbol) DO UPDATE SET updated_at=excluded.updated_at").bind(symbol,now)));
+    const symbolsToMap=[...new Set(active.results.map((x:any)=>String(x.symbol).toUpperCase()))];
     const normaliseTicker=(value:string)=>value.toUpperCase().replace(/[^A-Z0-9]/g,"");
     const cikByTicker=new Map<string,string>();
     for(const row of payload.data??[]) if(Number(row[ix.cik])>0) cikByTicker.set(normaliseTicker(String(row[ix.ticker])),String(row[ix.cik]).padStart(10,"0"));
-    const mappedSymbols=symbolsToMap.map(symbol=>({symbol,cik:cikByTicker.get(normaliseTicker(symbol))})).filter((row):row is {symbol:string;cik:string}=>!!row.cik);
-    for(let i=0;i<mappedSymbols.length;i+=80) await env.DB.batch(mappedSymbols.slice(i,i+80).map(row=>env.DB.prepare("UPDATE sec_company_map SET cik=?,updated_at=? WHERE symbol=?").bind(row.cik,now,row.symbol)));
+    // INTENTIONAL: SEC's 95k-row directory is an in-memory lookup only. Persist mappings
+    // exclusively for the small active MFI universe; never import SEC directory companies
+    // into stock_master. Upsert each MFI ticker once with its resolved CIK (or UNMAPPED),
+    // avoiding the previous placeholder insert followed by a second update.
+    const mappingRows=symbolsToMap.map(symbol=>({symbol,cik:cikByTicker.get(normaliseTicker(symbol))??"UNMAPPED"}));
+    for(let i=0;i<mappingRows.length;i+=80) await env.DB.batch(mappingRows.slice(i,i+80).map(row=>
+      env.DB.prepare("INSERT INTO sec_company_map(symbol,cik,updated_at) VALUES(?,?,?) ON CONFLICT(symbol) DO UPDATE SET cik=excluded.cik,updated_at=excluded.updated_at").bind(row.symbol,row.cik,now)
+    ));
   }
   const staleCalculatedBefore=new Date(Date.now()-30*86400000).toISOString();
   const staleRetryBefore=new Date(Date.now()-7*86400000).toISOString();
