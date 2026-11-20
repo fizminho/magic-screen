@@ -480,7 +480,7 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
 
     def test_actual_parent_child_debt_facts_are_flagged_for_overlap_review(self):
         first = row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 100)
-        second = row("custom_SecuredTermLoan", "Secured term loan", 100)
+        second = row("custom_LongTermLoansPayable", "Bank borrowings, non-current", 100)
         second["parent_concept"] = "us-gaap_LongTermDebtNoncurrent"
         categories = self.review(first, second)
         debt = categories["noncurrent_debt_candidates"]
