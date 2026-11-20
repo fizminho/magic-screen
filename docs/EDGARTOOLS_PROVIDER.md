@@ -34,12 +34,13 @@ The production integration therefore uses a Python execution lane:
 
 1. A scheduled or manually dispatched GitHub Actions job installs a pinned EdgarTools version.
 2. The job resolves the active MFI tickers and extracts each issuer's latest eligible annual filing (10-K, 20-F or 40-F).
-3. The job emits a versioned, normalized JSON payload with ticker, CIK, accession, filing date, fiscal period, reporting currency, statement facts, extraction status, and source provenance.
-4. A protected Worker ingestion endpoint validates the payload and persists provider evidence to D1.
-5. The Worker applies deterministic, independently tested accounting rules before writing calculated fundamentals.
-6. Existing all-candidate completeness gates remain in force. No partial-universe ranking is published.
+3. The job emits a versioned JSON report with ticker, filing metadata, reporting currency, statement facts, provider status, and source provenance.
+4. On manually dispatched runs only, GitHub Actions can POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
+5. The endpoint stores each ticker/accession payload in `edgartools_filing_evidence`. This is raw evidence storage only; it does not write `stock_fundamentals`, ratios, eligibility, or ranks. The `/api/fundamentals/edgartools/status` route reports stored provider coverage.
+6. The Worker will apply deterministic, independently tested accounting rules before writing calculated fundamentals.
+7. Existing all-candidate completeness gates remain in force. No partial-universe ranking is published.
 
-The existing review-only bakeoff is the extraction regression harness. It must not be mistaken for the production ingestion endpoint or an approved accounting resolver.
+The existing bakeoff is the extraction regression harness. Push-based runs only test and upload an artifact. Manual runs may optionally ingest raw evidence; the endpoint is size-bounded, authenticated, and idempotent by ticker/accession. It must not be mistaken for an approved accounting resolver.
 
 ## Accounting and ranking guardrails
 
@@ -65,4 +66,4 @@ The existing review-only bakeoff is the extraction regression harness. It must n
 
 ## Current safety boundary
 
-As of this decision, the existing production Worker still calculates US fundamentals directly from SEC Company Facts. The EdgarTools bakeoff remains research-only and does not write D1 or change production rankings. The provider decision is made; the runtime cutover is not yet complete. Do not describe the production pipeline as EdgarTools-backed until the ingestion and shadow-validation stages have passed.
+As of this decision, the existing production Worker still calculates US fundamentals directly from SEC Company Facts. The EdgarTools extraction and raw-evidence ingestion lanes are available, but the automated workflow-to-Worker POST remains disabled until the repository variable `EDGARTOOLS_INGEST_URL` and secret `UNIVERSE_SYNC_TOKEN` are configured. Raw evidence ingestion does not change production fundamentals or rankings. The provider decision is made; the runtime cutover is not yet complete. Do not describe the production pipeline as EdgarTools-backed until the ingestion and shadow-validation stages have passed.
