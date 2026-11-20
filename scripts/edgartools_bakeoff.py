@@ -17,7 +17,7 @@ from typing import Any
 
 from edgar import Company, set_identity
 
-SYMBOLS = ("HRB", "PBI", "ADBE")
+DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE")
 ROW_PATTERN = re.compile(
     r"operating income|operating profit|income from operations|profit from operations|"
     r"earnings before interest|\bebit\b|property|plant|equipment|fixed assets|"
@@ -529,11 +529,20 @@ def main() -> int:
     identity = os.environ.get("EDGAR_IDENTITY", "Magic Screen research support@binalah.co")
     set_identity(identity)
 
+    raw_symbols = os.environ.get("BAKEOFF_SYMBOLS", ",".join(DEFAULT_SYMBOLS))
+    symbols = tuple(dict.fromkeys(
+        item.strip().upper() for item in raw_symbols.split(",") if item.strip()
+    ))
+    if not symbols or any(not re.fullmatch(r"[A-Z0-9.-]{1,12}", symbol) for symbol in symbols):
+        raise ValueError("BAKEOFF_SYMBOLS must be a comma-separated list of valid ticker symbols")
+
     report = {
         "service": "Magic Screen EdgarTools bakeoff",
+        "symbol_input": raw_symbols,
+        "symbol_input_source": "workflow_dispatch_or_environment" if os.environ.get("BAKEOFF_SYMBOLS") else "default_control_cases",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "edgartools_version": None,
-        "symbols": list(SYMBOLS),
+        "symbols": list(symbols),
         "production_data_modified": False,
         "companies": [],
     }
@@ -543,7 +552,7 @@ def main() -> int:
     except Exception:
         pass
 
-    report["companies"] = [extract_company(symbol) for symbol in SYMBOLS]
+    report["companies"] = [extract_company(symbol) for symbol in symbols]
     output = Path(os.environ.get("OUTPUT_PATH", "edgartools-bakeoff.json"))
     output.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
 
