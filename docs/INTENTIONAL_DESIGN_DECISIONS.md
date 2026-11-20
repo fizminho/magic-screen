@@ -307,3 +307,12 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - Cash classification now distinguishes unrestricted cash, explicitly restricted cash, and combined cash/restricted-cash/short-term-investment facts. Combined totals are never reused as unrestricted cash.
 - Cash labels with footnote text may still be matched by the taxonomy concept, while labels or concepts explicitly identifying restricted cash or short-term investments are excluded from unrestricted cash.
 - **INTENTIONAL:** regression tests cover IFRS borrowings, current/noncurrent lease separation, annotated cash labels, and combined restricted-cash totals. The bakeoff workflow runs these tests before extracting issuer filings. No production fundamentals, EV, invested capital, Earnings Yield, ROC, eligibility or ranking logic is changed.
+
+
+## Issuer-specific PP&E and financing-obligation candidates (2026-11-20)
+
+- **INTENTIONAL:** standard net PP&E and rental property/equipment are surfaced as separate candidate categories. The PBI 2025 10-K presents them as separate asset lines and separately details gross cost and accumulated depreciation in Note 8. They are not collapsed into one generic PP&E candidate by the extractor.
+- **INTENTIONAL:** sale-leaseback financing and construction financing are surfaced in a separate `nondebt_financing_obligation_candidates` category. They are not silently classified as conventional borrowings or added to debt by the extractor.
+- PRDO's 2025 10-K describes the $56.992m sale-leaseback financing liability as the recategorization of construction financing after a failed sale-leaseback transaction. This issuer-specific financing obligation remains a separate review item; it is not a universal debt-tag mapping.
+- Regression tests assert that rental equipment does not contaminate standard PP&E candidates and that a sale-leaseback financing row does not enter current/noncurrent conventional debt candidates.
+- These changes affect only the EdgarTools review artifact. They do not alter production SEC mappings, debt aggregation, EV, invested capital, Earnings Yield, ROC, eligibility or ranking.
