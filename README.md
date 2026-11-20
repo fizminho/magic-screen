@@ -8,8 +8,9 @@ A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
 - Bursa Malaysia and US market views
 - US candidate universe sourced from the authenticated Magic Formula Investing screener
 - Quote snapshots cached in Cloudflare D1
-- SEC EDGAR Company Facts ingestion for US fundamentals
-- Earnings Yield and Return on Capital calculations when the required facts are available
+- EdgarTools is the designated primary extraction provider for US fundamentals (Python extraction lane; runtime cutover in progress)
+- SEC EDGAR filings remain the underlying source; Company Facts is not a planned fallback provider
+- Earnings Yield and Return on Capital remain gated by deterministic accounting validation and complete-universe checks
 - Combined Magic Formula ranking is published only after every active MFI candidate has usable fundamentals
 - SEC fundamentals sync runs in the background every 10 minutes, processing up to 10 candidates per invocation
 - Search, sort, market switcher, watchlist and Shariah-status filtering
@@ -30,6 +31,7 @@ The screener is a research aid, not investment advice. Verify current filings, c
 Read [Intentional design decisions](docs/INTENTIONAL_DESIGN_DECISIONS.md) before changing candidate selection, ranking gates, currency handling, SEC retry rules, MFI caching or scheduled processing. These behaviours are deliberate safeguards against misleading financial data.
 
 Additional technical notes:
+- [EdgarTools primary provider decision and rollout](docs/EDGARTOOLS_PROVIDER.md)
 - [SEC fundamentals pipeline](docs/SEC_FUNDAMENTALS.md)
 - [Magic Formula Investing integration](docs/MAGIC_FORMULA_INTEGRATION.md)
 - [Stock universe and Bursa import](docs/STOCK_UNIVERSE.md)
