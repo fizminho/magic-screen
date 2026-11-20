@@ -222,7 +222,14 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
         scenarios.append({
             "scenario": scenario,
             "candidate_operating_income": round(candidate, 2),
-            "assumption": "Cost of financing and other is operating" if include_financing else "Cost of financing and other is non-operating",
+            "assumption": ("Cost of financing and other is operating" if include_financing else "Cost of financing and other is non-operating") + "; assumes pension/postretirement and other expense are non-operating, and restructuring is operating",
+            "classification_assumptions": {
+                "financing_and_other": "operating" if include_financing else "non_operating",
+                "interest_expense": "non_operating",
+                "pension_non_service": "non_operating",
+                "other_expense": "non_operating_review_required",
+                "restructuring": "operating_review_required",
+            },
             "non_operating_adjustments": round(nonop_adjustments, 2),
             "reconstructed_pretax_income": round(reconstructed, 2),
             "reported_pretax_income": pretax["amount"],
