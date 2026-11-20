@@ -32,6 +32,12 @@ export default function App() {
   const [page, setPage] = useState(1);
   const [mfiCount, setMfiCount] = useState(30);
   const [minimumMarketCap, setMinimumMarketCap] = useState(50);
+  const [extensionOpen,setExtensionOpen]=useState(false);
+  const [extensionSymbol,setExtensionSymbol]=useState("HRB");
+  const [extensionToken,setExtensionToken]=useState("");
+  const [extensionStatus,setExtensionStatus]=useState("");
+  const [extensionResult,setExtensionResult]=useState<unknown>(null);
+  const [extensionBusy,setExtensionBusy]=useState(false);
   const pageSize = 40;
 
   async function load(forceMfiSync = false) {
@@ -123,6 +129,23 @@ export default function App() {
   const toggleWatch = (symbol: string) => setWatchlist(old => old.includes(symbol) ? old.filter(x=>x!==symbol) : [...old,symbol]);
 
 
+  async function runExtensionDiagnostic() {
+    if(!extensionToken.trim()){setExtensionStatus("Enter the UNIVERSE_SYNC_TOKEN configured in Cloudflare.");return;}
+    const symbol=extensionSymbol.trim().toUpperCase();
+    if(!/^[A-Z0-9.-]{1,15}$/.test(symbol)){setExtensionStatus("Enter a valid US ticker.");return;}
+    setExtensionBusy(true);setExtensionStatus("Reading the latest annual SEC filing...");setExtensionResult(null);
+    try{
+      const response=await fetch("/api/fundamentals/diagnose-extensions",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+extensionToken.trim()},body:JSON.stringify({symbol})});
+      const result=await response.json();
+      if(!response.ok) throw new Error(result.error||"SEC extension diagnostic failed ("+response.status+").");
+      setExtensionResult(result);setExtensionStatus("Diagnostic complete. No fundamentals or rankings were changed.");
+    }catch(error){setExtensionStatus(error instanceof Error?error.message:"Diagnostic failed.");}
+    finally{setExtensionToken("");setExtensionBusy(false);}
+  }
+  function closeExtensionDiagnostic(){
+    setExtensionOpen(false);setExtensionToken("");setExtensionStatus("");setExtensionResult(null);
+  }
+
   async function importBursaFile(file: File) {
     if (!importToken.trim()) { setImportStatus("Enter the UNIVERSE_SYNC_TOKEN you configured in Cloudflare."); return; }
     setImporting(true); setImportStatus("Reading CSV...");
@@ -180,8 +203,9 @@ export default function App() {
     <main className="main">
       <header className="topbar"><button className="menu-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)}>{menuOpen ? <X size={19}/> : <Menu size={19}/>}</button><div className="breadcrumb">Workspace <span>/</span> <b>Stock screener</b></div><div className="top-actions"><span className="market-pill">{market==="MY"?"🇲🇾 Bursa Malaysia":"🇺🇸 US Market"}</span><button className="icon-btn" title="About data" onClick={()=>setShowInfo(!showInfo)}><CircleHelp size={18}/></button><div className="avatar small-avatar">MS</div></div></header>
       <section className="content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><div className="heading-actions">{market==="MY" && <button className="import-btn" onClick={()=>{setImportOpen(true);setImportStatus("");}}><Database size={14}/> Import Bursa CSV</button>}{market==="US" && <><label className="mfi-control">Min cap ($M)<input type="number" min="50" max="5000000" step="10" value={minimumMarketCap} onChange={e=>setMinimumMarketCap(Math.max(50,Number(e.target.value)||50))}/></label><label className="mfi-control">Stocks<select value={mfiCount} onChange={e=>setMfiCount(Number(e.target.value))}><option value={30}>Top 30</option><option value={50}>Top 50</option></select></label></>}<button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div></div>
+        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><div className="heading-actions">{market==="MY" && <button className="import-btn" onClick={()=>{setImportOpen(true);setImportStatus("");}}><Database size={14}/> Import Bursa CSV</button>}{market==="US" && <><button className="import-btn" onClick={()=>{setExtensionOpen(true);setExtensionStatus("");setExtensionResult(null);}}><Database size={14}/> Inspect SEC tags</button><label className="mfi-control">Min cap ($M)<input type="number" min="50" max="5000000" step="10" value={minimumMarketCap} onChange={e=>setMinimumMarketCap(Math.max(50,Number(e.target.value)||50))}/></label><label className="mfi-control">Stocks<select value={mfiCount} onChange={e=>setMfiCount(Number(e.target.value))}><option value={30}>Top 30</option><option value={50}>Top 50</option></select></label></>}<button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div></div>
 
+        {extensionOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Inspect SEC extension facts"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">SEC EDGAR · READ ONLY</div><h3>Inspect custom XBRL tags</h3></div><button className="modal-close" onClick={closeExtensionDiagnostic} aria-label="Close diagnostic">×</button></div><p>Inspect issuer-specific financial facts in the latest annual filing. This diagnostic does not update D1, calculate ratios, or change rankings.</p><label className="token-label">US ticker<input value={extensionSymbol} onChange={e=>setExtensionSymbol(e.target.value.toUpperCase())} placeholder="e.g. HRB" autoComplete="off"/></label><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={extensionToken} onChange={e=>setExtensionToken(e.target.value)} placeholder="Cloudflare Worker secret" autoComplete="off"/></label><button className="refresh-btn" onClick={()=>void runExtensionDiagnostic()} disabled={extensionBusy}>{extensionBusy?"Inspecting...":"Inspect SEC filing"}</button>{extensionStatus && <div className="import-status">{extensionStatus}</div>}{extensionResult!=null && <pre className="extension-result">{JSON.stringify(extensionResult,null,2)}</pre>}<small className="import-security">The token is sent directly to your Worker for this request and cleared afterward. No Gemini API call is made.</small></div></div>}
         {importOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Import Bursa listings"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">BURSA MALAYSIA</div><h3>Import listed companies</h3></div><button className="modal-close" onClick={()=>setImportOpen(false)} aria-label="Close import">×</button></div><p>Upload the official Bursa company directory as a CSV file. The importer recognises common ticker and company-name column headings.</p><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={importToken} onChange={e=>setImportToken(e.target.value)} placeholder="Paste your Cloudflare Worker secret" autoComplete="off"/></label><label className="csv-upload"><Database size={18}/><b>{importing?"Importing...":"Choose Bursa CSV file"}</b><small>CSV format only. Export the Bursa directory to CSV first.</small><input type="file" accept=".csv,text/csv" disabled={importing} onChange={e=>{const file=e.currentTarget.files?.[0];if(file)void importBursaFile(file);e.currentTarget.value="";}}/></label>{importStatus && <div className="import-status">{importStatus}</div>}<small className="import-security">The token is sent directly to your Worker for this request only. It is not saved in the browser.</small></div></div>}
         {showInfo && <div className="info-banner"><ShieldCheck size={18}/><div><b>Data integrity comes first.</b><p>Prices, fundamentals and Shariah status are only shown when a source is available and verified. Unknown is not the same as compliant. US screening candidates are supplied by Magic Formula Investing. Bursa listings are loaded from the Bursa directory import. Yahoo Finance quotes are unofficial. Magic Formula metrics and Shariah classifications stay blank or unverified until reliable, dated financial and screening sources are connected.</p></div><button onClick={()=>setShowInfo(false)}>×</button></div>}
         <div className="stats-grid">
