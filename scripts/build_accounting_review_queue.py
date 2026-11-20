@@ -206,6 +206,111 @@ def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+# Curated filing-note checks. These are attached only to the exact accession
+# below; they are review evidence, never resolver inputs or approved debt values.
+FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
+    "BCRX": {
+        "accession": "0001628280-26-012240",
+        "method": "royalty_financing_note_review",
+        "observations": [
+            "Note 9 identifies royalty purchase proceeds as royalty financing obligations measured using the effective-interest method; FY2025 roll-forward ends at 465.688m.",
+            "Note 10 says the Pharmakon term loan was paid off in full during 2025, consistent with the exact year-end secured-term-loan row of zero.",
+        ],
+        "interpretation": "Royalty financing is a separate financing liability for EV policy review, not automatically conventional borrowings.",
+        "limitations": ["Do not merge royalty financing into conventional debt automatically.", "The zero term-loan row applies only to that instrument."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/882796/000162828026012240/bcrx-20251231.htm",
+    },
+    "PRDO": {
+        "accession": "0001193125-26-059331",
+        "method": "sale_leaseback_financing_note_review",
+        "observations": ["The 56.992m sale lease-back financing balance arose from construction financing recategorized at lease commencement because the transaction failed sale-leaseback accounting; it is presented separately from ordinary lease liabilities."],
+        "interpretation": "Keep as a separate financing-obligation category pending EV policy review.",
+        "limitations": ["Do not classify as ordinary lease liability or automatically add to conventional debt."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1046568/000119312526149817/prdo-ars-april_2026.pdf",
+    },
+    "VXRT": {
+        "accession": "0001437749-26-008023",
+        "method": "future_royalty_financing_note_review",
+        "observations": ["Note 6 describes cash received for specified future royalty rights; the remaining liability accretes imputed interest and is reduced as pass-through royalties are paid."],
+        "interpretation": "Financing-related obligation, separate from conventional bank borrowing and lease liabilities.",
+        "limitations": ["EV inclusion requires an explicit debt-like financing policy."],
+        "source_url": "https://investors.vaxart.com/static-files/4f2a1a16-8cbd-4bc9-8bf3-8978df723980",
+    },
+    "SBC": {
+        "accession": "0001193125-26-127557",
+        "method": "bank_borrowings_maturity_reconciliation",
+        "observations": ["Current and noncurrent bank and other borrowings total 42.833484m; Note 15 maturity schedule totals the same amount.", "Related-party notes payable are separately reported as zero in both maturity buckets."],
+        "interpretation": "Strong evidence supporting distinct bank-borrowing maturity buckets; retain manual review pending additive-scope policy.",
+        "limitations": ["Do not automatically sum distinct concepts or promote to approved EV debt."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1930313/000119312526127557/sbc-20251231.htm",
+    },
+    "SGHC": {
+        "accession": "0001628280-26-025609",
+        "method": "ifrs_borrowing_facility_maturity_review",
+        "observations": ["The 20-F presents 17m interest-bearing borrowings as noncurrent; Note 24 identifies Waterview Facilities A and B maturing March 7, 2030, with combined carrying amount 17.3m.", "The same note lists other loans payable on demand with an unspecified facility amount."],
+        "interpretation": "Noncurrent borrowing candidate is supported; current borrowing scope remains unresolved.",
+        "limitations": ["Do not infer current debt is zero from the missing current face-statement row."],
+        "source_url": "https://s205.q4cdn.com/195659402/files/doc_financials/2025/ar/Super-Group-SGHC-Limited-20-F-Annual-and-Transition-Report-foreign-private-issuer.pdf",
+    },
+    "ZVRA": {
+        "accession": "0001434647-26-000011",
+        "method": "term_loan_maturity_schedule_review",
+        "observations": ["Debt note reconciles 63.608m principal less 1.680m unamortized discount, issuance costs and PIK interest to 61.928m long-term debt.", "Future principal schedule shows 63.608m due in 2029 and no scheduled principal in 2026-2028."],
+        "interpretation": "Supports noncurrent classification of the reported carrying amount; current debt remains unresolved in the generic resolver.",
+        "limitations": ["Do not convert the current bucket to zero without reviewing acceleration and on-demand provisions."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1434647/000143464726000011/zvra-20251231.htm",
+    },
+    "PXED": {
+        "accession": "0001193125-26-445323",
+        "method": "revolving_credit_facility_note_review",
+        "observations": ["FY2026 10-K describes a 100m senior secured revolver maturing November 13, 2030 and explicitly reports no outstanding borrowings at August 31, 2026.", "A 28.4m letter of credit supports a sublease and reduces facility availability; it is not a drawn borrowing."],
+        "interpretation": "Negative evidence applies to the named facility only.",
+        "limitations": ["Do not treat the letter of credit as drawn debt or infer all debt categories are zero.", "Review restricted-cash release separately from unrestricted cash."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1600222/000119312526445323/pxed-20260831.htm",
+    },
+    "STRA": {
+        "accession": "0001013934-26-000006",
+        "method": "revolving_credit_facility_note_review",
+        "observations": ["FY2025 10-K describes a 250m senior secured revolver and explicitly states no borrowings were outstanding at December 31, 2025."],
+        "interpretation": "Negative evidence applies to the named revolver only; other debt categories remain subject to review.",
+        "limitations": ["Do not set all conventional debt to zero based on this facility disclosure alone."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1013934/000101393426000006/stra-20251231.htm",
+    },
+    "FHTX": {
+        "accession": "0001628280-26-016814",
+        "method": "face_statement_and_off_balance_sheet_review",
+        "observations": ["FY2025 balance sheet reports operating lease liabilities and other liabilities without a separately presented conventional-debt line; filing states no off-balance-sheet arrangements."],
+        "interpretation": "Useful negative evidence, but insufficient to conclude the issuer has no conventional borrowing.",
+        "limitations": ["Absence of a face-statement debt row is not proof of zero debt."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm",
+    },
+    "NRIX": {
+        "accession": "0001549595-26-000016",
+        "method": "face_statement_review",
+        "observations": ["FY2025 balance sheet reports operating lease liabilities and deferred revenue without a separately presented conventional-debt line."],
+        "interpretation": "Face-statement observation only; conventional debt remains unknown pending complete note review.",
+        "limitations": ["Absence of a face-statement debt row is not proof of zero debt."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm",
+    },
+}
+
+
+def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
+    """Return curated note evidence only for the exact issuer and filing accession."""
+    review = FILING_DEBT_NOTE_REVIEWS.get(symbol)
+    if not review or not accession or review["accession"] != accession:
+        return None
+    return {
+        **review,
+        "status": "review_only",
+        "source": "curated_primary_annual_filing_note_review",
+        "production_approved": False,
+        "resolver_input": False,
+        "debt_candidate_promoted": False,
+    }
+
+
 def build_queue(
     report: dict[str, Any],
     raw_evidence: dict[str, Any] | None = None,
@@ -245,6 +350,14 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["debt_scope_evidence"] = extract_debt_scope_evidence(raw_company)
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            item["filing_debt_note_review"] = filing_debt_note_review(item["symbol"], raw_accession)
+            item["filing_debt_note_review_source"] = (
+                "curated_primary_annual_filing_note_review_same_accession"
+                if item["filing_debt_note_review"] else "not_available"
+            )
+            if item["filing_debt_note_review"]:
+                item["issues"].append("filing_debt_note_review_available_manual_review")
+                item["issue_count"] = len(item["issues"])
             invested_review = raw_company.get("invested_capital_review") or {}
             denominator_diagnostics = invested_review.get("denominator_diagnostics")
             item["invested_capital_denominator_diagnostics"] = denominator_diagnostics
@@ -291,6 +404,8 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "stored_resolver_preview"
             item["debt_scope_evidence"] = None
             item["debt_scope_evidence_source"] = "stored_resolver_preview"
+            item["filing_debt_note_review"] = None
+            item["filing_debt_note_review_source"] = "stored_resolver_preview"
             item["invested_capital_denominator_diagnostics"] = None
             item["invested_capital_denominator_diagnostics_source"] = "stored_resolver_preview"
             item["balance_sheet_reconciliation_review"] = None
@@ -318,6 +433,7 @@ def build_queue(
                 for row in rows
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
+            "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
             "debt_scope_classification_rows": dict(Counter(
                 classification
                 for row in rows for evidence in ((row.get("debt_scope_evidence") or {}).get("rows") or [])
@@ -363,7 +479,7 @@ def main() -> int:
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
-        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "balance_sheet_reconciliation_review",
+        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
         "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
         "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
@@ -377,6 +493,7 @@ def main() -> int:
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
+            row["filing_debt_note_review"] = json.dumps(item.get("filing_debt_note_review"), separators=(",", ":"))
             row["balance_sheet_reconciliation_review"] = json.dumps(
                 item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
             )
