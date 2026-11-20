@@ -249,3 +249,12 @@ The SGHC FY2025 20-F (accession `0001628280-26-025609`) does not present a direc
 The filing's pretax bridge reconciles exactly: $357m operating subtotal + $11m finance income - $11m finance expense + $0m change in fair value of options - $1m share of post-tax profit of equity-accounted investments = $356m reported profit before taxation. Note 5 states that direct and marketing expenses include cost of revenues, so no separate cost-of-revenue deduction is added.
 
 This is an accession-specific manual-review reconstruction, not a reusable IFRS taxonomy rule. It is deliberately separate from the direct US-GAAP `OperatingIncomeLoss` review path and does not feed production fundamentals, ratios, eligibility or rankings.
+
+
+## ROC scope gate and enterprise-value input audit
+
+The EdgarTools bakeoff now withholds the `roc` value whenever unresolved accounting-scope flags exist. It preserves the arithmetic as `candidate_roc` with status `review_required_scope_flags`, rather than showing an apparently final diagnostic ratio. This matters for issuers such as Open Text, where current working capital plus PP&E produces a very small positive denominator while the issuer also has right-of-use assets and lease liabilities. The raw mathematical result is not a reliable approval signal until those scope questions are resolved.
+
+A separate `enterprise_value_scope_review` reports conventional current/noncurrent debt and unrestricted cash candidates. It computes gross/net debt candidates only when all three inputs are uniquely identified. Missing debt is unknown, not zero. Lease liabilities, sale-leaseback/construction financing, restricted cash and combined cash/short-term investment totals remain separate review items. This is not an EV calculation because market capitalization and issuer-specific policy decisions are not supplied by this statement-only artifact.
+
+These are research-only output guardrails. No production D1 data, EV, Earnings Yield, ROC, eligibility or ranking logic is changed.
