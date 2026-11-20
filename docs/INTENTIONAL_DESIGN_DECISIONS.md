@@ -173,3 +173,11 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **INTENTIONAL:** protect any row whose matching `stock_snapshot.provider` is `Magic Formula Investing`, because an earlier SEC upsert may have overwritten the original `stock_master.source` on a legitimate MFI symbol.
 - Cleanup runs one bounded batch (maximum 5,000 rows) per request and does not call `ensureSchema`; this avoids unrelated schema/seed writes. Preview is read-only. Do not delete `stock_snapshot`, `stock_fundamentals`, or `sec_company_map` rows as part of this cleanup.
 - D1 DELETE operations count toward daily rows-written quota. On Workers Free, wait until the daily reset if the write quota has already been exhausted, and run small batches while monitoring remaining quota.
+
+
+## SEC fundamentals are authoritative for displayed US ratios
+
+- **INTENTIONAL:** `stock_fundamentals` is the authoritative source for SEC-derived Earnings Yield and Return on Capital. `stock_snapshot` is a quote/cache projection and may lag after independent quote or universe refreshes.
+- The US stocks API prefers ratios from `stock_fundamentals` only when its status is `calculated` and its stored market cap exactly matches the current quote snapshot market cap. If the SEC market cap no longer matches, the API returns null ratios and a `fundamentals_stale_market_cap` status rather than showing stale valuation ratios.
+- The API derives the displayed fundamentals data status from the SEC record (`calculated`, `stale_fiscal_period`, or `missing_required_facts`) so a stale snapshot flag cannot label a completed SEC calculation as quote-only.
+- The full-universe ranking rule remains unchanged: ranks are published only when all active MFI candidates have current, usable fundamentals.
