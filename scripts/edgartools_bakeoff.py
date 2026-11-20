@@ -252,11 +252,139 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def filing_specific_review(symbol: str, filing: dict[str, Any], bridge: dict[str, Any]) -> dict[str, Any] | None:
+def statement_fact_amount(
+    statements: dict[str, Any], statement_name: str, concept_suffix: str,
+    label_pattern: str, period: str,
+) -> float | None:
+    statement = statements.get(statement_name) or {}
+    label_re = re.compile(label_pattern, re.IGNORECASE)
+    matches = [
+        row for row in statement.get("rows", [])
+        if row.get("dimension") is False
+        and not row.get("abstract")
+        and str(row.get("concept", "")).endswith(concept_suffix)
+        and label_re.search(str(row.get("label", "")))
+    ]
+    # INTENTIONAL: filing review facts require an exact statement label and
+    # fiscal-period key. Never pick the first annual column or a dimensional row.
+    if len(matches) != 1:
+        return None
+    values = matches[0].get("values") or {}
+    for key, value in values.items():
+        if str(key).startswith(period) and isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+    return None
+
+
+def filing_specific_review(
+    symbol: str, filing: dict[str, Any], bridge: dict[str, Any],
+    statements: dict[str, Any],
+) -> dict[str, Any] | None:
     accession = str(filing.get("accession_number") or filing.get("accession_no") or filing.get("accession") or "")
-    # INTENTIONAL: this is a one-filing PBI research note, not a reusable XBRL mapping.
-    # The SEC filing explicitly reconciles consolidated interest expense to include
-    # finance interest embedded in "Cost of financing and other".
+    period = str(filing.get("period_of_report") or filing.get("report_date") or "")
+
+    # INTENTIONAL: issuer/accession-specific review notes are manually scoped.
+    # These are not reusable XBRL mappings and never feed production calculations.
+    if symbol == "HRB" and accession == "0000012659-26-000026":
+        revenue = statement_fact_amount(
+            statements, "income_statement", "RevenueFromContractWithCustomerExcludingAssessedTax",
+            r"^Revenues$", period,
+        )
+        operating_expenses = statement_fact_amount(
+            statements, "income_statement", "CostsAndExpenses", r"^Total operating expenses$", period,
+        )
+        pretax = statement_fact_amount(
+            statements, "income_statement",
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+            r"^Income from continuing operations before income taxes$", period,
+        )
+        other_income = statement_fact_amount(
+            statements, "income_statement", "OtherNonoperatingIncomeExpense",
+            r"^Other income \(expense\), net$", period,
+        )
+        interest_signed = statement_fact_amount(
+            statements, "income_statement", "InterestExpenseDebt",
+            r"^Interest expense on borrowings$", period,
+        )
+        inputs = {
+            "reported_revenue": revenue,
+            "reported_total_operating_expenses": operating_expenses,
+            "reported_pretax_income": pretax,
+            "reported_other_income_expense_net": other_income,
+            "reported_interest_expense_signed": interest_signed,
+        }
+        if any(value is None for value in inputs.values()):
+            return {
+                "status": "review_required", "filing_accession": accession,
+                "source_context": "FY2026 Form 10-K, consolidated statement of income",
+                "inputs": inputs,
+                "reason": "One or more exact, non-dimensional statement facts were not found for the selected fiscal period.",
+            }
+        revenue_less_expenses = revenue - operating_expenses
+        pretax_reconciliation = pretax - other_income - interest_signed
+        return {
+            "status": "review_only",
+            "filing_accession": accession,
+            "fiscal_period": period,
+            "source_context": "FY2026 Form 10-K, consolidated statement of income and MD&A operating expense summary",
+            **inputs,
+            "ebit_candidate": round(revenue_less_expenses, 2),
+            "cross_checks": {
+                "revenue_less_total_operating_expenses": round(revenue_less_expenses, 2),
+                "pretax_less_other_nonoperating_income_and_signed_interest": round(pretax_reconciliation, 2),
+                "difference_between_methods": round(revenue_less_expenses - pretax_reconciliation, 2),
+                "reconciles_within_1": abs(revenue_less_expenses - pretax_reconciliation) <= 1.0,
+            },
+            "formula": "reported revenue - reported total operating expenses",
+            "classification_note": "The direct OperatingIncomeLoss row was not surfaced in EdgarTools, but the filing presents total operating expenses separately from other income (expense), net and interest expense. The operating subtotal is independently cross-checked from pretax income less non-operating income and signed interest expense. This is a filing-specific reconstruction, not a general tag mapping.",
+            "guardrail": "Filing-specific manual review only. Do not generalize this extraction or promote it into production fundamentals or rankings.",
+        }
+
+    if symbol == "ADBE" and accession == "0000796343-26-000003":
+        direct_operating_income = statement_fact_amount(
+            statements, "income_statement", "OperatingIncomeLoss", r"Operating income", period,
+        )
+        pretax = statement_fact_amount(
+            statements, "income_statement",
+            "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+            r"^Income before income taxes$", period,
+        )
+        nonoperating_net = statement_fact_amount(
+            statements, "income_statement", "NonoperatingIncomeExpense",
+            r"^Total non-operating income \(expense\), net$", period,
+        )
+        inputs = {
+            "reported_direct_operating_income": direct_operating_income,
+            "reported_pretax_income": pretax,
+            "reported_nonoperating_income_expense_net": nonoperating_net,
+        }
+        if any(value is None for value in inputs.values()):
+            return {
+                "status": "review_required", "filing_accession": accession,
+                "source_context": "FY2025 Form 10-K, consolidated statement of income",
+                "inputs": inputs,
+                "reason": "One or more exact, non-dimensional statement facts were not found for the selected fiscal period.",
+            }
+        pretax_less_nonoperating = pretax - nonoperating_net
+        return {
+            "status": "review_only",
+            "filing_accession": accession,
+            "fiscal_period": period,
+            "source_context": "FY2025 Form 10-K, consolidated statement of income and Note 18",
+            **inputs,
+            "ebit_candidate": round(direct_operating_income, 2),
+            "cross_checks": {
+                "pretax_less_nonoperating_income_expense": round(pretax_less_nonoperating, 2),
+                "difference_from_direct_operating_income": round(direct_operating_income - pretax_less_nonoperating, 2),
+                "reconciles_within_1": abs(direct_operating_income - pretax_less_nonoperating) <= 1.0,
+            },
+            "formula": "directly reported OperatingIncomeLoss; cross-checked as pretax income - net non-operating income",
+            "classification_note": "The filing presents GAAP operating income directly and separately reports interest expense, investment gains and other non-operating income. This is the control case for direct operating-income extraction.",
+            "guardrail": "Filing-specific validation only. Do not treat this as approval of any broad taxonomy mapping or production update.",
+        }
+
+    # INTENTIONAL: the PBI note below is restricted to its exact 2025 10-K.
+    # The filing allocates part of total interest expense into Cost of financing and other.
     if symbol != "PBI" or accession != "0001628280-26-009650":
         return None
     pretax_entry = bridge.get("pretax_income") or {}
@@ -284,7 +412,6 @@ def filing_specific_review(symbol: str, filing: dict[str, Any], bridge: dict[str
         "classification_note": "The filing states that a portion of total interest expense is allocated to finance interest expense within Cost of financing and other. Therefore that full expense line must not be classified wholly as operating or wholly as non-operating. The $47.696M allocated component is inferred from consolidated financing cost less the segment cost excluding allocated finance interest.",
         "guardrail": "Filing-specific manual review only. Do not generalize these values or this extraction to other issuers/periods, and do not write production fundamentals or rankings.",
     }
-
 
 def extract_company(symbol: str) -> dict[str, Any]:
     result: dict[str, Any] = {"symbol": symbol, "status": "error"}
@@ -331,7 +458,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # ratios, eligibility decisions or Magic Formula ranking.
         result["ebit_bridge"] = build_ebit_bridge(result["statements"]["income_statement"])
         result["filing_specific_review"] = filing_specific_review(
-            symbol, result["filing"], result["ebit_bridge"]
+            symbol, result["filing"], result["ebit_bridge"], result["statements"]
         )
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
