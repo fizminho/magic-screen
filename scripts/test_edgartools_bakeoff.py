@@ -400,7 +400,7 @@ class FilingSpecificEBITReviewTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "review_only")
         self.assertEqual(result["ebit_candidate"], 341_680_000)
-        self.assertEqual(result["total_interest_expense_for_EBIT_reconciliation"], 149_156_000)
+        self.assertEqual(result["total_interest_expense_for_EBIT_reconciliation_net_of_interest_income"], 149_156_000)
         self.assertEqual(result["allocated_finance_interest_embedded_in_cost_of_financing"], 47_696_000)
         self.assertEqual(result["interest_income_included_in_reported_net_interest_expense"], 8_000_000)
         self.assertEqual(result["fiscal_period"], PERIOD)
