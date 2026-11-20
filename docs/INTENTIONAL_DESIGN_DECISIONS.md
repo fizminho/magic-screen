@@ -181,3 +181,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - The US stocks API prefers ratios from `stock_fundamentals` only when its status is `calculated` and its stored market cap exactly matches the current quote snapshot market cap. If the SEC market cap no longer matches, the API returns null ratios and a `fundamentals_stale_market_cap` status rather than showing stale valuation ratios.
 - The API derives the displayed fundamentals data status from the SEC record (`calculated`, `stale_fiscal_period`, or `missing_required_facts`) so a stale snapshot flag cannot label a completed SEC calculation as quote-only.
 - The full-universe ranking rule remains unchanged: ranks are published only when all active MFI candidates have current, usable fundamentals.
+
+
+## SEC extension diagnostic: prioritize accounting-input candidates
+
+- **INTENTIONAL:** issuer-extension facts are sorted by likely Magic Formula input meaning (operating income, revenue, current assets/liabilities, PP&E, cash, debt/borrowings, interest and operating costs) after consolidated non-dimensional facts are placed ahead of dimensional breakdowns.
+- The diagnostic returns up to 30 extension facts instead of 12 so relevant balance-sheet tags are less likely to be hidden by alphabetic ordering.
+- This is a discovery and review aid only. Tag names, labels and presentation placement do not establish accounting equivalence; no extension fact is automatically mapped into production calculations or rankings.
