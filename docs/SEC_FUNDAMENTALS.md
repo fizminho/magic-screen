@@ -238,3 +238,5 @@ Regression tests ensure these categories remain distinct. No production ratios, 
 
 
 Review-only ROC previews also carry `review_flags` when the issuer has separate rental equipment, sale-leaseback/construction financing, lease liabilities, or restricted/combined cash. The flags identify accounting scope requiring manual review; they do not alter the reported candidate values or apply automatic adjustments to invested capital or enterprise value.
+
+Right-of-use assets are now surfaced as a separate balance-sheet candidate category and add a `right_of_use_assets_present_review_invested_capital_scope` flag to the review-only ROC output. The current denominator formula does not silently fold ROU assets into net PP&E or adjust lease liabilities. Manual review is required to decide whether/how lease assets and liabilities belong in the chosen Magic Formula implementation.
