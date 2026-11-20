@@ -249,3 +249,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **INTENTIONAL:** sample membership is grounded in the supplied MFI screen snapshot, not SEC directory membership. The sample is a technical extraction test, not a representative statistical sample or investment recommendation.
 - The extractor now checks annual 10-K, 20-F and 40-F filings and chooses the most recently filed annual report. Interim 10-Q/6-K reports remain excluded to keep the initial comparison annual and accession-aligned.
 - The package is pinned to EdgarTools 6.3.0. The artifact remains isolated from production data and calculations.
+
+
+## SEC coverage and direct operating-income diagnostics
+
+- The expanded default sample adds SGHC, a verified current MFI constituent whose FY2025 annual report is a Form 20-F, to exercise the foreign-private-issuer path. AFMJF remains as a deliberate negative coverage case: EdgarTools cannot resolve its OTC ticker in the SEC company index. Its annual financial statements are published outside SEC EDGAR; this is a source-coverage gap, not evidence that the company lacks financial statements.
+- **INTENTIONAL:** a `CompanyNotFoundError` for an individual ticker is recorded as `not_found_in_sec_company_index` and does not fail otherwise successful sample extractions. Unexpected extraction errors still fail the workflow.
+- The report now exposes a generic review-only direct `OperatingIncomeLoss` candidate when one unique consolidated non-dimensional row matches the selected annual fiscal period. This is evidence for manual comparison only, not an automatic EBIT mapping or production approval.
