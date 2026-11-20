@@ -74,46 +74,132 @@ def filing_metadata(filing: Any) -> dict[str, Any]:
     return result
 
 
+ROW_META_KEYS = {
+    "index", "concept", "label", "level", "abstract", "dimension",
+    "is_breakdown", "dimension_axis", "dimension_member",
+    "dimension_member_label", "dimension_label", "balance", "weight",
+    "preferred_sign", "parent_concept", "parent_abstract_concept",
+}
+
+
+def compact_statement_row(record: dict[str, Any]) -> dict[str, Any]:
+    # INTENTIONAL: retain every detailed row once. candidate replaces the
+    # duplicated all_rows + filtered rows arrays from the previous artifact.
+    row = {key: record.get(key) for key in ROW_META_KEYS if record.get(key) is not None}
+    values = {
+        key: safe_value(value) for key, value in record.items()
+        if key not in ROW_META_KEYS and value is not None
+    }
+    if values:
+        row["values"] = values
+    searchable = " ".join(str(value) for value in record.values() if value is not None)
+    row["candidate"] = bool(ROW_PATTERN.search(searchable))
+    return row
+
+
 def statement_candidates(statement: Any) -> dict[str, Any]:
     if statement is None:
-        return {
-            "available": False,
-            "row_count": 0,
-            "candidate_row_count": 0,
-            "all_rows": [],
-            "rows": [],
-            "error": "Statement unavailable",
-        }
+        return {"available": False, "row_count": 0, "candidate_row_count": 0, "rows": [], "error": "Statement unavailable"}
     try:
         frame = statement.to_dataframe(view="detailed").reset_index()
-        all_rows: list[dict[str, Any]] = []
-        candidate_rows: list[dict[str, Any]] = []
-        for record in frame.to_dict(orient="records"):
-            clean = {str(key): safe_value(value) for key, value in record.items()}
-            all_rows.append(clean)
-            searchable = " ".join(str(value) for value in clean.values() if value is not None)
-            if ROW_PATTERN.search(searchable):
-                candidate_rows.append(clean)
-
-        # INTENTIONAL: retain the full statement alongside the label-filtered
-        # subset. Label filtering is useful for navigation but can hide EBIT
-        # subtotals or issuer-specific labels. Neither collection is a mapping.
+        rows = [
+            compact_statement_row({str(key): safe_value(value) for key, value in record.items()})
+            for record in frame.to_dict(orient="records")
+        ]
         return {
             "available": True,
-            "row_count": len(all_rows),
-            "candidate_row_count": len(candidate_rows),
-            "all_rows": all_rows,
-            "rows": candidate_rows,
+            "row_count": len(rows),
+            "candidate_row_count": sum(1 for row in rows if row["candidate"]),
+            "rows": rows,
         }
     except Exception as exc:
-        return {
-            "available": False,
-            "row_count": 0,
-            "candidate_row_count": 0,
-            "all_rows": [],
-            "rows": [],
-            "error": f"{type(exc).__name__}: {exc}",
-        }
+        return {"available": False, "row_count": 0, "candidate_row_count": 0,
+                "rows": [], "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _row_amount(row: dict[str, Any]) -> float | None:
+    for value in row.get("values", {}).values():
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            return float(value)
+    return None
+
+
+def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
+    rows = income_statement.get("rows", [])
+
+    def find(pattern: str) -> dict[str, Any] | None:
+        regex = re.compile(pattern, re.IGNORECASE)
+        matches = [
+            row for row in rows
+            if not row.get("abstract") and not row.get("dimension")
+            and regex.search(str(row.get("concept", ""))) and _row_amount(row) is not None
+        ]
+        return matches[0] if matches else None
+
+    def item(name: str, pattern: str, treatment: str) -> dict[str, Any] | None:
+        row = find(pattern)
+        if row is None:
+            return None
+        return {"item": name, "concept": row.get("concept"), "label": row.get("label"),
+                "amount": _row_amount(row), "treatment": treatment,
+                "parent": row.get("parent_concept")}
+
+    revenue = item("revenue", r"RevenueFromContractWithCustomerExcludingAssessedTax|^Revenues$", "anchor")
+    if revenue is None:
+        revenue = item("revenue", r"^Revenue$", "anchor")
+    pretax = item("pretax_income", r"IncomeLossFromContinuingOperationsBeforeIncomeTaxes", "reconciliation_anchor")
+
+    category_patterns = [
+        ("cost_of_revenue", r"CostOfGoodsAndServicesSold|CostOfRevenue", "operating_candidate"),
+        ("selling_general_admin", r"SellingGeneralAndAdministrativeExpense", "operating_candidate"),
+        ("research_development", r"ResearchAndDevelopmentExpense", "operating_candidate"),
+        ("restructuring", r"RestructuringCostsAndAssetImpairmentCharges|RestructuringCharges", "operating_candidate_review"),
+        ("financing_and_other", r"FinancingInterestExpense", "ambiguous_review"),
+        ("interest_expense", r"InterestIncomeExpenseNet|InterestExpense", "non_operating_candidate"),
+        ("pension_non_service", r"NonoperatingIncomeExpense", "non_operating_candidate"),
+        ("other_expense", r"OtherNonrecurringIncomeExpense", "ambiguous_review"),
+    ]
+    expenses = [entry for name, pattern, treatment in category_patterns
+                if (entry := item(name, pattern, treatment))]
+    by_name = {entry["item"]: entry for entry in expenses}
+    required = ["cost_of_revenue", "selling_general_admin", "research_development"]
+    if revenue is None or pretax is None or any(name not in by_name for name in required):
+        return {"status": "insufficient_rows", "revenue": revenue, "pretax_income": pretax,
+                "expense_candidates": expenses,
+                "note": "Required non-dimensional rows were not all identified; no EBIT candidate calculated."}
+
+    # INTENTIONAL: the EdgarTools statement values are treated as positive
+    # expense magnitudes for these review scenarios only, never as production facts.
+    core_names = required + (["restructuring"] if "restructuring" in by_name else [])
+    core_total = sum(by_name[name]["amount"] for name in core_names)
+    financing = by_name.get("financing_and_other", {}).get("amount", 0.0)
+    nonop_names = ["interest_expense", "pension_non_service", "other_expense"]
+    nonop_total = sum(by_name[name]["amount"] for name in nonop_names if name in by_name)
+    scenarios = []
+    for scenario, include_financing in [
+        ("financing_cost_treated_as_operating", True),
+        ("financing_cost_treated_as_non_operating", False),
+    ]:
+        candidate = revenue["amount"] - core_total - (financing if include_financing else 0.0)
+        reconciliation = candidate - nonop_total - (0.0 if include_financing else financing)
+        scenarios.append({
+            "scenario": scenario,
+            "candidate_operating_income": round(candidate, 2),
+            "assumption": "Cost of financing and other is operating" if include_financing else "Cost of financing and other is non-operating",
+            "non_operating_adjustments": nonop_total + (0.0 if include_financing else financing),
+            "reconstructed_pretax_income": round(reconciliation, 2),
+            "reported_pretax_income": pretax["amount"],
+            "reconciles_within_1": abs(reconciliation - pretax["amount"]) <= 1.0,
+            "status": "review_required",
+        })
+    return {
+        "status": "review_required", "revenue": revenue, "pretax_income": pretax,
+        "operating_expense_candidates": [by_name[name] for name in core_names],
+        "ambiguous_expense_candidates": [by_name[name] for name in ("financing_and_other", "other_expense") if name in by_name],
+        "non_operating_candidates": [by_name[name] for name in ("interest_expense", "pension_non_service") if name in by_name],
+        "scenarios": scenarios,
+        "guardrail": "Reconciliation does not prove classification. Review filing presentation and notes; never promote this candidate automatically into production EBIT.",
+    }
 
 
 def extract_company(symbol: str) -> dict[str, Any]:
@@ -137,33 +223,28 @@ def extract_company(symbol: str) -> dict[str, Any]:
         if financials is None:
             raise RuntimeError("EdgarTools returned no financial statements")
 
-        metrics: Any = None
-        metrics_error: str | None = None
-        try:
-            metrics = financials.get_financial_metrics(include_periods=True)
-        except Exception as exc:
-            metrics_error = f"{type(exc).__name__}: {exc}"
-
         result.update({
             "status": "extracted",
             "filing": filing_metadata(filing),
             "financials_source": financials_source,
-            "metrics": safe_value(metrics),
-            "metrics_error": metrics_error,
             "statements": {
                 "income_statement": statement_candidates(financials.income_statement()),
                 "balance_sheet": statement_candidates(financials.balance_sheet()),
                 "cash_flow_statement": statement_candidates(financials.cash_flow_statement()),
             },
+            "ebit_bridge": None,
             "review_notes": [
-                "Full statement rows are included so label filtering cannot hide an income-statement subtotal.",
-                "The rows field remains a label-filtered convenience subset; all_rows is the complete detailed statement returned by EdgarTools.",
+                "Each detailed statement row appears once; candidate=true marks rows matching the broad label filter.",
+                "The EBIT bridge is assumption-based review output only; reconciliation does not prove accounting classification.",
                 "No EBIT, debt, invested-capital, Earnings Yield, or ROC value is approved automatically.",
                 "Confirm the statement fiscal period and filing accession before comparing values.",
                 "Dimensional breakdowns and consolidated totals must not be added together without checking the filing presentation.",
                 "Multiple PP&E concepts are shown separately; the script does not assume they are additive or non-overlapping.",
             ],
         })
+        # INTENTIONAL: bridge candidates never enter production SEC ingestion,
+        # ratios, eligibility decisions or Magic Formula ranking.
+        result["ebit_bridge"] = build_ebit_bridge(result["statements"]["income_statement"])
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
