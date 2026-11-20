@@ -788,9 +788,18 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       statementCandidates.push(fact);
     } else candidates.push(fact);
   }
+  // INTENTIONAL: default to a compact review payload. Full context detail is omitted
+  // so the diagnostic is readable in browser/API clients without a huge JSON response.
   candidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
-  statementCandidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL extension taxonomy",accession:anchor.accn,fiscal_period:anchor.end,form:anchor.form,filed_at:anchor.filed,filing_url:base+"index.html",instance_document:instance.name,label_document:labelFile?.name??null,label_status:labelStatus,presentation_document:presentationFile?.name??null,presentation_status:presentationStatus,extension_fact_count:candidates.length,extension_facts:candidates.slice(0,100),statement_fact_count:statementCandidates.length,statement_facts:statementCandidates.slice(0,150),truncated:candidates.length>100||statementCandidates.length>150,eligible_for_magic_formula:false,note:"Diagnostic only. Standard statement facts and extension tags are displayed side by side for filing review; neither is automatically mapped, stored in D1, used for ratios, or ranked. Review labels, contexts, units, dimensions, and presentation parent/child relationships before approving any mapping. Presentation arcs are structural clues, not proof of accounting meaning."};
+  // INTENTIONAL: prioritize company-wide standard statement facts; dimensional breakdowns
+  // remain visible when relevant, but should not crowd out primary statement values.
+  statementCandidates.sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+  const compact=(fact:any)=>({
+    tag:fact.tag,label:fact.label,value:fact.value,unit:fact.unit,kind:fact.kind,
+    dimensions:fact.dimensions,
+    presentation:fact.presentation.slice(0,2).map((p:any)=>({parent:p.parent,role:p.role}))
+  });
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:candidates.length,standard:statementCandidates.length},extension_facts:candidates.slice(0,30).map(compact),statement_facts:statementCandidates.slice(0,40).map(compact),truncated:candidates.length>30||statementCandidates.length>40,eligible_for_magic_formula:false,note:"Compact diagnostic only. Facts are not mapped to production metrics or used for ranking. Review filing context and accounting meaning before approving any mapping."};
 }
 
 export default {
