@@ -465,6 +465,43 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+def roc_review(direct_ebit: dict[str, Any], invested_capital: dict[str, Any]) -> dict[str, Any]:
+    """Compute a diagnostic ROC only from direct annual EBIT and positive unique capital."""
+    ebit = direct_ebit.get("ebit_candidate")
+    capital = invested_capital.get("value")
+    if direct_ebit.get("status") != "review_only" or not isinstance(ebit, (int, float)):
+        return {
+            "status": "review_required",
+            "roc": None,
+            "reason": "No unique direct consolidated annual OperatingIncomeLoss candidate.",
+        }
+    if invested_capital.get("status") != "calculated_review_only" or not isinstance(capital, (int, float)):
+        return {
+            "status": "review_required",
+            "roc": None,
+            "reason": "Invested-capital denominator is missing or ambiguous.",
+        }
+    if capital <= 0:
+        return {
+            "status": "not_calculated_nonpositive_invested_capital",
+            "roc": None,
+            "reason": "Nonpositive invested capital is not used as a ROC denominator.",
+            "invested_capital": capital,
+            "ebit": ebit,
+        }
+    # INTENTIONAL: EBIT and invested capital come from the same issuer filing
+    # and fiscal period, so the ratio is currency-neutral. This is still review-only.
+    return {
+        "status": "calculated_review_only",
+        "roc": round((float(ebit) / float(capital)) * 100, 4),
+        "ebit": ebit,
+        "invested_capital": capital,
+        "method": "direct_operating_income_over_reviewed_invested_capital",
+        "guardrail": "Diagnostic ROC only. Direct EBIT and unique denominator candidates are not production-approved mappings; this result never feeds D1, eligibility or ranking.",
+    }
+
+
 def filing_specific_review(
     symbol: str, filing: dict[str, Any], bridge: dict[str, Any],
     statements: dict[str, Any],
@@ -696,6 +733,12 @@ def extract_company(symbol: str) -> dict[str, Any]:
             "ebit_candidate": direct_operating_income,
             "guardrail": "Exact non-dimensional OperatingIncomeLoss statement fact only; review fiscal period, currency, classification and filing before use. Never writes production ratios or rankings.",
         }
+        # INTENTIONAL: only direct annual EBIT plus a unique positive denominator
+        # may produce a diagnostic ROC. This never feeds production calculations.
+        result["roc_review"] = roc_review(
+            result["direct_operating_income_review"],
+            result["invested_capital_review"],
+        )
         if symbol == "SNDK":
             # INTENTIONAL: annotate the separation context; do not adjust reported EBIT.
             result["review_notes"].append(
