@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
+from unittest.mock import patch
 
 from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, mfi_market_cap_usd_millions, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
 
@@ -124,6 +125,22 @@ class CurrencyNormalizationTests(unittest.TestCase):
         self.assertEqual(mfi_market_cap_usd_millions("EGHSF"), 643.04)
         self.assertEqual(mfi_market_cap_usd_millions("AFMJF"), 991.59)
         self.assertEqual(mfi_market_cap_usd_millions("ADBE"), None)
+
+    def test_new_price_date_does_not_reuse_pinned_market_cap_snapshot(self):
+        with patch.dict("os.environ", {"MFI_PRICE_DATE": "2026-11-19"}, clear=False):
+            with patch.dict("os.environ", {"MFI_MARKET_CAPS_JSON": ""}, clear=False):
+                self.assertIsNone(mfi_market_cap_usd_millions("EGHSF"))
+
+    def test_explicit_market_cap_override_can_be_used_with_new_price_date(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "MFI_PRICE_DATE": "2026-11-19",
+                "MFI_MARKET_CAPS_JSON": '{"EGHSF": 650.0}',
+            },
+            clear=False,
+        ):
+            self.assertEqual(mfi_market_cap_usd_millions("EGHSF"), 650.0)
 
     def test_enghouse_usd_market_cap_converts_to_cad_at_mfi_price_date(self):
         market_cap_usd = mfi_market_cap_usd_millions("EGHSF") * 1_000_000
