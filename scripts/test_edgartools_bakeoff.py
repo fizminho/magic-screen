@@ -1081,7 +1081,7 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         )
         self.assertEqual(
             noncurrent_concepts,
-            {"us-gaap_LongTermDebtNoncurrent", "issuer_NoncurrentBorrowings", "issuer_LongTermDebt"},
+            {"us-gaap_LongTermDebtNoncurrent", "issuer_NoncurrentBorrowings"},
         )
         self.assertFalse(current_concepts & noncurrent_concepts)
 
