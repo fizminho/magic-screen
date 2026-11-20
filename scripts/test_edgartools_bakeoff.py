@@ -354,6 +354,66 @@ class ManualEnterpriseValueScenarioTests(unittest.TestCase):
         self.assertEqual(result["scenarios"], [])
 
 
+
+class FilingSpecificEBITReviewTests(unittest.TestCase):
+    def period_row(self, concept, label, value, period):
+        return {
+            "concept": concept,
+            "label": label,
+            "values": {period: value},
+            "dimension": False,
+            "abstract": False,
+        }
+
+    def test_hrb_reconstruction_requires_all_exact_period_facts_and_cross_checks(self):
+        period = "2026-06-30"
+        statements = {
+            "income_statement": {
+                "rows": [
+                    self.period_row("us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", 3_945_392_000, period),
+                    self.period_row("us-gaap_CostsAndExpenses", "Total operating expenses", 3_037_706_000, period),
+                    self.period_row("us-gaap_IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "Income from continuing operations before income taxes", 853_888_000, period),
+                    self.period_row("us-gaap_OtherNonoperatingIncomeExpense", "Other income (expense), net", 26_813_000, period),
+                    self.period_row("us-gaap_InterestExpenseDebt", "Interest expense on borrowings", -80_611_000, period),
+                ]
+            }
+        }
+        result = filing_specific_review(
+            "HRB",
+            {"accession_number": "0000012659-26-000026", "period_of_report": period},
+            {},
+            statements,
+        )
+        self.assertEqual(result["status"], "review_only")
+        self.assertEqual(result["ebit_candidate"], 907_686_000)
+        self.assertTrue(result["cross_checks"]["reconciles_within_1"])
+        self.assertEqual(result["cross_checks"]["difference_between_methods"], 0)
+        self.assertEqual(result["automation_status"], "manual_review_only")
+
+    def test_pbi_interest_reconciliation_is_exact_accession_manual_review_only(self):
+        bridge = {"pretax_income": {"amount": 192_524_000}}
+        result = filing_specific_review(
+            "PBI",
+            {"accession_number": "0001628280-26-009650", "period_of_report": PERIOD},
+            bridge,
+            {},
+        )
+        self.assertEqual(result["status"], "review_only")
+        self.assertEqual(result["ebit_candidate"], 341_680_000)
+        self.assertEqual(result["total_interest_expense_for_EBIT_reconciliation"], 149_156_000)
+        self.assertEqual(result["allocated_finance_interest_embedded_in_cost_of_financing"], 47_696_000)
+        self.assertEqual(result["automation_status"], "manual_review_only")
+
+    def test_pbi_reconstruction_is_not_reused_for_another_accession(self):
+        result = filing_specific_review(
+            "PBI",
+            {"accession_number": "another-accession", "period_of_report": PERIOD},
+            {"pretax_income": {"amount": 192_524_000}},
+            {},
+        )
+        self.assertIsNone(result)
+
+
 class NonSecIssuerReviewTests(unittest.TestCase):
     def test_alphamin_manual_review_preserves_nci_and_exploration_scope(self):
         result = non_sec_issuer_review_case("AFMJF")
