@@ -7,6 +7,12 @@ on:
       - "scripts/edgartools_bakeoff.py"
       - ".github/workflows/edgartools-bakeoff.yml"
   workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated tickers from the current MFI universe (default runs the HRB/PBI/ADBE controls)"
+        required: false
+        default: "HRB,PBI,ADBE"
+        type: string
 
 permissions:
   contents: read
@@ -25,11 +31,12 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install EdgarTools
-        run: python -m pip install --upgrade pip edgartools
+        run: python -m pip install --upgrade pip "edgartools==6.3.0"
       - name: Extract HRB, PBI and ADBE statements
         env:
           EDGAR_IDENTITY: "Magic Screen research support@binalah.co"
           OUTPUT_PATH: "edgartools-bakeoff.json"
+          BAKEOFF_SYMBOLS: "${{ github.event.inputs.symbols || 'HRB,PBI,ADBE' }}"
         run: python scripts/edgartools_bakeoff.py
       - name: Upload test report
         if: always()
