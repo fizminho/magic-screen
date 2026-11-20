@@ -47,3 +47,8 @@ Quote refresh works in batches of 40 active stocks per request and prioritizes s
 - A missing quote is shown as missing; it does not remove the company from the universe.
 - Magic Formula values remain blank until verified financial statement inputs are integrated.
 - Shariah status remains `unverified` until a trusted, dated source is connected.
+
+
+## Removing accidental SEC directory imports
+
+The SEC company ticker exchange directory is not a stock universe. If legacy rows were imported into `stock_master`, use the protected cleanup endpoint to preview and then remove only rows with the exact SEC directory source marker. Rows whose quote snapshot provider is `Magic Formula Investing` are protected because the old upsert may have overwritten their source marker. The cleanup is batched and leaves quote/fundamental/CIK tables untouched.
