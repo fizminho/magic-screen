@@ -261,3 +261,11 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 ## Expanded MFI sample findings (2026-11-20)
 
 The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded as a SEC company-index coverage gap. Direct consolidated `OperatingIncomeLoss` candidates were surfaced for ADBE, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK. HRB and PBI retain their accession-specific manual-review candidates. SGHC's Form 20-F was successfully parsed, but no direct US-GAAP `OperatingIncomeLoss` fact was surfaced; IFRS line items require separate classification review. PLTK's negative operating income is retained as negative, not coerced to zero. SNDK's operating-income fact is surfaced with a pre/post-spin comparability note. None of these outputs changes production ratios, eligibility or ranks.
+
+
+## Generalized balance-sheet candidate review (2026-11-20)
+
+- **INTENTIONAL:** the EdgarTools bakeoff now emits `balance_sheet_fact_review` for every successfully extracted issuer, including Form 20-F/IFRS issuers. It searches exact fiscal-period values on consolidated, non-dimensional rows for unrestricted cash, restricted cash, current assets, current liabilities, net PP&E, current/noncurrent debt and current/noncurrent lease liabilities.
+- A category is marked `unique_candidate`, `ambiguous_candidates` or `not_found`; even a unique candidate is not an approved accounting mapping. The artifact retains original concept, label, period, value and standard-concept hint.
+- **INTENTIONAL:** restricted cash and lease liabilities are exposed separately; dimensional PP&E breakdowns are excluded from consolidated candidates. Multiple PPE concepts (for example rental equipment) remain visible as ambiguity rather than being added automatically.
+- No candidate is selected for EV, invested capital, Earnings Yield or ROC. This remains a local research artifact and does not write production D1, fundamentals or rankings.
