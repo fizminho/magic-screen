@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -54,6 +54,30 @@ class CurrencyNormalizationTests(unittest.TestCase):
         self.assertEqual(result["status"], "identified_from_accession_facts")
         self.assertEqual(result["currency"], "CAD")
         self.assertEqual(result["unit_counts"]["CAD"], 4)
+        self.assertEqual(result["review_flags"], [])
+
+    def test_secondary_currency_units_are_flagged_without_overriding_dominant_unit(self):
+        companyfacts = {
+            "facts": {
+                "us-gaap": {
+                    "Revenue": {
+                        "units": {
+                            "USD": [{"accn": "A", "end": PERIOD}] * 5,
+                            "JPY": [{"accn": "A", "end": PERIOD}],
+                        }
+                    }
+                }
+            }
+        }
+        result = reporting_currency_unit_review(companyfacts, "A", PERIOD)
+        self.assertEqual(result["currency"], "USD")
+        self.assertIn("secondary_currency_unit_observations_present", result["review_flags"])
+
+    def test_sghc_currency_override_is_exact_accession_only(self):
+        result = filing_specific_currency_override("SGHC", "0001628280-26-025609")
+        self.assertEqual(result["currency"], "USD")
+        self.assertIsNone(filing_specific_currency_override("SGHC", "another-accession"))
+        self.assertIsNone(filing_specific_currency_override("OTHER", "0001628280-26-025609"))
 
     def test_tied_currency_units_are_not_guessed(self):
         companyfacts = {
