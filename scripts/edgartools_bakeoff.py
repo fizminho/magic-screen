@@ -15,6 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+# INTENTIONAL: preserve both positive operating-profit and negative operating-loss labels.
+DIRECT_OPERATING_INCOME_LABEL_PATTERN = r"(?:operating (?:income|loss|earnings)|(?:income|loss).*from operations|operating profit|earnings from operations)"
+
 from edgar import Company, set_identity
 
 DEFAULT_SYMBOLS = ("HRB", "PBI", "ADBE", "AFMJF", "HPQ", "OTEX", "PRDO", "PLTK", "UPWK", "SNDK", "SGHC")
@@ -933,7 +936,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # fact for this annual period. This is diagnostic, not production EBIT.
         direct_operating_income = statement_fact_amount(
             result["statements"], "income_statement", "OperatingIncomeLoss",
-            r"operating income|income.*from operations|operating profit|earnings from operations",
+            DIRECT_OPERATING_INCOME_LABEL_PATTERN,
             fiscal_period,
         )
         result["direct_operating_income_review"] = {
