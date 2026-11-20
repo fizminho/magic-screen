@@ -89,3 +89,7 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **HRB's accrued PP&E additions are not net PP&E.** A duration fact describing additions during the year cannot substitute for the instant balance-sheet carrying amount.
 - **HRB's debt maturity in year eleven is not total debt.** A maturity-schedule fact is a future principal repayment disclosure and must not be used as the issuer's current total debt.
 - **HRB EBIT remains a filing-specific review candidate only.** The previously reconciled FY2026 operating-income candidate of USD 907.686 million is based on reported revenue less reported operating costs/expenses and reconciles to pretax income after the disclosed non-operating item and interest expense. It is not a generic production rule and must not be applied to other issuers or periods. The standard SEC Company Facts OperatingIncomeLoss concept was not present for this filing.
+
+## SEC presentation-linkbase diagnostic
+
+- **Presentation relationships remain diagnostic evidence only.** The SEC extension inspector now reads the filing's `_pre.xml` presentation linkbase and reports the role URI, parent/child concept relationship, order, and preferred label for matching extension concepts. These relationships help distinguish statement presentation from footnote placement, but they do not prove that a concept is a complete or correctly scoped accounting total. No presentation relationship is automatically mapped into production fundamentals, ratios, or rankings.
