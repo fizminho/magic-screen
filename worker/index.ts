@@ -548,16 +548,20 @@ async function syncUsFundamentals(env:Env, limit=10) {
         : splitDebtKnown ? debtCurrent.value!+shortDebt.value!+debtLong.value!
         : zeroCurrentLongTermDebtKnown ? longTermDebtFallback.value!
         : !anyBorrowingFacts && leaseDebtKnown ? leaseCurrent.value!+leaseLong.value! : null;
-      const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
-      const investedCapital=netWorkingCapital+(ppe.value??0);
+      const netWorkingCapital=assets.value!=null&&liabilities.value!=null ? assets.value-liabilities.value : null;
+      const investedCapital=netWorkingCapital!=null&&ppe.value!=null ? netWorkingCapital+ppe.value : null;
       const enterpriseValue=totalDebt!=null ? cap+totalDebt-(cash.value??0) : null;
-      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && totalDebt!=null && item.market_cap!=null && enterpriseValue!=null && enterpriseValue>0 && investedCapital>0;
+      // INTENTIONAL: a non-positive invested-capital denominator is an explicit review
+      // state, not a zero ROC and not a generic missing-facts state. Do not rank it.
+      const negativeInvestedCapital=investedCapital!=null&&investedCapital<0;
+      const zeroInvestedCapital=investedCapital===0;
+      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && totalDebt!=null && item.market_cap!=null && enterpriseValue!=null && enterpriseValue>0 && investedCapital!=null && investedCapital>0;
       const ey=complete ? (ebit.value as number)/enterpriseValue! : null;
-      const roc=complete ? (ebit.value as number)/investedCapital : null;
-      const status=staleFiscalPeriod ? "stale_fiscal_period" : complete ? "calculated" : "missing_required_facts";
+      const roc=complete ? (ebit.value as number)/investedCapital! : null;
+      const status=staleFiscalPeriod ? "stale_fiscal_period" : negativeInvestedCapital ? "negative_invested_capital" : zeroInvestedCapital ? "zero_invested_capital" : complete ? "calculated" : "missing_required_facts";
       await env.DB.prepare("INSERT INTO stock_fundamentals(symbol,market,cik,ebit,current_assets,current_liabilities,net_ppe,total_debt,cash,market_cap,earnings_yield,return_on_capital,fiscal_period,filed_at,status,source,updated_at) VALUES(?,'US',?,?,?,?,?,?,?,?,?,?,?,?,?,'SEC EDGAR Company Facts',?) ON CONFLICT(symbol,market) DO UPDATE SET cik=excluded.cik,ebit=excluded.ebit,current_assets=excluded.current_assets,current_liabilities=excluded.current_liabilities,net_ppe=excluded.net_ppe,total_debt=excluded.total_debt,cash=excluded.cash,market_cap=excluded.market_cap,earnings_yield=excluded.earnings_yield,return_on_capital=excluded.return_on_capital,fiscal_period=excluded.fiscal_period,filed_at=excluded.filed_at,status=excluded.status,source=excluded.source,updated_at=excluded.updated_at")
         .bind(item.symbol,item.cik,ebit.value,assets.value,liabilities.value,ppe.value,totalDebt,cash.value,item.market_cap,ey,roc,periodEnd||null,ebit.filed,status,now).run();
-      await env.DB.prepare("UPDATE stock_snapshot SET earnings_yield=?,return_on_capital=?,magic_formula_rank=NULL,data_status=? WHERE symbol=? AND market='US'").bind(ey,roc,staleFiscalPeriod?"fundamentals_stale":complete?"fundamentals_calculated":"fundamentals_incomplete",item.symbol).run();
+      await env.DB.prepare("UPDATE stock_snapshot SET earnings_yield=?,return_on_capital=?,magic_formula_rank=NULL,data_status=? WHERE symbol=? AND market='US'").bind(ey,roc,staleFiscalPeriod?"fundamentals_stale":negativeInvestedCapital?"fundamentals_negative_invested_capital":zeroInvestedCapital?"fundamentals_zero_invested_capital":complete?"fundamentals_calculated":"fundamentals_incomplete",item.symbol).run();
       if(complete) calculated++;
       if(staleFiscalPeriod) stale++;
       processed++;
@@ -769,6 +773,32 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       }
     } else presentationStatus="http_"+pr.status;
   }
+  // INTENTIONAL: role definitions provide filing-specific presentation context.
+  // SEC guidance distinguishes statement roles from note/disclosure roles; unknown
+  // roles remain unclassified rather than being guessed from a fact's label.
+  const schemaFile=files.find((x:any)=>String(x.name??"").toLowerCase().endsWith(".xsd"));
+  const roleDefinitions=new Map<string,string>();
+  let schemaStatus="not_found";
+  if(schemaFile?.name){
+    const sr=await fetch(base+encodeURIComponent(schemaFile.name),{headers});
+    if(sr.ok){
+      schemaStatus="loaded";
+      const schemaXml=await sr.text();
+      for(const roleType of schemaXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?roleType\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?roleType>/gi)){
+        const roleUri=roleType[1].match(/roleURI=["']([^"']+)["']/i)?.[1];
+        const definition=roleType[2].match(/<(?:[A-Za-z0-9_-]+:)?definition\\b[^>]*>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?definition>/i)?.[1]?.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+        if(roleUri&&definition) roleDefinitions.set(roleUri,definition);
+      }
+    } else schemaStatus="http_"+sr.status;
+  }
+  const classifyPresentation=(role:string|null)=>{
+    const definition=role?roleDefinitions.get(role)??"": "";
+    const normalized=(role+" "+definition).toLowerCase().replace(/[^a-z0-9]+/g,"");
+    if(/segment|disclosure|notes?tofinancialstatements|supplementaryinformation/.test(normalized)) return "disclosure_or_segment";
+    if(/consolidated.*statement|statement.*consolidated/.test(normalized)) return "consolidated_statement";
+    if(/statement/.test(normalized)) return "statement_role";
+    return "unclassified";
+  };
   const candidates:any[]=[];
   const statementCandidates:any[]=[];
   const relevant=/(revenue|sales|operating|expense|cost|income|debt|borrow|cash|property|plant|asset|liabilit|lease|capital|receivable|payable|inventory|goodwill|depreciation|amortization|tax|interest|profit|loss)/i;
@@ -855,7 +885,11 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
   const compact=(fact:any)=>({
     tag:fact.tag,label:fact.label,value:fact.value,start:fact.start??null,end:fact.end,
     unit:fact.unit,kind:fact.kind,context:fact.context??null,dimensions:fact.dimensions,
-    presentation:fact.presentation.slice(0,3).map((p:any)=>({parent:p.parent,role:p.role}))
+    presentation:fact.presentation.slice(0,3).map((p:any)=>({
+      parent:p.parent,parent_label:labels.get(p.parent)??null,role:p.role,
+      role_definition:roleDefinitions.get(p.role)??null,
+      role_classification:classifyPresentation(p.role)
+    }))
   });
   // INTENTIONAL: return targeted accounting candidates independently of the compact
   // top-30 extension preview. A relevant PP&E or EBIT fact must not disappear merely
@@ -871,8 +905,12 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     debt:/(long.?term.?debt|short.?term.?debt|debt.?current|debt.?noncurrent|borrowings|loans.?payable|total.?debt)/i
   };
   const targetedCandidates=Object.fromEntries(Object.entries(targetedPatterns).map(([key,pattern])=>{
+    const presentationPriority=(fact:any)=>{
+      const classes=(fact.presentation??[]).map((p:any)=>classifyPresentation(p.role));
+      return classes.includes("consolidated_statement")?0:classes.includes("statement_role")?1:classes.includes("disclosure_or_segment")?2:3;
+    };
     const matches=allReviewFacts.filter(f=>pattern.test(String(f.tag+" "+(f.label??""))))
-      .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+      .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||presentationPriority(a)-presentationPriority(b)||a.tag.localeCompare(b.tag));
     return [key,{count:matches.length,returned:Math.min(matches.length,25),truncated:matches.length>25,facts:matches.slice(0,25).map(compact)}];
   }));
   // INTENTIONAL: provide a filing-specific arithmetic lead for review when both
@@ -940,7 +978,7 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       note:"Cross-check only. Exact arithmetic reconciliation supports the issuer-specific interpretation but does not automatically approve an EBIT mapping."
     }:null
   };
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,30).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),targeted_candidates:targetedCandidates,review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>30||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates and explicitly labelled arithmetic review checks, not approved accounting mappings. No production ratios or rankings are changed."};
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus,schema:schemaStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length,role_definitions:roleDefinitions.size},extension_facts:relevantExtensions.slice(0,30).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),targeted_candidates:targetedCandidates,review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>30||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Presentation role classification is supporting evidence, not proof of consolidation or accounting equivalence. Unclassified roles must be reviewed in the filing. No production ratios or rankings are changed."};
 }
 
 export default {
@@ -953,14 +991,14 @@ export default {
         const quotes=await env.DB.prepare("SELECT MAX(updated_at) AS last_updated FROM stock_snapshot WHERE market=?").bind(market).first<any>();
         if (market==="MY") return json({market,last_quote_sync:quotes?.last_updated??null});
         const mfi=await env.DB.prepare("SELECT source_updated_at,price_date,quarter_date,result_count,minimum_market_cap,selected_count FROM mfi_screening_meta WHERE id=1").first<any>();
-        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='stale_fiscal_period' THEN 1 ELSE 0 END),0) AS stale_fiscal_period,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='stale_fiscal_period' THEN 1 ELSE 0 END),0) AS stale_fiscal_period,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
         return json({market,last_quote_sync:quotes?.last_updated??null,mfi_last_sync:mfi?.source_updated_at??null,mfi_price_date:mfi?.price_date??null,mfi_quarter_date:mfi?.quarter_date??null,mfi_count:mfi?.result_count??0,mfi_minimum_market_cap:mfi?.minimum_market_cap??null,mfi_selected_count:mfi?.selected_count??null,sec});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
     if (url.pathname==="/api/fundamentals/status" && request.method==="GET") {
       try {
         await ensureSchema(env);
-        const status=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        const status=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
         return json({source:"SEC EDGAR Company Facts",...status});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
@@ -1094,7 +1132,7 @@ export default {
           }
         }
         // INTENTIONAL: SEC fundamentals are authoritative for US calculations. The snapshot is a quote/cache projection and can lag the fundamentals table; prefer same-market-cap SEC ratios and derive the displayed status from the SEC record.
-        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.earnings_yield WHEN f.status='calculated' THEN NULL ELSE q.earnings_yield END AS earnings_yield,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.return_on_capital WHEN f.status='calculated' THEN NULL ELSE q.return_on_capital END AS return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,f.ebit AS fundamentals_ebit,f.current_assets AS fundamentals_current_assets,f.current_liabilities AS fundamentals_current_liabilities,f.net_ppe AS fundamentals_net_ppe,f.total_debt AS fundamentals_total_debt,f.cash AS fundamentals_cash,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 'fundamentals_calculated' WHEN f.status='calculated' THEN 'fundamentals_stale_market_cap' WHEN f.status='stale_fiscal_period' THEN 'fundamentals_stale' WHEN f.status='missing_required_facts' THEN 'fundamentals_incomplete' ELSE COALESCE(q.data_status,'awaiting_quote') END AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
+        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.earnings_yield WHEN f.status='calculated' THEN NULL ELSE q.earnings_yield END AS earnings_yield,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.return_on_capital WHEN f.status='calculated' THEN NULL ELSE q.return_on_capital END AS return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,f.ebit AS fundamentals_ebit,f.current_assets AS fundamentals_current_assets,f.current_liabilities AS fundamentals_current_liabilities,f.net_ppe AS fundamentals_net_ppe,f.total_debt AS fundamentals_total_debt,f.cash AS fundamentals_cash,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 'fundamentals_calculated' WHEN f.status='calculated' THEN 'fundamentals_stale_market_cap' WHEN f.status='stale_fiscal_period' THEN 'fundamentals_stale' WHEN f.status='missing_required_facts' THEN 'fundamentals_incomplete' WHEN f.status='negative_invested_capital' THEN 'fundamentals_negative_invested_capital' WHEN f.status='zero_invested_capital' THEN 'fundamentals_zero_invested_capital' ELSE COALESCE(q.data_status,'awaiting_quote') END AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
         // INTENTIONAL: preserve the distinction between an explicit numeric zero and an absent SEC fact.
         // Company Facts omits custom-tagged and dimension-specific observations, so missing fields
