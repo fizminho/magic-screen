@@ -275,3 +275,6 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 
 - **Balance-sheet candidate regression checks from the expanded sample:** taxonomy concepts must override ambiguous labels for current/noncurrent debt and leases. In particular, a label containing the substring `current` can also be `noncurrent`; current lease matching must explicitly exclude noncurrent concepts. A cash concept containing `RestrictedCash` must never be treated as unrestricted merely because its concept name also contains `CashAndCashEquivalents`. Rental property/equipment is surfaced as a separate PP&E candidate and is not automatically added to standard PP&E.
+
+
+- **IFRS lease concept suffixes require an exact current/noncurrent boundary.** `NoncurrentLeaseLiabilities` contains the substring `CurrentLeaseLiabilities`; the current-category matcher therefore requires a taxonomy boundary before `CurrentLeaseLiabilities`, not a loose suffix substring.
