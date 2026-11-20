@@ -901,6 +901,29 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["short_term_investment_candidates"]["candidate_count"], 1
         )
 
+    def test_current_and_noncurrent_debt_categories_do_not_overlap(self):
+        categories = self.review(
+            row("us-gaap_LongTermDebtCurrent", "Current portion of long-term debt", 15),
+            row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 85),
+            row("issuer_DebtCurrent", "Debt, current", 12),
+            row("issuer_NoncurrentBorrowings", "Noncurrent borrowings", 80),
+            row("issuer_LongTermDebt", "Long-term debt", 75),
+            row("issuer_DebtCurrentWithMisleadingLabel", "Long-term debt, net of current portion", 70),
+        )
+        current = categories["current_debt_candidates"]["candidates"]
+        noncurrent = categories["noncurrent_debt_candidates"]["candidates"]
+        current_concepts = {x["concept"] for x in current}
+        noncurrent_concepts = {x["concept"] for x in noncurrent}
+        self.assertEqual(
+            current_concepts,
+            {"us-gaap_LongTermDebtCurrent", "issuer_DebtCurrent"},
+        )
+        self.assertEqual(
+            noncurrent_concepts,
+            {"us-gaap_LongTermDebtNoncurrent", "issuer_NoncurrentBorrowings", "issuer_LongTermDebt"},
+        )
+        self.assertFalse(current_concepts & noncurrent_concepts)
+
     def test_noncurrent_lease_liabilities_never_enter_current_category(self):
         categories = self.review(
             row("us-gaap_OperatingLeaseLiabilityNoncurrent", "Operating lease liabilities, net of current portion", 40),
