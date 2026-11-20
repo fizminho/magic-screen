@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import balance_sheet_fact_review, enterprise_value_scope_review, filing_specific_review, roc_review
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, enterprise_value_scope_review, filing_specific_review, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -19,6 +19,42 @@ def row(concept, label, value, standard_concept=None):
         "abstract": False,
         "values": values,
     }
+
+
+class DirectOperatingIncomeLabelTests(unittest.TestCase):
+    def test_negative_operating_loss_labels_are_direct_facts(self):
+        statements = {
+            "income_statement": {
+                "rows": [
+                    row("us-gaap_OperatingIncomeLoss", "Loss from operations", -156_007_000),
+                ]
+            }
+        }
+        value = statement_fact_amount(
+            statements,
+            "income_statement",
+            "OperatingIncomeLoss",
+            DIRECT_OPERATING_INCOME_LABEL_PATTERN,
+            PERIOD,
+        )
+        self.assertEqual(value, -156_007_000)
+
+    def test_operating_earnings_loss_label_is_direct_fact(self):
+        statements = {
+            "income_statement": {
+                "rows": [
+                    row("us-gaap_OperatingIncomeLoss", "Operating earnings (loss)", -805_778_000),
+                ]
+            }
+        }
+        value = statement_fact_amount(
+            statements,
+            "income_statement",
+            "OperatingIncomeLoss",
+            DIRECT_OPERATING_INCOME_LABEL_PATTERN,
+            PERIOD,
+        )
+        self.assertEqual(value, -805_778_000)
 
 
 class BalanceSheetFactReviewTests(unittest.TestCase):
