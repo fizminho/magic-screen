@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import balance_sheet_fact_review, filing_specific_review, roc_review
+from edgartools_bakeoff import balance_sheet_fact_review, enterprise_value_scope_review, filing_specific_review, roc_review
 
 
 PERIOD = "2025-12-31"
@@ -151,9 +151,63 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             {"status": "calculated_review_only", "value": 642_370_000},
             balance_review,
         )
-        self.assertEqual(result["status"], "calculated_review_only")
-        self.assertAlmostEqual(result["roc"], 30.512, places=3)
+        self.assertEqual(result["status"], "review_required_scope_flags")
+        self.assertIsNone(result["roc"])
+        self.assertAlmostEqual(result["candidate_roc"], 30.512, places=3)
         self.assertEqual(len(result["review_flags"]), 5)
+
+    def test_enterprise_value_scope_keeps_missing_debt_unknown(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "cash_unrestricted_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 513_200_000}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 17_000_000}],
+                },
+            }
+        })
+        self.assertIsNone(result["current_debt_candidate"])
+        self.assertIsNone(result["gross_debt_candidate"])
+        self.assertIsNone(result["net_debt_candidate"])
+        self.assertIn(
+            "current_debt_not_uniquely_identified_not_assumed_zero",
+            result["review_flags"],
+        )
+
+    def test_enterprise_value_scope_reports_separate_lease_and_financing(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 10}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 90}],
+                },
+                "cash_unrestricted_candidates": {
+                    "candidate_count": 1,
+                    "candidates": [{"value": 25}],
+                },
+                "current_lease_liability_candidates": {"candidate_count": 1},
+                "noncurrent_lease_liability_candidates": {"candidate_count": 1},
+                "nondebt_financing_obligation_candidates": {"candidate_count": 1},
+            }
+        })
+        self.assertEqual(result["gross_debt_candidate"], 100)
+        self.assertEqual(result["net_debt_candidate"], 75)
+        self.assertEqual(result["separate_financing_obligation_candidate_count"], 1)
+        self.assertIn(
+            "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
+            result["review_flags"],
+        )
+        self.assertIn(
+            "separate_financing_obligation_requires_enterprise_value_policy_decision",
+            result["review_flags"],
+        )
 
     def test_sale_leaseback_financing_is_not_misclassified_as_debt(self):
         categories = self.review(
