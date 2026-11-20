@@ -790,6 +790,30 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["nondebt_financing_obligation_candidates"]["candidate_count"], 1
         )
 
+    def test_restricted_cash_variants_are_classified_separately(self):
+        categories = self.review(
+            row("ifrs-full_RestrictedCashAndCashEquivalents", "Restricted cash and cash equivalents", 12_000_000),
+            row("ifrs-full_CashAndCashEquivalents", "Cash and cash equivalents", 90_000_000),
+        )
+        self.assertEqual(
+            categories["cash_restricted_candidates"]["candidate_count"], 1
+        )
+        self.assertEqual(
+            categories["cash_unrestricted_candidates"]["candidate_count"], 1
+        )
+
+    def test_short_term_investments_are_not_unrestricted_cash(self):
+        categories = self.review(
+            row("us-gaap_CashAndCashEquivalentsAtCarryingValue", "Cash and cash equivalents", 90_000_000),
+            row("us-gaap_ShortTermInvestments", "Short-term investments", 25_000_000),
+        )
+        self.assertEqual(
+            categories["cash_unrestricted_candidates"]["candidate_count"], 1
+        )
+        self.assertEqual(
+            categories["short_term_investment_candidates"]["candidate_count"], 1
+        )
+
     def test_restricted_cash_and_unrestricted_cash_are_separate(self):
         categories = self.review(
             row("us-gaap_CashAndCashEquivalentsAtCarryingValue", "Cash and cash equivalents, unrestricted", 110_970_000),
