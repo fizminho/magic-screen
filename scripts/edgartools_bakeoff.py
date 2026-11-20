@@ -364,7 +364,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
         },
         "current_lease_liability_candidates": {
             "label": re.compile(r"^(?!non.?current).*current.*lease liabilities?|^(?!non.?current).*lease liabilities?.*current", re.I),
-            "concept": re.compile(r"(?:OperatingLeaseLiabilityCurrent|FinanceLeaseLiabilityCurrent|CurrentLeaseLiabilities)$", re.I),
+            "concept": re.compile(r"(?:OperatingLeaseLiabilityCurrent|FinanceLeaseLiabilityCurrent|(?:^|_)CurrentLeaseLiabilities)$", re.I),
         },
         "noncurrent_lease_liability_candidates": {
             "label": re.compile(r"non.?current.*lease liabilities?|lease liabilities?.*non.?current", re.I),
