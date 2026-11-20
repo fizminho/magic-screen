@@ -29,12 +29,6 @@ export default function App() {
   const [importToken, setImportToken] = useState("");
   const [importStatus, setImportStatus] = useState("");
   const [importing, setImporting] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiToken, setAiToken] = useState("");
-  const [aiSymbol, setAiSymbol] = useState("HRB");
-  const [aiStatus, setAiStatus] = useState("");
-  const [aiResult, setAiResult] = useState<unknown>(null);
-  const [aiBusy, setAiBusy] = useState(false);
   const [page, setPage] = useState(1);
   const [mfiCount, setMfiCount] = useState(30);
   const [minimumMarketCap, setMinimumMarketCap] = useState(50);
@@ -129,20 +123,6 @@ export default function App() {
   const toggleWatch = (symbol: string) => setWatchlist(old => old.includes(symbol) ? old.filter(x=>x!==symbol) : [...old,symbol]);
 
 
-  async function runAiDiagnostic() {
-    if (!aiToken.trim()) { setAiStatus("Enter the UNIVERSE_SYNC_TOKEN configured in Cloudflare."); return; }
-    if (!/^[A-Z0-9.-]{1,15}$/.test(aiSymbol.trim().toUpperCase())) { setAiStatus("Enter a valid ticker symbol."); return; }
-    setAiBusy(true); setAiStatus("Reading SEC facts and asking Gemini to map possible tags..."); setAiResult(null);
-    try {
-      const response=await fetch("/api/ai/fundamentals/extract",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+aiToken.trim()},body:JSON.stringify({symbol:aiSymbol.trim().toUpperCase()})});
-      const result=await response.json() as Record<string,unknown>;
-      if (!response.ok) throw new Error(String(result.error || "Diagnostic failed ("+response.status+")."));
-      setAiResult(result); setAiStatus("Diagnostic completed. Results are review-only and cannot affect Formula Rank.");
-      setAiToken("");
-    } catch(error) { setAiStatus(error instanceof Error?error.message:"Diagnostic failed."); }
-    finally { setAiBusy(false); }
-  }
-
   async function importBursaFile(file: File) {
     if (!importToken.trim()) { setImportStatus("Enter the UNIVERSE_SYNC_TOKEN you configured in Cloudflare."); return; }
     setImporting(true); setImportStatus("Reading CSV...");
@@ -200,9 +180,8 @@ export default function App() {
     <main className="main">
       <header className="topbar"><button className="menu-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)}>{menuOpen ? <X size={19}/> : <Menu size={19}/>}</button><div className="breadcrumb">Workspace <span>/</span> <b>Stock screener</b></div><div className="top-actions"><span className="market-pill">{market==="MY"?"🇲🇾 Bursa Malaysia":"🇺🇸 US Market"}</span><button className="icon-btn" title="About data" onClick={()=>setShowInfo(!showInfo)}><CircleHelp size={18}/></button><div className="avatar small-avatar">MS</div></div></header>
       <section className="content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><div className="heading-actions">{market==="MY" && <button className="import-btn" onClick={()=>{setImportOpen(true);setImportStatus("");}}><Database size={14}/> Import Bursa CSV</button>}{market==="US" && <button className="import-btn" onClick={()=>{setAiOpen(true);setAiStatus("");setAiResult(null);}}><Sparkles size={14}/> AI fact diagnostic</button>}{market==="US" && <><label className="mfi-control">Min cap ($M)<input type="number" min="50" max="5000000" step="10" value={minimumMarketCap} onChange={e=>setMinimumMarketCap(Math.max(50,Number(e.target.value)||50))}/></label><label className="mfi-control">Stocks<select value={mfiCount} onChange={e=>setMfiCount(Number(e.target.value))}><option value={30}>Top 30</option><option value={50}>Top 50</option></select></label></>}<button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div></div>
+        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><div className="heading-actions">{market==="MY" && <button className="import-btn" onClick={()=>{setImportOpen(true);setImportStatus("");}}><Database size={14}/> Import Bursa CSV</button>}{market==="US" && <><label className="mfi-control">Min cap ($M)<input type="number" min="50" max="5000000" step="10" value={minimumMarketCap} onChange={e=>setMinimumMarketCap(Math.max(50,Number(e.target.value)||50))}/></label><label className="mfi-control">Stocks<select value={mfiCount} onChange={e=>setMfiCount(Number(e.target.value))}><option value={30}>Top 30</option><option value={50}>Top 50</option></select></label></>}<button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div></div>
 
-        {aiOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Gemini SEC fact diagnostic"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">SEC + GEMINI</div><h3>Financial fact diagnostic</h3></div><button className="modal-close" onClick={()=>{setAiOpen(false);setAiToken("");}} aria-label="Close diagnostic">×</button></div><p>Ask Gemini to identify alternative XBRL tags from one SEC filing. This is a manual diagnostic only. It does not save facts, calculate ratios, or change rankings.</p><label className="token-label">Ticker<input value={aiSymbol} onChange={e=>setAiSymbol(e.target.value.toUpperCase())} placeholder="HRB" autoComplete="off"/></label><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={aiToken} onChange={e=>setAiToken(e.target.value)} placeholder="Your existing Cloudflare Worker token" autoComplete="off"/></label><button className="refresh-btn" onClick={()=>void runAiDiagnostic()} disabled={aiBusy}>{aiBusy?"Running diagnostic...":"Run Gemini diagnostic"}</button>{aiStatus && <div className="import-status">{aiStatus}</div>}{aiResult !== null && <pre className="ai-result">{JSON.stringify(aiResult,null,2)}</pre>}<small className="import-security">The token is sent directly to your Worker for this request only and is cleared after a successful response or when the dialog closes. Never enter your Gemini API key here.</small></div></div>}
         {importOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Import Bursa listings"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">BURSA MALAYSIA</div><h3>Import listed companies</h3></div><button className="modal-close" onClick={()=>setImportOpen(false)} aria-label="Close import">×</button></div><p>Upload the official Bursa company directory as a CSV file. The importer recognises common ticker and company-name column headings.</p><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={importToken} onChange={e=>setImportToken(e.target.value)} placeholder="Paste your Cloudflare Worker secret" autoComplete="off"/></label><label className="csv-upload"><Database size={18}/><b>{importing?"Importing...":"Choose Bursa CSV file"}</b><small>CSV format only. Export the Bursa directory to CSV first.</small><input type="file" accept=".csv,text/csv" disabled={importing} onChange={e=>{const file=e.currentTarget.files?.[0];if(file)void importBursaFile(file);e.currentTarget.value="";}}/></label>{importStatus && <div className="import-status">{importStatus}</div>}<small className="import-security">The token is sent directly to your Worker for this request only. It is not saved in the browser.</small></div></div>}
         {showInfo && <div className="info-banner"><ShieldCheck size={18}/><div><b>Data integrity comes first.</b><p>Prices, fundamentals and Shariah status are only shown when a source is available and verified. Unknown is not the same as compliant. US screening candidates are supplied by Magic Formula Investing. Bursa listings are loaded from the Bursa directory import. Yahoo Finance quotes are unofficial. Magic Formula metrics and Shariah classifications stay blank or unverified until reliable, dated financial and screening sources are connected.</p></div><button onClick={()=>setShowInfo(false)}>×</button></div>}
         <div className="stats-grid">
