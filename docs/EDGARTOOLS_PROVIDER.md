@@ -122,6 +122,8 @@ The extraction report also includes a read-only statement identity diagnostic. I
 
 The 2026-11-20 regression cohort produced 29 extracted statements and 29 `reconciled` results, all with a zero reported difference; two tickers (`AFMJF`, `EGHSF`) were unsupported by the EdgarTools SEC-company-index path and therefore had no reconciliation result. This is a sample-level data-quality result, not evidence that all underlying line-item classifications are correct.
 
+The extraction artifact also contains a small number of filing-specific EBIT reconstructions (for example, HRB, PBI and SGHC) that rely on issuer-specific statement presentation and filing notes. These are not generic XBRL mappings and are never promoted into the resolver or ranking automatically. The accounting exception queue surfaces them as manual-review evidence only when both the raw filing accession and the filing-specific review accession exactly match the Worker resolver preview accession. It records the candidate, method and cross-checks while keeping `production_approved=false`.
+
 The accounting exception queue carries this diagnostic forward only when the raw extraction accession exactly matches the Worker resolver preview accession. A non-reconciled status (`difference`, `ambiguous_inputs` or `insufficient_inputs`) is promoted to P1 triage. Mismatched filing accessions are never mixed; the queue records the stored-preview source and leaves the raw reconciliation unavailable. Reconciled statements do not create an exception or imply policy approval.
 
 #### Candidate confidence is not policy approval
