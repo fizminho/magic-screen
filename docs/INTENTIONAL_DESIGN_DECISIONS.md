@@ -281,3 +281,10 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 
 - **Unrestricted is not restricted cash.** The cash-exclusion rule uses a whole-word `restricted` match so labels such as `Cash and cash equivalents, unrestricted` remain eligible for the unrestricted-cash candidate category.
+
+
+## Review-only invested-capital denominator preview
+
+- **INTENTIONAL:** the bakeoff calculates `current assets - current liabilities + net PP&E` only when all three categories each contain exactly one consolidated non-dimensional candidate for the selected fiscal period.
+- If any input is missing or ambiguous, the denominator remains null and the unresolved category is reported. This is important for PBI, where standard PP&E and rental property/equipment are separate facts.
+- A positive/negative/zero sign is descriptive only. The preview does not approve accounting scope, EBIT, ROC, eligibility or ranking and never feeds production data.
