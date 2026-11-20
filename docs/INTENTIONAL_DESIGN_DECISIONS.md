@@ -206,3 +206,6 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **INTENTIONAL:** candidate selection is based on text labels to make the first comparison manageable. A missing row means only that the label filter did not find it; it does not prove that the filing lacks the fact. Review the complete filing and statement before concluding that an input is unavailable.
 - Filing metadata and fiscal periods must be checked before comparing values with the existing SEC diagnostic. If the filing-specific financials object is unavailable and the script falls back to company-level annual financials, the report labels that fallback explicitly.
 - The workflow is manually triggered, uses Python 3.11+, installs the MIT-licensed EdgarTools package, and retains its JSON artifact for seven days. It does not run on the production fundamentals schedule.
+
+
+- **The EdgarTools bakeoff now preserves complete detailed statements.** Each statement output includes `all_rows` for every row returned by EdgarTools and retains `rows` as the label-filtered convenience subset. This is intentional: a text filter can miss operating-income subtotals or issuer-specific line labels. Neither list is an approved accounting mapping. The report also warns reviewers not to add dimensional breakdowns to consolidated totals or assume multiple PP&E concepts are additive.
