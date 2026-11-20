@@ -55,6 +55,21 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["cash_unrestricted_candidates"]["candidate_count"], 1
         )
 
+    def test_ifrs_restricted_cash_concept_without_restricted_label(self):
+        categories = self.review(
+            row(
+                "ifrs-full_CurrentRestrictedCashAndCashEquivalents",
+                "Amounts segregated for users",
+                12_000_000,
+            )
+        )
+        self.assertEqual(
+            categories["cash_unrestricted_candidates"]["candidate_count"], 0
+        )
+        self.assertEqual(
+            categories["cash_restricted_candidates"]["candidate_count"], 1
+        )
+
     def test_combined_restricted_cash_is_not_unrestricted_cash(self):
         categories = self.review(
             row(
