@@ -818,8 +818,11 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
   };
   // INTENTIONAL: prioritize Magic Formula input candidates, rather than alphabetical tags.
   // This makes the small response useful for reviewing EBIT, EV and invested-capital inputs.
-  const relevantStandard=standardUnique.filter(f=>priority(f.tag)<99)
-    .sort((a,b)=>priority(a.tag)-priority(b.tag)||Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+  // INTENTIONAL: consolidated non-dimensional facts come first. Dimensional
+  // breakdowns can be useful for issuer-specific research, but must not crowd out
+  // company-wide inputs in this compact Magic Formula review response.
+  const relevantStandard=standardUnique.filter(f=>priority(f.tag)<99&&!f.dimensions)
+    .sort((a,b)=>priority(a.tag)-priority(b.tag)||a.tag.localeCompare(b.tag));
   const relevantExtensions=extensionUnique
     .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
   const compact=(fact:any)=>({
