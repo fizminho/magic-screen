@@ -780,14 +780,14 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
         },
         "current_debt_candidates": {
             "label": re.compile(r"current portion of .*debt|current maturities|debt,? current|short.?term borrowings|notes payable and short.?term borrowings|borrowings,?\s*current|notes? payables?,?\s*current", re.I),
-            "concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|CurrentBorrowings|LoansPayableCurrent|NotesPayableCurrent)$", re.I),
+            "concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|CurrentBorrowings|LoansPayableCurrent|NotesPayableCurrent|ConvertibleDebtCurrent|LinesOfCreditCurrent|LineOfCreditCurrent)$", re.I),
             "exclude_label": re.compile(r"non.?current|net of current portion", re.I),
             "exclude_concept": re.compile(r"(?:LongTermDebtNoncurrent|NoncurrentBorrowings)$", re.I),
         },
         "noncurrent_debt_candidates": {
             "label": re.compile(r"^long.?term debt$|^debt,? noncurrent$|^non.?current borrowings$|borrowings,?\s*non.?current|notes? payables?,?\s*non.?current", re.I),
-            "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings|LongTermLoansPayable|LongTermNotesPayable)$", re.I),
-            "exclude_label": re.compile(r"(?<!non[- ])\bcurrent\b", re.I),
+            "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings|LongTermLoansPayable|LongTermNotesPayable|LongTermLineOfCredit|LineOfCreditNoncurrent|LongTermConvertibleDebt|ConvertibleDebtNoncurrent)$", re.I),
+            "exclude_label": re.compile(r"(?<!net of )(?<!non[- ])\bcurrent\b", re.I),
             "exclude_concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|(?:^|_)CurrentBorrowings)$", re.I),
         },
         "aggregate_debt_candidates": {
