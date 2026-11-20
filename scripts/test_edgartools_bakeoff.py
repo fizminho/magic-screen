@@ -390,6 +390,47 @@ class FilingSpecificEBITReviewTests(unittest.TestCase):
         self.assertEqual(result["cross_checks"]["difference_between_methods"], 0)
         self.assertEqual(result["automation_status"], "manual_review_only")
 
+    def test_sghc_ifrs_reconstruction_uses_signed_operating_rows_and_exact_accession(self):
+        period = "2025-12-31"
+        statements = {
+            "income_statement": {
+                "rows": [
+                    self.period_row("ifrs-full_Revenue", "Revenue", 1_000_000_000, period),
+                    self.period_row("ifrs-full_SalesAndMarketingExpense", "Direct and marketing expenses", -500_000_000, period),
+                    self.period_row("ifrs-full_GeneralAndAdministrativeExpense", "General and administrative expenses", -100_000_000, period),
+                    self.period_row("ifrs-full_DepreciationAndAmortisationExpense", "Depreciation and amortization expense", -20_000_000, period),
+                    self.period_row("ifrs-full_ImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss", "Impairment of assets", -10_000_000, period),
+                    self.period_row("ifrs-full_MiscellaneousOtherOperatingIncome", "Other operating income", -13_000_000, period),
+                    self.period_row("ifrs-full_FinanceIncome", "Finance income", 5_000_000, period),
+                    self.period_row("ifrs-full_FinanceCosts", "Finance expense", -8_000_000, period),
+                    self.period_row("ifrs-full_GainsLossesOnFinancialLiabilitiesAtFairValueThroughProfitOrLossDesignatedAsUponInitialRecognition", "Change in fair value of options", 1_000_000, period),
+                    self.period_row("ifrs-full_ShareOfProfitLossOfAssociatesAccountedForUsingEquityMethod", "Share of post-tax profit of equity accounted investments", 1_000_000, period),
+                    self.period_row("ifrs-full_ProfitLossBeforeTax", "Profit before taxation", 356_000_000, period),
+                ]
+            }
+        }
+        result = filing_specific_review(
+            "SGHC",
+            {"accession_number": "0001628280-26-025609", "period_of_report": period},
+            {},
+            statements,
+        )
+        self.assertEqual(result["status"], "review_only")
+        self.assertEqual(result["method"], "ifrs_statement_subtotal_reconstructed")
+        self.assertEqual(result["ebit_candidate"], 357_000_000)
+        self.assertEqual(result["cross_checks"]["difference_to_reported_profit_before_taxation"], 0)
+        self.assertTrue(result["cross_checks"]["reconciles_within_1"])
+        self.assertEqual(result["automation_status"], "manual_review_only")
+
+    def test_sghc_reconstruction_is_not_reused_for_another_accession(self):
+        result = filing_specific_review(
+            "SGHC",
+            {"accession_number": "another-accession", "period_of_report": "2025-12-31"},
+            {},
+            {},
+        )
+        self.assertIsNone(result)
+
     def test_pbi_interest_reconciliation_is_exact_accession_manual_review_only(self):
         bridge = {"pretax_income": {"amount": 192_524_000}}
         result = filing_specific_review(
