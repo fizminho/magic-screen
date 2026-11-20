@@ -95,3 +95,11 @@ The FY2025 10-K describes a $250m senior secured revolving credit facility, but 
 ### FHTX and NRIX — no conventional debt row surfaced in the selected face statements
 
 FHTX's FY2025 balance sheet reports operating lease liabilities and other operating liabilities but no separate conventional-debt line; its filing also states it had no off-balance-sheet arrangements. NRIX's FY2025 balance sheet similarly reports operating lease liabilities and deferred revenue, without a separately presented conventional-debt line. These are useful face-statement observations, not sufficient proof that no borrowing exists. Keep the debt bucket unresolved unless a complete filing-note review confirms that no outstanding conventional borrowing or debt-like financing arrangement is disclosed. See [FHTX FY2025 Form 10-K](https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm) and [NRIX FY2025 Form 10-K](https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm).
+
+
+## MNTN and SPRO note-level debt checks
+
+- **MNTN** (FY2025 accession `0001891027-26-000019`): the 10-K says convertible notes were fully settled at the May 23, 2025 IPO and had no balance at year-end; the revolver had no borrowings at year-end; and the 2024 short-term holdback payable was settled in Q1 2025. The remaining partial-recourse promissory note is owed by an employee to MNTN, so it is not MNTN borrowing. The review record is limited to these named instruments and does not make an unrestricted company-wide debt assertion. [SEC filing](https://www.sec.gov/Archives/edgar/data/1891027/000189102726000019/mntn-20251231.htm)
+- **SPRO** (FY2025 accession `0001193125-26-126192`): the 10-K explicitly says the company has no debt in its lease accounting discussion. It separately reports operating lease liabilities of $2.895m and other long-term liabilities of $91k. The lease balances remain outside conventional debt pending policy; the $91k other liability is not classified as debt without further evidence. [SEC filing](https://www.sec.gov/Archives/edgar/data/1701108/000119312526126192/spro-20251231.htm)
+
+Both records are accession-bound and review-only. They do not promote debt candidates, change EV, or alter production rankings.
