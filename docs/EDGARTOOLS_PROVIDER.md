@@ -38,8 +38,9 @@ The production integration therefore uses a Python execution lane:
 4. The job emits a versioned JSON report with ticker, filing metadata, reporting currency, statement facts, provider status, and source provenance.
 5. Scheduled and manually dispatched runs POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
 6. The endpoint stores each ticker/accession payload in `edgartools_filing_evidence`. This is raw evidence storage only; it does not write `stock_fundamentals`, ratios, eligibility, or ranks. The `/api/fundamentals/edgartools/status` route reports stored provider coverage.
-7. The Worker will apply deterministic, independently tested accounting rules before writing calculated fundamentals.
-7. Existing all-candidate completeness gates remain in force. No partial-universe ranking is published.
+7. The protected `/api/fundamentals/edgartools/resolve-preview` endpoint applies deterministic read-only checks to the latest stored evidence: it independently verifies a unique, non-dimensional direct operating-income row against the extraction review value, checks filing/accession/period alignment, and surfaces invested-capital, currency, lease, and balance-sheet scope flags. It does not write calculated fundamentals.
+8. A later approved resolver will apply independently tested accounting rules before any calculated fundamentals can be written.
+9. Existing all-candidate completeness gates remain in force. No partial-universe ranking is published.
 
 The existing bakeoff is both the extraction regression harness and the scheduled raw-evidence refresh. Push-based runs only test and upload an artifact. Scheduled and manually dispatched runs discover the active US MFI universe and ingest raw evidence; a manual symbol override is available for focused tests. The endpoint is size-bounded, authenticated, and idempotent by ticker/accession. It must not be mistaken for an approved accounting resolver.
 
@@ -67,4 +68,4 @@ The existing bakeoff is both the extraction regression harness and the scheduled
 
 ## Current safety boundary
 
-The existing production Worker still calculates US fundamentals directly from SEC Company Facts. The EdgarTools extraction workflow now discovers the active US MFI universe through a protected Worker endpoint and schedules a daily raw-evidence refresh. The Worker code change must be deployed before the new universe-discovery endpoint is available in production. Raw evidence ingestion does not change production fundamentals or rankings. The accounting resolver, shadow validation, and runtime cutover are not yet complete. Do not describe production fundamentals or rankings as EdgarTools-backed until those later stages have passed.
+The existing production Worker still calculates US fundamentals directly from SEC Company Facts. The EdgarTools extraction workflow now discovers the active US MFI universe through a protected Worker endpoint and schedules a daily raw-evidence refresh. The Worker code change must be deployed before the new universe-discovery endpoint is available in production. Raw evidence ingestion does not change production fundamentals or rankings. The read-only deterministic resolver preview is implemented, but accounting policy approval, shadow validation, and runtime cutover are not yet complete. Do not describe production fundamentals or rankings as EdgarTools-backed until those later stages have passed.
