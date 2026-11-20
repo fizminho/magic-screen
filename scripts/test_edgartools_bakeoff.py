@@ -557,6 +557,32 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["cross_checks"]["difference_to_reported_profit_before_taxation"], 0
         )
 
+    def test_invested_capital_reports_rental_and_rou_scope(self):
+        result = invested_capital_review({
+            "categories": {
+                "current_assets_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 100}],
+                },
+                "current_liabilities_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 40}],
+                },
+                "net_ppe_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 60}],
+                },
+                "rental_equipment_net_candidates": {"candidate_count": 1},
+                "right_of_use_asset_candidates": {"candidate_count": 2},
+                "current_lease_liability_candidates": {"candidate_count": 1},
+                "noncurrent_lease_liability_candidates": {"candidate_count": 1},
+            }
+        })
+        self.assertEqual(result["value"], 120)
+        self.assertEqual(result["scope_review"]["rental_equipment_candidate_count"], 1)
+        self.assertEqual(result["scope_review"]["right_of_use_asset_candidate_count"], 2)
+        self.assertEqual(len(result["scope_flags"]), 3)
+
     def test_roc_preview_flags_separate_rental_ppe_and_financing(self):
         balance_review = {
             "categories": {
