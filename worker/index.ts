@@ -748,9 +748,23 @@ export default {
             refresh = {updated:0,failed:0,remaining:null,error:String(error)};
           }
         }
-        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,q.earnings_yield,q.return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,COALESCE(q.data_status,'awaiting_quote') AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
+        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,q.earnings_yield,q.return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,f.ebit AS fundamentals_ebit,f.current_assets AS fundamentals_current_assets,f.current_liabilities AS fundamentals_current_liabilities,f.net_ppe AS fundamentals_net_ppe,f.total_debt AS fundamentals_total_debt,f.cash AS fundamentals_cash,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,COALESCE(q.data_status,'awaiting_quote') AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
-        return json({market,stocks:result.results,updatedAt:latest?.updated_at ?? null,sourceStatus:result.results.some((row:any)=>row.price!=null)?"Quote cache connected":"Waiting for scheduled quote sync",refresh});
+        // INTENTIONAL: preserve the distinction between an explicit numeric zero and an absent SEC fact.
+        // Company Facts omits custom-tagged and dimension-specific observations, so missing fields
+        // are described as not found in this standard dataset, never as zero or proof of non-disclosure.
+        const fundamentalsFields=[["EBIT","fundamentals_ebit"],["Current assets","fundamentals_current_assets"],["Current liabilities","fundamentals_current_liabilities"],["Net PP&E","fundamentals_net_ppe"],["Total debt","fundamentals_total_debt"],["Cash","fundamentals_cash"]] as const;
+        const stocks=result.results.map((row:any)=>{
+          const missing:string[]=[];
+          const zero:string[]=[];
+          for(const [label,key] of fundamentalsFields){
+            if(row[key]==null) missing.push(label);
+            else if(row[key]===0) zero.push(label);
+          }
+          const {fundamentals_ebit,fundamentals_current_assets,fundamentals_current_liabilities,fundamentals_net_ppe,fundamentals_total_debt,fundamentals_cash,...stock}=row;
+          return {...stock,fundamentals_missing_fields:row.fundamentals_status==="missing_required_facts"?missing:[],fundamentals_zero_fields:zero};
+        });
+        return json({market,stocks,updatedAt:latest?.updated_at ?? null,sourceStatus:stocks.some((row:any)=>row.price!=null)?"Quote cache connected":"Waiting for scheduled quote sync",refresh});
       } catch (error) {
         return json({market,stocks:[],updatedAt:null,sourceStatus:"Cached stock read failed",error:String(error),refresh},503);
       }
