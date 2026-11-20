@@ -147,3 +147,8 @@ The script also emits an `ebit_bridge` review section. It lists same-statement, 
 ### EBIT bridge matching safeguards
 
 The diagnostic bridge uses suffix-aware XBRL concept matching to accommodate taxonomy prefixes. It constrains the separate interest-expense row by its statement label and excludes `FinancingInterestExpense` from that match. A concept can populate only one bridge category. These are extraction safeguards, not approved accounting mappings; scenarios remain review-required and are never consumed by production calculations. Pension/postretirement adjustments are searched by both concept and label. If interest, pension, or other-expense adjustments are not identified, the bridge reports the missing items and reconciliation difference, marks the scenario `missing_adjustment_rows`, and does not silently assume zero.
+
+
+## PBI 2025 EdgarTools filing review
+
+The PBI 2025 bakeoff now emits a filing-specific, review-only note for accession `0001628280-26-009650`. The 10-K says a portion of total interest expense is allocated into consolidated "Cost of financing and other". The review derives allocated finance interest of $47.696M from $61.503M consolidated financing cost less $13.807M SendTech segment financing cost excluding the allocation. Adding this to $101.460M reported interest expense gives $149.156M total interest expense; pretax income of $192.524M plus that interest gives an EBIT reconciliation candidate of $341.680M. This is hard-scoped to that PBI filing, remains review-only, and is not a production mapping or ranking input.
