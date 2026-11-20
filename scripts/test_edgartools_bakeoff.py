@@ -213,8 +213,8 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             }
         })
         self.assertIsNone(result["current_debt_candidate"])
-        self.assertIsNone(result["gross_debt_candidate"])
-        self.assertIsNone(result["net_debt_candidate"])
+        self.assertIsNone(result["conventional_gross_debt_candidate"])
+        self.assertIsNone(result["conventional_net_debt_candidate"])
         self.assertIn(
             "current_debt_not_uniquely_identified_not_assumed_zero",
             result["review_flags"],
