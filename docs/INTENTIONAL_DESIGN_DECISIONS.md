@@ -135,3 +135,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **A narrowly scoped review-only arithmetic check may be returned when consolidated annual revenue and costs/expenses are both explicitly tagged in the same extracted filing.** The result is labelled `review_only_not_approved_ebit`; it is not an EBIT fact, approved mapping, or production input.
 - **The diagnostic checks for an explicit operating-income fact separately.** If none is present, the arithmetic result remains a lead for manual reconciliation, not a substitute. Cost classifications and non-operating items vary by issuer, so no generic inference is permitted.
 - **This check is intentionally read-only.** It does not update SEC fundamentals, earnings yield, return on capital, or Magic Formula ranks.
+
+
+## SEC diagnostic: pretax reconciliation for review-only EBIT candidates
+
+- **The filing inspector may cross-check a revenue-minus-costs arithmetic candidate against reported pretax income.** When same-period consolidated annual interest expense, other non-operating income/expense, and pretax income facts are available, it calculates candidate EBIT less interest expense plus other non-operating income/expense and reports the difference from reported pretax income.
+- **An exact reconciliation is supporting evidence, not automatic approval.** The check remains issuer- and filing-specific, read-only, and labelled for manual review. It does not change production EBIT mappings, fundamentals, ratios, or rankings.
+- **Missing components remain null.** The diagnostic does not infer zero for missing interest, non-operating, or pretax facts.
