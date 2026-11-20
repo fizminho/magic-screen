@@ -425,6 +425,21 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["noncurrent_lease_liability_candidates"]["candidate_count"], 1
         )
 
+    def test_ifrs_current_and_noncurrent_borrowings_are_separated(self):
+        categories = self.review(
+            row("ifrs-full_ShorttermBorrowings", "Short-term borrowings", 4_000_000),
+            row("ifrs-full_LongtermBorrowings", "Interest-bearing loans and borrowings", 17_000_000),
+            row("ifrs-full_Borrowings", "Borrowings", 21_000_000),
+        )
+        current = categories["current_debt_candidates"]
+        noncurrent = categories["noncurrent_debt_candidates"]
+        self.assertEqual(current["candidate_count"], 1)
+        self.assertEqual(current["candidates"][0]["value"], 4_000_000)
+        self.assertEqual(noncurrent["candidate_count"], 1)
+        self.assertEqual(noncurrent["candidates"][0]["value"], 17_000_000)
+        self.assertFalse(current["automatic_aggregation"])
+        self.assertFalse(noncurrent["automatic_aggregation"])
+
     def test_generic_long_term_debt_concept_is_not_assumed_noncurrent(self):
         categories = self.review(
             row("us-gaap_LongTermDebt", "Long-term debt", 120_000_000),
