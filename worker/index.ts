@@ -577,6 +577,78 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
   };
 }
 
+
+type MfiPreviewRow = {
+  symbol:string; company_name:string|null; market_cap:number|null; reporting_currency:string|null;
+  ebit_candidate:number|null; invested_capital_candidate:number|null; ebit_status:string;
+  invested_capital_status:string; enterprise_value_candidate_review:any; review_flags:string[];
+};
+function percentileRanks(rows:MfiPreviewRow[], key:"earnings_yield"|"return_on_capital") {
+  const sorted=[...rows].sort((a:any,b:any)=>a[key]-b[key] || a.symbol.localeCompare(b.symbol));
+  const result=new Map<string,number>();
+  for(let i=0;i<sorted.length;) {
+    let end=i+1;
+    while(end<sorted.length && sorted[end][key]===sorted[i][key]) end++;
+    const averageRank=((i+1)+end)/2;
+    const percentile=averageRank/sorted.length*100;
+    for(let j=i;j<end;j++) result.set(sorted[j].symbol,percentile);
+    i=end;
+  }
+  return result;
+}
+function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
+  const evaluated=rows.map(row=>{
+    const ev=row.market_cap!==null && row.market_cap>0
+      && typeof row.enterprise_value_candidate_review?.conventional_gross_debt_candidate==="number"
+      && typeof row.enterprise_value_candidate_review?.unrestricted_cash_candidate==="number"
+      ? row.market_cap+row.enterprise_value_candidate_review.conventional_gross_debt_candidate-row.enterprise_value_candidate_review.unrestricted_cash_candidate
+      : null;
+    const eligible=row.ebit_status==="direct_reported_candidate_review_only"
+      && row.invested_capital_status==="positive_denominator_candidate_review_only"
+      && row.reporting_currency==="USD"
+      && row.enterprise_value_candidate_review?.conventional_debt_status==="identified_from_unique_current_and_noncurrent_components"
+      && ev!==null && ev>0
+      && typeof row.ebit_candidate==="number" && Number.isFinite(row.ebit_candidate)
+      && typeof row.invested_capital_candidate==="number" && row.invested_capital_candidate>0;
+    return {...row,enterprise_value_candidate:ev,
+      earnings_yield:eligible?row.ebit_candidate!/ev!:null,
+      return_on_capital:eligible?row.ebit_candidate!/row.invested_capital_candidate!:null,
+      ranking_eligible:eligible};
+  });
+  const eligible=evaluated.filter(row=>row.ranking_eligible);
+  const minimumCohort=5;
+  if(eligible.length>=minimumCohort) {
+    const ey=percentileRanks(eligible as any,"earnings_yield");
+    const roc=percentileRanks(eligible as any,"return_on_capital");
+    for(const row of eligible as any[]) {
+      row.earnings_yield_rank=ey.get(row.symbol)??null;
+      row.return_on_capital_rank=roc.get(row.symbol)??null;
+      row.magic_formula_score=(row.earnings_yield_rank+row.return_on_capital_rank)/2;
+    }
+    eligible.sort((a:any,b:any)=>b.magic_formula_score-a.magic_formula_score || a.symbol.localeCompare(b.symbol));
+    eligible.forEach((row:any,index:number)=>{row.magic_formula_rank=index+1;});
+  }
+  const ranked=new Set(eligible.length>=minimumCohort?eligible.map(row=>row.symbol):[]);
+  for(const row of evaluated as any[]) {
+    if(!ranked.has(row.symbol)) {
+      row.earnings_yield_rank=null; row.return_on_capital_rank=null;
+      row.magic_formula_score=null; row.magic_formula_rank=null;
+    }
+    row.production_approved=false;
+    row.production_write=false;
+  }
+  return {
+    methodology:"Greenblatt-inspired cross-sectional percentile ranking",
+    formulas:{earnings_yield:"EBIT / (market_cap + conventional_gross_debt - unrestricted_cash)",return_on_capital:"EBIT / invested_capital",combined_score:"(EY percentile + ROC percentile) / 2"},
+    ranking_direction:"Higher earnings yield and higher return on capital rank better; ties receive average percentile ranks.",
+    minimum_eligible_cohort:minimumCohort,
+    summary:{universe:evaluated.length,eligible:eligible.length,ranked:ranked.size,excluded:evaluated.length-ranked.size},
+    rankings:evaluated.sort((a:any,b:any)=>a.magic_formula_rank==null?(b.magic_formula_rank==null?a.symbol.localeCompare(b.symbol):1):b.magic_formula_rank==null?-1:a.magic_formula_rank-b.magic_formula_rank),
+    production_fundamentals_changed:false,rankings_changed:false,production_write:false,
+    guardrail:"Shadow preview only. Candidate accounting inputs are not policy-approved. No production fundamentals, ratios, eligibility or rankings are written."
+  };
+}
+
 async function syncUsFundamentals(env:Env, limit=10) {
   await ensureSchema(env);
   const mapAge=await env.DB.prepare("SELECT MIN(cm.updated_at) AS updated_at,COUNT(cm.symbol) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
@@ -1233,6 +1305,34 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools resolver preview"},503); }
     }
 
+
+    if (url.pathname==="/api/fundamentals/edgartools/ranking-preview" && request.method==="GET") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        const evidence=await env.DB.prepare(`SELECT m.symbol,m.company_name,e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json,e.ingested_at
+          FROM stock_master m
+          LEFT JOIN edgartools_filing_evidence e ON e.symbol=m.symbol AND e.accession_key=(
+            SELECT e2.accession_key FROM edgartools_filing_evidence e2
+            WHERE e2.symbol=m.symbol AND e2.market='US'
+            ORDER BY e2.ingested_at DESC,e2.accession_key DESC LIMIT 1
+          )
+          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'
+          ORDER BY m.symbol`).all<any>();
+        const caps=await env.DB.prepare(`SELECT m.symbol,q.market_cap FROM stock_master m
+          LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US'
+          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'`).all<any>();
+        const capBySymbol=new Map(caps.results.map((x:any)=>[x.symbol,x.market_cap==null?null:Number(x.market_cap)]));
+        const rows=evidence.results.map((row:any)=>{
+          let company:any=null;
+          if(row.payload_json) { try { company=JSON.parse(row.payload_json); } catch { company=null; } }
+          const resolved=resolveEdgarToolsEvidence(row.symbol,row.provider_status??null,row.accession??null,row.fiscal_period??null,company);
+          return {...resolved,company_name:row.company_name,market_cap:capBySymbol.get(row.symbol)??null};
+        });
+        const result=buildMfiRankingPreview(rows);
+        return json({...result,as_of:new Date().toISOString(),price_source:"Magic Formula Investing universe market-cap snapshot"});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"MFI shadow ranking preview"},503); }
+    }
     if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
