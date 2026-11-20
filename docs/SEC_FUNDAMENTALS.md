@@ -189,3 +189,10 @@ For each extracted issuer, the artifact also reports a review-only direct consol
 ## Expanded MFI sample results
 
 The 2026-11-20 EdgarTools 6.3.0 artifact extracted 10 of 11 current MFI sample symbols. AFMJF is not in the SEC company index and requires a non-SEC reporting source. Direct non-dimensional annual operating-income facts were surfaced for ADBE, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK. HRB and PBI continue to use filing-specific manual-review arithmetic, not automatic mapping. SGHC's 20-F was parsed successfully, but its IFRS presentation did not surface a direct US-GAAP `OperatingIncomeLoss` fact. PLTK's negative operating income remains negative. SNDK's FY2026 operating income is flagged for pre/post-spin comparability review. This sample is diagnostic only; it does not approve production EBIT, debt, cash, PP&E, ROC or EY mappings.
+
+
+## Generalized balance-sheet fact review
+
+The bakeoff emits `balance_sheet_fact_review` for each successfully extracted annual filing. It exposes exact-period, consolidated non-dimensional candidates for unrestricted cash, restricted cash, current assets, current liabilities, net PP&E, current and noncurrent debt, and current/noncurrent lease liabilities. Each category reports `unique_candidate`, `ambiguous_candidates` or `not_found`, retaining the original concept, label, period, value and standard-concept hint.
+
+A unique candidate is still review-only, not an approved production mapping. Restricted cash remains separate from cash and cash equivalents; lease liabilities remain separate from conventional debt; dimensional PP&E breakdowns are excluded from consolidated candidates; and multiple PP&E concepts are not summed automatically. This is particularly important for issuers with rental equipment or IFRS presentations. The review object never selects EV or invested-capital inputs and does not write D1, production fundamentals, Earnings Yield, ROC or ranks.
