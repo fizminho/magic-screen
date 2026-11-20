@@ -328,6 +328,64 @@ def balance_sheet_review(
         "guardrail": "Balance-sheet inputs are review-only. Lease liabilities and short-term investments are not included in this simple debt/cash comparison; confirm the production EV policy separately.",
     }
 
+def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[str, Any]:
+    """Expose issuer balance-sheet candidates without silently selecting accounting inputs."""
+    statement = statements.get("balance_sheet") or {}
+    rows = statement.get("rows", [])
+    categories = {
+        "cash_unrestricted_candidates": re.compile(r"^cash and cash equivalents$|^cash$", re.I),
+        "cash_restricted_candidates": re.compile(r"restricted cash", re.I),
+        "current_assets_candidates": re.compile(r"^total current assets$|^total current assets$", re.I),
+        "current_liabilities_candidates": re.compile(r"^total current liabilities$", re.I),
+        "net_ppe_candidates": re.compile(r"^(?:property,? plant and equipment|property and equipment|plant and equipment)(?:,|$)", re.I),
+        "current_debt_candidates": re.compile(r"^(?:current portion of (?:long.?term )?debt|debt,? current|current borrowings|short.?term borrowings)$", re.I),
+        "noncurrent_debt_candidates": re.compile(r"^(?:long.?term debt|debt,? noncurrent|non.?current borrowings|long.?term borrowings)$", re.I),
+        "current_lease_liability_candidates": re.compile(r"lease liabilities?.*current|current.*lease liabilities?", re.I),
+        "noncurrent_lease_liability_candidates": re.compile(r"lease liabilities?.*(?:noncurrent|non-current)|(?:noncurrent|non-current).*lease liabilities?", re.I),
+    }
+    result: dict[str, Any] = {}
+    for category, pattern in categories.items():
+        candidates = []
+        for row in rows:
+            label = str(row.get("label", "")).strip()
+            concept = str(row.get("concept", ""))
+            # INTENTIONAL: consolidated non-dimensional facts only. Dimensional
+            # breakdowns are retained in the statement rows but never mixed into totals.
+            if row.get("dimension") is not False or row.get("abstract") or not pattern.search(label):
+                continue
+            values = row.get("values") or {}
+            value = values.get(period)
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                continue
+            candidates.append({
+                "concept": concept,
+                "label": label,
+                "fiscal_period": period,
+                "value": value,
+                "standard_concept": values.get("standard_concept"),
+            })
+        result[category] = {
+            "status": "unique_candidate" if len(candidates) == 1 else (
+                "ambiguous_candidates" if candidates else "not_found"
+            ),
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+        }
+    # INTENTIONAL: even a unique label match is a review candidate, not an approved
+    # accounting mapping. Restricted cash, leases, debt scope and PP&E overlap need review.
+    unresolved = [
+        key for key, value in result.items()
+        if value["status"] != "unique_candidate"
+    ]
+    return {
+        "status": "review_only" if not unresolved else "review_required",
+        "fiscal_period": period,
+        "categories": result,
+        "unresolved_categories": unresolved,
+        "guardrail": "Candidate extraction only. No value is selected for EV, invested capital, Earnings Yield or ROC. Review reporting currency, restricted cash, debt scope, leases, PP&E overlap and issuer presentation before use.",
+    }
+
+
 def filing_specific_review(
     symbol: str, filing: dict[str, Any], bridge: dict[str, Any],
     statements: dict[str, Any],
@@ -532,6 +590,11 @@ def extract_company(symbol: str) -> dict[str, Any]:
         result["ebit_bridge"] = build_ebit_bridge(result["statements"]["income_statement"])
         result["filing_specific_review"] = filing_specific_review(
             symbol, result["filing"], result["ebit_bridge"], result["statements"]
+        )
+        # INTENTIONAL: generalized balance-sheet candidates cover every extracted
+        # issuer, including IFRS filers. This remains review-only and never feeds D1.
+        result["balance_sheet_fact_review"] = balance_sheet_fact_review(
+            result["statements"], fiscal_period
         )
         # INTENTIONAL: expose only an exact, consolidated OperatingIncomeLoss
         # fact for this annual period. This is diagnostic, not production EBIT.
