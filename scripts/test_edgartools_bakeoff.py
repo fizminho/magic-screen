@@ -390,6 +390,15 @@ class FilingSpecificEBITReviewTests(unittest.TestCase):
         self.assertEqual(result["cross_checks"]["difference_between_methods"], 0)
         self.assertEqual(result["automation_status"], "manual_review_only")
 
+    def test_hrb_reconstruction_is_not_reused_for_another_accession(self):
+        result = filing_specific_review(
+            "HRB",
+            {"accession_number": "another-accession", "period_of_report": "2026-06-30"},
+            {},
+            {},
+        )
+        self.assertIsNone(result)
+
     def test_sghc_ifrs_reconstruction_uses_signed_operating_rows_and_exact_accession(self):
         period = "2025-12-31"
         statements = {
