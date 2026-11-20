@@ -339,6 +339,58 @@ def currency_normalization_review(
     }
 
 
+def manual_enterprise_value_scenario_review(
+    market_cap_reporting_currency: float | None,
+    ebit_candidate: float | None,
+    conventional_net_debt: float | None,
+    noncontrolling_interest: float | None = None,
+    lease_liabilities: float | None = None,
+    currency: str | None = None,
+) -> dict[str, Any]:
+    """Show manual EV/EY scope sensitivities without selecting a production definition."""
+    required = (market_cap_reporting_currency, ebit_candidate, conventional_net_debt)
+    if any(not isinstance(value, (int, float)) for value in required):
+        return {
+            "status": "inputs_incomplete",
+            "currency": currency,
+            "scenarios": [],
+            "guardrail": "No EV/Earnings Yield scenario is calculated until market cap, EBIT and conventional net debt are all available in the same currency.",
+        }
+
+    nci = float(noncontrolling_interest or 0)
+    leases = float(lease_liabilities or 0)
+    base_ev = float(market_cap_reporting_currency) + float(conventional_net_debt)
+    definitions = [
+        ("conventional_debt_only", base_ev, "Market cap plus conventional net debt; excludes NCI and lease liabilities."),
+        ("plus_noncontrolling_interest", base_ev + nci, "Adds reported NCI to align consolidated EBIT with enterprise value."),
+        ("plus_lease_liabilities", base_ev + leases, "Adds current and noncurrent lease liabilities to conventional EV."),
+        ("plus_nci_and_lease_liabilities", base_ev + nci + leases, "Adds both NCI and lease liabilities to conventional EV."),
+    ]
+    scenarios = []
+    for name, enterprise_value, treatment in definitions:
+        earnings_yield = (
+            round(float(ebit_candidate) / enterprise_value * 100, 4)
+            if enterprise_value > 0 else None
+        )
+        scenarios.append({
+            "name": name,
+            "enterprise_value": round(enterprise_value, 2),
+            "earnings_yield_percent": earnings_yield,
+            "treatment": treatment,
+        })
+    return {
+        "status": "review_only_sensitivity",
+        "currency": currency,
+        "market_cap": round(float(market_cap_reporting_currency), 2),
+        "ebit_candidate": float(ebit_candidate),
+        "conventional_net_debt_candidate": float(conventional_net_debt),
+        "noncontrolling_interest_candidate": nci,
+        "lease_liabilities_candidate": leases,
+        "scenarios": scenarios,
+        "guardrail": "All scenarios are manual review sensitivities. No EV definition, EBIT classification, cash availability, debt scope or Earnings Yield is approved for production ranking.",
+    }
+
+
 def filing_metadata(filing: Any) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name in METADATA_FIELDS:
@@ -1435,6 +1487,22 @@ def extract_company(symbol: str) -> dict[str, Any]:
                     fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
                 manual_case["currency_normalization_review"] = currency_normalization_review(
                     reporting_currency, market_cap_usd, mfi_price_date, fx_review
+                )
+                # INTENTIONAL: compare EV scope alternatives only for manual issuer cases;
+                # never choose one scenario or publish it into production ratios/ranks.
+                currency_review = manual_case["currency_normalization_review"]
+                market_cap_reporting = currency_review.get("market_cap_in_reporting_currency")
+                lease_total = sum(
+                    float(manual_case.get(key) or 0)
+                    for key in ("current_lease_liabilities", "noncurrent_lease_liabilities")
+                )
+                manual_case["enterprise_value_scenario_review"] = manual_enterprise_value_scenario_review(
+                    market_cap_reporting,
+                    manual_case.get("ebit_candidate"),
+                    manual_case.get("conventional_net_debt_candidate"),
+                    manual_case.get("noncontrolling_interest"),
+                    lease_total,
+                    reporting_currency,
                 )
     return result
 
