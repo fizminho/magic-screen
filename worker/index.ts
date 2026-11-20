@@ -579,7 +579,7 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
 
 
 type MfiPreviewRow = {
-  symbol:string; company_name:string|null; market_cap:number|null; reporting_currency:string|null;
+  symbol:string; company_name:string|null; market_cap:number|null; provider_status:string; reporting_currency:string|null;
   ebit_candidate:number|null; invested_capital_candidate:number|null; ebit_status:string;
   invested_capital_status:string; enterprise_value_candidate_review:any; review_flags:string[];
 };
@@ -605,19 +605,25 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
       && row.enterprise_value_candidate_review.unrestricted_cash_candidate>=0
       ? row.market_cap+row.enterprise_value_candidate_review.conventional_gross_debt_candidate-row.enterprise_value_candidate_review.unrestricted_cash_candidate
       : null;
-    const eligible=row.ebit_status==="direct_reported_candidate_review_only"
-      && row.invested_capital_status==="positive_denominator_candidate_review_only"
-      && row.reporting_currency==="USD"
-      && row.enterprise_value_candidate_review?.conventional_debt_status==="identified_from_unique_current_and_noncurrent_components"
-      && ev!==null && ev>0
-      && typeof row.ebit_candidate==="number" && Number.isFinite(row.ebit_candidate) && row.ebit_candidate>0
-      && typeof row.invested_capital_candidate==="number" && row.invested_capital_candidate>0
-      && row.ebit_candidate/ev>0
-      && row.ebit_candidate/row.invested_capital_candidate>0;
+    const exclusionReasons:string[]=[];
+    if(row.provider_status!=="supported") {
+      exclusionReasons.push(row.provider_status==="unsupported_provider"
+        ?"EdgarTools provider unsupported for this issuer"
+        :"Annual filing evidence unavailable");
+    } else {
+      if(row.ebit_status!=="direct_reported_candidate_review_only") exclusionReasons.push("Direct operating-income candidate unavailable or ambiguous");
+      if(row.invested_capital_status!=="positive_denominator_candidate_review_only") exclusionReasons.push("Invested-capital denominator unresolved or non-positive");
+      if(row.reporting_currency!=="USD") exclusionReasons.push("Reporting currency not confirmed as USD");
+      if(row.enterprise_value_candidate_review?.conventional_debt_status!=="identified_from_unique_current_and_noncurrent_components") exclusionReasons.push("Conventional debt inputs incomplete or ambiguous");
+      if(ev===null || ev<=0) exclusionReasons.push("Enterprise-value candidate unavailable or non-positive");
+      if(typeof row.ebit_candidate!=="number" || !Number.isFinite(row.ebit_candidate) || row.ebit_candidate<=0) exclusionReasons.push("EBIT candidate missing or non-positive");
+      if(typeof row.invested_capital_candidate!=="number" || !Number.isFinite(row.invested_capital_candidate) || row.invested_capital_candidate<=0) exclusionReasons.push("Invested capital missing or non-positive");
+    }
+    const eligible=exclusionReasons.length===0;
     return {...row,enterprise_value_candidate:ev,
       earnings_yield:eligible?row.ebit_candidate!/ev!:null,
       return_on_capital:eligible?row.ebit_candidate!/row.invested_capital_candidate!:null,
-      ranking_eligible:eligible};
+      ranking_eligible:eligible,exclusion_reasons:exclusionReasons};
   });
   const eligible=evaluated.filter(row=>row.ranking_eligible);
   const minimumCohort=5;
@@ -1344,7 +1350,7 @@ export default {
             earnings_yield:row.earnings_yield,return_on_capital:row.return_on_capital,
             earnings_yield_rank:row.earnings_yield_rank,return_on_capital_rank:row.return_on_capital_rank,
             magic_formula_score:row.magic_formula_score,magic_formula_rank:row.magic_formula_rank,
-            ranking_eligible:row.ranking_eligible,review_flags:row.review_flags
+            ranking_eligible:row.ranking_eligible,exclusion_reasons:row.exclusion_reasons,review_flags:row.review_flags
           }))});
         }
         return json(response);
