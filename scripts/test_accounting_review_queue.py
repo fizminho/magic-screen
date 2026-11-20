@@ -381,5 +381,60 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(item["filing_specific_ebit_review_source"], "stored_resolver_preview")
         self.assertNotIn("filing_specific_ebit_candidate_available_manual_review", item["issues"])
 
+
+    def test_debt_scope_evidence_distinguishes_leases_financing_and_explicit_zero(self):
+        from build_accounting_review_queue import extract_debt_scope_evidence
+
+        company = {
+            "filing": {"period_of_report": "2025-12-31"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31"},
+            "statements": {"balance_sheet": {"rows": [
+                {"concept": "us-gaap_LongTermDebtNoncurrent", "label": "Secured term loan",
+                 "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 0}},
+                {"concept": "us-gaap_OperatingLeaseLiabilityNoncurrent", "label": "Operating lease liabilities",
+                 "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 500}},
+                {"concept": "issuer_RoyaltyFinancingLiabilitiesNoncurrent", "label": "Royalty financing obligations",
+                 "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 900}},
+                {"concept": "us-gaap_LongTermDebtNoncurrent", "label": "Debt by subsidiary",
+                 "parent_concept": "us-gaap_Liabilities", "dimension": True,
+                 "values": {"2025-12-31": 999}},
+                {"concept": "us-gaap_DebtSecuritiesAvailableForSaleNoncurrent", "label": "Debt securities",
+                 "parent_concept": "us-gaap_Assets", "values": {"2025-12-31": 1000}},
+            ]}},
+        }
+        evidence = extract_debt_scope_evidence(company)
+        self.assertEqual(evidence["row_count"], 3)
+        by_type = {row["classification"]: row for row in evidence["rows"]}
+        self.assertTrue(by_type["conventional_debt_candidate"]["explicit_zero"])
+        self.assertEqual(by_type["lease_liability"]["amount"], 500)
+        self.assertEqual(by_type["separate_financing_obligation"]["amount"], 900)
+        self.assertFalse(evidence["production_approved"])
+
+    def test_queue_enriches_debt_scope_evidence_only_for_matching_accession(self):
+        preview = {
+            "production_fundamentals_changed": False, "rankings_changed": False,
+            "resolutions": [{"symbol": "TEST", "accession": "same",
+                             "provider_status": "supported",
+                             "enterprise_value_candidate_review": {}}],
+        }
+        raw = {"companies": [{
+            "symbol": "TEST", "filing": {"accession_number": "same"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31", "categories": {}},
+            "statements": {"balance_sheet": {"rows": [{
+                "concept": "us-gaap_OperatingLeaseLiabilityCurrent",
+                "label": "Operating lease liabilities",
+                "parent_concept": "us-gaap_LiabilitiesCurrent",
+                "values": {"2025-12-31": 123},
+            }]}},
+        }]}
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["debt_scope_evidence_source"], "fresh_extraction_artifact_same_accession")
+        self.assertEqual(item["debt_scope_evidence"]["rows"][0]["amount"], 123)
+
+        raw["companies"][0]["filing"]["accession_number"] = "different"
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["debt_scope_evidence"])
+        self.assertEqual(item["debt_scope_evidence_source"], "stored_resolver_preview")
+
 if __name__ == "__main__":
     unittest.main()
