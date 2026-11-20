@@ -316,3 +316,6 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - PRDO's 2025 10-K describes the $56.992m sale-leaseback financing liability as the recategorization of construction financing after a failed sale-leaseback transaction. This issuer-specific financing obligation remains a separate review item; it is not a universal debt-tag mapping.
 - Regression tests assert that rental equipment does not contaminate standard PP&E candidates and that a sale-leaseback financing row does not enter current/noncurrent conventional debt candidates.
 - These changes affect only the EdgarTools review artifact. They do not alter production SEC mappings, debt aggregation, EV, invested capital, Earnings Yield, ROC, eligibility or ranking.
+
+
+- **INTENTIONAL:** review-only ROC previews now include explicit scope flags when separate rental equipment, sale-leaseback/construction financing, lease liabilities, or restricted/combined cash are present. The numerical diagnostic remains visible, but the flags make it harder to mistake the simple denominator/EV inputs for a complete issuer-specific accounting review. Flags never apply automatic adjustments.
