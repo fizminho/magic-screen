@@ -298,3 +298,12 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 - **INTENTIONAL:** the bakeoff computes a diagnostic ROC only when a unique direct consolidated annual `OperatingIncomeLoss` candidate and a unique positive invested-capital denominator are both available for the same filing and fiscal period.
 - Reconstructed HRB/PBI EBIT candidates are not silently promoted into this direct-fact path. Missing or ambiguous inputs return `review_required`; nonpositive invested capital returns `not_calculated_nonpositive_invested_capital`.
 - This ratio is a research comparison only. It does not approve EBIT or balance-sheet mappings and never feeds production D1, eligibility or ranking.
+
+
+## Balance-sheet candidate classification hardening (2026-11-20)
+
+- **INTENTIONAL:** current lease candidates explicitly exclude labels containing the whole token `noncurrent`; this prevents the substring `current` inside `noncurrent` from creating a false current-liability candidate.
+- IFRS `LongtermBorrowings` is recognized as a noncurrent-debt candidate when EdgarTools exposes the issuer's label as `Interest-bearing loans and borrowings`. It remains a candidate only, not an approved debt mapping.
+- Cash classification now distinguishes unrestricted cash, explicitly restricted cash, and combined cash/restricted-cash/short-term-investment facts. Combined totals are never reused as unrestricted cash.
+- Cash labels with footnote text may still be matched by the taxonomy concept, while labels or concepts explicitly identifying restricted cash or short-term investments are excluded from unrestricted cash.
+- **INTENTIONAL:** regression tests cover IFRS borrowings, current/noncurrent lease separation, annotated cash labels, and combined restricted-cash totals. The bakeoff workflow runs these tests before extracting issuer filings. No production fundamentals, EV, invested capital, Earnings Yield, ROC, eligibility or ranking logic is changed.
