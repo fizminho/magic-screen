@@ -519,6 +519,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const debtCurrent=periodEnd ? secFactValue(facts,["LongTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const shortDebt=periodEnd ? secFactValue(facts,["ShortTermBorrowings","ShortTermDebtCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const debtLong=periodEnd ? secFactValue(facts,["LongTermDebtNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
+      const longTermDebtFallback=periodEnd ? secFactValue(facts,["LongTermDebt"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const borrowingsLong=periodEnd ? secFactValue(facts,["BorrowingsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const debtAndLeaseLong=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsNoncurrent","LongTermDebtAndCapitalLeaseObligationsNoncurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
       const leaseCurrent=periodEnd ? secFactValue(facts,["LongTermDebtAndFinanceLeaseObligationsCurrent","LongTermDebtAndCapitalLeaseObligationsCurrent"],periodEnd,periodAccession,false) : {value:null,tag:null,filed:null};
@@ -531,12 +532,17 @@ async function syncUsFundamentals(env:Env, limit=10) {
       const usAggregateDebtKnown=debtCurrentAggregate.value!=null && debtAndLeaseLong.value!=null;
       const ifrsAggregateDebtKnown=borrowingsCurrentAggregate.value!=null && borrowingsLong.value!=null;
       const splitDebtKnown=debtCurrent.value!=null && shortDebt.value!=null && debtLong.value!=null;
-      const anyBorrowingFacts=debtCurrentAggregate.value!=null || borrowingsCurrentAggregate.value!=null || debtCurrent.value!=null || shortDebt.value!=null || debtLong.value!=null || borrowingsLong.value!=null;
+      // INTENTIONAL: LongTermDebt alone is not assumed to be a complete non-current split.
+      // Use it only when the same filing explicitly reports aggregate current debt as zero.
+      // This avoids adding a current portion twice while supporting balance sheets such as Adobe's.
+      const zeroCurrentLongTermDebtKnown=debtCurrentAggregate.value===0 && longTermDebtFallback.value!=null;
+      const anyBorrowingFacts=debtCurrentAggregate.value!=null || borrowingsCurrentAggregate.value!=null || debtCurrent.value!=null || shortDebt.value!=null || debtLong.value!=null || borrowingsLong.value!=null || longTermDebtFallback.value!=null;
       const leaseDebtKnown=leaseCurrent.value!=null && leaseLong.value!=null;
-      const debtKnown=usAggregateDebtKnown || ifrsAggregateDebtKnown || splitDebtKnown || (!anyBorrowingFacts && leaseDebtKnown);
+      const debtKnown=usAggregateDebtKnown || ifrsAggregateDebtKnown || splitDebtKnown || zeroCurrentLongTermDebtKnown || (!anyBorrowingFacts && leaseDebtKnown);
       const totalDebt=usAggregateDebtKnown ? debtCurrentAggregate.value!+debtAndLeaseLong.value!
         : ifrsAggregateDebtKnown ? borrowingsCurrentAggregate.value!+borrowingsLong.value!
         : splitDebtKnown ? debtCurrent.value!+shortDebt.value!+debtLong.value!
+        : zeroCurrentLongTermDebtKnown ? longTermDebtFallback.value!
         : !anyBorrowingFacts && leaseDebtKnown ? leaseCurrent.value!+leaseLong.value! : null;
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
       const investedCapital=netWorkingCapital+(ppe.value??0);
