@@ -861,6 +861,40 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["short_term_investment_candidates"]["candidate_count"], 1
         )
 
+    def test_noncurrent_lease_liabilities_never_enter_current_category(self):
+        categories = self.review(
+            row("us-gaap_OperatingLeaseLiabilityNoncurrent", "Operating lease liabilities, net of current portion", 40),
+            row("us-gaap_FinanceLeaseLiabilityNoncurrent", "Finance lease liabilities, non- current portion", 20),
+            row("us-gaap_OperatingLeaseLiabilityCurrent", "Operating lease liabilities, current", 10),
+        )
+        self.assertEqual(
+            categories["current_lease_liability_candidates"]["candidate_count"], 1
+        )
+        self.assertEqual(
+            categories["noncurrent_lease_liability_candidates"]["candidate_count"], 2
+        )
+        current_concepts = {
+            x["concept"] for x in categories["current_lease_liability_candidates"]["candidates"]
+        }
+        self.assertEqual(current_concepts, {"us-gaap_OperatingLeaseLiabilityCurrent"})
+
+    def test_combined_cash_and_investment_total_is_not_short_term_investment(self):
+        categories = self.review(
+            row("us-gaap_AvailableForSaleSecuritiesDebtSecuritiesCurrent", "Short-term investments", 100),
+            row(
+                "issuer_CashCashEquivalentsRestrictedCashAndShortTermInvestments",
+                "Total cash and cash equivalents, restricted cash and short-term investments",
+                200,
+            ),
+            row("us-gaap_MarketableSecuritiesNoncurrent", "Marketable securities, non-current", 30),
+        )
+        self.assertEqual(
+            categories["short_term_investment_candidates"]["candidate_count"], 1
+        )
+        self.assertEqual(
+            categories["cash_combined_or_investment_candidates"]["candidate_count"], 1
+        )
+
     def test_restricted_cash_and_unrestricted_cash_are_separate(self):
         categories = self.review(
             row("us-gaap_CashAndCashEquivalentsAtCarryingValue", "Cash and cash equivalents, unrestricted", 110_970_000),
