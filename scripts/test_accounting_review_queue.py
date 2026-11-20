@@ -39,6 +39,27 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertIsNone(item["unrestricted_cash_candidate"])
         self.assertIn("unrestricted_cash_not_uniquely_resolved", item["issues"])
 
+
+    def test_unique_balance_sheet_candidates_are_not_exceptions(self):
+        item = classify({
+            "symbol": "CLEAN",
+            "provider_status": "supported",
+            "ebit_status": "direct_reported_candidate_review_only",
+            "invested_capital_status": "positive_denominator_candidate_review_only",
+            "enterprise_value_candidate_review": {
+                "conventional_debt_status": "identified_from_unique_current_and_noncurrent_components",
+                "unrestricted_cash_candidate": 100,
+            },
+            "balance_sheet_candidate_review": {
+                "current_debt": {"status": "unique_candidate", "candidate_count": 1},
+                "noncurrent_debt": {"status": "unique_candidate", "candidate_count": 1},
+                "restricted_cash": {"status": "not_found", "candidate_count": 0},
+                "current_lease_liabilities": {"status": "ambiguous_candidates", "candidate_count": 2},
+            },
+        })
+        self.assertEqual(item["balance_sheet_exceptions"], ["current_lease_liabilities=ambiguous_candidates(2)"])
+        self.assertFalse(item["production_write"])
+
     def test_queue_sorts_by_priority_and_preserves_read_only_flags(self):
         report = {"resolver": "deterministic-preview-v1",
                   "production_fundamentals_changed": False, "rankings_changed": False,
@@ -56,6 +77,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(queue["production_fundamentals_changed"])
         self.assertFalse(queue["rankings_changed"])
         self.assertFalse(queue["production_write"])
+        self.assertTrue(all(item["production_write"] is False for item in queue["items"]))
 
 
 if __name__ == "__main__":
