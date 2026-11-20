@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 # INTENTIONAL: preserve both positive operating-profit and negative operating-loss labels.
-DIRECT_OPERATING_INCOME_LABEL_PATTERN = r"(?:operating (?:income|loss|earnings)|(?:income|loss).*from operations|operating profit|earnings from operations)"
+DIRECT_OPERATING_INCOME_LABEL_PATTERN = r"(?:operating (?:income|loss|earnings|profit)|(?:income|loss|profit).*from operations|(?:income|loss|profit).*from operating activit(?:y|ies)|earnings from operations)"
 
 from edgar import Company, set_identity
 
