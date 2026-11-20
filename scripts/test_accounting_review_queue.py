@@ -397,6 +397,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
                  "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 900}},
                 {"concept": "us-gaap_NotesPayableCurrent", "label": "Short-term note payable",
                  "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 0}},
+                {"concept": "us-gaap_NotesPayableCurrent", "label": "Notes payables, current - related parties",
+                 "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 0}},
                 {"concept": "us-gaap_OtherLongTermDebtNoncurrent", "label": "Other long-term liabilities",
                  "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 91}},
                 {"concept": "us-gaap_LongTermDebtNoncurrent", "label": "Debt by subsidiary",
@@ -407,7 +409,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
             ]}},
         }
         evidence = extract_debt_scope_evidence(company)
-        self.assertEqual(evidence["row_count"], 5)
+        self.assertEqual(evidence["row_count"], 6)
         by_type = {row["classification"]: row for row in evidence["rows"]}
         self.assertTrue(by_type["conventional_debt_candidate"]["explicit_zero"])
         self.assertEqual(by_type["lease_liability"]["amount"], 500)
