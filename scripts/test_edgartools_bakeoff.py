@@ -5,7 +5,7 @@ from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
 
 
 PERIOD = "2025-12-31"
@@ -282,6 +282,22 @@ class NonSecIssuerReviewTests(unittest.TestCase):
             "financial_statements_are_cad_while_mfi_market_cap_is_usd_fx_conversion_required",
             result["review_flags"],
         )
+
+class EdgarToolsProviderCoverageTests(unittest.TestCase):
+    def test_non_sec_issuer_is_tagged_unsupported_without_manual_fallback(self):
+        class CompanyNotFoundError(Exception):
+            pass
+
+        with patch("edgartools_bakeoff.Company", side_effect=CompanyNotFoundError("not in SEC index")):
+            with patch("edgartools_bakeoff.non_sec_issuer_review_case") as manual_fallback:
+                result = extract_company("AFMJF")
+
+        self.assertEqual(result["provider_status"], "unsupported_provider")
+        self.assertEqual(result["provider"], "EdgarTools")
+        self.assertIn("fallback is intentionally deferred", result["provider_reason"])
+        self.assertNotIn("non_sec_issuer_review", result)
+        manual_fallback.assert_not_called()
+
 
 class DirectOperatingIncomeLabelTests(unittest.TestCase):
     def test_negative_operating_loss_labels_are_direct_facts(self):
