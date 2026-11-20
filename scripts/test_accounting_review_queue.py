@@ -447,6 +447,41 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertIsNone(item["debt_scope_evidence"])
         self.assertEqual(item["debt_scope_evidence_source"], "stored_resolver_preview")
 
+
+    def test_filing_debt_note_review_is_accession_bound_and_never_promotes_debt(self):
+        from build_accounting_review_queue import filing_debt_note_review
+
+        review = filing_debt_note_review("SBC", "0001193125-26-127557")
+        self.assertEqual(review["status"], "review_only")
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertFalse(review["debt_candidate_promoted"])
+        self.assertIsNone(filing_debt_note_review("SBC", "different-accession"))
+        self.assertIsNone(filing_debt_note_review("UNKNOWN", "0001193125-26-127557"))
+
+    def test_queue_surfaces_filing_debt_note_review_only_for_exact_accession(self):
+        preview = {
+            "production_fundamentals_changed": False, "rankings_changed": False,
+            "resolutions": [{"symbol": "PXED", "accession": "0001193125-26-445323",
+                             "provider_status": "supported", "enterprise_value_candidate_review": {}}],
+        }
+        raw = {"companies": [{
+            "symbol": "PXED", "filing": {"accession_number": "0001193125-26-445323"},
+            "balance_sheet_fact_review": {"categories": {}},
+        }]}
+        queue = build_queue(preview, raw)
+        item = queue["items"][0]
+        self.assertEqual(item["filing_debt_note_review"]["method"], "revolving_credit_facility_note_review")
+        self.assertEqual(queue["summary"]["filing_debt_note_manual_reviews_available"], 1)
+        self.assertIn("filing_debt_note_review_available_manual_review", item["issues"])
+        self.assertFalse(item["filing_debt_note_review"]["production_approved"])
+        self.assertFalse(item["production_write"])
+
+        preview["resolutions"][0]["accession"] = "different-accession"
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["filing_debt_note_review"])
+        self.assertEqual(item["filing_debt_note_review_source"], "stored_resolver_preview")
+
     def test_queue_enriches_denominator_diagnostics_from_matching_accession(self):
         preview = {
             "production_fundamentals_changed": False, "rankings_changed": False,
