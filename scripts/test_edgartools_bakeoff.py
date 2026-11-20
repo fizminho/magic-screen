@@ -930,6 +930,26 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             "ifrs-full_LongtermBorrowings",
         )
 
+    def test_explicit_payables_are_classified_but_multiple_instruments_remain_ambiguous(self):
+        categories = self.review(
+            row("us-gaap_LoansPayableCurrent", "Bank and other borrowings, current", 9_099_046),
+            row("us-gaap_NotesPayableCurrent", "Notes payables, current - related parties", 0),
+            row("us-gaap_LongTermLoansPayable", "Bank and other borrowings, non-current", 33_734_438),
+            row("us-gaap_LongTermNotesPayable", "Notes payables, non-current - related parties", 0),
+        )
+        current = categories["current_debt_candidates"]
+        noncurrent = categories["noncurrent_debt_candidates"]
+        self.assertEqual(current["candidate_count"], 2)
+        self.assertEqual(noncurrent["candidate_count"], 2)
+        self.assertEqual(
+            {x["concept"] for x in current["candidates"]},
+            {"us-gaap_LoansPayableCurrent", "us-gaap_NotesPayableCurrent"},
+        )
+        self.assertEqual(
+            {x["concept"] for x in noncurrent["candidates"]},
+            {"us-gaap_LongTermLoansPayable", "us-gaap_LongTermNotesPayable"},
+        )
+
     def test_current_and_noncurrent_debt_categories_do_not_overlap(self):
         categories = self.review(
             row("us-gaap_LongTermDebtCurrent", "Current portion of long-term debt", 15),
