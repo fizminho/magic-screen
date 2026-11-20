@@ -1,6 +1,11 @@
 name: EdgarTools fundamentals bakeoff
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/edgartools_bakeoff.py"
+      - ".github/workflows/edgartools-bakeoff.yml"
   workflow_dispatch:
 
 permissions:
