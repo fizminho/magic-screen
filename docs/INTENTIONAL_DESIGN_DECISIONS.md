@@ -107,3 +107,11 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **The default diagnostic response is intentionally compact.** It returns at most 30 extension facts and 40 standard statement facts, with only concise presentation parent/role hints. This keeps the response usable in browser clients and avoids flooding the user with repeated context and relationship metadata.
 - **Standard statement facts are prioritized without dimensional breakdowns first.** This makes primary company-wide values easier to spot; extension facts retain dimensional-first ordering to support discovery.
 - **Counts and truncation are explicit.** The response reports total fact counts and a `truncated` flag. Production calculations, D1 storage, and ranking remain unchanged.
+
+
+## SEC filing diagnostic: prioritize Magic Formula inputs
+
+- **The diagnostic is intentionally focused on likely formula inputs rather than an alphabetical sample.** Standard facts are prioritized for operating income/profit, revenue, debt, cash, current assets/liabilities, PP&E, operating costs, and interest expense. This makes relevant facts visible within the response limit.
+- **Repeated non-dimensional facts are deduplicated.** Facts repeated through multiple contexts or presentation roles are returned once; dimensional facts are retained separately because they may represent distinct members.
+- **The response is smaller by default.** It returns up to 24 prioritized standard facts and 12 extension facts, with one concise presentation hint per fact. Counts report the deduplicated candidate totals; `truncated` signals omitted candidates.
+- **Priority is not approval.** These are discovery candidates only. No fact is automatically mapped into production calculations, ratios, or rankings.
