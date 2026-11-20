@@ -447,5 +447,57 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertIsNone(item["debt_scope_evidence"])
         self.assertEqual(item["debt_scope_evidence_source"], "stored_resolver_preview")
 
+    def test_queue_enriches_denominator_diagnostics_from_matching_accession(self):
+        preview = {
+            "production_fundamentals_changed": False, "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "OTEX", "accession": "same-accession",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        diagnostics = {
+            "working_capital": -505452000,
+            "net_ppe": 522197000,
+            "negative_working_capital_offset_ratio": 0.967934,
+            "negative_working_capital_offsets_at_least_90pct_of_net_ppe": True,
+            "near_zero_positive_denominator_from_negative_working_capital": True,
+        }
+        raw = {"companies": [{
+            "symbol": "OTEX", "filing": {"accession_number": "same-accession"},
+            "invested_capital_review": {"denominator_diagnostics": diagnostics},
+            "balance_sheet_fact_review": {"categories": {}},
+        }]}
+        queue = build_queue(preview, raw)
+        item = queue["items"][0]
+        self.assertEqual(item["invested_capital_denominator_diagnostics"], diagnostics)
+        self.assertEqual(item["invested_capital_denominator_diagnostics_source"],
+                         "fresh_extraction_artifact_same_accession")
+        self.assertEqual(queue["summary"]["negative_working_capital_offset_high_risk"], 1)
+        self.assertFalse(item["production_write"])
+
+    def test_queue_does_not_mix_denominator_diagnostics_from_different_accessions(self):
+        preview = {
+            "production_fundamentals_changed": False, "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "OTEX", "accession": "resolver-accession",
+                "provider_status": "supported",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {"companies": [{
+            "symbol": "OTEX", "filing": {"accession_number": "different-accession"},
+            "invested_capital_review": {"denominator_diagnostics": {
+                "negative_working_capital_offsets_at_least_90pct_of_net_ppe": True,
+            }},
+            "balance_sheet_fact_review": {"categories": {}},
+        }]}
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["invested_capital_denominator_diagnostics"])
+        self.assertEqual(item["invested_capital_denominator_diagnostics_source"],
+                         "stored_resolver_preview")
+
 if __name__ == "__main__":
     unittest.main()
