@@ -191,3 +191,9 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 
 - The diagnostic additionally returns `targeted_candidates` groups for operating income, PP&E, current assets, current liabilities, cash and debt. Each group is selected independently of the top-30 extension preview and reports its own count/truncation state, so a relevant fact cannot be hidden solely by the compact preview limit.
 - Candidate output includes fact period/context and up to three presentation relationships to support filing review. This is still evidence gathering only: neither tag names nor presentation relationships authorize production mappings.
+- The diagnostic also reads the filing schema's role definitions and classifies presentation relationships as `consolidated_statement`, `statement_role`, `disclosure_or_segment`, or `unclassified`. Candidate sorting prefers non-dimensional facts in statement roles, but this classification is supporting evidence only; it never approves a mapping. Unknown or ambiguous roles must be reviewed in the filing.
+
+
+## Non-positive invested capital review state
+
+- **INTENTIONAL:** if the reported current assets less current liabilities plus net PP&E is negative or zero, do not calculate ROC, do not substitute zero, and do not publish a Magic Formula rank for that company. Store `negative_invested_capital` or `zero_invested_capital` as an explicit review status and expose the corresponding stock-card data status. This is distinct from missing facts because the inputs may be present while the denominator is not meaningful for the formula.
