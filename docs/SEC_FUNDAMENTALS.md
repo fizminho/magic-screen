@@ -266,3 +266,5 @@ Filing-specific EBIT candidates (such as HRB's statement-subtotal reconstruction
 ## Research cohort expansion
 
 The default EdgarTools bakeoff now runs the full 30-stock MFI snapshot returned on 2026-11-20 at 09:14:01.782 UTC (`minimumMarketCap=50`, `select30=true`, price date 11/18, quarter date 09/30), plus ADBE as a historical SEC mapping control. The exact cohort is recorded in `docs/INTENTIONAL_DESIGN_DECISIONS.md`. This expands research coverage only; the MFI screen remains the source of the production US candidate universe, and the bakeoff never changes that universe or production rankings.
+
+The debt/cash bridge labels are explicitly `conventional_gross_debt_candidate` and `conventional_net_debt_candidate`. They represent only conventional current/noncurrent borrowings less uniquely identified unrestricted cash. Lease liabilities and separate financing obligations are excluded from those candidate totals and remain separately flagged for policy review.
