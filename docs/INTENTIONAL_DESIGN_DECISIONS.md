@@ -93,3 +93,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 ## SEC presentation-linkbase diagnostic
 
 - **Presentation relationships remain diagnostic evidence only.** The SEC extension inspector now reads the filing's `_pre.xml` presentation linkbase and reports the role URI, parent/child concept relationship, order, and preferred label for matching extension concepts. These relationships help distinguish statement presentation from footnote placement, but they do not prove that a concept is a complete or correctly scoped accounting total. No presentation relationship is automatically mapped into production fundamentals, ratios, or rankings.
+
+
+## SEC filing inspector: standard facts alongside extensions
+
+- **Standard taxonomy facts are displayed beside issuer extensions, but both remain diagnostic-only.** The filing inspector now returns a separate `statement_facts` collection for relevant US-GAAP and IFRS concepts found in the extracted XBRL instance, including their labels when available, value, unit, period, dimensions, context, and presentation relationships. Extension facts remain in `extension_facts`.
+- **No diagnostic fact is promoted automatically.** The combined view helps reviewers reconcile reported operating income, revenue, costs, debt, cash, and asset concepts against the filing's presentation structure. It does not write facts to D1, change production EBIT selection, calculate ratios, or create rankings.
+- **The diagnostic is intentionally bounded.** It includes instant facts and full-year duration facts ending on the selected annual filing period, filters to relevant financial concept names, and caps returned statement facts at 150 and extension facts at 100. The `truncated` flag indicates when either cap is exceeded.
