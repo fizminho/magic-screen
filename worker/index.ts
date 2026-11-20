@@ -459,7 +459,11 @@ type EdgarToolsResolution = {
   ebit_candidate:number|null; ebit_method:string|null; ebit_concept:string|null; ebit_label:string|null; ebit_status:string;
   invested_capital_candidate:number|null; invested_capital_status:string;
   reporting_currency:string|null; candidate_roc:number|null; review_flags:string[];
-  balance_sheet_candidate_review:Record<string,{status:string;candidate_count:number}>;
+  balance_sheet_candidate_review:Record<string,{
+    status:string;candidate_count:number;resolution_hint?:string;automatic_aggregation?:boolean;
+    candidates?:Array<{concept?:string;label?:string;fiscal_period?:string;value?:number;row_index?:unknown;
+      parent_concept?:string;parent_abstract_concept?:string;level?:number;balance?:string}>;
+  }>;
   enterprise_value_candidate_review:{
     status:string; conventional_debt_status:string; conventional_gross_debt_candidate:number|null;
     unrestricted_cash_candidate:number|null; conventional_net_debt_candidate:number|null;
@@ -539,12 +543,25 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
     restricted_cash:"cash_restricted_candidates",short_term_investments:"short_term_investment_candidates",
     current_lease_liabilities:"current_lease_liability_candidates",noncurrent_lease_liabilities:"noncurrent_lease_liability_candidates"
   };
-  const balanceSheetCandidateReview:Record<string,{status:string;candidate_count:number}>={};
+  const balanceSheetCandidateReview:EdgarToolsResolution["balance_sheet_candidate_review"]={};
   for (const [key,name] of Object.entries(categoryNames)) {
     const category=balanceReview.categories?.[name]??{};
     balanceSheetCandidateReview[key]={
       status:typeof category.status==="string"?category.status:"not_found",
-      candidate_count:Number.isInteger(category.candidate_count)?category.candidate_count:0
+      candidate_count:Number.isInteger(category.candidate_count)?category.candidate_count:0,
+      resolution_hint:typeof category.resolution_hint==="string"?category.resolution_hint:undefined,
+      automatic_aggregation:category.automatic_aggregation===true,
+      candidates:Array.isArray(category.candidates)?category.candidates.slice(0,12).map((candidate:any)=>({
+        concept:typeof candidate.concept==="string"?candidate.concept:undefined,
+        label:typeof candidate.label==="string"?candidate.label:undefined,
+        fiscal_period:typeof candidate.fiscal_period==="string"?candidate.fiscal_period:undefined,
+        value:typeof candidate.value==="number" && Number.isFinite(candidate.value)?candidate.value:undefined,
+        row_index:candidate.row_index,
+        parent_concept:typeof candidate.parent_concept==="string"?candidate.parent_concept:undefined,
+        parent_abstract_concept:typeof candidate.parent_abstract_concept==="string"?candidate.parent_abstract_concept:undefined,
+        level:typeof candidate.level==="number"?candidate.level:undefined,
+        balance:typeof candidate.balance==="string"?candidate.balance:undefined
+      })):[],
     };
   }
   const candidateNumber=(value:any):number|null=>
