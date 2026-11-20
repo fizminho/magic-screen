@@ -376,6 +376,8 @@ def filing_specific_review(
         pretax_reconciliation = pretax - other_income - interest_signed
         return {
             "status": "review_only",
+            "method": "statement_subtotal_reconstructed",
+            "automation_status": "manual_review_only",
             "filing_accession": accession,
             "fiscal_period": period,
             "source_context": "FY2026 Form 10-K, consolidated statement of income and MD&A operating expense summary",
@@ -421,6 +423,8 @@ def filing_specific_review(
         pretax_less_nonoperating = pretax - nonoperating_net
         return {
             "status": "review_only",
+            "method": "direct_reported_operating_income",
+            "automation_status": "direct_fact_control_only",
             "filing_accession": accession,
             "fiscal_period": period,
             "source_context": "FY2025 Form 10-K, consolidated statement of income and Note 18",
@@ -453,6 +457,8 @@ def filing_specific_review(
     total_interest = reported_interest + allocated_finance_interest
     return {
         "status": "review_only",
+        "method": "filing_specific_interest_reconciliation",
+        "automation_status": "manual_review_only",
         "filing_accession": accession,
         "source_context": "2025 Form 10-K, Item 7 Segment Results and consolidated statement of operations",
         "reported_interest_expense_net": reported_interest,
