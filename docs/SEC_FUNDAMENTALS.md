@@ -184,3 +184,8 @@ The EdgarTools research workflow is pinned to `edgartools==6.3.0` and tests a te
 The default EdgarTools sample includes SGHC to test a known Form 20-F annual report alongside domestic Form 10-K issuers. AFMJF is retained as a negative coverage test because its ticker is not found in the SEC company index; its annual financial statements are published through the issuer's own investor-reporting channels. This must be treated as an SEC coverage limitation, not zero/missing company fundamentals. Individual `CompanyNotFoundError` results are recorded as `not_found_in_sec_company_index`; unexpected errors still fail the workflow.
 
 For each extracted issuer, the artifact also reports a review-only direct consolidated `OperatingIncomeLoss` candidate when exactly one non-dimensional statement row matches the selected annual fiscal period. This output is not production mapping approval and must be reviewed for reporting currency, fiscal period and accounting classification.
+
+
+## Expanded MFI sample results
+
+The 2026-11-20 EdgarTools 6.3.0 artifact extracted 10 of 11 current MFI sample symbols. AFMJF is not in the SEC company index and requires a non-SEC reporting source. Direct non-dimensional annual operating-income facts were surfaced for ADBE, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK. HRB and PBI continue to use filing-specific manual-review arithmetic, not automatic mapping. SGHC's 20-F was parsed successfully, but its IFRS presentation did not surface a direct US-GAAP `OperatingIncomeLoss` fact. PLTK's negative operating income remains negative. SNDK's FY2026 operating income is flagged for pre/post-spin comparability review. This sample is diagnostic only; it does not approve production EBIT, debt, cash, PP&E, ROC or EY mappings.
