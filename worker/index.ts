@@ -784,9 +784,9 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     if(sr.ok){
       schemaStatus="loaded";
       const schemaXml=await sr.text();
-      for(const roleType of schemaXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?roleType\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?roleType>/gi)){
+      for(const roleType of schemaXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?roleType\b([^>]*)>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?roleType>/gi)){
         const roleUri=roleType[1].match(/roleURI=["']([^"']+)["']/i)?.[1];
-        const definition=roleType[2].match(/<(?:[A-Za-z0-9_-]+:)?definition\\b[^>]*>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?definition>/i)?.[1]?.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
+        const definition=roleType[2].match(/<(?:[A-Za-z0-9_-]+:)?definition\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z0-9_-]+:)?definition>/i)?.[1]?.replace(/<[^>]*>/g,"").replace(/&amp;/g,"&").trim();
         if(roleUri&&definition) roleDefinitions.set(roleUri,definition);
       }
     } else schemaStatus="http_"+sr.status;
