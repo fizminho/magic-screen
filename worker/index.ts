@@ -833,8 +833,25 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
   // company-wide inputs in this compact Magic Formula review response.
   const relevantStandard=standardUnique.filter(f=>priority(f.tag)<99&&!f.dimensions)
     .sort((a,b)=>priority(a.tag)-priority(b.tag)||a.tag.localeCompare(b.tag));
+  const extensionPriority=(fact:any)=>{
+    const t=String(fact.tag+" "+(fact.label??"")).toLowerCase().replace(/[^a-z0-9]+/g,"");
+    // INTENTIONAL: rank extension candidates by likely Magic Formula input meaning,
+    // while keeping consolidated facts ahead of dimensional breakdowns. This is
+    // diagnostic ordering only; priority never approves a concept for production.
+    if(/operating(income|profit)|profitlossfromoperating/.test(t)) return 1;
+    if(/revenue|sales/.test(t)) return 2;
+    if(/currentassets/.test(t)) return 3;
+    if(/currentliabilit/.test(t)) return 4;
+    if(/propertyplantandequipment|netppe|fixedassets/.test(t)) return 5;
+    if(/cashandcashequivalent|cashandbank|cashbalance/.test(t)) return 6;
+    if(/totaldebt|debtnoncurrent|debtcurrent|borrowings|loanspayable/.test(t)) return 7;
+    if(/interestexpense|financecost/.test(t)) return 8;
+    if(/operatingexpense|costofsales|costofrevenue|costsandexpenses/.test(t)) return 9;
+    if(/asset|liabilit|lease|receivable|payable|inventory/.test(t)) return 10;
+    return 99;
+  };
   const relevantExtensions=extensionUnique
-    .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||a.tag.localeCompare(b.tag));
+    .sort((a,b)=>Number(a.dimensions)-Number(b.dimensions)||extensionPriority(a)-extensionPriority(b)||a.tag.localeCompare(b.tag));
   const compact=(fact:any)=>({
     tag:fact.tag,label:fact.label,value:fact.value,unit:fact.unit,kind:fact.kind,
     dimensions:fact.dimensions,
@@ -905,7 +922,7 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       note:"Cross-check only. Exact arithmetic reconciliation supports the issuer-specific interpretation but does not automatically approve an EBIT mapping."
     }:null
   };
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,12).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>12||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates and explicitly labelled arithmetic review checks, not approved accounting mappings. No production ratios or rankings are changed."};
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL",filing:{accession:anchor.accn,period:anchor.end,form:anchor.form,filed_at:anchor.filed,url:base+"index.html"},linkbases:{labels:labelStatus,presentation:presentationStatus},counts:{extension:extensionUnique.length,standard:standardUnique.length,priority_standard:relevantStandard.length},extension_facts:relevantExtensions.slice(0,30).map(compact),statement_facts:relevantStandard.slice(0,24).map(compact),review_only_checks:reviewOnlyChecks,truncated:relevantExtensions.length>30||relevantStandard.length>24,eligible_for_magic_formula:false,note:"Focused diagnostic only. Shows likely Magic Formula input candidates and explicitly labelled arithmetic review checks, not approved accounting mappings. No production ratios or rankings are changed."};
 }
 
 export default {
