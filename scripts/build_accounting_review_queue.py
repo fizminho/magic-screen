@@ -73,14 +73,44 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
     if flags:
         issues.extend("flag:" + flag for flag in flags)
     balance = row.get("balance_sheet_candidate_review") or {}
-    category_summary = []
+    category_summary: list[str] = []
+    balance_assessments: dict[str, Any] = {}
     for name, detail in sorted(balance.items()):
         detail = detail or {}
         status = str(detail.get("status") or "not_found")
         count = detail.get("candidate_count", 0)
-        if status not in ("unique", "unique_candidate", "not_found") or (isinstance(count, int) and count > 1):
+        confidence = candidate_confidence(status, count)
+        balance_assessments[name] = {
+            "candidate_status": status,
+            "candidate_count": count,
+            "classification_confidence": confidence,
+            "policy_status": BALANCE_POLICY_STATUS.get(name, "pending_accounting_policy_review"),
+            "production_approved": False,
+        }
+        if confidence not in ("unique_candidate", "no_candidate_identified"):
             category_summary.append(f"{name}={status}({count})")
 
+    assessment = {
+        "ebit": {
+            "candidate_status": ebit,
+            "classification_confidence": "unique_candidate" if ebit == "direct_reported_candidate_review_only" else "unresolved",
+            "policy_status": "pending_operating_income_and_Magic_Formula_EBIT_approval",
+            "production_approved": False,
+        },
+        "invested_capital": {
+            "candidate_status": invested,
+            "classification_confidence": "unique_positive_candidate" if invested == "positive_denominator_candidate_review_only" else "unresolved",
+            "policy_status": "pending_invested_capital_scope_approval",
+            "production_approved": False,
+        },
+        "balance_sheet": balance_assessments,
+        "enterprise_value": {
+            "candidate_status": ev.get("status") or "not_resolved",
+            "debt_classification_status": debt,
+            "approval_status": ev.get("approval_status") or "review_only_no_production_ev_or_earnings_yield",
+            "production_approved": False,
+        },
+    }
     return {
         "symbol": symbol,
         "priority": tier,
@@ -94,9 +124,9 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "issue_count": len(issues),
         "issues": issues,
         "balance_sheet_exceptions": category_summary,
+        "candidate_vs_policy_assessment": assessment,
         "production_write": False,
     }
-
 
 def build_queue(report: dict[str, Any]) -> dict[str, Any]:
     rows = [classify(row) for row in report.get("resolutions", [])]
@@ -148,6 +178,7 @@ def main() -> int:
             row = dict(item)
             row["issues"] = " | ".join(item["issues"])
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
+            row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))
             writer.writerow(row)
     print("Accounting review queue:", json.dumps(queue["summary"], sort_keys=True))
     print("Review-only; production fundamentals and rankings were not changed.")
