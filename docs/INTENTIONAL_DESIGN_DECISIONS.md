@@ -319,3 +319,5 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 
 - **INTENTIONAL:** review-only ROC previews now include explicit scope flags when separate rental equipment, sale-leaseback/construction financing, lease liabilities, or restricted/combined cash are present. The numerical diagnostic remains visible, but the flags make it harder to mistake the simple denominator/EV inputs for a complete issuer-specific accounting review. Flags never apply automatic adjustments.
+
+- **INTENTIONAL:** right-of-use assets are surfaced separately from net PP&E and generate an ROC scope flag. Lease accounting can create both ROU assets and lease liabilities; the current diagnostic denominator does not silently add/subtract either category.
