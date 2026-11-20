@@ -256,3 +256,8 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - The expanded default sample adds SGHC, a verified current MFI constituent whose FY2025 annual report is a Form 20-F, to exercise the foreign-private-issuer path. AFMJF remains as a deliberate negative coverage case: EdgarTools cannot resolve its OTC ticker in the SEC company index. Its annual financial statements are published outside SEC EDGAR; this is a source-coverage gap, not evidence that the company lacks financial statements.
 - **INTENTIONAL:** a `CompanyNotFoundError` for an individual ticker is recorded as `not_found_in_sec_company_index` and does not fail otherwise successful sample extractions. Unexpected extraction errors still fail the workflow.
 - The report now exposes a generic review-only direct `OperatingIncomeLoss` candidate when one unique consolidated non-dimensional row matches the selected annual fiscal period. This is evidence for manual comparison only, not an automatic EBIT mapping or production approval.
+
+
+## Expanded MFI sample findings (2026-11-20)
+
+The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded as a SEC company-index coverage gap. Direct consolidated `OperatingIncomeLoss` candidates were surfaced for ADBE, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK. HRB and PBI retain their accession-specific manual-review candidates. SGHC's Form 20-F was successfully parsed, but no direct US-GAAP `OperatingIncomeLoss` fact was surfaced; IFRS line items require separate classification review. PLTK's negative operating income is retained as negative, not coerced to zero. SNDK's operating-income fact is surfaced with a pre/post-spin comparability note. None of these outputs changes production ratios, eligibility or ranks.
