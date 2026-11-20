@@ -149,3 +149,12 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - The filing-level inspector reports a direct operating-income fact when it finds one of the exact concepts already recognized by the production parser across the supported US-GAAP and IFRS taxonomies.
 - It returns the concept, label, amount, unit, duration type, and a presentation hint so reviewers can see which direct fact was found. The boolean is retained for simple client checks.
 - **INTENTIONAL:** this is diagnostic visibility only. It does not broaden production tag support or accept generic profit, pretax income, or non-operating income as EBIT. Production calculations remain governed by the existing explicit-tag parser.
+
+
+### SEC debt fallback when current debt is explicitly zero
+
+- Adobe FY2025 reports aggregate `DebtCurrent` as an explicit zero and `LongTermDebt` as USD 6.210 billion on its non-current liabilities statement.
+- The production pipeline may use `LongTermDebt` as the debt balance only when the same annual accession explicitly reports `DebtCurrent = 0`.
+- INTENTIONAL: do not use this fallback when current debt is non-zero or missing. In those cases, `LongTermDebt` may overlap current maturities and could be double-counted; a matched current/non-current split remains required.
+- This is a conservative, narrow fallback. It does not infer lease-inclusive debt or treat missing debt components as zero.
+- The ADBE diagnostic itself remains review-only; the production fallback uses exact-accession SEC Company Facts values and does not rely on the diagnostic endpoint.
