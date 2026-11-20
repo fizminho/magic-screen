@@ -995,11 +995,37 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
             "unresolved_inputs": unresolved,
             "guardrail": "No denominator is calculated unless current assets, current liabilities and net PP&E each have exactly one candidate. This review value never feeds production ROC or ranking.",
         }
-    value = (
-        inputs["current_assets_candidates"]
-        - inputs["current_liabilities_candidates"]
-        + inputs["net_ppe_candidates"]
+    working_capital = (
+        inputs["current_assets_candidates"] - inputs["current_liabilities_candidates"]
     )
+    net_ppe = inputs["net_ppe_candidates"]
+    value = working_capital + net_ppe
+    # INTENTIONAL: expose denominator composition so negative working capital
+    # cannot silently make invested capital look unusually small. This is a
+    # diagnostic only; it does not change the Greenblatt-style candidate formula.
+    negative_working_capital_offset_ratio = (
+        abs(working_capital) / net_ppe
+        if working_capital < 0 and net_ppe > 0 else None
+    )
+    denominator_diagnostics = {
+        "working_capital": round(working_capital, 2),
+        "net_ppe": round(net_ppe, 2),
+        "working_capital_as_pct_of_net_ppe": (
+            round((working_capital / net_ppe) * 100, 4) if net_ppe != 0 else None
+        ),
+        "negative_working_capital_offset_ratio": (
+            round(negative_working_capital_offset_ratio, 6)
+            if negative_working_capital_offset_ratio is not None else None
+        ),
+        "negative_working_capital_offsets_at_least_90pct_of_net_ppe": (
+            negative_working_capital_offset_ratio >= 0.90
+            if negative_working_capital_offset_ratio is not None else False
+        ),
+        "near_zero_positive_denominator_from_negative_working_capital": (
+            value > 0 and negative_working_capital_offset_ratio is not None
+            and negative_working_capital_offset_ratio >= 0.90
+        ),
+    }
     net_ppe_candidates = categories.get("net_ppe_candidates", {}).get("candidates", [])
     ppe_includes_finance_lease_rou_count = sum(
         1 for candidate in net_ppe_candidates
@@ -1027,10 +1053,11 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
         "value": round(value, 2),
         "sign": "positive" if value > 0 else "negative" if value < 0 else "zero",
         "inputs": inputs,
+        "denominator_diagnostics": denominator_diagnostics,
         "unresolved_inputs": [],
         "scope_review": scope_review,
         "scope_flags": scope_flags,
-        "guardrail": "Review-only denominator using unique label/concept candidates. Separate rental equipment and right-of-use assets, finance-lease ROU embedded in a PP&E concept, and lease liabilities are surfaced as scope flags; no accounting policy is inferred. This does not approve PP&E scope, EBIT, ROC, eligibility or ranking and never feeds production data.",
+        "guardrail": "Review-only denominator using unique label/concept candidates. Denominator composition diagnostics highlight when negative working capital offsets most net PP&E; they do not alter the formula. Separate rental equipment and right-of-use assets, finance-lease ROU embedded in PP&E, and lease liabilities remain scope flags. No accounting policy is inferred and this never feeds production data.",
     }
 
 
