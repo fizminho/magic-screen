@@ -182,7 +182,10 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
         # the suffix "InterestExpense".
         ("interest_expense", r"(?:^|_)(?:InterestIncomeExpenseNet|InterestExpense)$",
          "non_operating_candidate", r"^Interest expense$", r"FinancingInterestExpense"),
-        ("pension_non_service", r"NonoperatingIncomeExpense|Pension|Postretirement", "non_operating_candidate", r"pension|postretirement|non.?service", None),
+        # INTENTIONAL: EdgarTools may expose this as a generic NonoperatingIncomeExpense concept.
+        # Match the human-readable label independently of the taxonomy suffix, because
+        # issuer presentation labels can be more specific than the XBRL concept name.
+        ("pension_non_service", r".*", "non_operating_candidate", r"pension|postretirement|non.?service", None),
         ("other_expense", r"(?:^|_)OtherNonrecurringIncomeExpense$", "ambiguous_review", r"other expense", None),
     ]
     expenses = [
