@@ -9,6 +9,10 @@ const dateTime = (value?:string|null) => value ? new Date(value).toLocaleString(
 const money = (value: number | null, currency: string) => value == null ? "—" : new Intl.NumberFormat("en-US", {style:"currency",currency,maximumFractionDigits:2}).format(value);
 const pct = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 const ratioPct = (value: number | null) => value == null ? "—" : `${(value * 100).toFixed(2)}%`;
+
+type MfiPreviewRow = {symbol:string;company_name:string|null;market_cap:number|null;earnings_yield:number|null;return_on_capital:number|null;earnings_yield_rank:number|null;return_on_capital_rank:number|null;magic_formula_score:number|null;magic_formula_rank:number|null;ranking_eligible:boolean;review_flags:string[]};
+type MfiPreview = {as_of:string;summary:{universe:number;eligible:number;ranked:number;excluded:number};rankings:MfiPreviewRow[];production_write:boolean;guardrail:string};
+
 const MFI_SOURCE_URL = "https://www.magicformulainvesting.com/Screening/StockScreening";
 
 export default function App() {
@@ -20,6 +24,9 @@ export default function App() {
   const [marketUniverse, setMarketUniverse] = useState(universe);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
+  const [mfiPreview,setMfiPreview]=useState<MfiPreview|null>(null);
+  const [mfiPreviewError,setMfiPreviewError]=useState("");
+
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<string[]>([]);
@@ -106,6 +113,16 @@ export default function App() {
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, [market, mfiCount, minimumMarketCap]);
+  useEffect(()=>{
+    if(market!=="US"){setMfiPreview(null);setMfiPreviewError("");return;}
+    let cancelled=false;
+    fetch("/api/fundamentals/edgartools/ranking-preview/public")
+      .then(async response=>{const data=await response.json() as MfiPreview & {error?:string};if(!response.ok)throw new Error(data.error||"Shadow ranking unavailable");return data;})
+      .then(data=>{if(!cancelled){setMfiPreview(data);setMfiPreviewError("");}})
+      .catch(error=>{if(!cancelled)setMfiPreviewError(error instanceof Error?error.message:"Shadow ranking unavailable");});
+    return ()=>{cancelled=true;};
+  },[market]);
+
   useEffect(() => { setPage(1); }, [market, tab, query, sort]);
 
   const rows = useMemo(() => {
@@ -220,6 +237,18 @@ export default function App() {
             <div><span>SEC DATA LAST PROCESSED</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} current · {pipeline?.sec?.awaiting_market_cap ?? 0} awaiting market cap · {pipeline?.sec?.awaiting_fundamentals ?? 0} awaiting SEC · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.stale_market_cap ?? 0} valuation refresh pending · {pipeline?.sec?.unmapped ?? 0} unmapped · {pipeline?.sec?.provider_error ?? 0} provider errors</small></div>
           </> : <div><span>QUOTE CACHE</span><b>{dateTime(pipeline?.last_quote_sync)}</b><small>Latest stored Bursa quote timestamp</small></div>}
         </div>
+
+        {market==="US" && <section className="mfi-preview-panel">
+          <div className="mfi-preview-head"><div><div className="eyebrow">EDGARTOOLS · SHADOW CALCULATION</div><h2>Magic Formula preview <span className="preview-pill">NOT PRODUCTION</span></h2><p>Read-only ranking from annual filing evidence. Candidate accounting inputs are not yet policy-approved.</p></div><div className="preview-updated">{mfiPreview ? dateTime(mfiPreview.as_of) : "Waiting for preview"}</div></div>
+          {mfiPreviewError ? <div className="preview-empty">Preview unavailable: {mfiPreviewError}</div> : !mfiPreview ? <div className="preview-empty">Loading shadow ranking…</div> : <>
+            <div className="preview-stats"><div><b>{mfiPreview.summary.universe}</b><span>Universe</span></div><div><b>{mfiPreview.summary.ranked}</b><span>Ranked candidates</span></div><div><b>{mfiPreview.summary.excluded}</b><span>Excluded</span></div></div>
+            <div className="table-wrap"><table className="preview-table"><thead><tr><th>RANK</th><th>COMPANY</th><th>EARNINGS YIELD</th><th>RETURN ON CAPITAL</th><th>EY PERCENTILE</th><th>ROC PERCENTILE</th><th>REVIEW FLAGS</th></tr></thead><tbody>
+              {mfiPreview.rankings.filter(row=>row.magic_formula_rank!==null).map(row=><tr key={row.symbol}><td className="formula-score">#{row.magic_formula_rank}</td><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td>{ratioPct(row.earnings_yield)}</td><td>{ratioPct(row.return_on_capital)}</td><td>{row.earnings_yield_rank?.toFixed(1)??"—"}</td><td>{row.return_on_capital_rank?.toFixed(1)??"—"}</td><td><span className="preview-warning">{row.review_flags.length} flags</span></td></tr>)}
+            </tbody></table></div>
+            <p className="preview-footnote">{mfiPreview.guardrail} Production write: {String(mfiPreview.production_write)}.</p>
+          </>}
+        </section>}
+
         <div className="section-title"><div><div className="eyebrow">DISCOVER OPPORTUNITIES</div><h2>{market==="MY"?"Bursa Malaysia":"US Equities"} <span className="sub-count">{rows.length} companies</span></h2></div><div className="method-tag"><Sparkles size={14}/> MAGIC FORMULA</div></div>
         <div className="toolbar"><div className="tabs"><button className={tab==="all"?"selected":""} onClick={()=>setTab("all")}>All stocks</button><button className={tab==="shariah"?"selected":""} onClick={()=>setTab("shariah")}> <ShieldCheck size={14}/> Shariah verified</button><button className={tab==="watchlist"?"selected":""} onClick={()=>setTab("watchlist")}>Watchlist</button></div><div className="tools"><div className="searchbox"><Search size={15}/><input placeholder="Search company or ticker..." value={query} onChange={e=>setQuery(e.target.value)}/></div><button className="sort-btn" onClick={()=>setSort(s=>s==="rank"?"name":s==="name"?"change":"rank")}><ArrowDownUp size={14}/> Sort: {sort==="rank"?"Formula":sort==="name"?"Name":"Change"}</button></div></div>
         <div className="table-wrap"><table><thead><tr><th className="rank-col">#</th><th>COMPANY</th><th>PRICE</th><th>MARKET CAP</th><th>DAY CHANGE</th><th>EARNINGS YIELD</th><th>RETURN ON CAPITAL</th><th>FORMULA RANK</th><th>SOURCE</th><th></th></tr></thead><tbody>
