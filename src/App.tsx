@@ -136,7 +136,7 @@ export default function App() {
     setExtensionBusy(true);setExtensionStatus("Reading the latest annual SEC filing...");setExtensionResult(null);
     try{
       const response=await fetch("/api/fundamentals/diagnose-extensions",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+extensionToken.trim()},body:JSON.stringify({symbol})});
-      const result=await response.json();
+      const result=await response.json() as {error?:string};
       if(!response.ok) throw new Error(result.error||"SEC extension diagnostic failed ("+response.status+").");
       setExtensionResult(result);setExtensionStatus("Diagnostic complete. No fundamentals or rankings were changed.");
     }catch(error){setExtensionStatus(error instanceof Error?error.message:"Diagnostic failed.");}
