@@ -883,9 +883,15 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
         - inputs["current_liabilities_candidates"]
         + inputs["net_ppe_candidates"]
     )
+    net_ppe_candidates = categories.get("net_ppe_candidates", {}).get("candidates", [])
+    ppe_includes_finance_lease_rou_count = sum(
+        1 for candidate in net_ppe_candidates
+        if re.search(r"FinanceLeaseRightOfUseAsset", str(candidate.get("concept", "")), re.I)
+    )
     scope_review = {
         "rental_equipment_candidate_count": categories.get("rental_equipment_net_candidates", {}).get("candidate_count", 0),
         "right_of_use_asset_candidate_count": categories.get("right_of_use_asset_candidates", {}).get("candidate_count", 0),
+        "ppe_includes_finance_lease_rou_candidate_count": ppe_includes_finance_lease_rou_count,
         "current_lease_liability_candidate_count": categories.get("current_lease_liability_candidates", {}).get("candidate_count", 0),
         "noncurrent_lease_liability_candidate_count": categories.get("noncurrent_lease_liability_candidates", {}).get("candidate_count", 0),
     }
@@ -894,6 +900,8 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
         scope_flags.append("separate_rental_equipment_requires_invested_capital_scope_review")
     if scope_review["right_of_use_asset_candidate_count"]:
         scope_flags.append("right_of_use_assets_require_invested_capital_scope_review")
+    if scope_review["ppe_includes_finance_lease_rou_candidate_count"]:
+        scope_flags.append("finance_lease_right_of_use_assets_embedded_in_net_ppe_require_scope_review")
     if scope_review["current_lease_liability_candidate_count"] or scope_review["noncurrent_lease_liability_candidate_count"]:
         scope_flags.append("lease_liabilities_require_invested_capital_scope_review")
     return {
@@ -905,7 +913,7 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
         "unresolved_inputs": [],
         "scope_review": scope_review,
         "scope_flags": scope_flags,
-        "guardrail": "Review-only denominator using unique label/concept candidates. Separate rental equipment, right-of-use assets and lease liabilities are surfaced as scope flags; no accounting policy is inferred. This does not approve PP&E scope, EBIT, ROC, eligibility or ranking and never feeds production data.",
+        "guardrail": "Review-only denominator using unique label/concept candidates. Separate rental equipment and right-of-use assets, finance-lease ROU embedded in a PP&E concept, and lease liabilities are surfaced as scope flags; no accounting policy is inferred. This does not approve PP&E scope, EBIT, ROC, eligibility or ranking and never feeds production data.",
     }
 
 
