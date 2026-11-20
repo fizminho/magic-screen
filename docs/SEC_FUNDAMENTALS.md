@@ -299,3 +299,10 @@ ROC remains a same-currency calculation: EBIT and invested capital from the same
 Frankfurter is a free daily reference-rate service without an API key; its blended rates are not live trading quotes and can be revised. This bakeoff step only emits a conversion candidate. The current artifact does not contain MFI market-cap values, so the CAD rate for EGHSF can be shown without fabricating a converted market cap, EV or Earnings Yield. No production calculations or rankings are changed.
 
 The 2026-11-20 cohort found one reporting-currency evidence exception: SGHC's FY2025 20-F is presented in USD, but standard Company Facts did not expose an ISO currency-unit observation for that accession. The bakeoff therefore uses a manual USD override restricted to SGHC accession `0001628280-26-025609`. SBC's exact-accession unit evidence is overwhelmingly USD but includes one JPY observation; the artifact preserves that as a secondary-unit review flag.
+
+
+## MFI market-cap currency alignment in research
+
+The EdgarTools bakeoff now carries the MFI USD market caps for the pinned 2026-11-18 price snapshot (MFI response as-of 2026-11-20T09:14:01.782Z; quarter date 2026-09-30). It converts USD market cap into the issuer's filing currency using the Frankfurter blended daily reference rate for the MFI price date. The 2026-11-18 USD/CAD observation for EGHSF was 1.4296, converting its USD 643.04m MFI market cap to CAD 919.289984m. This avoids adding USD market cap to CAD debt/cash.
+
+The bakeoff supports a workflow-dispatch `market_caps_json` override for a newer snapshot, with `mfi_price_date` changed to the corresponding quote date. The pinned snapshot is review data only. ADBE is a historical control, not part of the 30-stock snapshot, and therefore has no attached MFI market cap. FX reference rates are not live trading quotes. No EV/Earnings Yield is approved by this review, and production calculations/ranks remain unchanged.
