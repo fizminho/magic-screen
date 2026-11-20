@@ -274,3 +274,13 @@ The full 30-stock MFI research cohort exposed a label-matching defect: some issu
 
 
 The balance-sheet review also surfaces noncontrolling/minority interests. Where consolidated EBIT includes controlled subsidiaries that are not wholly owned, the enterprise-value bridge may need a noncontrolling-interest adjustment. The bakeoff flags this scope issue but does not automatically add NCI to debt or EV.
+
+
+## Non-SEC MFI issuer-report coverage
+
+Two MFI OTC symbols in the 2026-11-20 cohort were not found in the SEC company index: AFMJF and EGHSF. Their absence from the SEC ticker/CIK mapping does not mean no audited financial statements exist. The bakeoff now attaches separate manual research cases from the issuers' own annual reports:
+
+- **AFMJF / Alphamin Resources Corp.:** audited FY2025 IFRS statements in USD, published March 11, 2026. Operating profit is $273.665m. The review preserves conventional debt, cash, lease liabilities, ROU assets included within PPE, separate exploration/evaluation assets, and $65.738m noncontrolling interest. Because the controlled mining subsidiary is only 84.14% owned, NCI must be considered when aligning consolidated EBIT with EV.
+- **EGHSF / Enghouse Systems Limited (TSX: ENGH):** audited FY2025 IFRS statements in CAD, published December 15, 2025. The $84.862m EBIT candidate is reconstructed from $114.354m results from operating activities less $29.492m acquired-software/customer-relationship amortization, and reconciles exactly to reported pretax income. The review keeps ROU assets and lease liabilities separate and flags the CAD/USD mismatch against the MFI market-cap input.
+
+These are manually transcribed, accession-free issuer-report cases. They do not create SEC CIK mappings, feed the SEC fundamentals sync, or change D1/production rankings. The Enghouse EV candidate remains unavailable until a documented FX conversion and aligned market-cap date are supplied.
