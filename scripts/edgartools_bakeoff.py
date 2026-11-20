@@ -360,15 +360,21 @@ def manual_enterprise_value_scenario_review(
             "guardrail": "No EV/Earnings Yield scenario is calculated until market cap, EBIT and conventional net debt are all available in the same currency.",
         }
 
-    nci = float(noncontrolling_interest or 0)
-    leases = float(lease_liabilities or 0)
+    nci = float(noncontrolling_interest) if isinstance(noncontrolling_interest, (int, float)) else None
+    leases = float(lease_liabilities) if isinstance(lease_liabilities, (int, float)) else None
     base_ev = float(market_cap_reporting_currency) + float(conventional_net_debt)
     definitions = [
         ("conventional_debt_only", base_ev, "Market cap plus conventional net debt; excludes NCI and lease liabilities."),
-        ("plus_noncontrolling_interest", base_ev + nci, "Adds reported NCI to align consolidated EBIT with enterprise value."),
-        ("plus_lease_liabilities", base_ev + leases, "Adds current and noncurrent lease liabilities to conventional EV."),
-        ("plus_nci_and_lease_liabilities", base_ev + nci + leases, "Adds both NCI and lease liabilities to conventional EV."),
     ]
+    if nci is not None:
+        definitions.append(("plus_noncontrolling_interest", base_ev + nci,
+            "Adds reported NCI to align consolidated EBIT with enterprise value."))
+    if leases is not None:
+        definitions.append(("plus_lease_liabilities", base_ev + leases,
+            "Adds current and noncurrent lease liabilities to conventional EV."))
+    if nci is not None and leases is not None:
+        definitions.append(("plus_nci_and_lease_liabilities", base_ev + nci + leases,
+            "Adds both NCI and lease liabilities to conventional EV."))
     scenarios = []
     for name, enterprise_value, treatment in definitions:
         earnings_yield = (
@@ -389,8 +395,9 @@ def manual_enterprise_value_scenario_review(
         "conventional_net_debt_candidate": float(conventional_net_debt),
         "noncontrolling_interest_candidate": nci,
         "lease_liabilities_candidate": leases,
+        "omitted_scenarios_due_to_unknown_inputs": [name for name, value in (("noncontrolling_interest", nci), ("lease_liabilities", leases)) if value is None],
         "scenarios": scenarios,
-        "guardrail": "All scenarios are manual review sensitivities. No EV definition, EBIT classification, cash availability, debt scope or Earnings Yield is approved for production ranking.",
+        "guardrail": "All scenarios are manual review sensitivities. A scenario is omitted when its required adjustment is unknown; missing NCI or lease liabilities are never assumed to be zero. No EV definition, EBIT classification, cash availability, debt scope or Earnings Yield is approved for production ranking.",
     }
 
 
