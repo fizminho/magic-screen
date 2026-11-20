@@ -249,6 +249,27 @@ class ManualEnterpriseValueScenarioTests(unittest.TestCase):
             places=4,
         )
 
+    def test_unknown_nci_and_lease_inputs_are_not_assumed_zero(self):
+        result = manual_enterprise_value_scenario_review(
+            1_000_000, 100_000, 50_000, currency="USD",
+        )
+        scenarios = {item["name"] for item in result["scenarios"]}
+        self.assertEqual(scenarios, {"conventional_debt_only"})
+        self.assertIsNone(result["noncontrolling_interest_candidate"])
+        self.assertIsNone(result["lease_liabilities_candidate"])
+        self.assertEqual(
+            set(result["omitted_scenarios_due_to_unknown_inputs"]),
+            {"noncontrolling_interest", "lease_liabilities"},
+        )
+
+    def test_explicit_zero_nci_is_distinct_from_unknown_nci(self):
+        result = manual_enterprise_value_scenario_review(
+            1_000_000, 100_000, 50_000, 0, None, "USD",
+        )
+        scenarios = {item["name"] for item in result["scenarios"]}
+        self.assertIn("plus_noncontrolling_interest", scenarios)
+        self.assertNotIn("plus_lease_liabilities", scenarios)
+
     def test_missing_inputs_do_not_generate_enterprise_value(self):
         result = manual_enterprise_value_scenario_review(None, 100, 0, currency="CAD")
         self.assertEqual(result["status"], "inputs_incomplete")
