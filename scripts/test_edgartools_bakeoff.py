@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import balance_sheet_fact_review
+from edgartools_bakeoff import balance_sheet_fact_review, roc_review
 
 
 PERIOD = "2025-12-31"
@@ -102,6 +102,26 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertEqual(
             categories["rental_equipment_net_candidates"]["candidate_count"], 1
         )
+
+    def test_roc_preview_flags_separate_rental_ppe_and_financing(self):
+        balance_review = {
+            "categories": {
+                "rental_equipment_net_candidates": {"candidate_count": 1},
+                "nondebt_financing_obligation_candidates": {"candidate_count": 1},
+                "current_lease_liability_candidates": {"candidate_count": 2},
+                "noncurrent_lease_liability_candidates": {"candidate_count": 2},
+                "cash_restricted_candidates": {"candidate_count": 1},
+                "cash_combined_or_investment_candidates": {"candidate_count": 1},
+            }
+        }
+        result = roc_review(
+            {"status": "review_only", "ebit_candidate": 196_000_000},
+            {"status": "calculated_review_only", "value": 642_370_000},
+            balance_review,
+        )
+        self.assertEqual(result["status"], "calculated_review_only")
+        self.assertAlmostEqual(result["roc"], 30.512, places=3)
+        self.assertEqual(len(result["review_flags"]), 4)
 
     def test_sale_leaseback_financing_is_not_misclassified_as_debt(self):
         categories = self.review(
