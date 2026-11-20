@@ -10,9 +10,9 @@ on:
   workflow_dispatch:
     inputs:
       symbols:
-        description: "Comma-separated tickers from the current MFI universe (default runs the HRB/PBI/ADBE controls plus MFI sample issuers, including a verified 20-F case)"
+        description: "Comma-separated tickers from the current MFI universe (default runs the latest full 30-stock MFI snapshot plus ADBE as a historical control)"
         required: false
-        default: "HRB,PBI,ADBE,AFMJF,HPQ,OTEX,PRDO,PLTK,UPWK,SNDK,SGHC"
+        default: "ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM"
         type: string
 
 permissions:
@@ -39,7 +39,7 @@ jobs:
         env:
           EDGAR_IDENTITY: "Magic Screen research support@binalah.co"
           OUTPUT_PATH: "edgartools-bakeoff.json"
-          BAKEOFF_SYMBOLS: "${{ github.event.inputs.symbols || 'HRB,PBI,ADBE,AFMJF,HPQ,OTEX,PRDO,PLTK,UPWK,SNDK,SGHC' }}"
+          BAKEOFF_SYMBOLS: "${{ github.event.inputs.symbols || 'ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM' }}"
         run: python scripts/edgartools_bakeoff.py
       - name: Upload test report
         if: always()
