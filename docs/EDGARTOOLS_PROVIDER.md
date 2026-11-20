@@ -80,6 +80,10 @@ The existing production Worker still calculates US fundamentals directly from SE
 - Lease liabilities, non-controlling interests, restricted cash, short-term investments and separate financing obligations remain scope flags. No EV/Earnings Yield or ROC candidate is promoted into production.
 
 
+#### Debt maturity classification boundary
+
+Current and noncurrent conventional debt categories now have reciprocal exclusion rules. A noncurrent label or taxonomy concept cannot enter the current bucket, and a current label or taxonomy concept cannot enter the noncurrent bucket. This protects the debt bridge from double counting when issuer labels and taxonomy concepts disagree, including labels such as "long-term debt, net of current portion". The new regression fixture checks SEC and issuer-specific concepts and asserts the candidate sets do not overlap.
+
 #### Explicit enterprise-value candidate selection policy
 
 The read-only EV scope review now reports the treatment of each balance-sheet category:
