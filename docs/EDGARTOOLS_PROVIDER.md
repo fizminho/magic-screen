@@ -198,3 +198,7 @@ The 10-K states that a portion of total interest expense is allocated into Cost 
 ### Invested-capital denominator composition diagnostic
 
 The review-only invested-capital calculation continues to use current assets minus current liabilities plus net PP&E when each input has exactly one consolidated, non-dimensional candidate. The resolver now also reports working capital, net PP&E, the working-capital-to-PP&E percentage, and the proportion of PP&E offset by negative working capital. When negative working capital offsets at least 90% of net PP&E, the diagnostic explicitly flags a near-zero positive denominator risk. This does not change the formula, reject the issuer automatically, or approve ROC. It is intended to make unusually high ROC candidates (such as the OTEX review case) easier to audit before any policy decision.
+
+### Invested-capital denominator diagnostics in the review queue
+
+The accounting review queue carries the extraction artifact's denominator-composition diagnostics only when the raw filing accession exactly matches the resolver preview accession. It surfaces working capital, net PP&E, the negative-working-capital offset ratio, and the high-offset/near-zero-positive-denominator flags. Mismatched filing vintages are not combined. These are triage diagnostics only: they do not alter the invested-capital formula, change eligibility, approve ROC, or write production data. The queue summary counts cases where negative working capital offsets at least 90% of net PP&E.
