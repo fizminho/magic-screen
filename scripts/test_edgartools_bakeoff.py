@@ -450,6 +450,31 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertFalse(debt["automatic_aggregation"])
         self.assertEqual(sum(item["value"] for item in debt["candidates"]), 9_000_000)
 
+    def test_distinct_debt_instruments_with_shared_parent_are_not_marked_overlap(self):
+        first = row("us-gaap_LoansPayableCurrent", "Bank borrowings, current", 9_000_000)
+        second = row("us-gaap_NotesPayableCurrent", "Related-party notes payable, current", 0)
+        first["parent_concept"] = "us-gaap_LiabilitiesCurrent"
+        second["parent_concept"] = "us-gaap_LiabilitiesCurrent"
+        categories = self.review(first, second)
+        debt = categories["current_debt_candidates"]
+        self.assertEqual(
+            debt["resolution_hint"],
+            "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
+        )
+        self.assertFalse(debt["automatic_aggregation"])
+
+    def test_actual_parent_child_debt_facts_are_flagged_for_overlap_review(self):
+        first = row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 100)
+        second = row("custom_SecuredTermLoan", "Secured term loan", 100)
+        second["parent_concept"] = "us-gaap_LongTermDebtNoncurrent"
+        categories = self.review(first, second)
+        debt = categories["noncurrent_debt_candidates"]
+        self.assertEqual(
+            debt["resolution_hint"],
+            "possible_duplicate_or_parent_child_overlap_manual_review_no_automatic_sum",
+        )
+        self.assertFalse(debt["automatic_aggregation"])
+
     def test_same_concept_debt_rows_are_flagged_for_overlap_review(self):
         first = row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 100)
         second = row("us-gaap_LongTermDebtNoncurrent", "Long-term debt, noncurrent", 100)
