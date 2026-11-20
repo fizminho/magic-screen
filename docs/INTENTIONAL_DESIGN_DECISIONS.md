@@ -158,3 +158,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - INTENTIONAL: do not use this fallback when current debt is non-zero or missing. In those cases, `LongTermDebt` may overlap current maturities and could be double-counted; a matched current/non-current split remains required.
 - This is a conservative, narrow fallback. It does not infer lease-inclusive debt or treat missing debt components as zero.
 - The ADBE diagnostic itself remains review-only; the production fallback uses exact-accession SEC Company Facts values and does not rely on the diagnostic endpoint.
+
+
+## SEC directory must never expand the stock universe
+
+- INTENTIONAL: company_tickers_exchange.json is fetched as an in-memory CIK lookup only. Its full directory must never be inserted into stock_master or treated as the US screener universe. Only active MFI candidates are eligible for persistent CIK mappings and SEC fundamentals.
+- On a mapping refresh, resolve each active MFI ticker first, then perform one upsert per ticker into sec_company_map, storing either the CIK or UNMAPPED. Never write a placeholder row and then update it in a second D1 operation.
+- This bounds mapping writes to the active MFI list (normally 30 or 50 candidates), not the SEC directory's approximately 95,000 companies. The in-memory SEC directory download itself does not create D1 row writes.
