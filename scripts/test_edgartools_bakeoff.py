@@ -950,6 +950,24 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             {"us-gaap_LongTermLoansPayable", "us-gaap_LongTermNotesPayable"},
         )
 
+    def test_credit_line_and_convertible_debt_maturity_concepts(self):
+        categories = self.review(
+            row("us-gaap_ConvertibleDebtCurrent", "Current portion of convertible senior notes", 199_680_000),
+            row("us-gaap_LinesOfCreditCurrent", "Venture debt, current portion", 6_235_000),
+            row("us-gaap_LongTermLineOfCredit", "Revolving credit facility", 385_000_000),
+            row("us-gaap_LongTermLineOfCredit", "Venture debt, net of current portion", 3_473_000),
+        )
+        self.assertEqual(
+            categories["current_debt_candidates"]["candidate_count"], 2
+        )
+        self.assertEqual(
+            categories["noncurrent_debt_candidates"]["candidate_count"], 2
+        )
+        noncurrent_labels = {
+            x["label"] for x in categories["noncurrent_debt_candidates"]["candidates"]
+        }
+        self.assertIn("Venture debt, net of current portion", noncurrent_labels)
+
     def test_current_and_noncurrent_debt_categories_do_not_overlap(self):
         categories = self.review(
             row("us-gaap_LongTermDebtCurrent", "Current portion of long-term debt", 15),
