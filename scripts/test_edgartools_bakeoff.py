@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, mfi_market_cap_usd_millions, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -166,6 +166,52 @@ class CurrencyNormalizationTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "fx_rate_available_market_cap_missing")
         self.assertIsNone(result["market_cap_in_reporting_currency"])
+
+
+class ManualEnterpriseValueScenarioTests(unittest.TestCase):
+    def test_alphamin_scenarios_show_nci_and_lease_sensitivity(self):
+        result = manual_enterprise_value_scenario_review(
+            991_590_000,
+            273_665_327,
+            -15_519_161,
+            65_738_168,
+            3_557_959,
+            "USD",
+        )
+        self.assertEqual(result["status"], "review_only_sensitivity")
+        scenarios = {item["name"]: item for item in result["scenarios"]}
+        self.assertEqual(scenarios["conventional_debt_only"]["enterprise_value"], 976_070_839)
+        self.assertEqual(scenarios["plus_noncontrolling_interest"]["enterprise_value"], 1_041_809_007)
+        self.assertEqual(scenarios["plus_nci_and_lease_liabilities"]["enterprise_value"], 1_045_366_966)
+        self.assertAlmostEqual(
+            scenarios["plus_nci_and_lease_liabilities"]["earnings_yield_percent"],
+            26.1789,
+            places=4,
+        )
+
+    def test_enghouse_scenarios_use_cad_converted_market_cap(self):
+        result = manual_enterprise_value_scenario_review(
+            919_289_984,
+            84_862_000,
+            -269_061_000,
+            0,
+            11_141_000,
+            "CAD",
+        )
+        self.assertEqual(result["status"], "review_only_sensitivity")
+        scenarios = {item["name"]: item for item in result["scenarios"]}
+        self.assertEqual(scenarios["conventional_debt_only"]["enterprise_value"], 650_228_984)
+        self.assertEqual(scenarios["plus_lease_liabilities"]["enterprise_value"], 661_369_984)
+        self.assertAlmostEqual(
+            scenarios["plus_lease_liabilities"]["earnings_yield_percent"],
+            12.8312,
+            places=4,
+        )
+
+    def test_missing_inputs_do_not_generate_enterprise_value(self):
+        result = manual_enterprise_value_scenario_review(None, 100, 0, currency="CAD")
+        self.assertEqual(result["status"], "inputs_incomplete")
+        self.assertEqual(result["scenarios"], [])
 
 
 class NonSecIssuerReviewTests(unittest.TestCase):
