@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, mfi_market_cap_usd_millions, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -119,6 +119,28 @@ class CurrencyNormalizationTests(unittest.TestCase):
         self.assertEqual(result["status"], "market_cap_same_currency")
         self.assertEqual(result["market_cap_in_reporting_currency"], 100_000_000)
         self.assertEqual(result["fx_rate_review"]["rate"], 1.0)
+
+    def test_mfi_market_cap_snapshot_values_are_available_for_cohort(self):
+        self.assertEqual(mfi_market_cap_usd_millions("EGHSF"), 643.04)
+        self.assertEqual(mfi_market_cap_usd_millions("AFMJF"), 991.59)
+        self.assertEqual(mfi_market_cap_usd_millions("ADBE"), None)
+
+    def test_enghouse_usd_market_cap_converts_to_cad_at_mfi_price_date(self):
+        market_cap_usd = mfi_market_cap_usd_millions("EGHSF") * 1_000_000
+        result = currency_normalization_review(
+            "CAD",
+            market_cap_usd,
+            "2026-11-18",
+            {
+                "status": "rate_available",
+                "base": "USD",
+                "quote": "CAD",
+                "rate": 1.4296,
+                "date": "2026-11-18",
+            },
+        )
+        self.assertEqual(result["status"], "market_cap_converted_review_only")
+        self.assertEqual(result["market_cap_in_reporting_currency"], 919_289_984.0)
 
     def test_missing_market_cap_never_fabricates_ev_input(self):
         result = currency_normalization_review(
