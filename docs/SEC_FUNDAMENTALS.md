@@ -226,3 +226,12 @@ The review-only EdgarTools candidate extractor distinguishes unrestricted cash, 
 Current lease candidates explicitly exclude noncurrent labels because the word `noncurrent` contains the substring `current`. IFRS `LongtermBorrowings` is surfaced as a noncurrent-debt candidate. These are candidate-discovery rules only, not accounting approvals or production mappings.
 
 The EdgarTools workflow runs regression tests for IFRS borrowings, current/noncurrent lease separation, unrestricted versus restricted cash, annotated cash labels and combined cash totals before extracting the issuer sample. The tests and review artifact do not write D1 or alter production ratios/ranks.
+
+
+## Separate rental PP&E and non-debt financing obligations
+
+The review-only EdgarTools output now separates standard net PP&E from rental property/equipment. This matters for PBI: its 2025 10-K presents $185.913m of property, plant and equipment and $24.054m of rental property and equipment as separate balance-sheet lines, with separate gross-cost and accumulated-depreciation detail in Note 8. The extractor keeps these as separate candidates. Although the filing supports that they are distinct asset classes, the review tool does not automatically sum them into the Magic Formula invested-capital denominator.
+
+The review output also surfaces sale-leaseback financing and construction financing separately from conventional current/noncurrent debt. PRDO's 2025 10-K reports $56.992m of sale-leaseback financing after a failed sale-leaseback transaction and explains that the liability reflects recategorization of construction financing when the lease commenced. The filing also describes future payments due under the failed transaction. This is a financing obligation that deserves review, but it is not silently mapped to conventional borrowings or added to EV debt.
+
+Regression tests ensure these categories remain distinct. No production ratios, eligibility or ranks are changed.
