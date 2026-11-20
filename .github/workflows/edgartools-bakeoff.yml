@@ -53,7 +53,7 @@ jobs:
           OUTPUT_PATH: "edgartools-bakeoff.json"
           BAKEOFF_SYMBOLS: "${{ github.event.inputs.symbols || 'ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM' }}"
           MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '2026-11-18' }}"
-          MFI_MARKET_CAPS_JSON: '${{ github.event.inputs.market_caps_json || '' }}'
+          MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || '' }}"
         run: python scripts/edgartools_bakeoff.py
       - name: Upload test report
         if: always()
