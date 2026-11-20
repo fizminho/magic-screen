@@ -109,6 +109,17 @@ The expanded payable and credit-line patterns were rerun against the 29 supporte
 
 This cohort snapshot is extraction evidence only. It does not approve debt aggregation, cash scope, EV, Earnings Yield, ROC, or production ranking.
 
+
+#### Balance-sheet identity reconciliation
+
+The extraction report also includes a read-only statement identity diagnostic. It compares one reported consolidated total-assets fact with one reported consolidated total-liabilities-and-equity fact from the same annual fiscal period. It recognises US-GAAP `Assets` / `LiabilitiesAndStockholdersEquity` and IFRS `Assets` / `EquityAndLiabilities` presentations.
+
+- Only unique, non-abstract, non-dimensional facts with a value for the selected fiscal period are considered.
+- Duplicate totals are reported as `ambiguous_inputs`; absent or period-mismatched totals are `insufficient_inputs`.
+- The diagnostic does not derive a missing total from liabilities plus equity, and does not treat missing values as zero.
+- Differences within a small scale-relative rounding tolerance are marked `reconciled`; larger differences are marked `difference`.
+- A reconciled statement is a data-quality signal only. It does not approve EBIT, debt, cash, invested capital, EV, ROC or ranking inputs, and it does not change eligibility or production data.
+
 #### Candidate confidence is not policy approval
 
 The resolver review queue reports two separate dimensions:
