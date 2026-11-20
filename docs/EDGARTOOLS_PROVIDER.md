@@ -178,3 +178,18 @@ The accounting review queue can also enrich its debt evidence from the current e
 The accounting review queue also carries selected-annual-filing balance-sheet face rows whose liability parent and concept/label indicate debt, borrowings, loans, lease liabilities, royalty financing or sale-leaseback/other financing. Rows are included only when they are non-dimensional, non-abstract face rows and have a value for the selected fiscal period. This makes the difference visible between (a) a specifically reported zero instrument balance, (b) a liability instrument that remains outside the conventional-debt mapping, and (c) no matching face row. It does **not** establish that an issuer has no debt: absence of a matching row is not proof of no debt.
 
 The queue labels these rows as conventional-debt candidates, lease liabilities, separate financing obligations or other financing/liability review. These are evidence labels only. No rows are summed, and lease liabilities, royalty financing, sale-leaseback financing and other financing obligations are not silently promoted into conventional gross debt or EV. Evidence is enriched only when the raw extraction accession exactly matches the resolver-preview accession. Mismatched filing evidence is omitted.
+
+
+#### PBI FY2025 EBIT bridge: exact-filing audit trail
+
+For Pitney Bowes accession `0001628280-26-009650` (FY ended 2025-12-31), the manual review bridge is:
+
+- Consolidated interest expense, net: $101.460M.
+- Interest income already included in that net line: $8.000M. Do not add it back a second time.
+- Consolidated cost of financing and other: $61.503M.
+- SendTech segment cost of financing and other, excluding allocated finance interest: $13.807M.
+- Finance interest allocated into consolidated cost of financing: $47.696M.
+- Net interest add-back for the candidate: $101.460M + $47.696M = $149.156M.
+- Pretax income: $192.524M; filing-specific EBIT candidate: $341.680M.
+
+The 10-K states that a portion of total interest expense is allocated into Cost of financing and other, and that the SendTech segment presentation excludes that allocated finance interest. Note 11 says the reported interest expense, net includes $8M interest income. The extractor now preserves that netting detail, filing period, and arithmetic cross-checks. This remains an exact-accession manual case, not a reusable EBIT mapping or production approval.
