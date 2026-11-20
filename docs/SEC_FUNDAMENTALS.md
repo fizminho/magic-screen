@@ -177,3 +177,10 @@ The read-only EdgarTools bakeoff pins `edgartools==6.3.0` and accepts a comma-se
 ## Expanded annual-filing bakeoff
 
 The EdgarTools research workflow is pinned to `edgartools==6.3.0` and tests a ten-symbol sample: HRB, PBI and ADBE control cases plus AFMJF, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK from the supplied 2026-11-20 MFI screen. It selects the latest-filed annual report across 10-K, 20-F and 40-F, matching the production pipeline's annual filing families. It intentionally excludes interim 10-Q/6-K in this first comparison. All outputs remain review-only GitHub Actions artifacts; no D1 rows, ratios, eligibility or rankings are changed.
+
+
+## SEC issuer coverage and direct EBIT candidate output
+
+The default EdgarTools sample includes SGHC to test a known Form 20-F annual report alongside domestic Form 10-K issuers. AFMJF is retained as a negative coverage test because its ticker is not found in the SEC company index; its annual financial statements are published through the issuer's own investor-reporting channels. This must be treated as an SEC coverage limitation, not zero/missing company fundamentals. Individual `CompanyNotFoundError` results are recorded as `not_found_in_sec_company_index`; unexpected errors still fail the workflow.
+
+For each extracted issuer, the artifact also reports a review-only direct consolidated `OperatingIncomeLoss` candidate when exactly one non-dimensional statement row matches the selected annual fiscal period. This output is not production mapping approval and must be reviewed for reporting currency, fiscal period and accounting classification.
