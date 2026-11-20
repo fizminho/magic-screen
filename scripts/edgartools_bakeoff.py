@@ -780,6 +780,10 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "label": re.compile(r"^long.?term debt$|^debt,? noncurrent$|^interest-bearing loans and borrowings$|^non.?current borrowings$", re.I),
             "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings)$", re.I),
         },
+        "aggregate_debt_candidates": {
+            "label": re.compile(r"^(?:total debt|total borrowings|total loans and borrowings|total debt and finance lease obligations)$", re.I),
+            "concept": re.compile(r"(?:LongTermDebtAndFinanceLeaseObligations|LongTermDebtAndCapitalLeaseObligations|DebtAndCapitalLeaseObligations)$", re.I),
+        },
         "current_lease_liability_candidates": {
             "label": re.compile(r"^(?!non.?current).*current.*lease liabilities?|^(?!non.?current).*lease liabilities?.*current", re.I),
             "concept": re.compile(r"(?:OperatingLeaseLiabilityCurrent|FinanceLeaseLiabilityCurrent|(?:^|_)CurrentLeaseLiabilities)$", re.I),
@@ -902,6 +906,7 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
     current_debt = unique_value("current_debt_candidates")
     noncurrent_debt = unique_value("noncurrent_debt_candidates")
     unrestricted_cash = unique_value("cash_unrestricted_candidates")
+    aggregate_debt_count = categories.get("aggregate_debt_candidates", {}).get("candidate_count", 0)
     flags = []
     if current_debt is None:
         flags.append("current_debt_not_uniquely_identified_not_assumed_zero")
@@ -923,7 +928,9 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
         flags.append("restricted_cash_or_short_term_investments_require_cash_scope_review")
 
     gross_debt = None
-    if current_debt is not None and noncurrent_debt is not None:
+    if aggregate_debt_count:
+        flags.append("aggregate_debt_total_present_do_not_add_to_current_and_noncurrent_components")
+    elif current_debt is not None and noncurrent_debt is not None:
         gross_debt = round(current_debt + noncurrent_debt, 2)
     net_debt = None
     if gross_debt is not None and unrestricted_cash is not None:
@@ -934,6 +941,7 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
         "status": "review_required" if flags else "candidate_inputs_identified_review_only",
         "current_debt_candidate": current_debt,
         "noncurrent_debt_candidate": noncurrent_debt,
+        "aggregate_debt_candidate_count": aggregate_debt_count,
         "conventional_gross_debt_candidate": gross_debt,
         "unrestricted_cash_candidate": unrestricted_cash,
         "conventional_net_debt_candidate": net_debt,
