@@ -51,7 +51,9 @@ The existing bakeoff is both the extraction regression harness and the scheduled
 - Do not add dimensional breakdowns to consolidated totals.
 - Do not treat missing values as zero.
 - Do not assume standard PP&E, rental equipment, right-of-use assets, lease liabilities, restricted cash, short-term investments, noncontrolling interests, or separate financing obligations are interchangeable.
-- Direct reported operating income is preferred. Filing-specific reconstructions remain review-required until an explicit resolver and regression suite approve them.
+- Direct reported operating income is preferred. The extraction review recognises the exact consolidated US-GAAP concepts `OperatingIncomeLoss` and IFRS concepts `OperatingProfitLoss` / `ProfitLossFromOperatingActivities`, but only when exactly one non-dimensional, non-abstract row has one value for the selected annual period. Multiple candidate rows remain ambiguous.
+- A direct operating-profit row is still a review-only candidate, not an approved EBIT value. Filing-specific reconstructions remain review-required until an explicit resolver and regression suite approve them.
+- EBIT reconstruction is never generalized from a successful reconciliation alone. The statement's operating/non-operating classification and filing presentation must independently support the bridge.
 - Ambiguous EBIT, debt, cash, currency, or invested-capital inputs must remain unresolved.
 - A successful EdgarTools extraction alone never makes a stock eligible for ranking.
 - Preserve the current rule that the complete active MFI universe must have valid, current fundamentals before any combined ranking is published.
