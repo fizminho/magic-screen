@@ -156,6 +156,49 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertAlmostEqual(result["candidate_roc"], 30.512, places=3)
         self.assertEqual(len(result["review_flags"]), 5)
 
+    def test_filing_specific_ifrs_ebit_produces_separate_roc_candidate(self):
+        result = roc_review(
+            {"status": "review_required", "ebit_candidate": None},
+            {"status": "calculated_review_only", "value": 418_000_000},
+            {
+                "categories": {
+                    "right_of_use_asset_candidates": {"candidate_count": 1},
+                    "current_lease_liability_candidates": {"candidate_count": 1},
+                    "noncurrent_lease_liability_candidates": {"candidate_count": 1},
+                }
+            },
+            {
+                "status": "review_only",
+                "method": "ifrs_statement_subtotal_reconstructed",
+                "automation_status": "manual_review_only",
+                "ebit_candidate": 357_000_000,
+            },
+        )
+        self.assertEqual(result["status"], "review_required_scope_flags")
+        self.assertIsNone(result["roc"])
+        self.assertAlmostEqual(result["candidate_roc"], 85.4067, places=4)
+        self.assertEqual(result["ebit_source"], "ifrs_statement_subtotal_reconstructed")
+        self.assertIn(
+            "right_of_use_assets_present_review_invested_capital_scope",
+            result["review_flags"],
+        )
+
+    def test_filing_specific_ebit_never_becomes_approved_roc_without_scope_flags(self):
+        result = roc_review(
+            {"status": "review_required", "ebit_candidate": None},
+            {"status": "calculated_review_only", "value": 100_000_000},
+            {"categories": {}},
+            {
+                "status": "review_only",
+                "method": "filing_specific_interest_reconciliation",
+                "automation_status": "manual_review_only",
+                "ebit_candidate": 50_000_000,
+            },
+        )
+        self.assertEqual(result["status"], "review_required_filing_specific_ebit")
+        self.assertIsNone(result["roc"])
+        self.assertEqual(result["candidate_roc"], 50.0)
+
     def test_enterprise_value_scope_keeps_missing_debt_unknown(self):
         result = enterprise_value_scope_review({
             "categories": {
