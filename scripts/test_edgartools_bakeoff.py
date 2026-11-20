@@ -864,6 +864,60 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["scope_flags"],
         )
 
+    def test_invested_capital_surfaces_negative_working_capital_offset(self):
+        result = invested_capital_review({
+            "categories": {
+                "current_assets_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 2_117_873_000}],
+                },
+                "current_liabilities_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 2_623_325_000}],
+                },
+                "net_ppe_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 522_197_000}],
+                },
+            }
+        })
+        self.assertEqual(result["value"], 16_745_000)
+        diagnostics = result["denominator_diagnostics"]
+        self.assertEqual(diagnostics["working_capital"], -505_452_000)
+        self.assertAlmostEqual(
+            diagnostics["negative_working_capital_offset_ratio"], 0.967936, places=5
+        )
+        self.assertTrue(
+            diagnostics["negative_working_capital_offsets_at_least_90pct_of_net_ppe"]
+        )
+        self.assertTrue(
+            diagnostics["near_zero_positive_denominator_from_negative_working_capital"]
+        )
+
+    def test_invested_capital_does_not_flag_positive_working_capital_as_offset(self):
+        result = invested_capital_review({
+            "categories": {
+                "current_assets_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 150}],
+                },
+                "current_liabilities_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 100}],
+                },
+                "net_ppe_candidates": {
+                    "status": "unique_candidate",
+                    "candidates": [{"value": 60}],
+                },
+            }
+        })
+        diagnostics = result["denominator_diagnostics"]
+        self.assertEqual(result["value"], 110)
+        self.assertIsNone(diagnostics["negative_working_capital_offset_ratio"])
+        self.assertFalse(
+            diagnostics["negative_working_capital_offsets_at_least_90pct_of_net_ppe"]
+        )
+
     def test_invested_capital_reports_rental_and_rou_scope(self):
         result = invested_capital_review({
             "categories": {
