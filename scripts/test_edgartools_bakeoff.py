@@ -643,6 +643,48 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["review_flags"],
         )
 
+    def test_aggregate_debt_reconciliation_reports_matching_components(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 25}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 125}],
+                },
+                "aggregate_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 150}],
+                },
+            }
+        })
+        self.assertEqual(
+            result["debt_reconciliation_review"]["status"], "reconciles_within_1"
+        )
+        self.assertEqual(
+            result["debt_reconciliation_review"]["difference"], 0
+        )
+
+    def test_aggregate_debt_reconciliation_exposes_mismatch(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 25}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 120}],
+                },
+                "aggregate_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 150}],
+                },
+            }
+        })
+        self.assertEqual(
+            result["debt_reconciliation_review"]["status"], "does_not_reconcile"
+        )
+        self.assertEqual(
+            result["debt_reconciliation_review"]["difference"], 5
+        )
+
     def test_aggregate_debt_prevents_component_sum(self):
         result = enterprise_value_scope_review({
             "categories": {
