@@ -588,6 +588,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # INTENTIONAL: bridge candidates never enter production SEC ingestion,
         # ratios, eligibility decisions or Magic Formula ranking.
         result["ebit_bridge"] = build_ebit_bridge(result["statements"]["income_statement"])
+        fiscal_period = str(result["filing"].get("period_of_report") or "")
         result["filing_specific_review"] = filing_specific_review(
             symbol, result["filing"], result["ebit_bridge"], result["statements"]
         )
@@ -598,7 +599,6 @@ def extract_company(symbol: str) -> dict[str, Any]:
         )
         # INTENTIONAL: expose only an exact, consolidated OperatingIncomeLoss
         # fact for this annual period. This is diagnostic, not production EBIT.
-        fiscal_period = str(result["filing"].get("period_of_report") or "")
         direct_operating_income = statement_fact_amount(
             result["statements"], "income_statement", "OperatingIncomeLoss",
             r"operating income|income.*from operations|operating profit|earnings from operations",
