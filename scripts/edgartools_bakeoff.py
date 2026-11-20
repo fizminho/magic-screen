@@ -260,7 +260,8 @@ def fetch_frankfurter_rate(
                 "rate": float(selected["rate"]),
                 "date": selected["date"],
                 "requested_date": requested_date,
-                "provider": "ECB daily reference rates via Frankfurter",
+                "provider": "ECB reference rates via Frankfurter",
+                "source_attribution": "Source: ECB statistics",
                 "is_previous_business_day": selected["date"] != requested_date,
             }
     except Exception as exc:
