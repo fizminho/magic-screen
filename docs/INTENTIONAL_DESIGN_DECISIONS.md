@@ -115,3 +115,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **Repeated non-dimensional facts are deduplicated.** Facts repeated through multiple contexts or presentation roles are returned once; dimensional facts are retained separately because they may represent distinct members.
 - **The response is smaller by default.** It returns up to 24 prioritized standard facts and 12 extension facts, with one concise presentation hint per fact. Counts report the deduplicated candidate totals; `truncated` signals omitted candidates.
 - **Priority is not approval.** These are discovery candidates only. No fact is automatically mapped into production calculations, ratios, or rankings.
+
+
+## SEC filing diagnostic: exact concept priority and dimensional deduplication
+
+- **Fact priority uses complete concept names for core inputs.** EBIT candidates are restricted to explicit operating-income concepts; non-operating income and operating-loss tax-note concepts must not be promoted by substring matches. Revenue, debt, cash, current assets/liabilities, PP&E, operating costs, and interest expense follow in review priority.
+- **Facts are deduplicated using their dimensional signature.** Repeated contexts or presentation roles no longer inflate the response, while genuinely different dimensional members remain distinct.
+- **Priority is not an accounting approval.** The endpoint remains read-only and diagnostic. No facts are mapped into production ratios or rankings without separate review.
