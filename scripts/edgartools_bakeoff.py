@@ -1470,47 +1470,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
             result["status"] = "not_found_in_sec_company_index"
             result["provider_status"] = "unsupported_provider"
             result["provider"] = "EdgarTools"
-            # INTENTIONAL: preserve separately sourced audited issuer reports
-            # for MFI OTC tickers without an SEC company-index match. These
-            # manual cases remain outside the SEC facts and production pipeline.
-            manual_case = non_sec_issuer_review_case(symbol)
-            if manual_case is not None:
-                result["non_sec_issuer_review"] = manual_case
-                # INTENTIONAL: manual issuer-report currencies are explicit
-                # source metadata, not guessed from the OTC ticker or exchange.
-                mfi_price_date = os.environ.get("MFI_PRICE_DATE", "2026-11-18")
-                reporting_currency = manual_case.get("currency")
-                market_cap_millions = mfi_market_cap_usd_millions(symbol)
-                market_cap_usd = market_cap_millions * 1_000_000 if market_cap_millions is not None else None
-                manual_case["mfi_market_cap_input"] = {
-                    "value_usd_millions": market_cap_millions,
-                    "currency": "USD",
-                    "price_date": mfi_price_date,
-                    "snapshot_as_of": MFI_SNAPSHOT_AS_OF if mfi_price_date == MFI_SNAPSHOT_PRICE_DATE else None,
-                    "source": "Magic Formula Investing MFI screen snapshot",
-                }
-                fx_review = None
-                if reporting_currency and reporting_currency != "USD":
-                    fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
-                manual_case["currency_normalization_review"] = currency_normalization_review(
-                    reporting_currency, market_cap_usd, mfi_price_date, fx_review
-                )
-                # INTENTIONAL: compare EV scope alternatives only for manual issuer cases;
-                # never choose one scenario or publish it into production ratios/ranks.
-                currency_review = manual_case["currency_normalization_review"]
-                market_cap_reporting = currency_review.get("market_cap_in_reporting_currency")
-                lease_total = sum(
-                    float(manual_case.get(key) or 0)
-                    for key in ("current_lease_liabilities", "noncurrent_lease_liabilities")
-                )
-                manual_case["enterprise_value_scenario_review"] = manual_enterprise_value_scenario_review(
-                    market_cap_reporting,
-                    manual_case.get("ebit_candidate"),
-                    manual_case.get("conventional_net_debt_candidate"),
-                    manual_case.get("noncontrolling_interest"),
-                    lease_total,
-                    reporting_currency,
-                )
+            result["provider_reason"] = "Issuer is not present in the EdgarTools SEC company index. Provider fallback is intentionally deferred."
     return result
 
 
