@@ -179,6 +179,26 @@ def build_queue(
             item["balance_sheet_reconciliation_evidence_source"] = (
                 "fresh_extraction_artifact_same_accession" if reconciliation else "not_available"
             )
+            filing_review = raw_company.get("filing_specific_review")
+            filing_review_accession = (filing_review or {}).get("filing_accession")
+            if filing_review and filing_review_accession == raw_accession:
+                item["filing_specific_ebit_review"] = filing_review
+                item["filing_specific_ebit_review_source"] = "fresh_extraction_artifact_same_accession"
+                if filing_review.get("status") == "review_only" and isinstance(
+                    filing_review.get("ebit_candidate"), (int, float)
+                ):
+                    item["issues"].append("filing_specific_ebit_candidate_available_manual_review")
+                    item["issue_count"] = len(item["issues"])
+                item["candidate_vs_policy_assessment"]["filing_specific_ebit"] = {
+                    "candidate_status": filing_review.get("status"),
+                    "method": filing_review.get("method"),
+                    "candidate_value": filing_review.get("ebit_candidate"),
+                    "policy_status": "pending_filing_specific_manual_review_and_EBIT_policy_approval",
+                    "production_approved": False,
+                }
+            else:
+                item["filing_specific_ebit_review"] = None
+                item["filing_specific_ebit_review_source"] = "not_available"
             reconciliation_status = str((reconciliation or {}).get("status") or "not_available")
             if reconciliation_status not in ("reconciled", "not_available"):
                 item["issues"].append("balance_sheet_reconciliation_" + reconciliation_status)
@@ -188,6 +208,8 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "stored_resolver_preview"
             item["balance_sheet_reconciliation_review"] = None
             item["balance_sheet_reconciliation_evidence_source"] = "stored_resolver_preview"
+            item["filing_specific_ebit_review"] = None
+            item["filing_specific_ebit_review_source"] = "stored_resolver_preview"
         rows.append(item)
     order = {"P1": 0, "P2": 1, "P3": 2}
     rows.sort(key=lambda row: (order.get(row["priority"], 9), row["symbol"]))
@@ -208,6 +230,10 @@ def build_queue(
                 str((row.get("balance_sheet_reconciliation_review") or {}).get("status") or "not_available")
                 for row in rows
             )),
+            "filing_specific_ebit_manual_review_available": sum(
+                1 for row in rows if row.get("filing_specific_ebit_review")
+                and isinstance(row["filing_specific_ebit_review"].get("ebit_candidate"), (int, float))
+            ),
         },
         "items": rows,
         "guardrail": "Triage only. Candidate values and classifications remain unapproved; missing values are unknown, never zero.",
@@ -239,7 +265,8 @@ def main() -> int:
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
         "debt_instrument_evidence_source", "balance_sheet_reconciliation_review",
-        "balance_sheet_reconciliation_evidence_source", "candidate_vs_policy_assessment", "production_write",
+        "balance_sheet_reconciliation_evidence_source", "filing_specific_ebit_review",
+        "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -251,6 +278,9 @@ def main() -> int:
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["balance_sheet_reconciliation_review"] = json.dumps(
                 item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
+            )
+            row["filing_specific_ebit_review"] = json.dumps(
+                item.get("filing_specific_ebit_review"), separators=(",", ":")
             )
             row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))
             writer.writerow(row)
