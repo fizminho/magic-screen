@@ -760,11 +760,14 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     } else presentationStatus="http_"+pr.status;
   }
   const candidates:any[]=[];
-  const relevant=/(revenue|sales|operating|expense|cost|income|debt|borrow|cash|property|plant|asset|liabilit|lease|capital)/i;
+  const statementCandidates:any[]=[];
+  const relevant=/(revenue|sales|operating|expense|cost|income|debt|borrow|cash|property|plant|asset|liabilit|lease|capital|receivable|payable|inventory|goodwill|depreciation|amortization|tax|interest|profit|loss)/i;
+  const standardPrefixes=new Set(["us-gaap","ifrs-full"]);
   const excludedPrefixes=new Set(["us-gaap","ifrs-full","dei","srt","ecd","country","currency","stpr","exch"]);
   for(const m of xml.matchAll(/<([A-Za-z][\w.-]*):([A-Za-z][\w.-]*)\b([^>]*)>([\s\S]*?)<\/\1:\2>/g)){
     const prefix=m[1],tag=m[2],attrs=m[3],raw=m[4];
-    if(excludedPrefixes.has(prefix.toLowerCase())||!relevant.test(tag)) continue;
+    const isStandard=standardPrefixes.has(prefix.toLowerCase());
+    if((excludedPrefixes.has(prefix.toLowerCase())&&!isStandard)||!relevant.test(tag)) continue;
     const contextId=attrs.match(/\bcontextRef=["']([^"']+)["']/i)?.[1],unitId=attrs.match(/\bunitRef=["']([^"']+)["']/i)?.[1];
     const context=contextId?contexts.get(contextId):null;
     if(!context||context.end!==anchor.end) continue;
@@ -779,10 +782,15 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     const scale=Number(attrs.match(/\bscale=["'](-?\d+)["']/i)?.[1]??0),sign=attrs.match(/\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
     const value=Number(valueText)*Math.pow(10,scale)*sign;
     if(!Number.isFinite(value)) continue;
-    candidates.push({tag:prefix+":"+tag,label:labels.get(tag)??null,value,start:context.start,end:context.end,kind:context.start?"duration":"instant",unit:unitId?units.get(unitId)??null:null,dimensions:context.dimensions,context:contextId,presentation:presentationByConcept.get(tag)??[]});
+    const fact={tag:prefix+":"+tag,label:labels.get(tag)??null,value,start:context.start,end:context.end,kind:context.start?"duration":"instant",unit:unitId?units.get(unitId)??null:null,dimensions:context.dimensions,context:contextId,presentation:presentationByConcept.get(tag)??[]};
+    if(isStandard) {
+      // INTENTIONAL: standard taxonomy facts are shown beside extension facts for review, but remain diagnostic-only and are never promoted into production calculations by this endpoint.
+      statementCandidates.push(fact);
+    } else candidates.push(fact);
   }
   candidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL extension taxonomy",accession:anchor.accn,fiscal_period:anchor.end,form:anchor.form,filed_at:anchor.filed,filing_url:base+"index.html",instance_document:instance.name,label_document:labelFile?.name??null,label_status:labelStatus,presentation_document:presentationFile?.name??null,presentation_status:presentationStatus,extension_fact_count:candidates.length,extension_facts:candidates.slice(0,100),truncated:candidates.length>100,eligible_for_magic_formula:false,note:"Diagnostic only. Extension tags are not automatically mapped to financial concepts, stored in D1, used for ratios, or ranked. Review labels, contexts, units, dimensions, and presentation parent/child relationships before approving any mapping. Presentation arcs are structural clues, not proof of accounting meaning."};
+  statementCandidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL extension taxonomy",accession:anchor.accn,fiscal_period:anchor.end,form:anchor.form,filed_at:anchor.filed,filing_url:base+"index.html",instance_document:instance.name,label_document:labelFile?.name??null,label_status:labelStatus,presentation_document:presentationFile?.name??null,presentation_status:presentationStatus,extension_fact_count:candidates.length,extension_facts:candidates.slice(0,100),statement_fact_count:statementCandidates.length,statement_facts:statementCandidates.slice(0,150),truncated:candidates.length>100||statementCandidates.length>150,eligible_for_magic_formula:false,note:"Diagnostic only. Standard statement facts and extension tags are displayed side by side for filing review; neither is automatically mapped, stored in D1, used for ratios, or ranked. Review labels, contexts, units, dimensions, and presentation parent/child relationships before approving any mapping. Presentation arcs are structural clues, not proof of accounting meaning."};
 }
 
 export default {
