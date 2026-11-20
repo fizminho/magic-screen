@@ -5,7 +5,7 @@ from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, invested_capital_review, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
 
 
 PERIOD = "2025-12-31"
