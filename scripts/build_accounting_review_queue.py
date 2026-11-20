@@ -90,6 +90,14 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         if confidence not in ("unique_candidate", "no_candidate_identified"):
             category_summary.append(f"{name}={status}({count})")
 
+    debt_instrument_evidence = {
+        name: (balance.get(name) or {})
+        for name in (
+            "current_debt_candidates",
+            "noncurrent_debt_candidates",
+            "aggregate_debt_candidates",
+        )
+    }
     assessment = {
         "ebit": {
             "candidate_status": ebit,
@@ -124,6 +132,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "issue_count": len(issues),
         "issues": issues,
         "balance_sheet_exceptions": category_summary,
+        "debt_instrument_evidence": debt_instrument_evidence,
         "candidate_vs_policy_assessment": assessment,
         "production_write": False,
     }
@@ -169,7 +178,7 @@ def main() -> int:
     fields = [
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
-        "issue_count", "issues", "balance_sheet_exceptions", "candidate_vs_policy_assessment", "production_write",
+        "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence", "candidate_vs_policy_assessment", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -178,6 +187,7 @@ def main() -> int:
             row = dict(item)
             row["issues"] = " | ".join(item["issues"])
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
+            row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))
             writer.writerow(row)
     print("Accounting review queue:", json.dumps(queue["summary"], sort_keys=True))
