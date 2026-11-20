@@ -128,3 +128,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 
 - **The compact standard-fact list intentionally excludes dimensional facts.** Consolidated, non-dimensional facts are the first review target for company-wide Magic Formula inputs. Segment and other dimensional facts remain outside this short list so they cannot crowd out balance-sheet and income-statement totals.
 - **This is a display-selection rule, not a data deletion or accounting mapping.** The diagnostic remains read-only; dimensional facts are not written to production or used in ratios/rankings.
+
+
+## SEC diagnostic: filing-specific arithmetic review checks
+
+- **A narrowly scoped review-only arithmetic check may be returned when consolidated annual revenue and costs/expenses are both explicitly tagged in the same extracted filing.** The result is labelled `review_only_not_approved_ebit`; it is not an EBIT fact, approved mapping, or production input.
+- **The diagnostic checks for an explicit operating-income fact separately.** If none is present, the arithmetic result remains a lead for manual reconciliation, not a substitute. Cost classifications and non-operating items vary by issuer, so no generic inference is permitted.
+- **This check is intentionally read-only.** It does not update SEC fundamentals, earnings yield, return on capital, or Magic Formula ranks.
