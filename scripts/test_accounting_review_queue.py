@@ -314,5 +314,72 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertNotIn("balance_sheet_reconciliation_difference", item["issues"])
         self.assertEqual(queue["summary"]["balance_sheet_reconciliation"], {"reconciled": 1})
 
+
+    def test_queue_surfaces_filing_specific_ebit_only_for_exact_accession(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "HRB",
+                "accession": "hrb-accession",
+                "provider_status": "supported",
+                "ebit_status": "review_required",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "HRB",
+                "filing": {"accession_number": "hrb-accession"},
+                "filing_specific_review": {
+                    "status": "review_only",
+                    "method": "statement_subtotal_reconstructed",
+                    "filing_accession": "hrb-accession",
+                    "ebit_candidate": 907686000,
+                    "cross_checks": {"reconciles_within_1": True},
+                },
+                "balance_sheet_fact_review": {"categories": {}},
+            }],
+        }
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["filing_specific_ebit_review_source"],
+                         "fresh_extraction_artifact_same_accession")
+        self.assertEqual(item["filing_specific_ebit_review"]["ebit_candidate"], 907686000)
+        self.assertIn("filing_specific_ebit_candidate_available_manual_review", item["issues"])
+        assessment = item["candidate_vs_policy_assessment"]["filing_specific_ebit"]
+        self.assertFalse(assessment["production_approved"])
+        self.assertIn("manual_review", assessment["policy_status"])
+
+    def test_queue_does_not_surface_filing_specific_ebit_from_mismatched_accession(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "HRB",
+                "accession": "resolver-accession",
+                "provider_status": "supported",
+                "ebit_status": "review_required",
+                "invested_capital_status": "review_required",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        raw = {
+            "companies": [{
+                "symbol": "HRB",
+                "filing": {"accession_number": "raw-accession"},
+                "filing_specific_review": {
+                    "status": "review_only",
+                    "filing_accession": "raw-accession",
+                    "ebit_candidate": 907686000,
+                },
+                "balance_sheet_fact_review": {"categories": {}},
+            }],
+        }
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["filing_specific_ebit_review"])
+        self.assertEqual(item["filing_specific_ebit_review_source"], "stored_resolver_preview")
+        self.assertNotIn("filing_specific_ebit_candidate_available_manual_review", item["issues"])
+
 if __name__ == "__main__":
     unittest.main()
