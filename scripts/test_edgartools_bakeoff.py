@@ -901,6 +901,20 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             categories["short_term_investment_candidates"]["candidate_count"], 1
         )
 
+    def test_unqualified_ifrs_borrowings_label_is_not_assumed_noncurrent(self):
+        categories = self.review(
+            row("issuer_InterestBearingLoansAndBorrowings", "Interest-bearing loans and borrowings", 100),
+        )
+        self.assertEqual(
+            categories["current_debt_candidates"]["candidate_count"], 0
+        )
+        self.assertEqual(
+            categories["noncurrent_debt_candidates"]["candidate_count"], 0
+        )
+        self.assertEqual(
+            categories["aggregate_debt_candidates"]["candidate_count"], 0
+        )
+
     def test_current_and_noncurrent_debt_categories_do_not_overlap(self):
         categories = self.review(
             row("us-gaap_LongTermDebtCurrent", "Current portion of long-term debt", 15),
