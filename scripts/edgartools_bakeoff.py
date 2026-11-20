@@ -796,7 +796,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             concept_match = bool(rules["concept"].search(concept))
             # INTENTIONAL: "noncurrent" contains the substring "current".
             # Do not let a noncurrent lease label enter the current category.
-            if category == "current_lease_liability_candidates" and re.search(r"\\bnon.?current\\b", label, re.I):
+            if category == "current_lease_liability_candidates" and re.search(r"\bnon.?current\b", label, re.I):
                 label_match = False
             if not (label_match or concept_match):
                 continue
