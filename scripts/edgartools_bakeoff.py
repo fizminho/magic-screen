@@ -333,25 +333,59 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
     statement = statements.get("balance_sheet") or {}
     rows = statement.get("rows", [])
     categories = {
-        "cash_unrestricted_candidates": re.compile(r"^cash and cash equivalents$|^cash$", re.I),
-        "cash_restricted_candidates": re.compile(r"restricted cash", re.I),
-        "current_assets_candidates": re.compile(r"^total current assets$|^total current assets$", re.I),
-        "current_liabilities_candidates": re.compile(r"^total current liabilities$", re.I),
-        "net_ppe_candidates": re.compile(r"^(?:property,? plant and equipment|property and equipment|plant and equipment)(?:,|$)", re.I),
-        "current_debt_candidates": re.compile(r"^(?:current portion of (?:long.?term )?debt|debt,? current|current borrowings|short.?term borrowings)$", re.I),
-        "noncurrent_debt_candidates": re.compile(r"^(?:long.?term debt|debt,? noncurrent|non.?current borrowings|long.?term borrowings)$", re.I),
-        "current_lease_liability_candidates": re.compile(r"lease liabilities?.*current|current.*lease liabilities?", re.I),
-        "noncurrent_lease_liability_candidates": re.compile(r"lease liabilities?.*(?:noncurrent|non-current)|(?:noncurrent|non-current).*lease liabilities?", re.I),
+        "cash_unrestricted_candidates": {
+            "label": re.compile(r"cash and cash equivalents|^cash$", re.I),
+            "concept": re.compile(r"CashAndCashEquivalentsAtCarryingValue|CashAndCashEquivalents$", re.I),
+            "exclude": re.compile(r"restricted", re.I),
+        },
+        "cash_restricted_candidates": {
+            "label": re.compile(r"restricted cash", re.I),
+            "concept": re.compile(r"RestrictedCash", re.I),
+        },
+        "current_assets_candidates": {
+            "label": re.compile(r"^total current assets$", re.I),
+            "concept": re.compile(r"(?:^|_)AssetsCurrent$", re.I),
+        },
+        "current_liabilities_candidates": {
+            "label": re.compile(r"^total current liabilities$", re.I),
+            "concept": re.compile(r"(?:^|_)LiabilitiesCurrent$", re.I),
+        },
+        "net_ppe_candidates": {
+            "label": re.compile(r"^(?:property|plant|fixed assets)", re.I),
+            "concept": re.compile(r"PropertyPlantAndEquipment(?:Net)?$", re.I),
+        },
+        "current_debt_candidates": {
+            "label": re.compile(r"current portion of .*debt|current maturities|debt,? current|short.?term borrowings|notes payable and short.?term borrowings", re.I),
+            "concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|CurrentBorrowings)$", re.I),
+        },
+        "noncurrent_debt_candidates": {
+            "label": re.compile(r"^long.?term debt$|^debt,? noncurrent$|^interest-bearing loans and borrowings$|^non.?current borrowings$", re.I),
+            "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings)$", re.I),
+        },
+        "current_lease_liability_candidates": {
+            "label": re.compile(r"current.*lease liabilities?|lease liabilities?.*current", re.I),
+            "concept": re.compile(r"(?:OperatingLeaseLiabilityCurrent|FinanceLeaseLiabilityCurrent|CurrentLeaseLiabilities)$", re.I),
+        },
+        "noncurrent_lease_liability_candidates": {
+            "label": re.compile(r"non.?current.*lease liabilities?|lease liabilities?.*non.?current", re.I),
+            "concept": re.compile(r"(?:OperatingLeaseLiabilityNoncurrent|FinanceLeaseLiabilityNoncurrent|NoncurrentLeaseLiabilities)$", re.I),
+        },
     }
     result: dict[str, Any] = {}
-    for category, pattern in categories.items():
+    for category, rules in categories.items():
         candidates = []
         for row in rows:
             label = str(row.get("label", "")).strip()
             concept = str(row.get("concept", ""))
             # INTENTIONAL: consolidated non-dimensional facts only. Dimensional
-            # breakdowns are retained in the statement rows but never mixed into totals.
-            if row.get("dimension") is not False or row.get("abstract") or not pattern.search(label):
+            # breakdowns are retained in statement rows but never mixed into totals.
+            if row.get("dimension") is not False or row.get("abstract"):
+                continue
+            label_match = bool(rules["label"].search(label))
+            concept_match = bool(rules["concept"].search(concept))
+            if not (label_match or concept_match):
+                continue
+            if rules.get("exclude") and rules["exclude"].search(label):
                 continue
             values = row.get("values") or {}
             value = values.get(period)
@@ -362,7 +396,6 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
                 "label": label,
                 "fiscal_period": period,
                 "value": value,
-                "standard_concept": values.get("standard_concept"),
             })
         result[category] = {
             "status": "unique_candidate" if len(candidates) == 1 else (
@@ -371,12 +404,13 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "candidate_count": len(candidates),
             "candidates": candidates,
         }
-    # INTENTIONAL: even a unique label match is a review candidate, not an approved
-    # accounting mapping. Restricted cash, leases, debt scope and PP&E overlap need review.
     unresolved = [
         key for key, value in result.items()
         if value["status"] != "unique_candidate"
     ]
+    # INTENTIONAL: label and taxonomy matching only surfaces candidates. It does
+    # not resolve aggregate-vs-component debt, lease scope, restricted cash, or
+    # issuer-specific PP&E overlap. No candidate is promoted into production.
     return {
         "status": "review_only" if not unresolved else "review_required",
         "fiscal_period": period,
