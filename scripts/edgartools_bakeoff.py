@@ -336,7 +336,8 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
         "cash_unrestricted_candidates": {
             "label": re.compile(r"cash and cash equivalents|^cash$", re.I),
             "concept": re.compile(r"CashAndCashEquivalentsAtCarryingValue|CashAndCashEquivalents$", re.I),
-            "exclude": re.compile(r"\brestricted\b", re.I),
+            "exclude_label": re.compile(r"\brestricted\b", re.I),
+            "exclude_concept": re.compile(r"RestrictedCash", re.I),
         },
         "cash_restricted_candidates": {
             "label": re.compile(r"restricted cash", re.I),
@@ -385,7 +386,8 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             concept_match = bool(rules["concept"].search(concept))
             if not (label_match or concept_match):
                 continue
-            if rules.get("exclude") and (rules["exclude"].search(label) or rules["exclude"].search(concept)):
+            if ((rules.get("exclude_label") and rules["exclude_label"].search(label))
+                    or (rules.get("exclude_concept") and rules["exclude_concept"].search(concept))):
                 continue
             values = row.get("values") or {}
             value = values.get(period)
