@@ -1310,9 +1310,12 @@ export default {
     }
 
 
-    if (url.pathname==="/api/fundamentals/edgartools/ranking-preview" && request.method==="GET") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+    if ((url.pathname==="/api/fundamentals/edgartools/ranking-preview" || url.pathname==="/api/fundamentals/edgartools/ranking-preview/public") && request.method==="GET") {
+      const publicPreview=url.pathname.endsWith("/public");
+      if (!publicPreview) {
+        if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+        if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      }
       try {
         const evidence=await env.DB.prepare(`SELECT m.symbol,m.company_name,e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json,e.ingested_at
           FROM stock_master m
@@ -1334,7 +1337,17 @@ export default {
           return {...resolved,company_name:row.company_name,market_cap:capBySymbol.get(row.symbol)??null};
         });
         const result=buildMfiRankingPreview(rows);
-        return json({...result,as_of:new Date().toISOString(),price_source:"Magic Formula Investing universe market-cap snapshot"});
+        const response={...result,as_of:new Date().toISOString(),price_source:"Magic Formula Investing universe market-cap snapshot"};
+        if (publicPreview) {
+          return json({...response,rankings:result.rankings.map((row:any)=>({
+            symbol:row.symbol,company_name:row.company_name,market_cap:row.market_cap,
+            earnings_yield:row.earnings_yield,return_on_capital:row.return_on_capital,
+            earnings_yield_rank:row.earnings_yield_rank,return_on_capital_rank:row.return_on_capital_rank,
+            magic_formula_score:row.magic_formula_score,magic_formula_rank:row.magic_formula_rank,
+            ranking_eligible:row.ranking_eligible,review_flags:row.review_flags
+          }))});
+        }
+        return json(response);
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"MFI shadow ranking preview"},503); }
     }
     if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
