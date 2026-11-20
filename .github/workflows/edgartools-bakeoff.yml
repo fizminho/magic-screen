@@ -8,6 +8,9 @@ on:
       - "scripts/test_edgartools_bakeoff.py"
       - "scripts/build_accounting_review_queue.py"
       - "scripts/test_accounting_review_queue.py"
+      - "worker/index.ts"
+      - "src/App.tsx"
+      - "src/styles.css"
       - ".github/workflows/edgartools-bakeoff.yml"
   schedule:
     - cron: "20 6 * * *"
