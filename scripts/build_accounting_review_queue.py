@@ -93,9 +93,9 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
     debt_instrument_evidence = {
         name: (balance.get(name) or {})
         for name in (
-            "current_debt_candidates",
-            "noncurrent_debt_candidates",
-            "aggregate_debt_candidates",
+            "current_debt",
+            "noncurrent_debt",
+            "aggregate_debt",
         )
     }
     assessment = {
