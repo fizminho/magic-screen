@@ -258,3 +258,6 @@ The EdgarTools bakeoff now withholds the `roc` value whenever unresolved account
 A separate `enterprise_value_scope_review` reports conventional current/noncurrent debt and unrestricted cash candidates. It computes gross/net debt candidates only when all three inputs are uniquely identified. Missing debt is unknown, not zero. Lease liabilities, sale-leaseback/construction financing, restricted cash and combined cash/short-term investment totals remain separate review items. This is not an EV calculation because market capitalization and issuer-specific policy decisions are not supplied by this statement-only artifact.
 
 These are research-only output guardrails. No production D1 data, EV, Earnings Yield, ROC, eligibility or ranking logic is changed.
+
+
+Filing-specific EBIT candidates (such as HRB's statement-subtotal reconstruction, PBI's interest reconciliation and SGHC's IFRS operating subtotal) can now produce a separate `candidate_roc` for comparative research when the denominator is available. The output preserves the exact filing-specific method and labels the result `review_required_filing_specific_ebit` or `review_required_scope_flags`. It never populates the `roc` field, even if no additional balance-sheet scope flags are present. This is not a generic EBIT/ROC mapping and does not feed production calculations or rankings.
