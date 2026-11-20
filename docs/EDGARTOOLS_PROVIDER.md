@@ -193,3 +193,8 @@ For Pitney Bowes accession `0001628280-26-009650` (FY ended 2025-12-31), the man
 - Pretax income: $192.524M; filing-specific EBIT candidate: $341.680M.
 
 The 10-K states that a portion of total interest expense is allocated into Cost of financing and other, and that the SendTech segment presentation excludes that allocated finance interest. Note 11 says the reported interest expense, net includes $8M interest income. The extractor now preserves that netting detail, filing period, and arithmetic cross-checks. This remains an exact-accession manual case, not a reusable EBIT mapping or production approval.
+
+
+### Invested-capital denominator composition diagnostic
+
+The review-only invested-capital calculation continues to use current assets minus current liabilities plus net PP&E when each input has exactly one consolidated, non-dimensional candidate. The resolver now also reports working capital, net PP&E, the working-capital-to-PP&E percentage, and the proportion of PP&E offset by negative working capital. When negative working capital offsets at least 90% of net PP&E, the diagnostic explicitly flags a near-zero positive denominator risk. This does not change the formula, reject the issuer automatically, or approve ROC. It is intended to make unusually high ROC candidates (such as the OTEX review case) easier to audit before any policy decision.
