@@ -251,6 +251,12 @@ def build_queue(
             item["invested_capital_denominator_diagnostics_source"] = (
                 "fresh_extraction_artifact_same_accession" if denominator_diagnostics else "not_available"
             )
+            if (denominator_diagnostics or {}).get(
+                "negative_working_capital_offsets_at_least_90pct_of_net_ppe"
+            ):
+                item["issues"].append("invested_capital_negative_working_capital_offset_high_risk_manual_review")
+                item["priority"] = "P1"
+                item["issue_count"] = len(item["issues"])
             reconciliation = raw_company.get("balance_sheet_reconciliation_review")
             item["balance_sheet_reconciliation_review"] = reconciliation
             item["balance_sheet_reconciliation_evidence_source"] = (
