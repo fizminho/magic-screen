@@ -5,7 +5,7 @@ from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, invested_capital_review, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, balance_sheet_reconciliation_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, invested_capital_review, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
 
 
 PERIOD = "2025-12-31"
@@ -22,6 +22,84 @@ def row(concept, label, value, standard_concept=None):
         "abstract": False,
         "values": values,
     }
+
+
+class BalanceSheetReconciliationTests(unittest.TestCase):
+    def review(self, *rows):
+        return balance_sheet_reconciliation_review(
+            {"balance_sheet": {"rows": list(rows)}}, PERIOD
+        )
+
+    def test_us_gaap_reported_totals_reconcile(self):
+        result = self.review(
+            row("us-gaap_Assets", "Assets", 500),
+            row("us-gaap_LiabilitiesAndStockholdersEquity", "Liabilities and stockholders' equity", 500),
+        )
+        self.assertEqual(result["status"], "reconciled")
+        self.assertEqual(result["difference_assets_less_liabilities_and_equity"], 0)
+
+    def test_ifrs_equity_and_liabilities_total_is_supported(self):
+        result = self.review(
+            row("ifrs-full_Assets", "Assets", 750),
+            row("ifrs-full_EquityAndLiabilities", "Equity and liabilities", 749.95),
+        )
+        self.assertEqual(result["status"], "reconciled")
+        self.assertAlmostEqual(result["difference_assets_less_liabilities_and_equity"], 0.05)
+
+    def test_material_balance_sheet_difference_is_reported(self):
+        result = self.review(
+            row("us-gaap_Assets", "Assets", 500),
+            row("us-gaap_LiabilitiesAndStockholdersEquity", "Liabilities and stockholders' equity", 490),
+        )
+        self.assertEqual(result["status"], "difference")
+        self.assertEqual(result["difference_assets_less_liabilities_and_equity"], 10)
+
+    def test_duplicate_reported_totals_are_ambiguous(self):
+        result = self.review(
+            row("us-gaap_Assets", "Assets", 500),
+            row("issuer_Assets", "Total assets", 500),
+            row("us-gaap_LiabilitiesAndStockholdersEquity", "Liabilities and stockholders' equity", 500),
+        )
+        self.assertEqual(result["status"], "ambiguous_inputs")
+        self.assertIsNone(result["difference_assets_less_liabilities_and_equity"])
+
+    def test_dimensional_totals_are_excluded(self):
+        dimensional = row("issuer_Assets", "Assets", 500)
+        dimensional["dimension"] = True
+        result = self.review(
+            dimensional,
+            row("us-gaap_Assets", "Assets", 500),
+            row("us-gaap_LiabilitiesAndStockholdersEquity", "Liabilities and stockholders' equity", 500),
+        )
+        self.assertEqual(result["status"], "reconciled")
+        self.assertEqual(result["candidate_counts"]["total_assets"], 1)
+
+    def test_period_mismatch_is_insufficient_not_zero(self):
+        old_period = row("us-gaap_Assets", "Assets", 500)
+        old_period["values"] = {"2024-12-31": 500}
+        result = self.review(
+            old_period,
+            row("us-gaap_LiabilitiesAndStockholdersEquity", "Liabilities and stockholders' equity", 500),
+        )
+        self.assertEqual(result["status"], "insufficient_inputs")
+        self.assertIsNone(result["assets"])
+
+    def test_missing_total_is_not_derived_from_components(self):
+        result = self.review(
+            row("us-gaap_Assets", "Assets", 500),
+            row("us-gaap_Liabilities", "Liabilities", 300),
+            row("us-gaap_StockholdersEquity", "Stockholders' equity", 200),
+        )
+        self.assertEqual(result["status"], "insufficient_inputs")
+        self.assertIsNone(result["liabilities_and_equity"])
+
+    def test_rounding_tolerance_is_relative_to_statement_scale(self):
+        result = self.review(
+            row("us-gaap_Assets", "Assets", 1_000_000),
+            row("us-gaap_LiabilitiesAndStockholdersEquity", "Liabilities and stockholders' equity", 999_950),
+        )
+        self.assertEqual(result["status"], "reconciled")
+        self.assertEqual(result["tolerance"], 100)
 
 
 class CurrencyNormalizationTests(unittest.TestCase):
