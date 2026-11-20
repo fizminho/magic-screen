@@ -172,3 +172,8 @@ The research artifact labels the evidence path for each manually reviewed issuer
 ## Configurable EdgarTools validation sample
 
 The read-only EdgarTools bakeoff pins `edgartools==6.3.0` and accepts a comma-separated `BAKEOFF_SYMBOLS` environment variable. The manual GitHub Actions workflow exposes a `symbols` input for testing additional issuers. HRB/PBI/ADBE remain the default control cases. For a broader Magic Screen validation sample, pass only tickers copied from the current verified MFI screen response. Do not infer current MFI membership from SEC's company ticker directory or old stock-master rows. The script extracts filings into a temporary GitHub Actions artifact only; it does not access D1 or change production calculations.
+
+
+## Expanded annual-filing bakeoff
+
+The EdgarTools research workflow is pinned to `edgartools==6.3.0` and tests a ten-symbol sample: HRB, PBI and ADBE control cases plus AFMJF, HPQ, OTEX, PRDO, PLTK, UPWK and SNDK from the supplied 2026-11-20 MFI screen. It selects the latest-filed annual report across 10-K, 20-F and 40-F, matching the production pipeline's annual filing families. It intentionally excludes interim 10-Q/6-K in this first comparison. All outputs remain review-only GitHub Actions artifacts; no D1 rows, ratios, eligibility or rankings are changed.
