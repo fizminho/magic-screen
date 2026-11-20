@@ -384,3 +384,11 @@ The pinned EdgarTools 6.3.0 run extracted 10 of 11 symbols; AFMJF was recorded a
 
 - The full-cohort currency artifact identifies USD for 28 standard SEC filers, CAD for the manual EGHSF issuer report, and USD for AFMJF's manual issuer report. SGHC's FY2025 20-F is identified as USD only through an exact-symbol/exact-accession manual override because its IFRS Company Facts did not expose a usable ISO currency unit. This override must not be generalized.
 - SBC has 213 USD and one JPY accession-scoped currency-unit observations. USD remains the dominant reporting-currency candidate, but the secondary JPY observation is retained as a review flag rather than silently discarded.
+
+
+## MFI quote-date market-cap currency alignment (2026-11-20)
+
+- **INTENTIONAL:** the research bakeoff now attaches the exact MFI USD market-cap snapshot dated 2026-11-18 (snapshot as-of 2026-11-20T09:14:01.782Z; quarter date 2026-09-30) to each matching ticker. Values are stored as USD millions and converted to full USD before any currency conversion. ADBE remains a historical control and intentionally has no MFI market-cap value in this cohort.
+- For a non-USD reporting currency, the bakeoff translates the USD market cap into reporting-currency units using the Frankfurter blended daily reference rate on the MFI price date (or the latest available observation on/before that date, within the bounded 7-day lookup). The EGHSF CAD example uses USD/CAD 1.4296 on 2026-11-18; USD 643.04m converts to CAD 919.289984m.
+- **INTENTIONAL:** the snapshot is pinned research input, not a live quote. A workflow-dispatch `market_caps_json` override (ticker to USD millions) is available for a newer MFI snapshot; the matching `mfi_price_date` must be updated at the same time. The report records the snapshot as-of and quote dates.
+- The conversion is still review-only. It does not approve EBIT, debt, cash, lease, NCI or invested-capital classifications, and it does not calculate production EV/Earnings Yield or change D1/ranks. Same-currency USD market caps are passed through without an external FX request.
