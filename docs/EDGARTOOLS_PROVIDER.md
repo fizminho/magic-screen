@@ -35,10 +35,10 @@ The production integration therefore uses a Python execution lane:
 1. A daily scheduled or manually dispatched GitHub Actions job installs a pinned EdgarTools version.
 2. The job fetches the current active US MFI ticker list from the protected Worker `/api/fundamentals/edgartools/universe` endpoint. A manual ticker override remains available for focused tests; push-triggered regression runs retain a fixed control cohort.
 3. The job extracts each issuer's latest eligible annual filing (10-K, 20-F or 40-F).
-3. The job emits a versioned JSON report with ticker, filing metadata, reporting currency, statement facts, provider status, and source provenance.
-4. Scheduled and manually dispatched runs POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
-5. The endpoint stores each ticker/accession payload in `edgartools_filing_evidence`. This is raw evidence storage only; it does not write `stock_fundamentals`, ratios, eligibility, or ranks. The `/api/fundamentals/edgartools/status` route reports stored provider coverage.
-6. The Worker will apply deterministic, independently tested accounting rules before writing calculated fundamentals.
+4. The job emits a versioned JSON report with ticker, filing metadata, reporting currency, statement facts, provider status, and source provenance.
+5. Scheduled and manually dispatched runs POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
+6. The endpoint stores each ticker/accession payload in `edgartools_filing_evidence`. This is raw evidence storage only; it does not write `stock_fundamentals`, ratios, eligibility, or ranks. The `/api/fundamentals/edgartools/status` route reports stored provider coverage.
+7. The Worker will apply deterministic, independently tested accounting rules before writing calculated fundamentals.
 7. Existing all-candidate completeness gates remain in force. No partial-universe ranking is published.
 
 The existing bakeoff is both the extraction regression harness and the scheduled raw-evidence refresh. Push-based runs only test and upload an artifact. Scheduled and manually dispatched runs discover the active US MFI universe and ingest raw evidence; a manual symbol override is available for focused tests. The endpoint is size-bounded, authenticated, and idempotent by ticker/accession. It must not be mistaken for an approved accounting resolver.
