@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, enterprise_value_scope_review, filing_specific_review, non_sec_issuer_review_case, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -19,6 +19,90 @@ def row(concept, label, value, standard_concept=None):
         "abstract": False,
         "values": values,
     }
+
+
+class CurrencyNormalizationTests(unittest.TestCase):
+    def test_reporting_currency_uses_exact_accession_and_period_units(self):
+        companyfacts = {
+            "facts": {
+                "us-gaap": {
+                    "Revenue": {
+                        "units": {
+                            "CAD": [
+                                {"accn": "0000000001-25-000001", "end": "2025-12-31", "form": "10-K"},
+                                {"accn": "0000000001-25-000001", "end": "2025-12-31", "form": "10-K"},
+                            ],
+                            "USD": [
+                                {"accn": "0000000001-24-000001", "end": "2025-12-31", "form": "10-K"},
+                            ],
+                        }
+                    },
+                    "Assets": {
+                        "units": {
+                            "CAD": [
+                                {"accn": "0000000001-25-000001", "end": "2025-12-31", "form": "10-K"},
+                                {"accn": "0000000001-25-000001", "end": "2025-12-31", "form": "10-K"},
+                            ]
+                        }
+                    },
+                }
+            }
+        }
+        result = reporting_currency_unit_review(
+            companyfacts, "0000000001-25-000001", "2025-12-31"
+        )
+        self.assertEqual(result["status"], "identified_from_accession_facts")
+        self.assertEqual(result["currency"], "CAD")
+        self.assertEqual(result["unit_counts"]["CAD"], 4)
+
+    def test_tied_currency_units_are_not_guessed(self):
+        companyfacts = {
+            "facts": {
+                "us-gaap": {
+                    "Revenue": {
+                        "units": {
+                            "CAD": [{"accn": "A", "end": PERIOD}] * 3,
+                            "USD": [{"accn": "A", "end": PERIOD}] * 3,
+                        }
+                    }
+                }
+            }
+        }
+        result = reporting_currency_unit_review(companyfacts, "A", PERIOD)
+        self.assertEqual(result["status"], "currency_unit_ambiguous")
+        self.assertIsNone(result["currency"])
+
+    def test_usd_market_cap_converts_to_reporting_currency_at_quote_date(self):
+        result = currency_normalization_review(
+            "CAD",
+            100_000_000,
+            "2026-11-18",
+            {
+                "status": "rate_available",
+                "base": "USD",
+                "quote": "CAD",
+                "rate": 1.4,
+                "date": "2026-11-18",
+                "requested_date": "2026-11-18",
+            },
+        )
+        self.assertEqual(result["status"], "market_cap_converted_review_only")
+        self.assertEqual(result["market_cap_in_reporting_currency"], 140_000_000)
+        self.assertEqual(result["fx_rate_review"]["date"], "2026-11-18")
+
+    def test_same_currency_does_not_require_fx(self):
+        result = currency_normalization_review("USD", 100_000_000, "2026-11-18")
+        self.assertEqual(result["status"], "market_cap_converted_review_only")
+        self.assertEqual(result["market_cap_in_reporting_currency"], 100_000_000)
+        self.assertEqual(result["fx_rate_review"]["rate"], 1.0)
+
+    def test_missing_market_cap_never_fabricates_ev_input(self):
+        result = currency_normalization_review(
+            "CAD", None, "2026-11-18",
+            {"status": "rate_available", "rate": 1.4, "date": "2026-11-18"},
+        )
+        self.assertEqual(result["status"], "fx_rate_available_market_cap_missing")
+        self.assertIsNone(result["market_cap_in_reporting_currency"])
 
 
 class NonSecIssuerReviewTests(unittest.TestCase):
