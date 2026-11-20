@@ -142,3 +142,10 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 - **The filing inspector may cross-check a revenue-minus-costs arithmetic candidate against reported pretax income.** When same-period consolidated annual interest expense, other non-operating income/expense, and pretax income facts are available, it calculates candidate EBIT less interest expense plus other non-operating income/expense and reports the difference from reported pretax income.
 - **An exact reconciliation is supporting evidence, not automatic approval.** The check remains issuer- and filing-specific, read-only, and labelled for manual review. It does not change production EBIT mappings, fundamentals, ratios, or rankings.
 - **Missing components remain null.** The diagnostic does not infer zero for missing interest, non-operating, or pretax facts.
+
+
+## SEC diagnostic: direct operating-income fact visibility
+
+- The filing-level inspector reports a direct operating-income fact when it finds one of the exact concepts already recognized by the production parser across the supported US-GAAP and IFRS taxonomies.
+- It returns the concept, label, amount, unit, duration type, and a presentation hint so reviewers can see which direct fact was found. The boolean is retained for simple client checks.
+- **INTENTIONAL:** this is diagnostic visibility only. It does not broaden production tag support or accept generic profit, pretax income, or non-operating income as EBIT. Production calculations remain governed by the existing explicit-tag parser.
