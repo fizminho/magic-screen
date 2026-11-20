@@ -55,7 +55,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         detail = detail or {}
         status = str(detail.get("status") or "not_found")
         count = detail.get("candidate_count", 0)
-        if status not in ("unique", "not_found") or (isinstance(count, int) and count > 1):
+        if status not in ("unique", "unique_candidate", "not_found") or (isinstance(count, int) and count > 1):
             category_summary.append(f"{name}={status}({count})")
 
     return {
@@ -71,7 +71,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "issue_count": len(issues),
         "issues": issues,
         "balance_sheet_exceptions": category_summary,
-        "production_write": row.get("production_write") is False,
+        "production_write": False,
     }
 
 
