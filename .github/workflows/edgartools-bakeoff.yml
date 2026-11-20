@@ -55,6 +55,26 @@ jobs:
           MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '2026-11-18' }}"
           MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || '' }}"
         run: python scripts/edgartools_bakeoff.py
+      # INTENTIONAL: never ingest on push-based regression runs. Manual runs can
+      # post raw EdgarTools evidence only when the Worker URL is configured.
+      - name: Ingest EdgarTools filing evidence (raw, no ranking changes)
+        if: github.event_name == 'workflow_dispatch' && vars.EDGARTOOLS_INGEST_URL != ''
+        env:
+          EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
+          UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
+        run: |
+          if [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
+            echo "::warning::UNIVERSE_SYNC_TOKEN is not configured; report remains artifact-only."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+            -X POST \
+            -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @edgartools-bakeoff.json \
+            "$EDGARTOOLS_INGEST_URL"
+      - name: Upload test report
+
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
