@@ -32,7 +32,7 @@ jobs:
           python-version: "3.11"
       - name: Install EdgarTools
         run: python -m pip install --upgrade pip "edgartools==6.3.0"
-      - name: Extract HRB, PBI and ADBE statements
+      - name: Extract selected company statements
         env:
           EDGAR_IDENTITY: "Magic Screen research support@binalah.co"
           OUTPUT_PATH: "edgartools-bakeoff.json"
