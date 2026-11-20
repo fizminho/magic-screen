@@ -112,3 +112,10 @@ A separate protected endpoint, `POST /api/fundamentals/diagnose-extensions`, acc
 - The SEC company ticker exchange directory is lookup data, not the US stock universe. Download it in memory to resolve CIKs only for active Magic Formula Investing symbols. Never bulk-insert its roughly 95,000 directory rows into stock_master.
 - Persist only the small active MFI ticker-to-CIK mapping in sec_company_map. Each selected ticker is upserted once per mapping refresh, with its resolved CIK or the explicit UNMAPPED marker. Do not insert placeholders and then issue a second update for the same ticker.
 - The MFI screen remains the sole source of active US screener candidates. SEC Company Facts is fetched only for those candidates.
+
+
+## Presentation-role classification and denominator review states
+
+The extension diagnostic now reads the filing schema's role definitions and attaches the matching role definition and a conservative classification to each returned presentation relationship: `consolidated_statement`, `statement_role`, `disclosure_or_segment`, or `unclassified`. Candidate groups prefer non-dimensional facts attached to statement roles, but the classification is review evidence only. It does not prove that a fact is consolidated, complete, or equivalent to a Magic Formula input. Confirm the role and line item in the filing itself, especially where segment disclosures or note tables are present.
+
+When current assets minus current liabilities plus net PP&E is negative or zero, the production pipeline records `negative_invested_capital` or `zero_invested_capital`, leaves both ratios unavailable, and excludes the company from ranking. This is an intentional review state, not a missing-fact or zero-ratio fallback. The pipeline status endpoint reports these counts separately.
