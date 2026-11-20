@@ -727,6 +727,38 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
       }
     } else labelStatus="http_"+lr.status;
   }
+  const presentationFile=files.find((x:any)=>String(x.name??"").toLowerCase().endsWith("_pre.xml"));
+  const presentationByConcept=new Map<string,any[]>();
+  let presentationStatus="not_found";
+  if(presentationFile?.name){
+    const pr=await fetch(base+encodeURIComponent(presentationFile.name),{headers});
+    if(pr.ok){
+      presentationStatus="loaded";
+      const presentationXml=await pr.text();
+      for(const link of presentationXml.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationLink\\b([^>]*)>([\\s\\S]*?)<\\/(?:[A-Za-z0-9_-]+:)?presentationLink>/gi)){
+        const linkAttrs=link[1],body=link[2];
+        const role=linkAttrs.match(/xlink:role=["']([^"']+)["']/i)?.[1]??null;
+        const locators=new Map<string,string>();
+        for(const loc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?loc\\b([^>]*)\\/?\\s*>/gi)){
+          const attrs=loc[1],label=attrs.match(/xlink:label=["']([^"']+)["']/i)?.[1],href=attrs.match(/xlink:href=["']([^"']+)["']/i)?.[1];
+          const concept=href?.split("#").pop()?.replace(/^[^_]+_/,"");
+          if(label&&concept) locators.set(label,concept);
+        }
+        for(const arc of body.matchAll(/<(?:[A-Za-z0-9_-]+:)?presentationArc\\b([^>]*)\\/?\\s*>/gi)){
+          const attrs=arc[1],from=attrs.match(/xlink:from=["']([^"']+)["']/i)?.[1],to=attrs.match(/xlink:to=["']([^"']+)["']/i)?.[1];
+          const parent=from?locators.get(from):null,child=to?locators.get(to):null;
+          if(!parent||!child) continue;
+          const order=attrs.match(/\\border=["']([^"']+)["']/i)?.[1]??null;
+          const preferredLabel=attrs.match(/preferredLabel=["']([^"']+)["']/i)?.[1]??null;
+          // INTENTIONAL: presentation arcs are structural evidence only. They do not establish that a fact is a complete balance or income-statement total.
+          const entry={role,parent,child,order,preferred_label:preferredLabel};
+          const list=presentationByConcept.get(child)??[];
+          if(list.length<12) list.push(entry);
+          presentationByConcept.set(child,list);
+        }
+      }
+    } else presentationStatus="http_"+pr.status;
+  }
   const candidates:any[]=[];
   const relevant=/(revenue|sales|operating|expense|cost|income|debt|borrow|cash|property|plant|asset|liabilit|lease|capital)/i;
   const excludedPrefixes=new Set(["us-gaap","ifrs-full","dei","srt","ecd","country","currency","stpr","exch"]);
@@ -747,10 +779,10 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
     const scale=Number(attrs.match(/\bscale=["'](-?\d+)["']/i)?.[1]??0),sign=attrs.match(/\bsign=["']([^"']+)["']/i)?.[1]==="-"?-1:1;
     const value=Number(valueText)*Math.pow(10,scale)*sign;
     if(!Number.isFinite(value)) continue;
-    candidates.push({tag:prefix+":"+tag,label:labels.get(tag)??null,value,start:context.start,end:context.end,kind:context.start?"duration":"instant",unit:unitId?units.get(unitId)??null:null,dimensions:context.dimensions,context:contextId});
+    candidates.push({tag:prefix+":"+tag,label:labels.get(tag)??null,value,start:context.start,end:context.end,kind:context.start?"duration":"instant",unit:unitId?units.get(unitId)??null:null,dimensions:context.dimensions,context:contextId,presentation:presentationByConcept.get(tag)??[]});
   }
   candidates.sort((a,b)=>Number(b.dimensions)-Number(a.dimensions)||a.tag.localeCompare(b.tag));
-  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL extension taxonomy",accession:anchor.accn,fiscal_period:anchor.end,form:anchor.form,filed_at:anchor.filed,filing_url:base+"index.html",instance_document:instance.name,label_document:labelFile?.name??null,label_status:labelStatus,extension_fact_count:candidates.length,extension_facts:candidates.slice(0,100),truncated:candidates.length>100,eligible_for_magic_formula:false,note:"Diagnostic only. Extension tags are not automatically mapped to financial concepts, stored in D1, used for ratios, or ranked. Review labels, contexts, units, dimensions, and the filing presentation before approving any mapping."};
+  return {symbol:stock.symbol,company_name:stock.company_name,source:"SEC filing XBRL extension taxonomy",accession:anchor.accn,fiscal_period:anchor.end,form:anchor.form,filed_at:anchor.filed,filing_url:base+"index.html",instance_document:instance.name,label_document:labelFile?.name??null,label_status:labelStatus,presentation_document:presentationFile?.name??null,presentation_status:presentationStatus,extension_fact_count:candidates.length,extension_facts:candidates.slice(0,100),truncated:candidates.length>100,eligible_for_magic_formula:false,note:"Diagnostic only. Extension tags are not automatically mapped to financial concepts, stored in D1, used for ratios, or ranked. Review labels, contexts, units, dimensions, and presentation parent/child relationships before approving any mapping. Presentation arcs are structural clues, not proof of accounting meaning."};
 }
 
 export default {
