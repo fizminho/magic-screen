@@ -235,3 +235,6 @@ The review-only EdgarTools output now separates standard net PP&E from rental pr
 The review output also surfaces sale-leaseback financing and construction financing separately from conventional current/noncurrent debt. PRDO's 2025 10-K reports $56.992m of sale-leaseback financing after a failed sale-leaseback transaction and explains that the liability reflects recategorization of construction financing when the lease commenced. The filing also describes future payments due under the failed transaction. This is a financing obligation that deserves review, but it is not silently mapped to conventional borrowings or added to EV debt.
 
 Regression tests ensure these categories remain distinct. No production ratios, eligibility or ranks are changed.
+
+
+Review-only ROC previews also carry `review_flags` when the issuer has separate rental equipment, sale-leaseback/construction financing, lease liabilities, or restricted/combined cash. The flags identify accounting scope requiring manual review; they do not alter the reported candidate values or apply automatic adjustments to invested capital or enterprise value.
