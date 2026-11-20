@@ -778,6 +778,9 @@ export default {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
+        // INTENTIONAL: initialize D1 tables here so the protected diagnostic works independently
+        // of whether the screener or another API route has been opened first.
+        await ensureSchema(env);
         const payload:any=await request.json();
         const symbol=String(payload.symbol??"").trim().toUpperCase();
         if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
