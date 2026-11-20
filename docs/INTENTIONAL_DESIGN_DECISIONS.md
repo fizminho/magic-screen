@@ -197,3 +197,12 @@ The HRB diagnostic also attempts to discover the filing's extracted XBRL instanc
 ## Non-positive invested capital review state
 
 - **INTENTIONAL:** if the reported current assets less current liabilities plus net PP&E is negative or zero, do not calculate ROC, do not substitute zero, and do not publish a Magic Formula rank for that company. Store `negative_invested_capital` or `zero_invested_capital` as an explicit review status and expose the corresponding stock-card data status. This is distinct from missing facts because the inputs may be present while the denominator is not meaningful for the formula.
+
+
+## EdgarTools extraction bakeoff
+
+- **INTENTIONAL:** the manual `EdgarTools fundamentals bakeoff` GitHub Actions workflow is a read-only research lane. It extracts annual 10-K financial-statement candidates for HRB, PBI and ADBE and uploads a short-lived JSON artifact; it never calls the Magic Screen Worker, writes D1, changes `stock_fundamentals`, calculates production ratios, or publishes ranks.
+- The script uses EdgarTools to obtain the selected filing's income statement, balance sheet and cash-flow statement, then emits rows whose labels may relate to operating income, PP&E, current assets/liabilities, cash, debt, leases and interest. These are candidate rows for manual review, not approved accounting mappings.
+- **INTENTIONAL:** candidate selection is based on text labels to make the first comparison manageable. A missing row means only that the label filter did not find it; it does not prove that the filing lacks the fact. Review the complete filing and statement before concluding that an input is unavailable.
+- Filing metadata and fiscal periods must be checked before comparing values with the existing SEC diagnostic. If the filing-specific financials object is unavailable and the script falls back to company-level annual financials, the report labels that fallback explicitly.
+- The workflow is manually triggered, uses Python 3.11+, installs the MIT-licensed EdgarTools package, and retains its JSON artifact for seven days. It does not run on the production fundamentals schedule.
