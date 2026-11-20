@@ -531,9 +531,9 @@ async function syncUsFundamentals(env:Env, limit=10) {
         : !anyBorrowingFacts && leaseDebtKnown ? leaseCurrent.value!+leaseLong.value! : null;
       const netWorkingCapital=(assets.value??0)-(liabilities.value??0);
       const investedCapital=netWorkingCapital+(ppe.value??0);
-      const enterpriseValue=cap+totalDebt-(cash.value??0);
-      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && totalDebt!=null && item.market_cap!=null && enterpriseValue>0 && investedCapital>0;
-      const ey=complete ? (ebit.value as number)/enterpriseValue : null;
+      const enterpriseValue=totalDebt!=null ? cap+totalDebt-(cash.value??0) : null;
+      const complete=!staleFiscalPeriod && ebit.value!=null && assets.value!=null && liabilities.value!=null && ppe.value!=null && cash.value!=null && debtKnown && totalDebt!=null && item.market_cap!=null && enterpriseValue!=null && enterpriseValue>0 && investedCapital>0;
+      const ey=complete ? (ebit.value as number)/enterpriseValue! : null;
       const roc=complete ? (ebit.value as number)/investedCapital : null;
       const status=staleFiscalPeriod ? "stale_fiscal_period" : complete ? "calculated" : "missing_required_facts";
       await env.DB.prepare("INSERT INTO stock_fundamentals(symbol,market,cik,ebit,current_assets,current_liabilities,net_ppe,total_debt,cash,market_cap,earnings_yield,return_on_capital,fiscal_period,filed_at,status,source,updated_at) VALUES(?,'US',?,?,?,?,?,?,?,?,?,?,?,?,?,'SEC EDGAR Company Facts',?) ON CONFLICT(symbol,market) DO UPDATE SET cik=excluded.cik,ebit=excluded.ebit,current_assets=excluded.current_assets,current_liabilities=excluded.current_liabilities,net_ppe=excluded.net_ppe,total_debt=excluded.total_debt,cash=excluded.cash,market_cap=excluded.market_cap,earnings_yield=excluded.earnings_yield,return_on_capital=excluded.return_on_capital,fiscal_period=excluded.fiscal_period,filed_at=excluded.filed_at,status=excluded.status,source=excluded.source,updated_at=excluded.updated_at")
