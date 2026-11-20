@@ -20,9 +20,9 @@ from edgar import Company, set_identity
 SYMBOLS = ("HRB", "PBI", "ADBE")
 ROW_PATTERN = re.compile(
     r"operating income|operating profit|income from operations|profit from operations|"
-    r"earnings before interest|\bebit\b|property|plant|equipment|fixed assets|"
+    r"earnings before interest|\\bebit\\b|property|plant|equipment|fixed assets|"
     r"depreciation|depletion|amortization|current assets|current liabilities|"
-    r"cash and cash equivalents|cash equivalents|cash and bank|\bcash\b|"
+    r"cash and cash equivalents|cash equivalents|cash and bank|\\bcash\\b|"
     r"long.?term debt|short.?term debt|current portion of debt|borrowings|"
     r"loans payable|notes payable|finance lease|lease liabilities|interest expense",
     re.IGNORECASE,
@@ -76,21 +76,44 @@ def filing_metadata(filing: Any) -> dict[str, Any]:
 
 def statement_candidates(statement: Any) -> dict[str, Any]:
     if statement is None:
-        return {"available": False, "rows": [], "error": "Statement unavailable"}
+        return {
+            "available": False,
+            "row_count": 0,
+            "candidate_row_count": 0,
+            "all_rows": [],
+            "rows": [],
+            "error": "Statement unavailable",
+        }
     try:
-        frame = statement.to_dataframe(view="detailed")
-        # Keep the original row labels/concepts and period columns. This is a
-        # review artifact, not an automatic accounting-tag mapping.
-        frame = frame.reset_index()
-        rows: list[dict[str, Any]] = []
+        frame = statement.to_dataframe(view="detailed").reset_index()
+        all_rows: list[dict[str, Any]] = []
+        candidate_rows: list[dict[str, Any]] = []
         for record in frame.to_dict(orient="records"):
             clean = {str(key): safe_value(value) for key, value in record.items()}
+            all_rows.append(clean)
             searchable = " ".join(str(value) for value in clean.values() if value is not None)
             if ROW_PATTERN.search(searchable):
-                rows.append(clean)
-        return {"available": True, "candidate_row_count": len(rows), "rows": rows}
+                candidate_rows.append(clean)
+
+        # INTENTIONAL: retain the full statement alongside the label-filtered
+        # subset. Label filtering is useful for navigation but can hide EBIT
+        # subtotals or issuer-specific labels. Neither collection is a mapping.
+        return {
+            "available": True,
+            "row_count": len(all_rows),
+            "candidate_row_count": len(candidate_rows),
+            "all_rows": all_rows,
+            "rows": candidate_rows,
+        }
     except Exception as exc:
-        return {"available": False, "rows": [], "error": f"{type(exc).__name__}: {exc}"}
+        return {
+            "available": False,
+            "row_count": 0,
+            "candidate_row_count": 0,
+            "all_rows": [],
+            "rows": [],
+            "error": f"{type(exc).__name__}: {exc}",
+        }
 
 
 def extract_company(symbol: str) -> dict[str, Any]:
@@ -133,10 +156,12 @@ def extract_company(symbol: str) -> dict[str, Any]:
                 "cash_flow_statement": statement_candidates(financials.cash_flow_statement()),
             },
             "review_notes": [
-                "Candidate rows are selected by label text for human review only.",
+                "Full statement rows are included so label filtering cannot hide an income-statement subtotal.",
+                "The rows field remains a label-filtered convenience subset; all_rows is the complete detailed statement returned by EdgarTools.",
                 "No EBIT, debt, invested-capital, Earnings Yield, or ROC value is approved automatically.",
                 "Confirm the statement fiscal period and filing accession before comparing values.",
-                "A missing candidate row means only that this label filter did not find it; inspect the full filing before treating a fact as absent.",
+                "Dimensional breakdowns and consolidated totals must not be added together without checking the filing presentation.",
+                "Multiple PP&E concepts are shown separately; the script does not assume they are additive or non-overlapping.",
             ],
         })
     except Exception as exc:
@@ -164,7 +189,7 @@ def main() -> int:
 
     report["companies"] = [extract_company(symbol) for symbol in SYMBOLS]
     output = Path(os.environ.get("OUTPUT_PATH", "edgartools-bakeoff.json"))
-    output.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+    output.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str) + "\\n", encoding="utf-8")
 
     for company in report["companies"]:
         print(f"{company['symbol']}: {company['status']}")
@@ -172,7 +197,10 @@ def main() -> int:
             print(f"  ERROR: {company['error']}")
         else:
             for name, statement in company["statements"].items():
-                print(f"  {name}: {statement.get('candidate_row_count', 0)} candidate rows")
+                print(
+                    f"  {name}: {statement.get('row_count', 0)} full rows, "
+                    f"{statement.get('candidate_row_count', 0)} label candidates"
+                )
             print(f"  filing metadata: {json.dumps(company.get('filing', {}), default=str)}")
 
     print(f"JSON report written to {output}")
