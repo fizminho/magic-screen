@@ -535,7 +535,7 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
         "noncurrent_debt_candidate": noncurrent_debt,
         "gross_debt_candidate": gross_debt,
         "unrestricted_cash_candidate": unrestricted_cash,
-        "net_debt_candidate": net_debt,
+        "conventional_net_debt_candidate": net_debt,
         "lease_liabilities": {
             "current_candidate_count": categories.get("current_lease_liability_candidates", {}).get("candidate_count", 0),
             "noncurrent_candidate_count": categories.get("noncurrent_lease_liability_candidates", {}).get("candidate_count", 0),
