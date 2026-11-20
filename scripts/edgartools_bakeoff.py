@@ -735,7 +735,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
             "exclude_concept": re.compile(r"RestrictedCash|CashCashEquivalentsRestrictedCash", re.I),
         },
         "cash_restricted_candidates": {
-            "label": re.compile(r"restricted cash|restricted cash equivalents", re.I),
+            "label": re.compile(r"^(?!total\\b).*restricted cash|^restricted cash equivalents", re.I),
             "concept": re.compile(r"(?:RestrictedCashCurrent|RestrictedCashNoncurrent|CurrentRestrictedCashAndCashEquivalents)$", re.I),
         },
         "short_term_investment_candidates": {
