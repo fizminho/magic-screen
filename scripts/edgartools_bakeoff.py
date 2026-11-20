@@ -536,7 +536,7 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
         "status": "review_required" if flags else "candidate_inputs_identified_review_only",
         "current_debt_candidate": current_debt,
         "noncurrent_debt_candidate": noncurrent_debt,
-        "gross_debt_candidate": gross_debt,
+        "conventional_gross_debt_candidate": gross_debt,
         "unrestricted_cash_candidate": unrestricted_cash,
         "conventional_net_debt_candidate": net_debt,
         "lease_liabilities": {
