@@ -174,8 +174,20 @@ def build_queue(
                 for name, raw_name in raw_category_names.items()
             }
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            reconciliation = raw_company.get("balance_sheet_reconciliation_review")
+            item["balance_sheet_reconciliation_review"] = reconciliation
+            item["balance_sheet_reconciliation_evidence_source"] = (
+                "fresh_extraction_artifact_same_accession" if reconciliation else "not_available"
+            )
+            reconciliation_status = str((reconciliation or {}).get("status") or "not_available")
+            if reconciliation_status not in ("reconciled", "not_available"):
+                item["issues"].append("balance_sheet_reconciliation_" + reconciliation_status)
+                item["priority"] = "P1"
+                item["issue_count"] = len(item["issues"])
         else:
             item["debt_instrument_evidence_source"] = "stored_resolver_preview"
+            item["balance_sheet_reconciliation_review"] = None
+            item["balance_sheet_reconciliation_evidence_source"] = "stored_resolver_preview"
         rows.append(item)
     order = {"P1": 0, "P2": 1, "P3": 2}
     rows.sort(key=lambda row: (order.get(row["priority"], 9), row["symbol"]))
@@ -192,6 +204,10 @@ def build_queue(
             "priority_1": counts.get("P1", 0),
             "priority_2": counts.get("P2", 0),
             "priority_3": counts.get("P3", 0),
+            "balance_sheet_reconciliation": dict(Counter(
+                str((row.get("balance_sheet_reconciliation_review") or {}).get("status") or "not_available")
+                for row in rows
+            )),
         },
         "items": rows,
         "guardrail": "Triage only. Candidate values and classifications remain unapproved; missing values are unknown, never zero.",
@@ -222,7 +238,8 @@ def main() -> int:
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
-        "debt_instrument_evidence_source", "candidate_vs_policy_assessment", "production_write",
+        "debt_instrument_evidence_source", "balance_sheet_reconciliation_review",
+        "balance_sheet_reconciliation_evidence_source", "candidate_vs_policy_assessment", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -232,6 +249,9 @@ def main() -> int:
             row["issues"] = " | ".join(item["issues"])
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
+            row["balance_sheet_reconciliation_review"] = json.dumps(
+                item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
+            )
             row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))
             writer.writerow(row)
     print("Accounting review queue:", json.dumps(queue["summary"], sort_keys=True))
