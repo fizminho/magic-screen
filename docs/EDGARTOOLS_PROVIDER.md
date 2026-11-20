@@ -140,3 +140,12 @@ Formulas:
 Higher values rank better. Ties receive average percentile ranks. At least five eligible companies are required before numeric ranks are published; below that threshold, all rank fields remain null to avoid misleading single-company percentiles.
 
 This endpoint is a **shadow preview only**. Debt, cash, EBIT and invested-capital values remain candidate/review-only and are not policy-approved. The endpoint does not write to `stock_fundamentals`, `stock_snapshot`, production ratios, eligibility, or production rankings. It explicitly returns immutable production flags.
+
+
+#### Open-source debt mapping reference
+
+The debt taxonomy review borrows a narrow mapping insight from the MIT-licensed [crible SEC EDGAR provider](https://github.com/maxgfr/crible/blob/main/src/crible/providers/edgar.py): its provider intentionally avoids generic US-GAAP `LongTermDebt` because that fact can include current maturities, and instead prefers `LongTermDebtNoncurrent` for the noncurrent bucket and `DebtCurrent` for the current bucket. Magic Screen applies that distinction conservatively in its own review-only extractor.
+
+Magic Screen does not import crible's full canonical accounting model or treat its derived total-debt/EV definitions as approved. The local resolver still requires one unambiguous candidate per maturity bucket, preserves all candidate facts and hierarchy metadata, and refuses automatic aggregation when multiple instruments, duplicate concepts, parent/child relationships or aggregate totals may overlap. The MIT licence permits reuse subject to retaining its copyright and licence notice; this change adapts the mapping rule rather than copying the provider implementation.
+
+Reference: [crible src/crible/providers/edgar.py](https://github.com/maxgfr/crible/blob/main/src/crible/providers/edgar.py), especially its CONCEPT_MAP comments for LongTermDebtNoncurrent, LongTermDebtAndCapitalLeaseObligations and DebtCurrent.
