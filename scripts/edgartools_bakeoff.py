@@ -276,6 +276,58 @@ def statement_fact_amount(
     return None
 
 
+
+def balance_sheet_review(
+    statements: dict[str, Any], period: str,
+    current_debt_concept: str, noncurrent_debt_concept: str,
+) -> dict[str, Any]:
+    current_assets = statement_fact_amount(
+        statements, "balance_sheet", "AssetsCurrent", r"^Total current assets$", period,
+    )
+    current_liabilities = statement_fact_amount(
+        statements, "balance_sheet", "LiabilitiesCurrent", r"^Total current liabilities$", period,
+    )
+    cash = statement_fact_amount(
+        statements, "balance_sheet", "CashAndCashEquivalentsAtCarryingValue",
+        r"^Cash and cash equivalents$", period,
+    )
+    ppe = statement_fact_amount(
+        statements, "balance_sheet", "PropertyPlantAndEquipmentNet",
+        r"^Property and equipment", period,
+    )
+    current_debt = statement_fact_amount(
+        statements, "balance_sheet", current_debt_concept, r"^(?:Current portion of long-term debt|Debt)$", period,
+    )
+    noncurrent_debt = statement_fact_amount(
+        statements, "balance_sheet", noncurrent_debt_concept, r"^(?:Long-term debt|Debt)$", period,
+    )
+    values = {
+        "current_assets": current_assets,
+        "current_liabilities": current_liabilities,
+        "cash_and_cash_equivalents_excluding_restricted_cash": cash,
+        "net_property_plant_and_equipment": ppe,
+        "current_debt": current_debt,
+        "noncurrent_debt": noncurrent_debt,
+    }
+    if any(value is None for value in values.values()):
+        return {
+            "status": "review_required",
+            "inputs": values,
+            "reason": "One or more exact, non-dimensional balance-sheet facts were not found for the selected fiscal period.",
+        }
+    total_debt = current_debt + noncurrent_debt
+    working_capital = current_assets - current_liabilities
+    invested_capital = working_capital + ppe
+    return {
+        "status": "review_only",
+        "inputs": values,
+        "total_debt_excluding_leases": round(total_debt, 2),
+        "net_debt_excluding_leases": round(total_debt - cash, 2),
+        "working_capital": round(working_capital, 2),
+        "invested_capital_current_assets_less_current_liabilities_plus_net_ppe": round(invested_capital, 2),
+        "guardrail": "Balance-sheet inputs are review-only. Lease liabilities and short-term investments are not included in this simple debt/cash comparison; confirm the production EV policy separately.",
+    }
+
 def filing_specific_review(
     symbol: str, filing: dict[str, Any], bridge: dict[str, Any],
     statements: dict[str, Any],
@@ -337,6 +389,7 @@ def filing_specific_review(
             },
             "formula": "reported revenue - reported total operating expenses",
             "classification_note": "The direct OperatingIncomeLoss row was not surfaced in EdgarTools, but the filing presents total operating expenses separately from other income (expense), net and interest expense. The operating subtotal is independently cross-checked from pretax income less non-operating income and signed interest expense. This is a filing-specific reconstruction, not a general tag mapping.",
+            "balance_sheet_review": balance_sheet_review(statements, period, "LongTermDebtCurrent", "LongTermDebtNoncurrent"),
             "guardrail": "Filing-specific manual review only. Do not generalize this extraction or promote it into production fundamentals or rankings.",
         }
 
@@ -380,6 +433,7 @@ def filing_specific_review(
             },
             "formula": "directly reported OperatingIncomeLoss; cross-checked as pretax income - net non-operating income",
             "classification_note": "The filing presents GAAP operating income directly and separately reports interest expense, investment gains and other non-operating income. This is the control case for direct operating-income extraction.",
+            "balance_sheet_review": balance_sheet_review(statements, period, "DebtCurrent", "LongTermDebt"),
             "guardrail": "Filing-specific validation only. Do not treat this as approval of any broad taxonomy mapping or production update.",
         }
 
