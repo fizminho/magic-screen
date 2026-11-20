@@ -329,3 +329,23 @@
   overflow-wrap:anywhere;
 }
 .import-dialog .refresh-btn { margin-top:14px; }
+
+
+.mfi-preview-panel{margin:26px 0 38px;padding:20px;background:#111a2d;border:1px solid #31415b;border-radius:9px}
+.mfi-preview-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}
+.mfi-preview-head h2{font:650 20px Manrope;color:#edf2fb;margin:7px 0}
+.mfi-preview-head p,.preview-footnote{font-size:10px;color:#8795ae;margin:0;line-height:1.6}
+.preview-pill{font:500 8px "DM Mono";letter-spacing:.7px;color:#e3c27c;border:1px solid #6a5731;background:#2a2418;border-radius:4px;padding:5px 7px;vertical-align:middle;margin-left:6px}
+.preview-updated{font:9px "DM Mono";color:#7d8ba4;white-space:nowrap}
+.preview-stats{display:flex;gap:10px;margin:16px 0}
+.preview-stats div{background:#17243a;border:1px solid #293b58;border-radius:6px;padding:10px 14px;min-width:110px}
+.preview-stats b{display:block;font:600 20px Manrope;color:#eaf1fb}
+.preview-stats span{display:block;font-size:9px;color:#8090aa;margin-top:3px}
+.preview-table{min-width:740px}
+.preview-table td{font-size:10px}
+.preview-table td b{display:block;color:#e4ebf7;font-size:10px}
+.preview-symbol{display:block;color:#7888a3;font:9px "DM Mono";margin-top:3px}
+.preview-warning{color:#e4c17c;font-size:9px;background:#2a2418;border-radius:4px;padding:4px 6px}
+.preview-empty{padding:20px 0;color:#8795ae;font-size:11px}
+.preview-footnote{margin-top:12px}
+@media(max-width:760px){.mfi-preview-panel{padding:14px;margin:18px 0 28px}.mfi-preview-head{display:block}.preview-updated{margin-top:10px}.preview-stats{gap:6px}.preview-stats div{min-width:0;flex:1;padding:9px}.preview-stats b{font-size:17px}}
