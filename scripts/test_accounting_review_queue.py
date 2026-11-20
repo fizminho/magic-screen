@@ -80,5 +80,45 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertTrue(all(item["production_write"] is False for item in queue["items"]))
 
 
+    def test_unique_classification_does_not_mean_policy_approval(self):
+        item = classify({
+            "symbol": "LEASE",
+            "provider_status": "supported",
+            "ebit_status": "direct_reported_candidate_review_only",
+            "invested_capital_status": "positive_denominator_candidate_review_only",
+            "enterprise_value_candidate_review": {
+                "status": "candidate_inputs_identified_review_only",
+                "conventional_debt_status": "identified_from_unique_current_and_noncurrent_components",
+                "approval_status": "review_only_no_production_ev_or_earnings_yield",
+                "unrestricted_cash_candidate": 100,
+            },
+            "balance_sheet_candidate_review": {
+                "current_debt": {"status": "unique_candidate", "candidate_count": 1},
+                "current_lease_liabilities": {"status": "unique_candidate", "candidate_count": 1},
+                "restricted_cash": {"status": "unique_candidate", "candidate_count": 1},
+                "short_term_investments": {"status": "unique_candidate", "candidate_count": 1},
+            },
+        })
+        assessment = item["candidate_vs_policy_assessment"]
+        self.assertEqual(assessment["balance_sheet"]["current_debt"]["classification_confidence"], "unique_candidate")
+        self.assertIn("pending_conventional_debt_policy", assessment["balance_sheet"]["current_debt"]["policy_status"])
+        self.assertIn("excluded_pending_lease_policy", assessment["balance_sheet"]["current_lease_liabilities"]["policy_status"])
+        self.assertIn("excluded_pending_restricted_cash_policy", assessment["balance_sheet"]["restricted_cash"]["policy_status"])
+        self.assertFalse(assessment["balance_sheet"]["current_lease_liabilities"]["production_approved"])
+        self.assertFalse(assessment["enterprise_value"]["production_approved"])
+
+    def test_ambiguous_classification_stays_ambiguous_and_unapproved(self):
+        item = classify({
+            "symbol": "AMB",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "noncurrent_debt": {"status": "ambiguous_candidates", "candidate_count": 2},
+            },
+        })
+        assessment = item["candidate_vs_policy_assessment"]["balance_sheet"]["noncurrent_debt"]
+        self.assertEqual(assessment["classification_confidence"], "ambiguous_candidates")
+        self.assertFalse(assessment["production_approved"])
+
+
 if __name__ == "__main__":
     unittest.main()
