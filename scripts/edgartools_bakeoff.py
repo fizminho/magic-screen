@@ -1465,26 +1465,42 @@ def filing_specific_review(
     if not isinstance(pretax_amount, (int, float)):
         return {"status": "review_required", "filing_accession": accession,
                 "reason": "The filing-specific interest review requires a recognized pretax-income anchor."}
-    reported_interest = 101_460_000.0
+    reported_interest_net = 101_460_000.0
+    interest_income_netted = 8_000_000.0
+    gross_interest_expense_before_netting = reported_interest_net + interest_income_netted
     consolidated_financing_cost = 61_503_000.0
     segment_financing_cost_ex_interest = 13_807_000.0
     allocated_finance_interest = consolidated_financing_cost - segment_financing_cost_ex_interest
-    total_interest = reported_interest + allocated_finance_interest
+    total_interest_net_of_interest_income = reported_interest_net + allocated_finance_interest
+    ebit_candidate = float(pretax_amount) + total_interest_net_of_interest_income
     return {
         "status": "review_only",
         "method": "filing_specific_interest_reconciliation",
         "automation_status": "manual_review_only",
         "filing_accession": accession,
-        "source_context": "2025 Form 10-K, Item 7 Segment Results and consolidated statement of operations",
-        "reported_interest_expense_net": reported_interest,
+        "fiscal_period": period,
+        "source_context": "FY2025 Form 10-K: consolidated statement of operations, Item 7 Segment Results, and Note 11 supplemental financial statement information",
+        "reported_interest_expense_net": reported_interest_net,
+        "interest_income_included_in_reported_net_interest_expense": interest_income_netted,
+        "gross_interest_expense_before_netting": gross_interest_expense_before_netting,
         "consolidated_cost_of_financing_and_other": consolidated_financing_cost,
         "SendTech_segment_cost_of_financing_and_other_ex_allocated_interest": segment_financing_cost_ex_interest,
         "allocated_finance_interest_embedded_in_cost_of_financing": allocated_finance_interest,
-        "total_interest_expense_for_EBIT_reconciliation": total_interest,
+        "total_interest_expense_for_EBIT_reconciliation_net_of_interest_income": total_interest_net_of_interest_income,
         "reported_pretax_income": float(pretax_amount),
-        "ebit_candidate": round(float(pretax_amount + total_interest), 2),
-        "formula": "reported pretax income + consolidated interest expense, including finance interest allocated into cost of financing",
-        "classification_note": "The filing states that a portion of total interest expense is allocated to finance interest expense within Cost of financing and other. Therefore that full expense line must not be classified wholly as operating or wholly as non-operating. The $47.696M allocated component is inferred from consolidated financing cost less the segment cost excluding allocated finance interest.",
+        "ebit_candidate": round(ebit_candidate, 2),
+        "cross_checks": {
+            "allocated_finance_interest_from_consolidated_less_segment_cost": round(allocated_finance_interest, 2),
+            "interest_expense_net_plus_allocated_finance_interest": round(total_interest_net_of_interest_income, 2),
+            "pretax_plus_interest_net_of_interest_income": round(ebit_candidate, 2),
+            "reconciles_with_reported_components": (
+                abs(allocated_finance_interest - 47_696_000.0) <= 1
+                and abs(total_interest_net_of_interest_income - 149_156_000.0) <= 1
+                and abs(ebit_candidate - 341_680_000.0) <= 1
+            ),
+        },
+        "formula": "reported pretax income + interest expense net of interest income + finance interest allocated into cost of financing",
+        "classification_note": "The filing states that a portion of total interest expense is allocated to finance interest expense within Cost of financing and other. The $47.696M allocation is the consolidated $61.503M cost less the $13.807M SendTech segment cost that excludes allocated finance interest. Note 11 says the $101.460M reported interest expense, net already includes $8M interest income; that income is therefore not added back a second time. This is an exact-filing manual bridge, not a general mapping.",
         "guardrail": "Filing-specific manual review only. Do not generalize these values or this extraction to other issuers/periods, and do not write production fundamentals or rankings.",
     }
 
