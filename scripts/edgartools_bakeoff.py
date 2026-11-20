@@ -252,13 +252,18 @@ def build_ebit_bridge(income_statement: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def filing_specific_review(symbol: str, filing: dict[str, Any]) -> dict[str, Any] | None:
+def filing_specific_review(symbol: str, filing: dict[str, Any], bridge: dict[str, Any]) -> dict[str, Any] | None:
     accession = str(filing.get("accession_number") or filing.get("accession_no") or filing.get("accession") or "")
     # INTENTIONAL: this is a one-filing PBI research note, not a reusable XBRL mapping.
     # The SEC filing explicitly reconciles consolidated interest expense to include
     # finance interest embedded in "Cost of financing and other".
     if symbol != "PBI" or accession != "0001628280-26-009650":
         return None
+    pretax_entry = bridge.get("pretax_income") or {}
+    pretax_amount = pretax_entry.get("amount")
+    if not isinstance(pretax_amount, (int, float)):
+        return {"status": "review_required", "filing_accession": accession,
+                "reason": "The filing-specific interest review requires a recognized pretax-income anchor."}
     reported_interest = 101_460_000.0
     consolidated_financing_cost = 61_503_000.0
     segment_financing_cost_ex_interest = 13_807_000.0
@@ -273,7 +278,8 @@ def filing_specific_review(symbol: str, filing: dict[str, Any]) -> dict[str, Any
         "SendTech_segment_cost_of_financing_and_other_ex_allocated_interest": segment_financing_cost_ex_interest,
         "allocated_finance_interest_embedded_in_cost_of_financing": allocated_finance_interest,
         "total_interest_expense_for_EBIT_reconciliation": total_interest,
-        "ebit_candidate": round(float(192_524_000.0 + total_interest), 2),
+        "reported_pretax_income": float(pretax_amount),
+        "ebit_candidate": round(float(pretax_amount + total_interest), 2),
         "formula": "reported pretax income + consolidated interest expense, including finance interest allocated into cost of financing",
         "classification_note": "The filing states that a portion of total interest expense is allocated to finance interest expense within Cost of financing and other. Therefore that full expense line must not be classified wholly as operating or wholly as non-operating. The $47.696M allocated component is inferred from consolidated financing cost less the segment cost excluding allocated finance interest.",
         "guardrail": "Filing-specific manual review only. Do not generalize these values or this extraction to other issuers/periods, and do not write production fundamentals or rankings.",
@@ -324,7 +330,9 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # INTENTIONAL: bridge candidates never enter production SEC ingestion,
         # ratios, eligibility decisions or Magic Formula ranking.
         result["ebit_bridge"] = build_ebit_bridge(result["statements"]["income_statement"])
-        result["filing_specific_review"] = filing_specific_review(symbol, result["filing"])
+        result["filing_specific_review"] = filing_specific_review(
+            symbol, result["filing"], result["ebit_bridge"]
+        )
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
