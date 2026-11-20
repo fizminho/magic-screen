@@ -83,7 +83,7 @@ The existing production Worker still calculates US fundamentals directly from SE
 #### Debt maturity classification boundary
 Unqualified IFRS-style labels such as "interest-bearing loans and borrowings" are deliberately not assumed to be noncurrent debt. Without a maturity qualifier or an unambiguous taxonomy concept, the fact remains unclassified rather than being added to the debt bridge. This avoids silently treating an issuer's potentially aggregate borrowing line as long-term debt.
 
-Explicit payable concepts are also recognised: current `LoansPayableCurrent` / `NotesPayableCurrent`, and noncurrent `LongTermLoansPayable` / `LongTermNotesPayable`. Labels such as "bank and other borrowings, current" and "notes payables, non-current" are accepted when they clearly identify maturity. If more than one debt instrument is surfaced in a maturity bucket, the bucket remains ambiguous; the resolver does not sum multiple rows until additive scope and subtotal overlap rules are explicitly approved.
+Explicit payable and financing concepts are also recognised: current `LoansPayableCurrent`, `NotesPayableCurrent`, `ConvertibleDebtCurrent` and `LinesOfCreditCurrent`; noncurrent `LongTermLoansPayable`, `LongTermNotesPayable` and `LongTermLineOfCredit`. Labels such as "bank and other borrowings, current", "notes payables, non-current" and "venture debt, net of current portion" are accepted when they clearly identify maturity. If more than one debt instrument is surfaced in a maturity bucket, the bucket remains ambiguous; the resolver does not sum multiple rows until additive scope and subtotal overlap rules are explicitly approved.
 
 
 
