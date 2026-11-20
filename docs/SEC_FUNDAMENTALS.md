@@ -261,3 +261,8 @@ These are research-only output guardrails. No production D1 data, EV, Earnings Y
 
 
 Filing-specific EBIT candidates (such as HRB's statement-subtotal reconstruction, PBI's interest reconciliation and SGHC's IFRS operating subtotal) can now produce a separate `candidate_roc` for comparative research when the denominator is available. The output preserves the exact filing-specific method and labels the result `review_required_filing_specific_ebit` or `review_required_scope_flags`. It never populates the `roc` field, even if no additional balance-sheet scope flags are present. This is not a generic EBIT/ROC mapping and does not feed production calculations or rankings.
+
+
+## Research cohort expansion
+
+The default EdgarTools bakeoff now runs the full 30-stock MFI snapshot returned on 2026-11-20 at 09:14:01.782 UTC (`minimumMarketCap=50`, `select30=true`, price date 11/18, quarter date 09/30), plus ADBE as a historical SEC mapping control. The exact cohort is recorded in `docs/INTENTIONAL_DESIGN_DECISIONS.md`. This expands research coverage only; the MFI screen remains the source of the production US candidate universe, and the bakeoff never changes that universe or production rankings.
