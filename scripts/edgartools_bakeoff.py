@@ -787,7 +787,7 @@ def balance_sheet_fact_review(statements: dict[str, Any], period: str) -> dict[s
         "noncurrent_debt_candidates": {
             "label": re.compile(r"^long.?term debt$|^debt,? noncurrent$|^non.?current borrowings$|borrowings,?\s*non.?current|notes? payables?,?\s*non.?current", re.I),
             "concept": re.compile(r"(?:LongTermDebtNoncurrent|LongTermDebt|LongtermBorrowings|NoncurrentBorrowings|LongTermLoansPayable|LongTermNotesPayable)$", re.I),
-            "exclude_label": re.compile(r"\bcurrent\b", re.I),
+            "exclude_label": re.compile(r"(?<!non[- ])\bcurrent\b", re.I),
             "exclude_concept": re.compile(r"(?:LongTermDebtCurrent|DebtCurrent|ShortTermBorrowings|(?:^|_)CurrentBorrowings)$", re.I),
         },
         "aggregate_debt_candidates": {
