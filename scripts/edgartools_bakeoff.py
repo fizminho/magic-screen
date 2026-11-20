@@ -20,9 +20,9 @@ from edgar import Company, set_identity
 SYMBOLS = ("HRB", "PBI", "ADBE")
 ROW_PATTERN = re.compile(
     r"operating income|operating profit|income from operations|profit from operations|"
-    r"earnings before interest|\\bebit\\b|property|plant|equipment|fixed assets|"
+    r"earnings before interest|\bebit\b|property|plant|equipment|fixed assets|"
     r"depreciation|depletion|amortization|current assets|current liabilities|"
-    r"cash and cash equivalents|cash equivalents|cash and bank|\\bcash\\b|"
+    r"cash and cash equivalents|cash equivalents|cash and bank|\bcash\b|"
     r"long.?term debt|short.?term debt|current portion of debt|borrowings|"
     r"loans payable|notes payable|finance lease|lease liabilities|interest expense",
     re.IGNORECASE,
@@ -189,7 +189,7 @@ def main() -> int:
 
     report["companies"] = [extract_company(symbol) for symbol in SYMBOLS]
     output = Path(os.environ.get("OUTPUT_PATH", "edgartools-bakeoff.json"))
-    output.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str) + "\\n", encoding="utf-8")
+    output.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
 
     for company in report["companies"]:
         print(f"{company['symbol']}: {company['status']}")
