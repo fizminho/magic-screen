@@ -119,3 +119,24 @@ The resolver review queue reports two separate dimensions:
 In particular, uniquely classified current/noncurrent debt is not automatically approved as conventional debt; lease liabilities remain excluded pending a lease policy; restricted cash and short-term investments remain excluded pending their respective liquidity policies. EBIT and invested-capital candidates also retain separate approval requirements. Every assessment is explicitly marked production_approved=false, and queue output remains read-only.
 
 This separation prevents a stronger extraction/classification result from silently becoming an accounting-policy decision or a production value.
+
+## Shadow MFI ranking preview
+
+The protected `GET /api/fundamentals/edgartools/ranking-preview` endpoint builds a read-only cross-sectional Greenblatt-style ranking from the latest EdgarTools filing evidence and MFI market-cap snapshot.
+
+Eligibility is intentionally conservative. A company must have:
+- a unique direct operating-income candidate from the selected annual filing;
+- a positive invested-capital candidate;
+- USD reporting currency (the MFI market-cap snapshot is USD);
+- uniquely classified conventional current and noncurrent debt;
+- a separately identified unrestricted-cash candidate;
+- positive enterprise value after the candidate debt/cash bridge.
+
+Formulas:
+- Earnings Yield = EBIT / (market cap + conventional gross debt - unrestricted cash)
+- Return on Capital = EBIT / invested capital
+- Combined score = mean of the cross-sectional percentile ranks for Earnings Yield and Return on Capital.
+
+Higher values rank better. Ties receive average percentile ranks. At least five eligible companies are required before numeric ranks are published; below that threshold, all rank fields remain null to avoid misleading single-company percentiles.
+
+This endpoint is a **shadow preview only**. Debt, cash, EBIT and invested-capital values remain candidate/review-only and are not policy-approved. The endpoint does not write to `stock_fundamentals`, `stock_snapshot`, production ratios, eligibility, or production rankings. It explicitly returns immutable production flags.
