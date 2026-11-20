@@ -104,3 +104,7 @@ This is a conservative candidate-selection policy for diagnostics, not a final M
 #### Classification guardrails added after issuer bakeoff
 
 Current and noncurrent lease liabilities are separated using both taxonomy concepts and labels. A noncurrent concept remains excluded from the current bucket even when its label says "net of current portion" or uses unusual spacing. Combined cash/restricted-cash/short-term-investment totals are not counted as short-term investments, and noncurrent marketable securities remain outside that bucket. These are candidate-classification safeguards only; they do not establish EV policy.
+
+The expanded payable and credit-line patterns were rerun against the 29 supported issuers in the 2026-11-20 cohort. Current debt classification produced 17 unique candidates, 2 ambiguous buckets and 10 with no candidate; noncurrent debt produced 21 unique candidates, 1 ambiguous bucket and 7 with no candidate. The new patterns surfaced IRWD convertible notes, MGTX notes payable and QTTB venture credit lines. MNTN and SBC remain ambiguous because multiple debt rows exist in the same maturity bucket; those rows are not summed. No aggregate-debt candidate was identified. Unrestricted cash was uniquely identified for 27 of 29 supported issuers; HPQ and VXRT report combined cash/restricted-cash facts and therefore remain unresolved for the base cash deduction.
+
+This cohort snapshot is extraction evidence only. It does not approve debt aggregation, cash scope, EV, Earnings Yield, ROC, or production ranking.
