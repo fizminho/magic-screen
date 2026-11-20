@@ -456,6 +456,9 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(review["production_approved"])
         self.assertFalse(review["resolver_input"])
         self.assertFalse(review["debt_candidate_promoted"])
+        self.assertEqual(review["evidence_scope"], "current_and_noncurrent_bank_borrowings_with_maturity_reconciliation")
+        self.assertTrue(review["manual_review_questions"])
+        self.assertTrue(review["prohibited_inferences"])
         self.assertIsNone(filing_debt_note_review("SBC", "different-accession"))
         self.assertIsNone(filing_debt_note_review("UNKNOWN", "0001193125-26-127557"))
 
@@ -475,6 +478,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(queue["summary"]["filing_debt_note_manual_reviews_available"], 1)
         self.assertIn("filing_debt_note_review_available_manual_review", item["issues"])
         self.assertFalse(item["filing_debt_note_review"]["production_approved"])
+        self.assertEqual(item["filing_debt_note_review"]["evidence_scope"], "named_revolver_undrawn_status_and_letter_of_credit")
+        self.assertIn("Do not infer company-wide zero debt from the undrawn revolver.", item["filing_debt_note_review"]["prohibited_inferences"])
         self.assertFalse(item["production_write"])
 
         preview["resolutions"][0]["accession"] = "different-accession"
