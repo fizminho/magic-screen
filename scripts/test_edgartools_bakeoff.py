@@ -2,7 +2,7 @@
 """Regression checks for review-only balance-sheet candidate classification."""
 import unittest
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, enterprise_value_scope_review, filing_specific_review, roc_review, statement_fact_amount
+from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, balance_sheet_fact_review, enterprise_value_scope_review, filing_specific_review, non_sec_issuer_review_case, roc_review, statement_fact_amount
 
 
 PERIOD = "2025-12-31"
@@ -20,6 +20,34 @@ def row(concept, label, value, standard_concept=None):
         "values": values,
     }
 
+
+class NonSecIssuerReviewTests(unittest.TestCase):
+    def test_alphamin_manual_review_preserves_nci_and_exploration_scope(self):
+        result = non_sec_issuer_review_case("AFMJF")
+        self.assertEqual(result["status"], "review_only_non_sec_source")
+        self.assertEqual(result["currency"], "USD")
+        self.assertEqual(result["ebit_candidate"], 273_665_327)
+        self.assertEqual(result["invested_capital_candidate"], 435_962_673)
+        self.assertEqual(result["conventional_gross_debt_candidate"], 40_569_087)
+        self.assertEqual(result["noncontrolling_interest"], 65_738_168)
+        self.assertEqual(result["conventional_net_debt_plus_nci_candidate"], 50_219_007)
+        self.assertAlmostEqual(result["candidate_roc"], 62.7727, places=4)
+        self.assertAlmostEqual(
+            result["candidate_roc_including_exploration_assets"], 59.7334, places=4
+        )
+
+    def test_enghouse_manual_review_reconciles_ifrs_ebit_and_flags_cad_fx(self):
+        result = non_sec_issuer_review_case("EGHSF")
+        self.assertEqual(result["status"], "review_only_non_sec_source")
+        self.assertEqual(result["currency"], "CAD")
+        self.assertEqual(result["ebit_candidate"], 84_862_000)
+        self.assertEqual(result["pretax_reconciliation"]["difference"], 0)
+        self.assertEqual(result["conventional_gross_debt_candidate"], 0)
+        self.assertEqual(result["current_lease_liabilities"], 5_197_000)
+        self.assertIn(
+            "financial_statements_are_cad_while_mfi_market_cap_is_usd_fx_conversion_required",
+            result["review_flags"],
+        )
 
 class DirectOperatingIncomeLabelTests(unittest.TestCase):
     def test_negative_operating_loss_labels_are_direct_facts(self):
@@ -90,6 +118,25 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertEqual(
             categories["cash_unrestricted_candidates"]["candidate_count"], 1
         )
+
+    def test_noncontrolling_interest_balance_sheet_candidate_is_detected(self):
+        result = balance_sheet_fact_review(
+            {
+                "balance_sheet": {
+                    "rows": [
+                        row(
+                            "us-gaap_NoncontrollingInterestInConsolidatedEntity",
+                            "Noncontrolling interest",
+                            65_738_168,
+                        )
+                    ]
+                }
+            },
+            PERIOD,
+        )
+        category = result["categories"]["noncontrolling_interest_candidates"]
+        self.assertEqual(category["candidate_count"], 1)
+        self.assertEqual(category["candidates"][0]["value"], 65_738_168)
 
     def test_ifrs_restricted_cash_concept_without_restricted_label(self):
         categories = self.review(
