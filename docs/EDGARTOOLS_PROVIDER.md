@@ -32,15 +32,16 @@ The current application backend is a Cloudflare Worker (TypeScript) with D1. Edg
 
 The production integration therefore uses a Python execution lane:
 
-1. A scheduled or manually dispatched GitHub Actions job installs a pinned EdgarTools version.
-2. The job resolves the active MFI tickers and extracts each issuer's latest eligible annual filing (10-K, 20-F or 40-F).
+1. A daily scheduled or manually dispatched GitHub Actions job installs a pinned EdgarTools version.
+2. The job fetches the current active US MFI ticker list from the protected Worker `/api/fundamentals/edgartools/universe` endpoint. A manual ticker override remains available for focused tests; push-triggered regression runs retain a fixed control cohort.
+3. The job extracts each issuer's latest eligible annual filing (10-K, 20-F or 40-F).
 3. The job emits a versioned JSON report with ticker, filing metadata, reporting currency, statement facts, provider status, and source provenance.
-4. On manually dispatched runs only, GitHub Actions can POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
+4. Scheduled and manually dispatched runs POST the report to the protected Worker ingestion endpoint when `EDGARTOOLS_INGEST_URL` and `UNIVERSE_SYNC_TOKEN` are configured.
 5. The endpoint stores each ticker/accession payload in `edgartools_filing_evidence`. This is raw evidence storage only; it does not write `stock_fundamentals`, ratios, eligibility, or ranks. The `/api/fundamentals/edgartools/status` route reports stored provider coverage.
 6. The Worker will apply deterministic, independently tested accounting rules before writing calculated fundamentals.
 7. Existing all-candidate completeness gates remain in force. No partial-universe ranking is published.
 
-The existing bakeoff is the extraction regression harness. Push-based runs only test and upload an artifact. Manual runs may optionally ingest raw evidence; the endpoint is size-bounded, authenticated, and idempotent by ticker/accession. It must not be mistaken for an approved accounting resolver.
+The existing bakeoff is both the extraction regression harness and the scheduled raw-evidence refresh. Push-based runs only test and upload an artifact. Scheduled and manually dispatched runs discover the active US MFI universe and ingest raw evidence; a manual symbol override is available for focused tests. The endpoint is size-bounded, authenticated, and idempotent by ticker/accession. It must not be mistaken for an approved accounting resolver.
 
 ## Accounting and ranking guardrails
 
@@ -66,4 +67,4 @@ The existing bakeoff is the extraction regression harness. Push-based runs only 
 
 ## Current safety boundary
 
-As of this decision, the existing production Worker still calculates US fundamentals directly from SEC Company Facts. The EdgarTools extraction and raw-evidence ingestion lanes are available, but the automated workflow-to-Worker POST remains disabled until the repository variable `EDGARTOOLS_INGEST_URL` and secret `UNIVERSE_SYNC_TOKEN` are configured. Raw evidence ingestion does not change production fundamentals or rankings. The provider decision is made; the runtime cutover is not yet complete. Do not describe the production pipeline as EdgarTools-backed until the ingestion and shadow-validation stages have passed.
+As of this decision, the existing production Worker still calculates US fundamentals directly from SEC Company Facts. The EdgarTools extraction and raw-evidence ingestion lanes are available, but the automated workflow-to-Worker POST remains disabled until the repository variable `EDGARTOOLS_INGEST_URL` and secret `UNIVERSE_SYNC_TOKEN` are configured. Raw evidence ingestion does not change production fundamentals or rankings. The provider decision and automated raw-evidence refresh are implemented; the accounting resolver, shadow validation, and runtime cutover are not yet complete. Do not describe production fundamentals or rankings as EdgarTools-backed until those later stages have passed.
