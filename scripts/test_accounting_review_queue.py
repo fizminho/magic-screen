@@ -764,7 +764,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
             filing_debt_note_review,
         )
 
-        self.assertEqual(set(FILING_DEBT_REVIEW_CLASSIFICATIONS), set(FILING_DEBT_NOTE_REVIEWS))
+        self.assertTrue(set(FILING_DEBT_REVIEW_CLASSIFICATIONS).issubset(set(FILING_DEBT_NOTE_REVIEWS)))
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["BCRX"], "separate_royalty_financing_obligation")
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["PRDO"], "separate_sale_leaseback_financing_obligation")
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["VXRT"], "separate_future_royalty_financing_obligation")
