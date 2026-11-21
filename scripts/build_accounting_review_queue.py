@@ -814,6 +814,11 @@ FILING_DEBT_REVIEW_CLASSIFICATIONS: dict[str, str] = {
     "ZVRA": "conventional_term_loan_maturity_schedule",
     "PXED": "named_instrument_zero_or_undrawn_facility",
     "STRA": "named_instrument_zero_or_undrawn_facility",
+    "OTEX": "conventional_borrowing_maturity_reconciliation",
+    "IRWD": "conventional_borrowing_maturity_reconciliation",
+    "QTTB": "conventional_term_loan_maturity_schedule",
+    "SNDK": "named_instrument_zero_or_undrawn_facility",
+    "UPWK": "conventional_borrowing_current_maturity",
 }
 
 # Curated filing-note checks. These are attached only to the exact accession

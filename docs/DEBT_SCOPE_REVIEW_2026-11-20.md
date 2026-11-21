@@ -440,3 +440,18 @@ Seven excluded issuers have positive EBIT and positive invested-capital candidat
 ### Interpretation
 
 The five currently ranked issuers are not a production-ready cohort: every issuer still has accounting review flags and `production_approved=false`. The seven debt-blocked names above are research priorities only. No row is promoted to the resolver, no missing bucket is converted to zero, and no production fundamentals, EV, earnings yield, return on capital, eligibility or ranking is changed by this worklist.
+
+
+## Additional accession-matched debt review classifications
+
+The curated debt-note classification set was extended after inspection of the generated queue:
+
+| Issuer | Classification | Evidence summary | Boundary |
+|---|---|---|---|
+| OTEX | conventional_borrowing_maturity_reconciliation | FY2026 debt-note carrying value of $5,770.369m reconciles to current $35.850m plus noncurrent $5,734.519m | Restricted cash, deposits, investments, leases and NCI remain separate EV-policy questions |
+| IRWD | conventional_borrowing_maturity_reconciliation | FY2025 convertible-note carrying value of $199.680m plus $385m revolver balance reconciles to $584.680m debt candidates | Annual reporting-date snapshot; do not substitute later interim repayments |
+| QTTB | conventional_term_loan_maturity_schedule | FY2025 term-loan carrying value of $9.708m reconciles to current $6.235m and noncurrent $3.473m | $0.647m restricted cash and operating lease liabilities remain separate |
+| SNDK | named_instrument_zero_or_undrawn_facility | FY2026 current and noncurrent debt rows are explicit zero; term loan repaid and revolver undrawn at year-end | Applies to reviewed reporting date and named facilities, not every possible debt category |
+| UPWK | conventional_borrowing_current_maturity | FY2025 convertible-note carrying value of $359.770m is classified current and matures August 15, 2026 | Marketable securities require a separate cash-like policy; restricted cash and customer escrow are excluded |
+
+These additions classify the nature of the filing evidence only. All five remain `review_only`, `production_approved=false`, `resolver_input=false`, and `debt_candidate_promoted=false`. FHTX and NRIX remain `unclassified_manual_review` because their current evidence is limited to face-statement absence of a conventional-debt line, which is not proof of zero debt.

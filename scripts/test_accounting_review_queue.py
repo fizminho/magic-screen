@@ -769,6 +769,11 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["PRDO"], "separate_sale_leaseback_financing_obligation")
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["VXRT"], "separate_future_royalty_financing_obligation")
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["SBC"], "conventional_borrowing_maturity_reconciliation")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["OTEX"], "conventional_borrowing_maturity_reconciliation")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["IRWD"], "conventional_borrowing_maturity_reconciliation")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["QTTB"], "conventional_term_loan_maturity_schedule")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["SNDK"], "named_instrument_zero_or_undrawn_facility")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["UPWK"], "conventional_borrowing_current_maturity")
         for symbol, source in FILING_DEBT_NOTE_REVIEWS.items():
             with self.subTest(symbol=symbol):
                 review = filing_debt_note_review(symbol, source["accession"])
