@@ -87,7 +87,7 @@ test("recognizes NCI escalation in the real EdgarTools underscore-based evidence
     }
   };
   const tasks = listGeminiAccountingEscalations("GTM", company, resolver).map(item => item.task);
-  assert.deepEqual(tasks.sort(), ["cash_scope", "debt_scope", "financing_scope", "lease_scope", "nci_scope"].sort());
+  assert.deepEqual(tasks.sort(), ["cash_scope", "debt_scope", "financing_scope", "full_scope", "invested_capital_scope", "lease_scope", "nci_scope"].sort());
 });
 
 
