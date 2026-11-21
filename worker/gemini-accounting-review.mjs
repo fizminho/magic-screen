@@ -9,7 +9,7 @@ const TASK_RULES = {
   cash_scope: { categories: ["unrestricted_cash", "restricted_cash", "short_term_investments"], pattern: /cash|restricted|escrow|customer funds|marketable securities/i },
   lease_scope: { categories: ["current_lease_liabilities", "noncurrent_lease_liabilities"], pattern: /lease|right.of.use|rou asset/i },
   nci_scope: { categories: [], pattern: /noncontrolling interest|non-controlling interest|nci|consolidation perimeter/i },
-  financing_scope: { categories: [], pattern: /supplier finance|vendor financing|factoring|receivables financing|royalty financing|tax receivable agreement|failed sale.leaseback/i }
+  financing_scope: { categories: [], pattern: /financing|supplier finance|vendor financing|factoring|receivables financing|royalty financing|tax receivable agreement|failed sale.leaseback/i }
 };
 const STATUS_VALUES = new Set(["ACCEPTED_CANDIDATE", "REVIEW_REQUIRED", "CONFLICTING_EVIDENCE", "INSUFFICIENT_EVIDENCE", "NOT_APPLICABLE"]);
 const CLASSIFICATIONS = new Set([
@@ -95,9 +95,13 @@ export function listGeminiAccountingEscalations(symbol, company, resolver) {
   for (const task of ALLOWED_TASKS) {
     const rule = TASK_RULES[task];
     const categories = rule.categories.map(key => categoryEvidence(company, key));
-    const hasAmbiguousCategory = categories.some(x => x.candidate_count > 1 || (x.candidate_count > 0 && x.status !== "unique_candidate" && x.status !== "identified"));
+    const hasAmbiguousCategory = categories.some(x => x.candidate_count > 1
+      || (x.candidate_count > 0 && /ambiguous|review|required|unresolved|incomplete|conflict|insufficient|multiple/i.test(x.status)));
     const matchingFlag = flags.some(flag => rule.pattern.test(flag));
-    const matchingReview = Object.entries({...financing, ...ev}).some(([key, value]) => rule.pattern.test(key) && value != null);
+    const matchingReview = task === "financing_scope"
+      ? Object.entries(financing).some(([key, value]) => rule.pattern.test(key) && value != null
+        && (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || Array.isArray(value)))
+      : false;
     if (hasAmbiguousCategory || matchingFlag || matchingReview) {
       tasks.push({ task, reason: hasAmbiguousCategory ? "ambiguous_candidate_rows" : matchingFlag ? "unresolved_deterministic_flag" : "structured_review_evidence",
         evidence_count: categories.reduce((sum, x) => sum + x.candidates.length, 0) });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { listGeminiAccountingEscalations } from "./gemini-accounting-review.ts";
+import { listGeminiAccountingEscalations } from "./gemini-accounting-review.mjs";
 
 test("does not escalate deterministic categories with no unresolved signals", () => {
   const company = { balance_sheet_fact_review: { categories: {

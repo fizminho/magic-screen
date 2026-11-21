@@ -1,8 +1,8 @@
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
 import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation";
-import { runGeminiAccountingReview, listGeminiAccountingEscalations } from "./gemini-accounting-review";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.\nimport { runGeminiAccountingReview, listGeminiAccountingEscalations } from "./gemini-accounting-review.mjs";
 
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; GEMINI_MODEL?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
     {symbol:"1155.KL",name:"Maybank",market:"MY",currency:"MYR"},{symbol:"1295.KL",name:"Public Bank",market:"MY",currency:"MYR"},
