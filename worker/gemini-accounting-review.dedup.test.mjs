@@ -5,6 +5,7 @@ import { runGeminiAccountingReview } from "./gemini-accounting-review.mjs";
 class FakeD1 {
   cache = new Map();
   locks = new Map();
+  gateNextAllowedAt = null;
 
   prepare(sql) {
     const db = this;
@@ -12,6 +13,12 @@ class FakeD1 {
     return {
       bind(...args) { values = args; return this; },
       async first() {
+        if (sql.includes("INSERT INTO gemini_api_request_gate")) {
+          const [initialNextAllowedAt, now, intervalMs, subtractInterval] = values;
+          if (db.gateNextAllowedAt === null) db.gateNextAllowedAt = initialNextAllowedAt;
+          else db.gateNextAllowedAt = Math.max(db.gateNextAllowedAt, now) + intervalMs;
+          return { scheduled_at: db.gateNextAllowedAt - subtractInterval };
+        }
         if (sql.includes("SELECT response_json")) {
           const row = db.cache.get(values[0]);
           return row ? { ...row } : null;
@@ -44,7 +51,7 @@ class FakeD1 {
 
 function reviewInput(DB) {
   return {
-    env: { DB, GEMINI_API_KEY: "test-key" },
+    env: { DB, GEMINI_API_KEY: "test-key", GEMINI_MIN_REQUEST_INTERVAL_MS: "1000" },
     input: {
       task: "debt_scope",
       symbol: "ABC",
@@ -135,13 +142,19 @@ test("returns a retryable rate-limit status for non-quota HTTP 429 responses", a
   const DB = new FakeD1();
   const { env, input } = reviewInput(DB);
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ error: {
-    code: 429, message: "Too many requests. Please retry in 30 seconds."
-  } }), { status: 429, headers: { "content-type": "application/json" } });
+  let apiCalls = 0;
+  globalThis.fetch = async () => {
+    apiCalls += 1;
+    return new Response(JSON.stringify({ error: {
+      code: 429, message: "Too many requests. Please retry in 30 seconds."
+    } }), { status: 429, headers: { "content-type": "application/json" } });
+  };
   try {
     const result = await runGeminiAccountingReview(env, input);
     assert.equal(result.status, "RATE_LIMITED");
     assert.equal(result.retryable, true);
+    assert.equal(result.attempts, 3);
+    assert.equal(apiCalls, 3);
     assert.equal(DB.cache.size, 0);
     assert.equal(DB.locks.size, 0);
   } finally {
