@@ -333,4 +333,11 @@ The first full 30-name read-only reconciliation artifact is available from succe
 - 27 of 28 supported issuers have no legacy total-debt value. Legacy field coverage is EBIT 25/28, invested capital 23/28, debt 1/28 and cash 24/28.
 - Only one full EY/ROC comparison is possible. None of the five current shadow-ranked issuers has a complete legacy comparison.
 
-This is a legacy data-completeness blocker, not evidence of an EdgarTools metric error. The comparison endpoint has been extended to show partial same-period input deltas even when the legacy debt input is missing, while keeping full EV/EY/ROC deltas blocked. The next bakeoff will validate those partial comparisons and report field coverage. Production cutover remains blocked until legacy-vs-new differences are explainable or the owner explicitly approves a controlled replacement of the legacy path.
+This is a legacy data-completeness blocker, not evidence of an EdgarTools metric error. The enhanced endpoint now reports partial same-period input deltas even when legacy debt is missing, while keeping full EV/EY/ROC deltas blocked. Successful bakeoff run 44889673041 produced 27 period-aligned partial issuer comparisons and 72 field-level comparisons with zero differences. Legacy field coverage is EBIT 25/28, invested capital 23/28, debt 1/28 and cash 24/28. Twenty-seven supported issuers still lack legacy debt, and none of the five shadow-ranked names has a full legacy comparison. Production cutover remains blocked until legacy-vs-new differences are explainable or the owner explicitly approves a controlled replacement of the legacy path.
+
+
+## Partial legacy comparison results verified (run 44889673041)
+
+The enhanced reconciliation artifact contains 30 issuer rows, 27 period-aligned partial comparisons and 72 field-level comparisons. All 72 available fields match exactly between legacy and EdgarTools. The single full metric comparison is BMBL: EV $1,208.625m, EY -66.67% and ROC -462.64%, identical on both sides; BMBL is not in the ranked cohort because EBIT is negative.
+
+The five shadow-ranked issuers have 14 available field comparisons with zero differences. HRB's legacy EBIT is missing because the EdgarTools value is a filing-specific reconstruction; OTEX, UPWK, IRWD and QTTB match on available EBIT, invested capital and cash. All five lack legacy debt, so none has a full legacy EV/EY/ROC comparison. This confirms strong agreement on available fundamentals but leaves a clear legacy debt-coverage gap.

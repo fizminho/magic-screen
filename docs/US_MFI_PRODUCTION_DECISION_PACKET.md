@@ -145,3 +145,10 @@ The proposed cohort-wide accounting policy matrix and the P3 supported-but-unran
 The first full read-only reconciliation run (44889267826) included all 30 active issuers. EdgarTools supports 28. Only one supported issuer has a fully calculated legacy fundamentals record (BMBL), and 27/28 supported issuers have no legacy total-debt value. Legacy coverage is EBIT 25/28, invested capital 23/28, debt 1/28 and cash 24/28. Only BMBL has a full period-aligned EY/ROC comparison; none of the five shadow-ranked names has a complete legacy comparison.
 
 This prevents a conventional like-for-like cohort reconciliation. The read-only endpoint is being enhanced to compare available same-period inputs without presenting incomplete rows as full metric comparisons. This finding does not invalidate the EdgarTools candidate data, but it means the legacy path cannot serve as a complete validation baseline. Production cutover remains blocked pending a documented owner decision on the replacement and reconciliation evidence.
+
+
+## Partial legacy comparison outcome
+
+The enhanced reconciliation passed in bakeoff run 44889673041: 27 period-aligned partial issuer comparisons, 72 field-level comparisons and zero differences. The five shadow-ranked issuers have 14 available field comparisons with zero differences. The only complete EV/EY/ROC comparison is BMBL, which matches exactly on both sides but has negative EBIT and is not ranked.
+
+The blocker remains legacy debt coverage: 27/28 supported issuers have no legacy total-debt value. None of the five ranked issuers can be fully compared to legacy EV/EY/ROC. The legacy path is therefore a useful partial cross-check, but not a complete validation baseline for cutover.

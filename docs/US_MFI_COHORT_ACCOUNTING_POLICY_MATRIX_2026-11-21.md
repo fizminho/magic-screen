@@ -127,3 +127,8 @@ The authenticated read-only reconciliation preview compares legacy and EdgarTool
 The first full reconciliation (run 44889267826) includes all 30 issuers and confirms 28 EdgarTools-supported names. Only one supported issuer has a fully calculated legacy fundamentals record, and 27/28 supported issuers have no legacy total-debt value. Legacy field coverage is EBIT 25/28, invested capital 23/28, debt 1/28 and cash 24/28. The only full EY/ROC comparison is BMBL, which is not in the ranked cohort. None of the five current shadow-ranked names can be fully compared with legacy.
 
 This is a material legacy completeness gap. The new preview now reports partial same-period input deltas separately from full metric deltas; full EV/EY/ROC comparisons remain blocked when debt or another required input is missing. Cutover must not be approved merely because the new path has better coverage; every difference must be explained or explicitly accepted by the accounting/product owner.
+
+
+## Partial legacy comparison validation
+
+Bakeoff run 44889673041 validated 27 period-aligned partial comparisons and 72 field-level comparisons with zero differences. The five shadow-ranked names have 14 available field comparisons with zero differences, but none has a legacy debt value and therefore none has a full EV/EY/ROC comparison. The only complete comparison is BMBL, which matches exactly but has negative EBIT and is not ranked. This is positive evidence for the accuracy of available overlapping inputs, not a complete legacy validation.
