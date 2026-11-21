@@ -10,6 +10,13 @@ class MfiSensitivityTests(unittest.TestCase):
   x=lease_adjustment({"accounting_framework":"US_GAAP","lease_accounting_model":"ASC842_operating_finance_model",
    "lease_liabilities":[{"value":20,"maturity":"current","lease_type":"operating"}],"rou_assets":[{"value":18,"lease_type":"operating"}]})
   self.assertEqual((x["liability_total"],x["rou_total"]),(0,0))
+ def test_empty_lease_evidence_remains_unknown_not_zero(self):
+  x=lease_adjustment({"accounting_framework":"US_GAAP","lease_accounting_model":"ASC842_operating_finance_model",
+   "lease_liabilities":[],"rou_assets":[],"embedded_rou_in_net_ppe":[]})
+  self.assertEqual(x["status"],"lease_rows_not_identified_unknown_not_zero")
+  self.assertIsNone(x["liability_total"])
+  self.assertIsNone(x["liability_current"])
+  self.assertIsNone(x["rou_total"])
  def test_finance_lease_reclassifies_current_liability_and_adds_rou_once(self):
   p={"minimum_eligible_cohort":5,"rankings":[{"symbol":"AAA","ranking_eligible":True,"ebit_candidate":100,"enterprise_value_candidate":500,"invested_capital_candidate":100}]}
   q={"items":[{"symbol":"AAA"}]};l={"issuers":[{"symbol":"AAA","accounting_framework":"US_GAAP","lease_accounting_model":"ASC842_operating_finance_model",
