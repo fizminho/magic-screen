@@ -188,3 +188,32 @@ The accounting review queue now classifies selected annual balance-sheet face ro
 - The category inventory is intentionally broader than conventional debt so the review does not lose sight of leases, investments, customer funds, NCI and financing-like obligations.
 
 No production fundamentals, ratios, eligibility decisions or rankings are changed by this evidence layer.
+## Latest EV scope inventory snapshot (21 Nov 2026)
+
+The successful read-only queue build covered 30 universe members. Raw annual balance-sheet EV-scope evidence was accession-matched for 28 companies; two EdgarTools-unsupported issuers remain deferred. The following are **row counts, not issuer counts or approved EV adjustments**:
+
+| Category | Face-row count |
+|---|---:|
+| Conventional debt | 41 |
+| Lease liabilities | 51 |
+| Restricted cash | 15 |
+| Unrestricted cash and cash equivalents | 25 |
+| Noncontrolling interests | 5 |
+| Marketable debt securities identified by label/concept | 4 |
+| Generic marketable securities, composition unknown | 7 |
+| Marketable equity securities | 1 |
+| Equity-method investments | 1 |
+| Notes receivable / related-party notes and investments | 5 |
+| Other financing obligations | 6 |
+| Customer escrow assets and payables | 2 |
+
+Additional review coverage: 17 accession-bound issuer debt-note reviews, three filing-specific EBIT manual reviews and six high negative-working-capital-offset cases. All remain review-only.
+
+### Important issuer-level classification checks
+
+- **OTEX:** the separately reported noncontrolling-interest line is $1.962m. The $4,016.066m total shareholders' equity subtotal is not NCI and is excluded from the NCI evidence category.
+- **NRIX:** $345.981m is tagged as marketable debt securities because the XBRL concept is `DebtSecuritiesAvailableForSaleExcludingAccruedInterestCurrent`, even though the face label is generic. This is a debt-security classification, not a conclusion that it is cash-equivalent.
+- **UPWK:** $378.425m remains generic marketable securities because its face XBRL concept does not establish a cash-equivalent category. Its note describes money-market funds, commercial paper, Treasury bills, corporate bonds and other fixed-income securities available for current operations. Composition, maturities, restrictions and liquidity still require a consistent policy review.
+- **SNDK:** $1.777bn of marketable equity securities and $678m of Flash Ventures notes/investments remain separate from cash and cash equivalents.
+
+The latest queue confirms `production_fundamentals_changed=false`, `rankings_changed=false` and `production_write=false`. The evidence inventory does not aggregate or net these rows.
