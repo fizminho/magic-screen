@@ -35,14 +35,14 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 
 ## Required completion gates
 
-| Phase | Required evidence | Release gate |
+| Phase | Status | Evidence / remaining gate |
 |---|---|---|
-| A. Universe integrity | Active universe, selection settings, market-cap date, unique symbols | No silent cohort truncation or stale market caps |
-| B. Extraction and ingestion | Full scheduled/manual run; every requested symbol represented; raw evidence accepted | Supported filings accession-bound; unsupported tracked |
-| C. Accounting resolver | EBIT, invested capital, debt, cash and currency policies; issuer exceptions | Human-approved accounting rules and regression tests |
-| D. Shadow MFI | Classic ordinal rank sum; deterministic ties; coverage report | Reconciled against independently calculated sample |
-| E. Runtime migration | Compare EdgarTools shadow output with legacy Company Facts; deliberate cutover | Reconciliation and rollback plan pass |
-| F. Production release | Monitoring, stale-data controls, scheduled refresh, runbook and rollback | Explicit approval; no silent partial-universe ranking |
+| A. Universe integrity | **Complete** | 30-symbol active US cohort, top 30 / $50m minimum, dynamic quote-date-aligned market caps and uniqueness checks |
+| B. Extraction and ingestion | **Complete** | Full run accepted 31/31 records including ADBE regression control; 28 supported, 2 explicitly unsupported, 0 awaiting evidence |
+| C. Accounting resolver | **Review pending** | Deterministic resolver and issuer evidence queue exist; 23 active-universe companies still need accounting/valuation review and the five ranked candidates remain unapproved |
+| D. Shadow MFI | **Complete for shadow** | Classic ordinal rank sum, tie handling, minimum cohort, independent artifact validator and coverage accounting all pass |
+| E. Runtime migration | **In progress** | Side-by-side legacy Company Facts vs EdgarTools EY/ROC is displayed; per-issuer differences and rollback/cutover still need approval |
+| F. Production release | **Blocked** | Requires accounting policy sign-off, issuer review closure, legacy reconciliation and explicit release approval |
 
 ## Current known blockers
 
@@ -58,6 +58,10 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 - Continue using EdgarTools (MIT) as the primary SEC filing extraction library already integrated.
 - Reuse only narrowly scoped, license-compatible ranking patterns. The MIT-licensed `bailewen/magicformula` repository is a reference for generic workflow ideas, not its FMP provider, TTM defaults or accounting heuristics.
 - Do not copy code from repositories without an explicit compatible license. Do not add another fundamentals provider or broad finance dependency while the resolver is under review.
+
+## Production decision packet
+
+See [US MFI production policy decisions](US_MFI_PRODUCTION_DECISION_PACKET.md) for the recommended default accounting and ranking policies, quantified ranking sensitivities, issuer-specific review points and the decisions that must be signed off before production cutover.
 
 ## Safety boundary
 
