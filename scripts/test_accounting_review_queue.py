@@ -946,7 +946,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
         for row in result["rows"]:
             by_category.setdefault(row["category"], []).append(row)
         self.assertEqual(result["category_counts"]["unrestricted_cash"], 1)
-        self.assertEqual(result["category_counts"]["restricted_cash"], 1)
+        self.assertEqual(result["category_counts"]["cash_and_restricted_cash_combined"], 1)
+        self.assertNotIn("restricted_cash", result["category_counts"])
         self.assertEqual(result["category_counts"]["lease_liabilities"], 1)
         self.assertEqual(result["category_counts"]["conventional_debt"], 2)
         self.assertEqual(result["category_counts"]["noncontrolling_interests"], 1)
@@ -961,8 +962,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertTrue(all(row["accession"] == "annual-accession" for row in result["rows"]))
         self.assertTrue(all(row["production_approved"] is False and row["resolver_input"] is False
                             for row in result["rows"]))
-        self.assertEqual(by_category["restricted_cash"][0]["policy_status"],
-                         "exclude_from_unrestricted_cash_pending_policy")
+        self.assertEqual(by_category["cash_and_restricted_cash_combined"][0]["policy_status"],
+                         "combined_cash_scope_do_not_treat_as_unrestricted_without_note_reconciliation")
         self.assertFalse(result["production_approved"])
         self.assertFalse(result["resolver_input"])
 
