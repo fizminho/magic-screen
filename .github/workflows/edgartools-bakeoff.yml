@@ -17,6 +17,8 @@ on:
       - "scripts/test_validate_mfi_ranking_preview.py"
       - "scripts/validate_mfi_universe_coverage.py"
       - "scripts/test_validate_mfi_universe_coverage.py"
+      - "scripts/build_mfi_sensitivity_report.py"
+      - "scripts/test_build_mfi_sensitivity_report.py"
       - "scripts/validate_edgartools_pipeline.py"
       - "scripts/test_validate_edgartools_pipeline.py"
       - "scripts/prepare_mfi_market_caps.py"
