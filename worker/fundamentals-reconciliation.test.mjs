@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import testCase from "node:test";
-import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation.ts";
+import { buildFundamentalsReconciliationPreview, classifyDebtReconciliation } from "./fundamentals-reconciliation.ts";
 function row(overrides={}){return {
   symbol:"TEST",company_name:"Test Inc",current_market_cap:100000000,market_cap_updated_at:"2026-11-20T10:00:00.000Z",
   legacy_status:"calculated",legacy_source:"SEC EDGAR Company Facts",legacy_fiscal_period:"2025-12-31",legacy_filed_at:"2026-02-20",
