@@ -414,3 +414,18 @@ test("full scope reconciles lease and sale-leaseback findings in the same respon
   assert.equal(result.requires_manual_reconciliation, false);
   assert.equal(result.relationship, "separate_obligations_supported_by_filing");
 });
+
+
+test("full scope does not escalate solely because deterministic invested-capital inputs exist", async () => {
+  const company = { balance_sheet_fact_review: { categories: {
+    current_assets_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "AssetsCurrent", value: 100 }] },
+    current_liabilities_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "LiabilitiesCurrent", value: 50 }] },
+    net_ppe_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "PropertyPlantAndEquipmentNet", value: 20 }] }
+  }, unresolved_categories: [] }, invested_capital_review: { status: "calculated_review_only", scope_flags: [] },
+  direct_operating_income_review: { status: "review_only", candidate_review: { status: "unique_candidate" } },
+  filing_note_review: { candidates: [] }, enterprise_value_scope_review: {} };
+  const resolver = { symbol: "ABC", accession: "a", fiscal_period: "2025-12-31", review_flags: [],
+    ebit_status: "direct_reported_candidate_review_only", invested_capital_status: "positive_denominator_candidate_review_only",
+    enterprise_value_candidate_review: { conventional_debt_status: "identified_from_unique_current_and_noncurrent_components" } };
+  assert.deepEqual(listGeminiAccountingEscalations("ABC", company, resolver), []);
+});

@@ -215,11 +215,11 @@ export function buildGeminiAccountingEvidence(task, company, resolver) {
   const filingNoteCandidates = Array.isArray(company?.filing_note_review?.candidates)
     ? company.filing_note_review.candidates.filter(item => Array.isArray(item?.topics)
       && (task === "full_scope" ? item.topics.length > 0 : item.topics.includes(task)))
-      .slice(0, task === "full_scope" ? 6 : 3).map((item, index) => ({
+      .slice(0, task === "full_scope" ? 8 : 3).map((item, index) => ({
         evidence_id: "filing_note:" + index,
         source_kind: "filing_note_candidate",
         note_title: cleanText(item?.title, 180),
-        excerpt: cleanText(item?.excerpt, task === "full_scope" ? 850 : 1200)
+        excerpt: cleanText(item?.excerpt, task === "full_scope" ? 700 : 1200)
       }))
     : [];
   const incomeEvidence = ["ebit_scope", "full_scope"].includes(task)
@@ -250,6 +250,11 @@ export function buildGeminiAccountingEvidence(task, company, resolver) {
       debt_reconciliation_status: resolver.enterprise_value_candidate_review?.debt_reconciliation_status ?? null,
       direct_operating_income_status: company?.direct_operating_income_review?.status ?? null,
       direct_operating_income_candidate_review: company?.direct_operating_income_review?.candidate_review?.status ?? null,
+      ebit_bridge_status: company?.ebit_bridge?.status ?? null,
+      ebit_bridge_unmatched_required: Array.isArray(company?.ebit_bridge?.unmatched_required)
+        ? company.ebit_bridge.unmatched_required.slice(0, 8) : [],
+      roc_review_status: company?.roc_review?.status ?? null,
+      balance_sheet_reconciliation_status: company?.balance_sheet_reconciliation_review?.status ?? null,
       invested_capital_scope_flags: Array.isArray(company?.invested_capital_review?.scope_flags)
         ? company.invested_capital_review.scope_flags.slice(0, 8) : [],
       invested_capital_scope_review: company?.invested_capital_review?.scope_review ?? null,
@@ -292,7 +297,6 @@ export function listGeminiAccountingEscalations(symbol, company, resolver) {
       ))
       || (task === "invested_capital_scope" && (
         (company?.invested_capital_review?.scope_flags?.length ?? 0) > 0
-        || categories.some(x => x.candidate_count > 0)
       ));
     const matchingFlag = flags.some(flag => rule.pattern.test(flag));
     const matchingReview = task === "financing_scope"
