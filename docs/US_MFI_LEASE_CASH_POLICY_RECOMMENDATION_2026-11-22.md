@@ -31,7 +31,7 @@ Sources: [FASB ASU 2016-02, Topic 842](https://storage.fasb.org/ASU_2016-02_Sect
 | PBI | Operating ROU $106.996m; operating liabilities $28.396m + $99.757m; $185.913m finance ROU embedded in combined net PP&E | Keep embedded asset inside net PP&E |
 | SGHC | IFRS 16 ROU $58m; current lease liabilities $5m + noncurrent $59m | Treat as IFRS 16 recognized leases; do not invent US GAAP lease type |
 
-The full-universe audit counted 30 active issuers, 28 supported issuers, 24 with separate ROU rows, 23 with lease-liability rows, 28 ROU rows, 50 lease-liability rows, 3 embedded ROU issuers (CRNC, FHTX, PBI), 1 missing selected-period ROU amount and 2 lease-liability rows whose type is not identified. The two SGHC rows are IFRS 16 evidence; framework tagging is more useful than guessing an operating/finance label.
+The full-universe audit counted 30 active issuers, 28 supported issuers, 24 with separate ROU rows, 23 with lease-liability rows, 28 ROU rows, 50 lease-liability rows, 3 embedded ROU issuers (CRNC, FHTX, PBI), and 1 missing selected-period ROU amount. SGHC has 2 lease-liability rows without a US GAAP operating/finance type label, but its IFRS XBRL namespace identifies IFRS 16; these are framework-classified, not unresolved US GAAP type gaps. The lease report now surfaces accounting framework and lease model explicitly.
 
 ## 2. Calculation and data guardrails
 

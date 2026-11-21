@@ -3,6 +3,15 @@ function valueAt(row, period) {
   const v = row?.values?.[period];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
+function detectAccountingFramework(rows) {
+  const concepts = (rows ?? []).map(r => String(r?.concept ?? ""));
+  const ifrs = concepts.filter(x => x.startsWith("ifrs-full_")).length;
+  const usGaap = concepts.filter(x => x.startsWith("us-gaap_")).length;
+  if (ifrs > 0 && usGaap === 0) return "IFRS";
+  if (usGaap > 0 && ifrs === 0) return "US_GAAP";
+  if (ifrs > 0 && usGaap > 0) return "mixed_or_uncertain";
+  return "unknown";
+}
 export function buildLeaseRouCoverage(extraction, universe = null) {
   const activeSymbols = Array.isArray(universe?.symbols) ? new Set(universe.symbols.map(s => String(s).toUpperCase())) : null;
   const extractedCompanies = (extraction?.companies ?? []).filter(c => c && typeof c.symbol === "string");
@@ -13,12 +22,18 @@ export function buildLeaseRouCoverage(extraction, universe = null) {
     const period = c.filing?.period_of_report ?? c.filing?.report_date ?? null;
     const currency = c.reporting_currency_review?.currency ?? c.reporting_currency ?? "unknown";
     const rou = [], leases = [], embedded = [], unclassified = [];
-    for (const r of c.statements?.balance_sheet?.rows ?? []) {
+    const balanceSheetRows = c.statements?.balance_sheet?.rows ?? [];
+    const accountingFramework = detectAccountingFramework(balanceSheetRows);
+    const leaseAccountingModel = accountingFramework === "IFRS"
+      ? "IFRS16_single_lessee_model"
+      : accountingFramework === "US_GAAP" ? "ASC842_operating_finance_model" : "unknown";
+    for (const r of balanceSheetRows) {
       if (!r || r.dimension === true || r.is_breakdown === true || r.abstract === true) continue;
       const concept = String(r.concept ?? ""), label = String(r.label ?? "");
       const text = (concept + " " + label).toLowerCase();
       const item = { concept, label, value: period ? valueAt(r, period) : null, fiscal_period: period,
-        row_index: Number.isInteger(r.index) ? r.index : null, currency };
+        row_index: Number.isInteger(r.index) ? r.index : null, currency,
+        accounting_framework: accountingFramework, lease_accounting_model: leaseAccountingModel };
       if (/PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAsset/i.test(concept)) {
         embedded.push({ ...item, disposition: "embedded_in_net_ppe_do_not_add_again" }); continue;
       }
@@ -26,15 +41,18 @@ export function buildLeaseRouCoverage(extraction, universe = null) {
         rou.push({ ...item, lease_type: /finance/i.test(text) ? "finance" : /operat/i.test(text) ? "operating" : "unspecified" }); continue;
       }
       if (/lease liabilities|lease liability|lease obligations|lease obligation/i.test(text) || /LeaseLiabilit|LeaseObligation/i.test(concept)) {
-        const type = /finance/i.test(text) ? "finance" : /operat/i.test(text) ? "operating" : "unspecified";
+        const type = accountingFramework === "IFRS" ? "unspecified"
+          : /finance/i.test(text) ? "finance" : /operat/i.test(text) ? "operating" : "unspecified";
         const maturity = /noncurrent|long.term|net of current|less current/i.test(text) ? "noncurrent" : /current/i.test(text) ? "current" : "unspecified";
         const row = { ...item, lease_type: type, maturity }; leases.push(row);
-        if (type === "unspecified" || maturity === "unspecified") unclassified.push(row);
+        // IFRS 16 does not use the US GAAP operating/finance lessee classification.
+        if ((accountingFramework !== "IFRS" && type === "unspecified") || maturity === "unspecified") unclassified.push(row);
       }
     }
     return { symbol:c.symbol, company_name:c.filing?.company ?? null, provider_status:c.provider_status ?? null,
       accession:c.filing?.accession_number ?? c.filing?.accession_no ?? null, fiscal_period:period,
-      form:c.filing?.form ?? null, currency, rou_assets:rou, lease_liabilities:leases,
+      form:c.filing?.form ?? null, currency, accounting_framework:accountingFramework,
+      lease_accounting_model:leaseAccountingModel, rou_assets:rou, lease_liabilities:leases,
       embedded_rou_in_net_ppe:embedded, unclassified_lease_liabilities:unclassified };
   }).sort((a,b)=>a.symbol.localeCompare(b.symbol));
   const supported = issuers.filter(x=>x.provider_status==="supported");
@@ -49,7 +67,8 @@ export function buildLeaseRouCoverage(extraction, universe = null) {
       rou_asset_rows:rou.length, lease_liability_rows:leases.length, embedded_rou_in_net_ppe_rows:embedded.length,
       missing_rou_amount_rows:rou.filter(x=>x.value===null).length,
       missing_lease_liability_amount_rows:leases.filter(x=>x.value===null).length,
-      unclassified_lease_liability_rows:supported.reduce((n,x)=>n+x.unclassified_lease_liabilities.length,0) },
+      unclassified_lease_liability_rows:supported.reduce((n,x)=>n+x.unclassified_lease_liabilities.length,0),
+      ifrs16_lease_liability_rows:leases.filter(x=>x.lease_accounting_model==="IFRS16_single_lessee_model").length },
     issuers, out_of_universe_extraction_symbols:outOfUniverseSymbols, production_write:false, production_approved:false, production_fundamentals_changed:false, rankings_changed:false,
     guardrail:"Filing-period-bound evidence coverage only. Missing values remain unknown. ROU assets embedded in combined PP&E concepts are not counted separately. No lease/ROU formula, EV, ROC or ranking is approved or changed." };
 }
@@ -58,12 +77,12 @@ export function renderLeaseRouCoverageMarkdown(report) {
     "Evidence inventory only. Amounts remain in each filing's reported currency and units.","",
     "## Coverage summary","","| Measure | Count |","|---|---:|"];
   for(const [k,v] of Object.entries(report.summary)) lines.push("| "+k.replaceAll("_"," ")+" | "+v+" |");
-  lines.push("","## Issuer-level evidence","","| Symbol | Period | Currency | ROU rows | Lease-liability rows | Embedded ROU in PP&E | Unclassified lease rows |","|---|---|---|---:|---:|---:|---:|");
-  for(const x of report.issuers) lines.push("| "+[x.symbol,x.fiscal_period??"unknown",x.currency,x.rou_assets.length,x.lease_liabilities.length,x.embedded_rou_in_net_ppe.length,x.unclassified_lease_liabilities.length].join(" | ")+" |");
+  lines.push("","## Issuer-level evidence","","| Symbol | Period | Currency | Framework | Lease model | ROU rows | Lease-liability rows | Embedded ROU in PP&E | Unclassified lease rows |","|---|---|---|---|---|---:|---:|---:|---:|");
+  for(const x of report.issuers) lines.push("| "+[x.symbol,x.fiscal_period??"unknown",x.currency,x.accounting_framework,x.lease_accounting_model,x.rou_assets.length,x.lease_liabilities.length,x.embedded_rou_in_net_ppe.length,x.unclassified_lease_liabilities.length].join(" | ")+" |");
   lines.push("","## Detailed evidence","");
   for(const x of report.issuers) {
     if(!x.rou_assets.length&&!x.lease_liabilities.length&&!x.embedded_rou_in_net_ppe.length) continue;
-    lines.push("### "+x.symbol+" ("+(x.fiscal_period??"period unknown")+")","","| Type | Classification | Maturity | Amount | Concept / label | Row |","|---|---|---|---:|---|---:|");
+    lines.push("### "+x.symbol+" ("+(x.fiscal_period??"period unknown")+")","","Framework: "+x.accounting_framework+"; lease model: "+x.lease_accounting_model,"","| Type | Classification | Maturity | Amount | Concept / label | Row |","|---|---|---|---:|---|---:|");
     for(const r of x.rou_assets) lines.push("| ROU asset | "+r.lease_type+" | n/a | "+(r.value??"unknown")+" | "+r.concept+" / "+r.label+" | "+(r.row_index??"?")+" |");
     for(const r of x.lease_liabilities) lines.push("| Lease liability | "+r.lease_type+" | "+r.maturity+" | "+(r.value??"unknown")+" | "+r.concept+" / "+r.label+" | "+(r.row_index??"?")+" |");
     for(const r of x.embedded_rou_in_net_ppe) lines.push("| Embedded ROU | finance / combined PP&E | n/a | "+(r.value??"unknown")+" | "+r.concept+" / "+r.label+" | "+(r.row_index??"?")+" |");
@@ -72,6 +91,7 @@ export function renderLeaseRouCoverageMarkdown(report) {
   lines.push("production_write=false; production_approved=false; production_fundamentals_changed=false; rankings_changed=false.","");
   lines.push("## Guardrails","","- Missing rows or amounts are unknown, not zero.","- Rows use the selected annual filing period only.",
     "- Dimensional breakdowns are excluded.","- Combined PP&E / finance-lease ROU concepts are flagged to prevent double counting.",
+    "- IFRS 16 rows are identified from the filing's IFRS XBRL namespace and are not forced into US GAAP operating/finance types.",
     "- Do not add ROU assets alone. Any lease-inclusive ROC/EV scenario needs matching EBIT and liability treatment and remains sensitivity-only.",
     "",report.guardrail,"");
   return lines.join("\n");

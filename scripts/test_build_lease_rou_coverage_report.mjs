@@ -32,6 +32,10 @@ test("supports IFRS lease captions and excludes dimensional breakdowns",()=>{
  {...row("ifrs-full_RightofuseAssets","Leasehold property",10000000,32),dimension:true}
  ]}}}]});
  assert.equal(r.issuers[0].rou_assets.length,1); assert.equal(r.issuers[0].lease_liabilities.length,2);
+ assert.equal(r.issuers[0].accounting_framework,"IFRS");
+ assert.equal(r.issuers[0].lease_accounting_model,"IFRS16_single_lessee_model");
+ assert.equal(r.summary.ifrs16_lease_liability_rows,2);
+ assert.equal(r.summary.unclassified_lease_liability_rows,0);
  assert.equal(r.issuers[0].lease_liabilities.find(x=>x.maturity==="current").value,5000000);
 });
 test("missing selected-period values remain unknown, not zero",()=>{
