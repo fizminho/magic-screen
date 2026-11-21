@@ -12,9 +12,9 @@
 | Active US MFI cohort | 30 |
 | EdgarTools supported | 28 |
 | Provider unsupported | 2 |
-| Shadow eligible / ranked | 5 |
-| Accounting / valuation review exclusions | 23 |
-| P1 / P2 / P3 queue | 9 / 11 / 10 |
+| Shadow eligible / ranked | 0 |
+| Accounting / valuation review exclusions | 28 |
+| P1 / P2 / P3 queue | 10 / 10 / 10 |
 | Balance sheets reconciled / unavailable | 28 / 2 |
 | Production-approved shadow rows | 0 |
 
@@ -34,32 +34,26 @@ Amounts below are the candidate values selected from the stated annual filing pe
 | SSTK | 0001549346-26-000008 / 2025-12-31 | $75.059m | **-$227.210m** | Negative invested capital; deferred revenue and contributor royalties payable are large current liabilities | Reconcile the $158.110m current debt (including a $155m revolver) and $116.639m noncurrent term loan. Filing separately reports $178.244m cash and $25.582m operating lease liabilities; review negative working capital before any ROC ranking. |
 | XPOF | 0001802156-26-000016 / 2025-12-31 | $19.848m | **-$10.438m** | Negative invested capital; current assets include restricted cash; debt carrying-value bridge and NCI scope remain open | Filing note identifies $33.7m cash and cash equivalents excluding $12.2m restricted cash. Review negative working capital, 28% noncontrolling interest in XPO LLC, lease scope and debt carrying-value reconciliation. |
 
-## Five current shadow-ranked issuers
+## Current shadow ranking status
 
-These five are the only names currently passing the preview eligibility gates. All remain accounting-review items and `production_approved=false`.
+The latest successful full-universe run (21 November 2026, commit `ca685fa`) produced **zero eligible and zero ranked issuers**. All 28 EdgarTools-supported issuers remain in accounting / valuation review; two issuers are explicitly excluded because provider evidence is unsupported. This is a deliberate fail-closed result after applying the cohort-wide lease, cash, NCI and financing-scope gates. It is not a production ranking.
 
-| Rank | Symbol | Earnings Yield | Candidate ROC | Rank sum | Current priority |
-|---:|---|---:|---:|---:|---|
-| 1 | HRB | 14.59% | 331.77% | 3 | P1 |
-| 2 | OTEX | 10.71% | 6,465.20% | 4 | P1 |
-| 3 | UPWK | 11.13% | 37.47% | 7 | P3 |
-| 4 | IRWD | 8.57% | 278.51% | 8 | P3 |
-| 4 | QTTB | 10.39% | 37.83% | 8 | P3 |
+The five names that appeared in an earlier preview (HRB, OTEX, UPWK, IRWD and QTTB) are no longer eligible under the stricter gates. Their earlier candidate yields and ROC values must not be presented as current ranks or recommendations.
 
-### Ranked-name evidence requiring sign-off
+### Priority evidence requiring sign-off
 
 - **HRB:** FY2026 EBIT candidate $907.686m is reconstructed as revenue less operating expenses and cross-checked against the pretax bridge. It remains manual-review-only. The generic resolver does not select it as a direct reported EBIT.
-- **OTEX:** Note 11 current and noncurrent debt components reconcile exactly to total debt carrying value. Invested capital is only $16.745m because negative working capital offsets most of net PP&E. The candidate ROC is therefore highly denominator-sensitive.
+- **OTEX:** Note 11 current and noncurrent debt components reconcile exactly to total debt carrying value. Invested capital is only $16.745m because negative working capital offsets most of net PP&E. The candidate ROC is highly denominator-sensitive and must remain withheld.
 - **UPWK:** annual convertible-note carrying value is $359.770m, current; cash/equivalents $294.356m; marketable securities $378.425m remain separate. Restricted cash and customer escrow are excluded from unrestricted cash.
 - **IRWD:** FY2025 convertible notes and revolver balances are annual-period inputs. Later interim repayments must not overwrite the FY2025 snapshot.
 - **QTTB:** FY2025 term-loan carrying value is $9.708m, with $6.235m current and $3.473m noncurrent. Restricted cash of $0.647m collateralises venture debt and lease LOCs and is not unrestricted cash.
 
 ## Review order
 
-1. **First:** HRB and OTEX because they are currently ranked and their accounting decisions directly affect the visible top two.
-2. **Next:** PBI and SGHC because EBIT reconstruction / currency and debt scope are unresolved.
-3. **Then:** GTM, HPQ, HRMY, SSTK and XPOF because invested capital is negative or unresolved and must remain unranked until resolved.
-4. After P1 closure, review P2 debt/cash cases and P3 ranked candidates UPWK, IRWD and QTTB.
+1. **First:** close cohort-wide policy decisions for lease / ROU symmetry, unrestricted cash classification, NCI perimeter and other financing obligations. These are now the common blockers across much of the supported cohort.
+2. **In parallel:** HRB and OTEX require issuer-specific EBIT / denominator review; PBI and SGHC require EBIT, currency and debt resolution.
+3. **Then:** GTM, HPQ, HRMY, SSTK and XPOF require negative or unresolved invested-capital and cash/debt review.
+4. After the shared policy is approved, re-run all 30 issuers and then sequence remaining P2/P3 issuer-level debt, cash and filing reviews.
 
 ## Guardrails
 
