@@ -219,10 +219,11 @@ Additional review coverage: 17 accession-bound issuer debt-note reviews, three f
 The latest queue confirms `production_fundamentals_changed=false`, `rankings_changed=false` and `production_write=false`. The evidence inventory does not aggregate or net these rows.
 ## Issuer-level cash and investment note reviews (21 Nov 2026)
 
-Eight exact-accession annual-filing reviews are now attached separately from the debt-note review layer. These records explain portfolio composition, maturity, liquidity and restrictions; they do not approve any cash deduction or promote any balance into the resolver.
+Nine exact-accession annual-filing reviews are now attached separately from the debt-note review layer. These records explain portfolio composition, maturity, liquidity and restrictions; they do not approve any cash deduction or promote any balance into the resolver.
 
 | Issuer | Reporting date | Investment evidence | Review implication |
 |---|---|---|---|
+| SGHC | 31 Dec 2025 | $513m cash equivalents: $45m cash-in-transit, $468m bank balances, including $129m processor wallets accessible on demand. | $19m regulatory balances and $12m CSR-earmarked balances require availability review; separate $6m user-segregated cash must not be added to corporate cash. |
 | FHTX | 31 Dec 2025 | $78.018m available-for-sale: $1.500m U.S. government agencies, $35.287m commercial paper, $41.231m corporate notes/bonds. | Available for current operations, but some maturities may exceed one year; keep separate from cash equivalents. [10-K](https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm) |
 | NRIX | 30 Nov 2025 | $345.981m U.S. Treasury securities, separately from $241.364m money-market cash equivalents. | Debt securities with current classification; do not automatically merge with cash equivalents. [10-K](https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm) |
 | PXED | 31 Aug 2026 | $167.852m marketable debt securities: $137.094m current, $30.758m noncurrent. Includes U.S. Treasury/agency, commercial paper and investment-grade corporate debt. | Maturity extends up to three years; liquidity deployability is constrained by Department of Education composite-score requirements. [10-K](https://www.sec.gov/Archives/edgar/data/1600222/000119312526445323/pxed-20260831.htm) |
@@ -236,7 +237,7 @@ Eight exact-accession annual-filing reviews are now attached separately from the
 
 The issuers use materially different labels and classifications: cash equivalents, available-for-sale securities, held-to-maturity securities, current marketable securities and noncurrent marketable securities. Several portfolios are explicitly available for current operations, but this is not equivalent to the issuer's cash-equivalent definition. The future policy should define a consistent maturity ceiling, eligible instrument types, credit-quality standard, market-liquidity test, encumbrance test and operational-availability test. No issuer-specific exception should be used to improve a particular ranking.
 
-All eight reviews are exact-accession-bound and carry `status=review_only`, `production_approved=false`, `resolver_input=false` and `cash_candidate_promoted=false`. They are surfaced separately from conventional-debt note reviews.
+All nine reviews are exact-accession-bound and carry `status=review_only`, `production_approved=false`, `resolver_input=false` and `cash_candidate_promoted=false`. They are surfaced separately from conventional-debt note reviews.
 ## Additional issuer-specific debt and cash follow-up (21 Nov 2026)
 
 ### SGHC: on-demand loan ambiguity and cash availability
