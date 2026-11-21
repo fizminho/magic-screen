@@ -148,8 +148,8 @@ def render_markdown(report):
         "- No issuer is approved by this assessment. A candidate or a shadow rank is not accounting approval.",
         "- Direct reported EBIT still requires consolidated-scope and cohort-policy sign-off; filing-specific reconstructions remain manual-review-only.",
         "- Positive invested-capital candidates remain subject to asset-scope and near-zero materiality approval. Unresolved or non-positive denominators are not ranked.",
-        "- Debt and cash candidates remain review-only until note-level carrying values, maturity buckets, unrestricted cash and double-counting checks are signed off.
-- Generic XBRL candidate buckets are not treated as issuer-specific blockers without an explicit review flag.",
+        "- Debt and cash candidates remain review-only until note-level carrying values, maturity buckets, unrestricted cash and double-counting checks are signed off.",
+        "- Generic XBRL candidate buckets are not treated as issuer-specific blockers without an explicit review flag.",
         "- Unsupported issuers remain visible exclusions. Missing values are unknown, never zero.",
         "- VSNT remains excluded because its pre-separation combined annual statements are not comparable to post-separation market capitalization.",
         "",
