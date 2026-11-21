@@ -439,3 +439,29 @@ The current shadow preview reports **2 eligible, 0 ranked** because the proposed
 The run ingested 31 records (30 active issuers plus ADBE regression control). `production_write=false`, `production_fundamentals_changed=false`, and `rankings_changed=false`. No production fundamentals, ratios, eligibility, EV, ROC or rankings were changed.
 
 **Decision:** the evidence-coverage audit is accepted as a reporting control. The lease/ROU accounting policy is still open. Next, define a coherent invested-capital and EBIT/EV treatment before producing lease-inclusive ROC sensitivities. Do not add ROU assets alone, do not double-count embedded finance-lease ROU, and do not force IFRS lease types into US GAAP operating/finance categories.
+
+## Latest full-universe acceptance run (22 November 2026)
+
+Run **44926317787** completed successfully: https://github.com/fizminho/magic-screen/actions/runs/44926317787. All stages passed, including active-universe discovery, annual filing extraction, raw evidence ingestion, read-only resolver and ranking previews, legacy reconciliation, lease/ROU coverage, exception queue, policy cohort assessment, ranking sensitivity and debt-note guardrails. Artifact **14716380518** (edgartools-bakeoff) is the evidence source for the counts below.
+
+| Measure | Verified result |
+|---|---:|
+| Active US MFI universe | 30 |
+| Extraction records | 31 (30 active + ADBE regression control) |
+| Active provider-supported issuers | 28 |
+| Unsupported issuers | 2 (AFMJF, EGHSF) |
+| Separately reported ROU issuers | 24 |
+| Issuers with lease-liability rows | 23 |
+| Embedded ROU in combined net PP&E issuers | 3 (CRNC, FHTX, PBI) |
+| ROU rows / lease-liability rows | 28 / 50 |
+| Missing selected-period ROU / lease amounts | 1 / 0 |
+| Unclassified lease-liability rows | 2 (SGHC, type unspecified) |
+| Direct EBIT candidates | 25 |
+| Conventional debt candidates / net-debt candidates | 17 / 15 |
+| Ambiguous debt inputs | 11 |
+| Shadow-eligible / ranked | 2 / 0 |
+| Production-approved | 0 |
+
+The two shadow-eligible review-only candidates are **IRWD and SNDK**. The proposed minimum cohort is five, so the ranked output remains withheld. The 26 supported issuers outside eligibility remain in accounting/valuation review; the two unsupported names remain visible exclusions. All 31 raw records were ingested. The artifact confirms production_fundamentals_changed=false and rankings_changed=false; no production fundamentals, ratios, EV, ROC or rankings were modified.
+
+**Lease audit correction:** active-cohort counts exclude ADBE, which remains separately reported as an extraction regression control. Do not add embedded finance-lease ROU a second time to PP&E. SGHC's IFRS lease types remain unspecified. PRDO's unvalued aggregate ROU concept remains unknown and is not substituted for its separately valued operating and finance ROU assets.

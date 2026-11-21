@@ -12,9 +12,9 @@
 | Active US MFI cohort | 30 |
 | EdgarTools supported | 28 |
 | Provider unsupported | 2 |
-| Shadow eligible / ranked | 1 / 0 |
-| Accounting / valuation review exclusions | 27 |
-| P1 / P2 / P3 queue | 10 / 10 / 10 |
+| Shadow eligible / ranked | 2 / 0 |
+| Accounting / valuation review exclusions | 26 |
+| P1 / P2 / P3 queue | 9 / 10 / 11 |
 | Balance sheets reconciled / unavailable | 28 / 2 |
 | Production-approved shadow rows | 0 |
 
@@ -36,7 +36,7 @@ Amounts below are the candidate values selected from the stated annual filing pe
 
 ## Current shadow ranking status
 
-The latest successful full-universe run (21 November 2026, bakeoff run `44900789031`, commit `4a5447c`) produced **one shadow-eligible issuer (IRWD) and zero ranked issuers**. The ranking remains withheld because the proposed policy requires at least five eligible issuers. Twenty-seven supported issuers remain in accounting / valuation review; two issuers are explicitly excluded because provider evidence is unsupported. This is a shadow-only result, not a production ranking or approval.
+The latest successful full-universe run (22 November 2026, bakeoff run `44926317787`) produced **two shadow-eligible issuers (IRWD and SNDK) and zero ranked issuers**. The ranking remains withheld because the proposed policy requires at least five eligible issuers. Twenty-six supported issuers remain in accounting / valuation review; two issuers are explicitly excluded because provider evidence is unsupported. This is a shadow-only result, not a production ranking or approval.
 
 IRWD passes the current mechanical shadow gates: direct-reported EBIT, a positive invested-capital candidate, uniquely identified current and noncurrent conventional debt components, and a separately identified unrestricted-cash candidate. The filing has no aggregate-debt candidate, so there is no aggregate figure to reconcile against the component sum. This absence is not a mismatch. IRWD still requires owner policy approval and issuer-level sign-off before production use.
 
@@ -78,4 +78,4 @@ The earlier five-name preview (HRB, OTEX, UPWK, IRWD and QTTB) remains supersede
 This is a comparability/period-perimeter blocker, not simply a missing debt tag. The 2025 statements themselves caution that they may not represent results as an independent company.
 
 
-**Current queue priority count:** 10 P1 / 10 P2 / 10 P3 across the 30-symbol active cohort. The P1 count comprises the nine issuer accounting cases above plus the VSNT company-perimeter mismatch documented in the separate exception row. This count is from the latest verified full-universe artifact; it is not an approval count.
+**Current queue priority count:** 9 P1 / 10 P2 / 11 P3 across the 30-symbol active cohort, as verified in run 44926317787. The nine P1 cases are the issuer accounting cases in the table above. VSNT remains documented as a separate company-perimeter exception but is not part of the current 30-symbol active cohort and is not included in these priority counts. These are review-lane counts, not approval counts.

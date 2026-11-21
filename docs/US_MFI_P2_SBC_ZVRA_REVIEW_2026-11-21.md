@@ -113,3 +113,25 @@ The company also describes two separate instruments that had already been exting
 | ZVRA | Senior secured term loan; principal maturity and carrying-value bridge | $63.608m principal less $1.680m adjustments = $61.928m carrying value | No |
 
 These two conventional-debt cases are now materially better evidenced. The next P2 batch remains the named-facility and note-completeness group: MNTN, PXED, STRA, FHTX and NRIX. Explicit zero-drawn evidence must remain facility-specific; no face debt row or missing note evidence must remain unknown, not zero.
+
+## Revalidation against full-universe extraction (22 November 2026)
+
+The FY2025 filing was re-extracted in successful full-universe run **44926317787**, artifact **14716380518**. Accession 0001193125-26-127557 and period 2025-12-31 match this review.
+
+The current balance-sheet rows independently reproduce the borrowing buckets:
+
+| Statement line | FY2025 amount (USD) | Evidence disposition |
+|---|---:|---|
+| Bank and other borrowings, current | 9,099,046 | Non-zero borrowing instrument |
+| Bank and other borrowings, non-current | 33,734,438 | Non-zero borrowing instrument |
+| Notes payable, current - related parties | 0 | Explicit zero, separate instrument |
+| Notes payable, non-current - related parties | 0 | Explicit zero, separate instrument |
+| **Bank and other borrowings total** | **42,833,484** | Matches Note 15 maturity schedule |
+
+Additional statement controls: cash and cash equivalents **$163.774m**; operating lease liabilities **$4.417m current + $4.136m noncurrent**; finance lease liabilities **$0.133m current + $0.117m noncurrent**; operating ROU asset **$8.367m**; finance ROU asset **$0.451m**. A separate **$2.693m due-to-related-party** current liability is not part of the bank-borrowing total and remains a separate classification question.
+
+The deterministic queue still reports current and noncurrent debt as ambiguous because it sees one non-zero borrowing line alongside a distinct explicit-zero related-party note line in each maturity bucket. This is a conservative review flag, not a numeric mismatch. Keep the non-zero bank-borrowing values and zero note-payable values separate; do not sum duplicate/dimensional rows or auto-promote them to production. The filing note's instrument and maturity reconciliation supports the documented $42.833484m total, subject to reviewer sign-off.
+
+For ZVRA, the same run reconfirms accession 0001434647-26-000011, period 2025-12-31, long-term debt carrying value **$61.928m**, cash and equivalents **$62.406m**, current and noncurrent available-for-sale debt securities **$128.605m / $47.879m**, and operating lease liabilities **$0.419m / $0.859m**. The balance sheet has no separately reported current borrowing line. The maturity schedule's lack of scheduled principal in 2026-2028 is not converted into an explicit current-debt zero by the resolver; current debt remains unknown pending the filing-level maturity / acceleration review. The $63.608m principal and $61.928m carrying value remain distinct; the $1.680m bridge must not be treated as additional debt.
+
+No accounting policy, EV, EBIT, invested-capital formula, production fundamental or ranking was changed by this revalidation.

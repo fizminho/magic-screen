@@ -51,3 +51,9 @@ A P2 issuer can leave the debt/EV review queue only when all of the following ar
 7. The queue remains review-only until human accounting approval; no automated candidate is promoted to production.
 
 No item in this document changes the resolver, production fundamentals, enterprise value, EY, ROC, ranking eligibility or shadow rank.
+
+## SBC / ZVRA evidence status after latest full-universe run (22 November 2026)
+
+Run **44926317787** re-extracted both FY2025 annual filings and confirmed the accession/period pairs in the issuer worksheet. SBC's bank borrowing rows remain $9.099046m current and $33.734438m noncurrent, totaling $42.833484m and matching its Note 15 principal schedule. The two related-party note-payable rows are explicit zeros, not additional borrowing. The resolver intentionally retains a manual ambiguity flag because it sees multiple distinct instrument lines; no automatic sum or production promotion is allowed. ZVRA's long-term debt carrying value remains $61.928m against $63.608m principal; no current borrowing line is selected, and the 2026-2028 maturity schedule is not silently converted into a zero current-debt fact. See the updated SBC / ZVRA evidence worksheet (US_MFI_P2_SBC_ZVRA_REVIEW_2026-11-21.md).
+
+The refreshed cohort queue remains review-only: 17 conventional-debt candidates, 15 net-debt candidates and 11 ambiguous debt inputs. These aggregate counts are evidence coverage, not issuer approvals. The next targeted debt-note review remains MNTN, PXED, STRA, FHTX and NRIX, with facility-specific zeros kept distinct from proof of no other debt.
