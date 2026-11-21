@@ -1451,7 +1451,7 @@ The carrying amount of noncontrolling interest was $8 million.
 
         notes = Notes()
         result = filing_note_review(type("FilingObject", (), {"notes": notes})())
-        self.assertEqual(notes.focus, ["Debt", "Cash", "Lease", "Equity", "Financing", "Commitments", "Contingencies", "Related Party"])
+        self.assertEqual(notes.focus, ["Debt", "Cash", "Lease", "Equity", "Financing", "Commitments", "Contingencies", "Related Party", "Operating", "Revenue", "Property", "Pension", "Acquisition", "Impairment", "Intangible"])
         self.assertEqual(result["status"], "candidates_found")
         self.assertEqual(result["candidate_count"], 2)
         by_title = {item["title"]: item for item in result["candidates"]}
@@ -1496,3 +1496,20 @@ A financing obligation liability was recognized.
         result = filing_note_review(type("FilingObject", (), {"notes": BrokenNotes()})())
         self.assertEqual(result["status"], "extraction_error")
         self.assertEqual(result["candidates"], [])
+
+
+    def test_extracts_new_ebit_invested_capital_and_other_ev_note_topics(self):
+        markdown = """# Note 10 - Operating Results
+The company recorded restructuring and impairment charges in operating income.
+# Note 11 - Property
+Right-of-use assets and rental equipment are separately presented.
+# Note 12 - Financing
+The company has contingent consideration and pension liabilities.
+"""
+        result = filing_note_review(type("FilingObject", (), {
+            "notes": type("Notes", (), {"to_markdown": lambda self, focus=None: markdown})()
+        })())
+        by_title = {item["title"]: item for item in result["candidates"]}
+        self.assertIn("ebit_scope", by_title["Note 10 - Operating Results"]["topics"])
+        self.assertIn("invested_capital_scope", by_title["Note 11 - Property"]["topics"])
+        self.assertIn("financing_scope", by_title["Note 12 - Financing"]["topics"])

@@ -87,7 +87,7 @@ test("recognizes NCI escalation in the real EdgarTools underscore-based evidence
     }
   };
   const tasks = listGeminiAccountingEscalations("GTM", company, resolver).map(item => item.task);
-  assert.deepEqual(tasks.sort(), ["cash_scope", "debt_scope", "financing_scope", "lease_scope", "nci_scope"].sort());
+  assert.deepEqual(tasks.sort(), ["cash_scope", "debt_scope", "financing_scope", "full_scope", "invested_capital_scope", "lease_scope", "nci_scope"].sort());
 });
 
 
@@ -346,4 +346,86 @@ test("resolves lease and failed sale-leaseback overlap only with explicit note a
   });
   assert.equal(duplicatedFaceRow.requires_manual_reconciliation, true);
   assert.equal(duplicatedFaceRow.relationship, "unresolved");
+});
+
+
+test("full scope escalation bundles EBIT and invested-capital ambiguity with existing accounting scopes", async () => {
+  const { buildGeminiAccountingEvidence } = await import("./gemini-accounting-review.mjs");
+  const company = {
+    balance_sheet_fact_review: { categories: {
+      current_debt_candidates: { status: "ambiguous", candidate_count: 2, candidates: [
+        { concept: "NotesPayableCurrent", label: "Notes payable", value: 100, row_index: 10 }
+      ] },
+      current_assets_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [
+        { concept: "AssetsCurrent", label: "Total current assets", value: 500, fiscal_period: "2025-12-31", row_index: 2 }
+      ] },
+      current_liabilities_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [
+        { concept: "LiabilitiesCurrent", label: "Total current liabilities", value: 300, fiscal_period: "2025-12-31", row_index: 3 }
+      ] },
+      net_ppe_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [
+        { concept: "PropertyPlantAndEquipmentNet", label: "Property and equipment, net", value: 200, fiscal_period: "2025-12-31", row_index: 4 }
+      ] },
+      right_of_use_asset_candidates: { status: "identified", candidate_count: 1, candidates: [
+        { concept: "OperatingLeaseRightOfUseAsset", label: "Operating lease right-of-use asset", value: 50, row_index: 5 }
+      ] }
+    }, unresolved_categories: ["current_debt_ambiguous"] },
+    statements: { income_statement: { rows: [
+      { index: 6, dimension: false, abstract: false, concept: "us-gaap_OperatingIncomeLoss", label: "Operating income", values: { "2025-12-31": 80 } },
+      { index: 7, dimension: false, abstract: false, concept: "us-gaap_RestructuringCostsAndAssetImpairmentCharges", label: "Restructuring and impairment", values: { "2025-12-31": 5 } },
+      { index: 8, dimension: true, abstract: false, concept: "us-gaap_OperatingIncomeLoss", label: "Segment operating income", values: { "2025-12-31": 20 } }
+    ] } },
+    direct_operating_income_review: { status: "ambiguous", candidate_review: { status: "ambiguous" } },
+    invested_capital_review: { scope_flags: ["right_of_use_assets_require_invested_capital_scope_review"], scope_review: { right_of_use_asset_candidate_count: 1 } },
+    filing_note_review: { candidates: [
+      { title: "Note 8 - Debt", topics: ["debt_scope"], excerpt: "Supplier finance arrangements." },
+      { title: "Note 12 - Operations", topics: ["ebit_scope"], excerpt: "Operating income includes restructuring costs." },
+      { title: "Note 15 - Leases", topics: ["invested_capital_scope", "lease_scope"], excerpt: "Right-of-use assets and lease liabilities." }
+    ] }
+  };
+  const resolver = { symbol: "ABC", accession: "a", fiscal_period: "2025-12-31", review_flags: [],
+    ebit_status: "direct_reported_candidate_review_only", invested_capital_status: "positive_denominator_candidate_review_only",
+    enterprise_value_candidate_review: { conventional_debt_status: "incomplete_or_ambiguous_debt_inputs" } };
+  const escalations = listGeminiAccountingEscalations("ABC", company, resolver);
+  assert.ok(escalations.some(item => item.task === "ebit_scope"));
+  assert.ok(escalations.some(item => item.task === "invested_capital_scope"));
+  assert.ok(escalations.some(item => item.task === "full_scope"));
+  const evidence = buildGeminiAccountingEvidence("full_scope", company, resolver);
+  assert.equal(evidence.income_statement_candidates.length, 2);
+  assert.equal(evidence.income_statement_candidates[0].evidence_id, "income_statement:0");
+  assert.equal(evidence.categories.current_assets.candidates[0].row_index, 2);
+  assert.equal(evidence.filing_note_candidates.length, 3);
+});
+
+test("full scope reconciles lease and sale-leaseback findings in the same response", async () => {
+  const { reconcileGeminiLeaseFinancingOverlap } = await import("./gemini-accounting-review.mjs");
+  const findings = [
+    { evidence_id: "current_lease_liabilities:0", evidence_ids: ["current_lease_liabilities:0"], classification: "operating_lease_liability" },
+    { evidence_id: "nondebt_financing_obligation:0", evidence_ids: ["nondebt_financing_obligation:0"], classification: "failed_sale_leaseback_financing" }
+  ];
+  const company = {
+    balance_sheet_fact_review: { categories: {
+      nondebt_financing_obligation_candidates: { candidates: [{ label: "Sale lease-back financing", value: 56992000, row_index: 52 }] },
+      current_lease_liability_candidates: { candidates: [{ label: "Operating lease liability current", value: 6032000, row_index: 39 }] },
+      noncurrent_lease_liability_candidates: { candidates: [{ label: "Operating lease liability noncurrent", value: 43752000, row_index: 50 }] }
+    }},
+    filing_note_review: { lease_financing_reconciliation: { status: "financing_treatment_supported", matched_signals: ["failed_sale_leaseback_identified"] } }
+  };
+  const result = reconcileGeminiLeaseFinancingOverlap("full_scope", findings, [], company);
+  assert.equal(result.requires_manual_reconciliation, false);
+  assert.equal(result.relationship, "separate_obligations_supported_by_filing");
+});
+
+
+test("full scope does not escalate solely because deterministic invested-capital inputs exist", async () => {
+  const company = { balance_sheet_fact_review: { categories: {
+    current_assets_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "AssetsCurrent", value: 100 }] },
+    current_liabilities_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "LiabilitiesCurrent", value: 50 }] },
+    net_ppe_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "PropertyPlantAndEquipmentNet", value: 20 }] }
+  }, unresolved_categories: [] }, invested_capital_review: { status: "calculated_review_only", scope_flags: [] },
+  direct_operating_income_review: { status: "review_only", candidate_review: { status: "unique_candidate" } },
+  filing_note_review: { candidates: [] }, enterprise_value_scope_review: {} };
+  const resolver = { symbol: "ABC", accession: "a", fiscal_period: "2025-12-31", review_flags: [],
+    ebit_status: "direct_reported_candidate_review_only", invested_capital_status: "positive_denominator_candidate_review_only",
+    enterprise_value_candidate_review: { conventional_debt_status: "identified_from_unique_current_and_noncurrent_components" } };
+  assert.deepEqual(listGeminiAccountingEscalations("ABC", company, resolver), []);
 });

@@ -435,13 +435,15 @@ def manual_enterprise_value_scenario_review(
     }
 
 
-NOTE_FOCUS_TERMS = ["Debt", "Cash", "Lease", "Equity", "Financing", "Commitments", "Contingencies", "Related Party"]
+NOTE_FOCUS_TERMS = ["Debt", "Cash", "Lease", "Equity", "Financing", "Commitments", "Contingencies", "Related Party", "Operating", "Revenue", "Property", "Pension", "Acquisition", "Impairment", "Intangible"]
 NOTE_TOPIC_PATTERNS = {
     "debt_scope": re.compile(r"\b(debt|borrowings?|loans?|credit facilities|commercial paper|notes payable)\b", re.I),
     "cash_scope": re.compile(r"\b(cash and cash equivalents|restricted cash|escrow|customer funds|marketable securities|short.?term investments)\b", re.I),
     "lease_scope": re.compile(r"\b(lease liabilities?|right.of.use|\bROU\b|sale.leaseback)\b", re.I),
     "nci_scope": re.compile(r"\b(non.?controlling interest|minority interest|ownership interest|noncontrolling interests)\b", re.I),
-    "financing_scope": re.compile(r"\b(supplier finance|vendor financing|factoring|receivables financing|royalty financing|tax receivable agreement|failed sale.leaseback|sale.leaseback financing|construction financing)\b", re.I),
+    "financing_scope": re.compile(r"\b(supplier finance|vendor financing|factoring|receivables financing|royalty financing|tax receivable agreement|failed sale.leaseback|sale.leaseback financing|construction financing|contingent consideration|deferred acquisition consideration|pension liabilities|asset retirement obligations|preferred stock|redeemable noncontrolling interest)\b", re.I),
+    "ebit_scope": re.compile(r"\b(operating income|operating profit|income from operations|discontinued operations|restructuring|impairment|pension|postretirement|stock.?based compensation|nonrecurring|unusual gain|unusual loss|amortization of acquired)\b", re.I),
+    "invested_capital_scope": re.compile(r"\b(invested capital|working capital|property,? plant and equipment|rental equipment|right.of.use assets?|lease liabilities?)\b", re.I),
 }
 
 
