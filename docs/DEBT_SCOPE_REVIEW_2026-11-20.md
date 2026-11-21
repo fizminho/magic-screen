@@ -158,6 +158,7 @@ The accounting review queue now classifies selected annual balance-sheet face ro
 | Unrestricted cash and cash equivalents | Candidate cash deduction | Require evidence that the balance is available to the consolidated group |
 | Restricted cash | Exclude from unrestricted cash | Do not net collateral, deposits or restricted balances against debt |
 | Marketable debt securities / short-term investments | Separate liquidity category | Decide cash-like treatment using common maturity, credit-risk, liquidity and availability criteria |
+| Generic marketable securities with unknown composition | Composition unknown; not cash by assumption | Inspect issuer note to determine debt/equity mix, maturity, restrictions and liquidity |
 | Marketable equity securities | Not cash equivalents | Do not treat strategic/equity investments as cash without explicit policy |
 | Equity-method investments | Separate investment asset | Do not net against EV automatically |
 | Notes receivable / loans receivable | Separate financial asset | Do not treat strategic or affiliate notes as cash equivalents |
