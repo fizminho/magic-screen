@@ -45,13 +45,26 @@ def assess(queue, ranking, policy):
             blockers.append("conventional debt / EV inputs incomplete or ambiguous")
         else:
             blockers.append("debt instrument and maturity tie-out remains review-only")
-        issue_text = " ".join(str(x).lower() for x in item.get("issues", []))
-        if "cash" in issue_text or any("cash" in x.lower() for x in flags):
+        # Generic XBRL candidate buckets are evidence hints, not automatic blockers.
+        issue_set = set(item.get("issues", []))
+        if any(x in issue_set for x in (
+            "flag:restricted_or_combined_cash_present_review_enterprise_value_cash_input",
+            "flag:unrestricted_cash_not_uniquely_identified",
+            "flag:restricted_cash_or_short_term_investments_require_cash_scope_review",
+        )):
             blockers.append("cash classification / unrestricted availability requires review")
-        if "noncontrolling" in issue_text or "company_perimeter" in issue_text:
+        if any(x in issue_set for x in (
+            "flag:noncontrolling_interest_present_review_enterprise_value_scope",
+            "flag:noncontrolling_interest_requires_enterprise_value_adjustment_review",
+            "flag:company_perimeter_mismatch_requires_manual_review",
+        )):
             blockers.append("NCI or reporting-entity perimeter requires review")
-        if item.get("priority") == "P1" and symbol == "VSNT":
-            blockers.append("pre-separation financials are not comparable to post-separation market cap")
+        if any("right_of_use_assets_present_review" in x or "lease_liabilities_present_review" in x
+               or "lease_liabilities_separate_from_conventional_debt" in x for x in issue_set):
+            blockers.append("lease / ROU symmetry requires cohort-wide policy decision")
+        debt_review = item.get("filing_debt_note_review") or {}
+        ebit_review = item.get("filing_operating_income_quality_review") or {}
+        perimeter_review = item.get("filing_company_perimeter_review") or {}
         rows.append({
             "symbol": symbol,
             "priority": item.get("priority"),
@@ -65,6 +78,9 @@ def assess(queue, ranking, policy):
             "production_approved": rank.get("production_approved", False),
             "blockers": list(dict.fromkeys(blockers)),
             "review_flags": flags,
+            "debt_note_review_questions": debt_review.get("manual_review_questions", []),
+            "operating_income_quality_review": ebit_review or None,
+            "company_perimeter_review": perimeter_review or None,
         })
     controls = (
         queue.get("production_write") is False
@@ -132,7 +148,8 @@ def render_markdown(report):
         "- No issuer is approved by this assessment. A candidate or a shadow rank is not accounting approval.",
         "- Direct reported EBIT still requires consolidated-scope and cohort-policy sign-off; filing-specific reconstructions remain manual-review-only.",
         "- Positive invested-capital candidates remain subject to asset-scope and near-zero materiality approval. Unresolved or non-positive denominators are not ranked.",
-        "- Debt and cash candidates remain review-only until note-level carrying values, maturity buckets, unrestricted cash and double-counting checks are signed off.",
+        "- Debt and cash candidates remain review-only until note-level carrying values, maturity buckets, unrestricted cash and double-counting checks are signed off.
+- Generic XBRL candidate buckets are not treated as issuer-specific blockers without an explicit review flag.",
         "- Unsupported issuers remain visible exclusions. Missing values are unknown, never zero.",
         "- VSNT remains excluded because its pre-separation combined annual statements are not comparable to post-separation market capitalization.",
         "",

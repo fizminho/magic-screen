@@ -53,6 +53,21 @@ class CohortAssessmentTests(unittest.TestCase):
         result = assess(q, r, p)
         self.assertTrue(any("immutability" in e for e in result["validation_errors"]))
 
+    def test_generic_cash_and_nci_candidate_buckets_are_not_overstated(self):
+        q, r, p = fixtures()
+        q["items"][0]["issues"] += ["flag:balance_sheet:cash_restricted_candidates", "flag:balance_sheet:noncontrolling_interest_candidates"]
+        result = assess(q, r, p)
+        row = next(x for x in result["issuer_assessments"] if x["symbol"] == "AAA")
+        self.assertFalse(any("cash classification" in x for x in row["blockers"]))
+        self.assertFalse(any("NCI" in x for x in row["blockers"]))
+
+    def test_specific_cash_flag_is_a_blocker(self):
+        q, r, p = fixtures()
+        q["items"][0]["issues"].append("flag:restricted_or_combined_cash_present_review_enterprise_value_cash_input")
+        result = assess(q, r, p)
+        row = next(x for x in result["issuer_assessments"] if x["symbol"] == "AAA")
+        self.assertTrue(any("cash classification" in x for x in row["blockers"]))
+
     def test_report_keeps_candidate_as_review_only(self):
         q, r, p = fixtures()
         report = render_markdown(assess(q, r, p))
