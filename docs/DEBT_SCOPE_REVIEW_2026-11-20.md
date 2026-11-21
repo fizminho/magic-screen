@@ -396,3 +396,30 @@ The successful read-only EdgarTools bakeoff artifact from run **44861336228** (c
 - No denominator floor, net-PP&E substitution, issuer exclusion, production approval or ranking adjustment is introduced. The candidate formula remains current assets minus current liabilities plus net PP&E.
 
 The queue reports six high negative-working-capital-offset cases. All top-five composition figures and sensitivities are review-only; production fundamentals, ratios, eligibility and rankings remain unchanged.
+
+## Shadow-cohort readiness and next debt-review priorities (21 Nov 2026)
+
+The read-only ranking preview from bakeoff run **44861336228** (commit `0941ee27d8179c83cb0e393f0b09b4f334a7dd58`) covered 30 issuers: 5 passed the current positive-EBIT, positive-invested-capital and EV-input gates; 25 were excluded. These are overlapping exclusion-reason counts, not mutually exclusive issuer groups:
+
+| Exclusion reason | Issuer count |
+|---|---:|
+| Enterprise-value candidate unavailable or non-positive | 13 |
+| Conventional debt inputs incomplete or ambiguous | 12 |
+| EBIT candidate missing or non-positive | 10 |
+| Invested-capital denominator unresolved or non-positive | 7 |
+| Direct operating-income candidate unavailable or ambiguous | 3 |
+| EdgarTools provider unsupported | 2 |
+
+Seven excluded issuers have positive EBIT and positive invested-capital candidates, but their conventional-debt / EV inputs remain incomplete: **BCRX, MNTN, PRDO, PXED, SBC, STRA and VXRT**. These are the most direct debt-policy review opportunities for expanding the shadow cohort. They are not approved ranking candidates until both maturity buckets and EV cash scope are resolved.
+
+### Suggested review order
+
+1. **SBC:** strongest near-term reconciliation candidate. The FY2025 face statement's $9.099046m current and $33.734438m noncurrent bank borrowings reconcile exactly to Note 15's $42.833484m principal schedule. The separate related-party notes are zero in both buckets. Review whether the current resolver can accept the two maturity-specific bank-borrowing rows without summing overlapping instruments.
+2. **MNTN:** named current short-term note payable and convertible debt are both explicitly zero after settlement; revolver was undrawn at year-end. Noncurrent debt completeness still needs to be established. Preserve the exact instrument-level evidence and do not infer company-wide zero.
+3. **PXED and STRA:** each has filing evidence of an undrawn revolving facility at the selected annual reporting date. This resolves only the named facility's drawn balance, not all possible debt categories or missing maturity buckets.
+4. **BCRX and VXRT:** conventional borrowing evidence must remain separate from substantial royalty-financing obligations. Decide whether those obligations belong in a debt-like EV category under a uniform policy; do not silently include or exclude them.
+5. **PRDO:** the $56.992m sale-leaseback financing arose from a failed sale-leaseback accounting treatment and recategorized construction financing. It requires a separate financing-obligation policy decision rather than a generic conventional-debt mapping.
+
+### Interpretation
+
+The five currently ranked issuers are not a production-ready cohort: every issuer still has accounting review flags and `production_approved=false`. The seven debt-blocked names above are research priorities only. No row is promoted to the resolver, no missing bucket is converted to zero, and no production fundamentals, EV, earnings yield, return on capital, eligibility or ranking is changed by this worklist.
