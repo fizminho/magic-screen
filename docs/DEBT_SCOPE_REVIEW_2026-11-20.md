@@ -125,3 +125,26 @@ The five current shadow-ranked companies were checked against the exact annual f
 - Do not fold restricted cash, customer escrow, leases, equity-method investments, marketable equity securities, or noncontrolling interests into EV inputs without an explicit and consistently applied policy.
 - Marketable debt securities at UPWK are a separate liquid-investment category. Their possible cash-like treatment must be decided consistently across the universe, not issuer-by-issuer.
 - These five checks are attached to the queue only for the exact accession. They remain `review_only`, are not resolver inputs, do not promote debt candidates, and do not alter production fundamentals or rankings.
+
+
+### EV sensitivity, not a policy decision
+
+Using the current shadow preview's market-cap snapshot and the same annual EBIT/debt/cash inputs, the following isolates the size of selected unresolved scope items. Amounts are USD; yields are EBIT divided by EV. The lease sensitivity simply adds reported operating lease liabilities to EV without adjusting EBIT, so it is deliberately a diagnostic only, not a consistent lease-capitalization methodology.
+
+| Stock | Current candidate EV | Candidate EY | EV with reported operating leases added | EY with leases added |
+|---|---:|---:|---:|---:|
+| OTEX | 10,260.305m | 10.551% | 10,462.342m | 10.348% |
+| SNDK | 107,013.700m | 11.577% | 107,214.700m | 11.555% |
+| IRWD | 1,159.074m | 8.498% | 1,172.196m | 8.403% |
+| QTTB | 163.891m | 10.313% | 168.834m | 10.011% |
+| UPWK | 1,226.374m | 10.544% | 1,236.081m | 10.461% |
+
+Additional isolated scope checks:
+
+- OTEX noncontrolling interests of 1.962m would add 1.962m to EV under a conventional consolidated-EV treatment, moving EY from 10.551% to approximately 10.549% before any lease adjustment.
+- UPWK's 378.425m marketable securities are separately presented and described as available for current operations. If a future, universe-wide policy explicitly treats these as cash-like, the illustrative EV would fall from 1,226.374m to 847.949m and EY would rise from 10.544% to approximately 15.249%. This is the most ranking-sensitive unresolved cash-scope item among the five.
+- Restricted cash and customer escrow are excluded from all these scenarios. No restricted balance is treated as freely available cash.
+- SNDK's 1,777m marketable equity securities and 678m Flash Ventures notes/investments are not equivalent to cash equivalents; they are not included in the cash-like scenario.
+- OTEX's near-zero invested-capital denominator remains the largest ROC sensitivity. The existing denominator diagnostics and P1 escalation remain in force.
+
+These figures are scenario arithmetic only. They do not change the five-stock shadow ranking, accounting approval state, or production data.
