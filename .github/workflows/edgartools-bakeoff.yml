@@ -11,6 +11,8 @@ on:
       - "config/us-mfi-accounting-policy-v1-proposed.json"
       - "scripts/validate_us_mfi_accounting_policy.py"
       - "scripts/test_validate_us_mfi_accounting_policy.py"
+      - "scripts/assess_us_mfi_policy_cohort.py"
+      - "scripts/test_assess_us_mfi_policy_cohort.py"
       - "scripts/validate_mfi_ranking_preview.py"
       - "scripts/test_validate_mfi_ranking_preview.py"
       - "scripts/validate_mfi_universe_coverage.py"
