@@ -296,6 +296,11 @@ jobs:
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
+      - name: Assess proposed policy across the full US MFI cohort
+        if: always() && hashFiles('accounting-review-queue.json') != '' && hashFiles('edgartools-mfi-ranking-preview.json') != ''
+        run: |
+          python -m unittest discover -s scripts -p "test_assess_us_mfi_policy_cohort.py" -v
+          python scripts/assess_us_mfi_policy_cohort.py
       - name: Build top-cohort ranking sensitivity report
         if: always() && hashFiles('edgartools-mfi-ranking-preview.json') != '' && hashFiles('accounting-review-queue.json') != ''
         run: python scripts/build_mfi_sensitivity_report.py
@@ -344,6 +349,8 @@ jobs:
             edgartools-resolver-preview.json
             accounting-review-queue.json
             accounting-review-queue.csv
+            us-mfi-policy-cohort-assessment.json
+            us-mfi-policy-cohort-assessment.md
             edgartools-mfi-ranking-preview.json
             edgartools-reconciliation-preview.json
             mfi-ranking-sensitivity.json
