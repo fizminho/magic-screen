@@ -386,3 +386,10 @@ The next implementation step is not to add these amounts to EV. First close the 
 Added a deterministic Node.js audit that reads the selected annual filing's balance-sheet rows and emits JSON/Markdown coverage for separately reported ROU assets and current/noncurrent lease liabilities. It also flags combined PP&E concepts that already include finance-lease ROU, preventing a second addition to net PP&E. The audit excludes dimensional breakdowns, binds values to each issuer's selected filing period, retains accession and currency, and leaves missing amounts unknown. It is coverage evidence only; it does not calculate an alternative invested-capital formula or change EV, ROC or rankings.
 
 The workflow now runs regression tests for the audit, builds the report from each extraction, and retains both outputs in the bakeoff artifact. The next full-universe run will quantify ROU/lease coverage and identify embedded-asset cases before any lease-inclusive sensitivity is designed. Operating lease expense / EBIT alignment, finance-lease treatment, current lease liabilities within working capital, and any debt-like EV treatment remain owner-policy decisions. Production writes and ranking changes remain disabled.
+
+
+## Lease/ROU audit regression and full-universe revalidation (22 November 2026)
+
+The first post-merge bakeoff run (44924152153) stopped during regression tests because the Markdown renderer did not print the explicit immutability flags asserted by its new test. The audit logic itself was not implicated. PR #21 adds the four flags to the report, and its Build workflow passed (run 44924274382). The main Build after merge also passed (run 44924344677).
+
+This documentation commit triggers a fresh full-universe bakeoff so the corrected test, annual filing extraction, raw evidence ingestion, and lease/ROU coverage artifact are validated together. Accept only the generated artifact's actual coverage counts. The report remains evidence-only: no lease/ROU formula, EV adjustment, EBIT adjustment, production fundamental or ranking is changed.
