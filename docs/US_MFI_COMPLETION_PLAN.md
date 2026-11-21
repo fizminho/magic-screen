@@ -59,6 +59,9 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 - Reuse only narrowly scoped, license-compatible ranking patterns. The MIT-licensed `bailewen/magicformula` repository is a reference for generic workflow ideas, not its FMP provider, TTM defaults or accounting heuristics.
 - Do not copy code from repositories without an explicit compatible license. Do not add another fundamentals provider or broad finance dependency while the resolver is under review.
 
+
+See [P1 issuer review register](US_MFI_P1_ISSUER_REVIEW_REGISTER.md) for accession-bound candidate values, the current nine P1 cases and the specific accounting questions to close. The register is evidence triage only; it does not approve any candidate or change production.
+
 ## Production decision packet
 
 See [US MFI production policy decisions](US_MFI_PRODUCTION_DECISION_PACKET.md) for the recommended default accounting and ranking policies, quantified ranking sensitivities, issuer-specific review points and the decisions that must be signed off before production cutover.
