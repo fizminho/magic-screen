@@ -1,4 +1,4 @@
-const PROMPT_VERSION = "gemini-accounting-review-v4";
+const PROMPT_VERSION = "gemini-accounting-review-v5";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const SUPPORTED_TEXT_MODELS = new Set([
@@ -95,7 +95,7 @@ export function groupGeminiAccountingFindings(findings, evidence) {
     groups.set(finding.classification, group);
   }
   return [...groups.entries()].map(([classification, items]) => {
-    const evidenceIds = [...new Set(items.map(item => item.evidence_id))];
+    const evidenceIds = [...new Set(items.flatMap(item => Array.isArray(item.evidence_ids) ? item.evidence_ids : [item.evidence_id]))];
     const supportingEvidence = evidenceIds.map(evidenceId => {
       const source = evidenceById.get(evidenceId) ?? {};
       return {
@@ -242,19 +242,28 @@ export function validateGeminiAccountingResponse(parsed, task, evidence) {
   if (!Array.isArray(parsed.findings) || parsed.findings.length > 20) {
     throw new Error("Gemini response contract error: findings must be an array containing at most 20 items");
   }
-  const ids = new Set();
+  const evidenceById = new Map();
   const collect = value => {
     if (!value || typeof value !== "object") return;
     if (Array.isArray(value)) return value.forEach(collect);
-    if (["filing_fact_candidate", "filing_note_candidate"].includes(value.source_kind) && typeof value.evidence_id === "string") ids.add(value.evidence_id);
+    if (["filing_fact_candidate", "filing_note_candidate"].includes(value.source_kind) && typeof value.evidence_id === "string") evidenceById.set(value.evidence_id, value);
     Object.values(value).forEach(collect);
   };
   collect(evidence);
+  const ids = new Set(evidenceById.keys());
   const findings = parsed.findings.map((item, index) => {
     const prefix = "Gemini finding " + index + " contract error: ";
     if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(prefix + "finding must be an object");
     if (typeof item.evidence_id !== "string" || !ids.has(item.evidence_id)) {
       throw new Error(prefix + "evidence_id is missing or not in the supplied evidence allowlist");
+    }
+    const evidenceIds = Array.isArray(item.evidence_ids) ? [...new Set(item.evidence_ids)] : [item.evidence_id];
+    if (!evidenceIds.includes(item.evidence_id) || evidenceIds.some(id => typeof id !== "string" || !ids.has(id))) {
+      throw new Error(prefix + "evidence_ids must contain the primary evidence_id and only supplied filing evidence IDs");
+    }
+    const rationaleIds = [...new Set(item.rationale.match(/\\b[a-z][a-z0-9_]*:\\d+\\b/gi) ?? [])];
+    if (rationaleIds.some(id => !ids.has(id) || !evidenceIds.includes(id))) {
+      throw new Error(prefix + "every filing evidence ID cited in rationale must be included in evidence_ids and the supplied evidence allowlist");
     }
     if (!CLASSIFICATIONS.has(item.classification)) {
       throw new Error(prefix + "classification is missing or not in the allowed classification list");
@@ -265,12 +274,38 @@ export function validateGeminiAccountingResponse(parsed, task, evidence) {
     if (!["low", "medium", "high"].includes(item.confidence)) {
       throw new Error(prefix + "confidence must be low, medium, or high");
     }
-    return { evidence_id: item.evidence_id, classification: item.classification, rationale: item.rationale, confidence: item.confidence };
+    return { evidence_id: item.evidence_id, evidence_ids: evidenceIds, classification: item.classification, rationale: item.rationale, confidence: item.confidence };
   });
   const questions = Array.isArray(parsed.unresolved_questions)
     ? parsed.unresolved_questions.slice(0, 8).map(x => String(x).slice(0, 400)) : [];
   return { task, status: parsed.status, summary: parsed.summary, findings, unresolved_questions: questions,
     production_approved: false, production_write: false };
+}
+
+export function reconcileGeminiCrossTaskFindings(currentFindings, priorReviews) {
+  const priorClassificationByEvidence = new Map();
+  for (const review of priorReviews ?? []) {
+    for (const finding of review?.findings ?? []) {
+      const ids = Array.isArray(finding.evidence_ids) ? finding.evidence_ids : [finding.evidence_id];
+      for (const id of ids) {
+        if (typeof id !== "string") continue;
+        const classifications = priorClassificationByEvidence.get(id) ?? new Set();
+        classifications.add(finding.classification);
+        priorClassificationByEvidence.set(id, classifications);
+      }
+    }
+  }
+  const conflicts = [];
+  for (const finding of currentFindings ?? []) {
+    const ids = Array.isArray(finding.evidence_ids) ? finding.evidence_ids : [finding.evidence_id];
+    for (const id of ids) {
+      const prior = priorClassificationByEvidence.get(id);
+      if (prior && [...prior].some(classification => classification !== finding.classification)) {
+        conflicts.push({ evidence_id: id, current_classification: finding.classification, prior_classifications: [...prior] });
+      }
+    }
+  }
+  return conflicts;
 }
 
 export async function runGeminiAccountingReview(env, input) {
@@ -335,7 +370,7 @@ export async function runGeminiAccountingReview(env, input) {
     "Findings may cite ONLY evidence objects marked source_kind=filing_fact_candidate or source_kind=filing_note_candidate. Resolver summaries are context only and MUST NOT be cited as filing evidence or treated as independent reported facts. Cite each finding with an exact evidence_id from the explicit filing-evidence allowlist below. Never invent, shorten, rename, or reconstruct an evidence ID. If no filing-fact evidence supports a finding, return no finding for it and explain the gap in unresolved_questions.",
     "This is a review proposal only. Never approve production values, alter MFI formulas, or recommend a stock.",
     "Return strict JSON only with exactly these top-level fields: task, status, summary, findings, unresolved_questions.",
-    "Each finding must contain exactly: evidence_id (string), classification (one allowed value), rationale (non-empty string), confidence (low, medium, or high).",
+    "Each finding must contain exactly: evidence_id (primary string), evidence_ids (array containing every filing evidence ID used, including IDs mentioned in rationale), classification (one allowed value), rationale (non-empty string), confidence (low, medium, or high). If the rationale refers to a filing note or fact by ID, that exact ID MUST appear in evidence_ids. Do not cite evidence that is not listed there.",
     "Allowed status: ACCEPTED_CANDIDATE, REVIEW_REQUIRED, CONFLICTING_EVIDENCE, INSUFFICIENT_EVIDENCE, NOT_APPLICABLE.",
     "Allowed classification: conventional_debt, lease_liability, finance_lease_liability, operating_lease_liability, failed_sale_leaseback_financing, supplier_finance, vendor_financing, factoring, receivables_financing, royalty_financing, tax_receivable_agreement, restricted_cash, unrestricted_cash, customer_funds, escrow, short_term_investment, noncontrolling_interest, operating_liability, other_financing_or_liability, unknown.",
     "Valid filing-evidence evidence_id allowlist: " + JSON.stringify([...new Set([...serializedEvidence.matchAll(/\{"evidence_id":"([^"]+)","source_kind":"(?:filing_fact_candidate|filing_note_candidate)"/g)].map(match => match[1]))].sort()),
@@ -398,7 +433,21 @@ export async function runGeminiAccountingReview(env, input) {
   try { parsed = JSON.parse(text.trim().replace(/^\u0060{3}(?:json)?\s*/i, "").replace(/\s*\u0060{3}$/, "")); }
   catch { throw new Error("Gemini returned invalid JSON for the accounting review contract"); }
   const validated = validateGeminiAccountingResponse(parsed, input.task, evidence);
-    const normalized = { ...validated, findings: groupGeminiAccountingFindings(validated.findings, evidence) };
+    let normalized = { ...validated, findings: groupGeminiAccountingFindings(validated.findings, evidence) };
+    const priorReviewsResult = await env.DB.prepare("SELECT response_json FROM " + cacheTable + " WHERE symbol=? AND accession=? AND task<>?")
+      .bind(input.symbol, input.accession, input.task).all();
+    const priorReviews = (priorReviewsResult?.results ?? []).map(row => {
+      try { return JSON.parse(row.response_json); } catch { return null; }
+    }).filter(Boolean);
+    const crossTaskConflicts = reconcileGeminiCrossTaskFindings(normalized.findings, priorReviews);
+    if (crossTaskConflicts.length) {
+      normalized = { ...normalized, status: "CONFLICTING_EVIDENCE",
+        summary: (normalized.summary + " Cross-task evidence reconciliation found conflicting classifications; manual review is required.").slice(0, 1200),
+        unresolved_questions: [...normalized.unresolved_questions, ...crossTaskConflicts.map(item =>
+          "Evidence " + item.evidence_id + " is classified as " + item.current_classification + " here but as " +
+          item.prior_classifications.join(" / ") + " in another accounting review.")].slice(0, 8),
+        cross_task_conflicts: crossTaskConflicts };
+    }
     const result = { ...normalized, symbol: input.symbol, accession: input.accession, fiscal_period: input.fiscalPeriod,
       model, attempts: modelFailures.length + 1, ...(modelFailures.length ? { model_fallbacks: modelFailures } : {}),
       cached: false, input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,

@@ -236,3 +236,47 @@ test("reserves a shared request slot in D1 and defaults to a conservative six re
   assert.match(statements[1], /ON CONFLICT\(gate_key\) DO UPDATE/);
   assert.match(statements[1], /RETURNING next_allowed_at - \? AS scheduled_at/);
 });
+
+
+test("requires every filing evidence ID cited in rationale to be explicitly supported", async () => {
+  const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
+  const evidence = { categories: { financing: { candidates: [
+    { evidence_id: "nondebt_financing_obligation:0", source_kind: "filing_fact_candidate" }
+  ] } }, filing_note_candidates: [
+    { evidence_id: "filing_note:1", source_kind: "filing_note_candidate" }
+  ] };
+  const finding = { evidence_id: "nondebt_financing_obligation:0", evidence_ids: ["nondebt_financing_obligation:0"],
+    classification: "failed_sale_leaseback_financing",
+    rationale: "Filing note filing_note:1 confirms failed sale-leaseback treatment.", confidence: "high" };
+  const base = { task: "financing_scope", status: "ACCEPTED_CANDIDATE", summary: "Supported.", findings: [finding], unresolved_questions: [] };
+  assert.throws(() => validateGeminiAccountingResponse(base, "financing_scope", evidence), /every filing evidence ID cited in rationale/);
+  const accepted = validateGeminiAccountingResponse({ ...base, findings: [{ ...finding,
+    evidence_ids: ["nondebt_financing_obligation:0", "filing_note:1"] }] }, "financing_scope", evidence);
+  assert.deepEqual(accepted.findings[0].evidence_ids, ["nondebt_financing_obligation:0", "filing_note:1"]);
+});
+
+test("grouping preserves all primary and supporting evidence IDs", async () => {
+  const { groupGeminiAccountingFindings } = await import("./gemini-accounting-review.mjs");
+  const evidence = { categories: { financing: { candidates: [
+    { evidence_id: "fact:0", source_kind: "filing_fact_candidate", value: 56 }
+  ] } }, filing_note_candidates: [
+    { evidence_id: "filing_note:1", source_kind: "filing_note_candidate", excerpt: "Failed sale-leaseback." }
+  ] };
+  const grouped = groupGeminiAccountingFindings([{ evidence_id: "fact:0", evidence_ids: ["fact:0", "filing_note:1"],
+    classification: "failed_sale_leaseback_financing", rationale: "Note filing_note:1 supports classification.", confidence: "high" }], evidence);
+  assert.deepEqual(grouped[0].evidence_ids, ["fact:0", "filing_note:1"]);
+  assert.deepEqual(grouped[0].supporting_evidence.map(item => item.evidence_id), ["fact:0", "filing_note:1"]);
+});
+
+test("cross-task reconciliation flags one evidence ID classified differently", async () => {
+  const { reconcileGeminiCrossTaskFindings } = await import("./gemini-accounting-review.mjs");
+  const conflicts = reconcileGeminiCrossTaskFindings([
+    { evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }
+  ], [{ findings: [{ evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "lease_liability" }] }]);
+  assert.equal(conflicts.length, 1);
+  assert.equal(conflicts[0].evidence_id, "fact:0");
+  assert.deepEqual(conflicts[0].prior_classifications, ["lease_liability"]);
+  assert.deepEqual(reconcileGeminiCrossTaskFindings([
+    { evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }
+  ], [{ findings: [{ evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }] }]), []);
+});
