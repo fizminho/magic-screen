@@ -816,6 +816,88 @@ class AccountingReviewQueueTests(unittest.TestCase):
                 self.assertFalse(review["cash_candidate_promoted"])
                 self.assertIsNone(filing_ev_scope_note_review(symbol, "different-accession"))
 
+    def test_cash_policy_tags_use_controlled_values_and_cover_all_reviewed_issuers(self):
+        from build_accounting_review_queue import (
+            FILING_EV_CASH_POLICY_TAGS, FILING_EV_SCOPE_NOTE_REVIEWS,
+            filing_ev_scope_note_review,
+        )
+
+        self.assertEqual(set(FILING_EV_CASH_POLICY_TAGS), set(FILING_EV_SCOPE_NOTE_REVIEWS))
+        allowed_maturity = {
+            "on_demand", "not_applicable_cash_balance", "within_12_months",
+            "3_to_12_months", "over_12_months", "1_to_2_years", "1_to_3_years",
+            "1_to_5_years", "over_12_months_possible",
+            "mixed_or_security_level_detail_required", "combined_cash_and_investment_schedule",
+            "not_disclosed_in_review",
+        }
+        for symbol, source in FILING_EV_SCOPE_NOTE_REVIEWS.items():
+            with self.subTest(symbol=symbol):
+                review = filing_ev_scope_note_review(symbol, source["accession"])
+                tags = review["cash_policy_dimensions"]
+                self.assertTrue(tags["maturity_buckets"])
+                self.assertTrue(tags["credit_quality"])
+                self.assertTrue(tags["availability"])
+                self.assertTrue(set(tags["maturity_buckets"]).issubset(allowed_maturity))
+                self.assertFalse(review["production_approved"])
+                self.assertFalse(review["resolver_input"])
+                self.assertFalse(review["cash_candidate_promoted"])
+
+    def test_cash_policy_summary_counts_tag_dimensions(self):
+        from build_accounting_review_queue import build_queue
+
+        preview = {"resolutions": [
+            {"symbol": "UPWK", "accession": "0001627475-26-000012",
+             "provider_status": "supported", "enterprise_value_candidate_review": {}},
+        ]}
+        raw = {"companies": [{
+            "symbol": "UPWK", "filing": {"accession_number": "0001627475-26-000012"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31", "categories": {}},
+            "statements": {"balance_sheet": {"rows": []}},
+        }]}
+        summary = build_queue(preview, raw)["summary"]
+        self.assertEqual(summary["filing_ev_scope_policy_dimensions_complete"], 1)
+        self.assertGreater(summary["cash_policy_unresolved_questions"], 0)
+        self.assertIn("not_disclosed_in_review", summary["cash_policy_maturity_bucket_tags"])
+        self.assertIn("not_disclosed_in_review", summary["cash_policy_credit_quality_tags"])
+
+    def test_ev_cash_policy_dimensions_are_structured_and_complete(self):
+        from build_accounting_review_queue import (
+            FILING_EV_CASH_POLICY_DIMENSIONS, FILING_EV_SCOPE_NOTE_REVIEWS,
+            filing_ev_scope_note_review,
+        )
+
+        self.assertEqual(set(FILING_EV_CASH_POLICY_DIMENSIONS), set(FILING_EV_SCOPE_NOTE_REVIEWS))
+        required = {
+            "instrument_types", "issuer_cash_equivalent_definition", "maturity_profile",
+            "liquidity_evidence", "restriction_or_encumbrance",
+            "provisional_mfi_treatment", "unresolved_questions",
+            "maturity_buckets", "credit_quality", "availability",
+        }
+        for symbol, source in FILING_EV_SCOPE_NOTE_REVIEWS.items():
+            with self.subTest(symbol=symbol):
+                review = filing_ev_scope_note_review(symbol, source["accession"])
+                self.assertTrue(review["cash_policy_dimensions_complete"])
+                self.assertEqual(set(review["cash_policy_dimensions"]), required)
+                self.assertTrue(review["cash_policy_dimensions"]["instrument_types"])
+                self.assertTrue(review["cash_policy_dimensions"]["unresolved_questions"])
+                self.assertFalse(review["production_approved"])
+                self.assertFalse(review["resolver_input"])
+                self.assertFalse(review["cash_candidate_promoted"])
+
+    def test_upwk_policy_dimensions_keep_marketable_securities_and_customer_escrow_separate(self):
+        from build_accounting_review_queue import filing_ev_scope_note_review
+
+        review = filing_ev_scope_note_review("UPWK", "0001627475-26-000012")
+        dimensions = review["cash_policy_dimensions"]
+        self.assertIn("378.425m marketable securities", dimensions["provisional_mfi_treatment"])
+        self.assertIn("180.752m matched customer escrow", dimensions["provisional_mfi_treatment"])
+        self.assertIn("maturity", dimensions["unresolved_questions"][0])
+
+    def test_cash_policy_dimensions_do_not_attach_to_a_different_accession(self):
+        from build_accounting_review_queue import filing_ev_scope_note_review
+
+        self.assertIsNone(filing_ev_scope_note_review("UPWK", "0001627475-26-999999"))
+
     def test_queue_attaches_ev_scope_note_review_only_for_matching_accession(self):
         preview = {
             "production_fundamentals_changed": False, "rankings_changed": False,

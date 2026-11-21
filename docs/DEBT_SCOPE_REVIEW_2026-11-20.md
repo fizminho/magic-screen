@@ -279,3 +279,27 @@ Each category includes candidate status, candidate count, reported candidate val
 This is particularly important for issuers such as UPWK, where the $378.425m marketable-securities portfolio is distinct from $294.356m cash and cash equivalents, and SGHC, where reported cash-equivalent balances include processor and earmarked balances requiring availability review. The tool must not treat a marketable-securities balance as cash simply because it is liquid or available for current operations.
 
 The diagnostics are not resolver inputs, do not promote cash candidates, do not approve EV policy, and do not change production fundamentals, ratios or rankings.
+
+
+## Structured cash-policy evidence matrix (21 Nov 2026)
+
+The nine issuer-specific cash and investment reviews now carry a common structured schema alongside their source observations:
+
+- **Instrument types:** money-market funds, Treasury bills, government agency securities, commercial paper, corporate bonds, term deposits and other identified instruments.
+- **Issuer definition:** the issuer's own cash-equivalent maturity convention and presentation.
+- **Maturity profile:** current/noncurrent or stated contractual maturity bands, without treating balance-sheet current classification as proof of cash equivalence.
+- **Liquidity evidence:** marketability, settlement access and issuer statements about availability for current operations.
+- **Restrictions / encumbrances:** regulatory minimums, earmarking, pledges, customer escrow and other limitations.
+- **Provisional MFI treatment:** keep separately presented marketable investments outside unrestricted cash until a common policy is approved.
+- **Unresolved questions:** the remaining evidence needed before any future policy decision.
+
+Coverage includes SGHC, FHTX, NRIX, PXED, STRA, ALEC, PLTK, ZVRA and UPWK. The queue summary counts complete structured reviews and outstanding questions. Evidence is attached only when the extracted accession exactly matches the resolver preview accession.
+
+This is a research and triage layer, not a policy engine. It does not change EV cash deductions, candidate earnings yield, MFI ranking eligibility, resolver inputs or production data. No investment is promoted to cash-like status by this change.
+
+
+### Controlled comparison tags
+
+The structured review now also exposes controlled, multi-value tags for maturity bands, credit-quality evidence and liquidity/availability constraints. Tags preserve uncertainty rather than filling gaps: for example, UPWK's instrument-level maturity and credit-quality details remain explicitly undisclosed in this review, while ALEC's combined cash-and-investment maturity schedule is tagged as combined rather than misattributed to marketable securities alone.
+
+The queue summary reports tag distributions across accession-matched issuer reviews. These distributions are descriptive coverage metrics only; they do not imply that current securities are cash-equivalent, that investment-grade assets are unrestricted, or that any issuer's candidate cash deduction is approved.

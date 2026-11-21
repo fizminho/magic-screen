@@ -503,13 +503,167 @@ FILING_EV_SCOPE_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
 }
 
 
+
+# Structured, issuer-specific cash-equivalent policy dimensions. These fields
+# summarize cited annual filing evidence; they are not accounting approvals.
+FILING_EV_CASH_POLICY_DIMENSIONS: dict[str, dict[str, Any]] = {
+    "SGHC": {
+        "instrument_types": ["cash_in_transit", "bank_balances", "processor_wallet_balances"],
+        "issuer_cash_equivalent_definition": "Reported cash and cash equivalents; bank balances include processor wallets accessible on demand.",
+        "maturity_profile": "Cash and on-demand balances; no separate marketable-securities maturity portfolio in this review.",
+        "liquidity_evidence": "129m processor wallet balances are stated accessible on demand; 45m cash in transit and 468m bank balances.",
+        "restriction_or_encumbrance": "19m designated regulatory accounts with minimum-balance expectations; 12m CSR earmarked; separate 6m user-segregated cash.",
+        "provisional_mfi_treatment": "Keep reported 513m cash-equivalent face balance as the review candidate; separately assess regulatory and CSR availability; exclude user-segregated funds.",
+        "unresolved_questions": ["Are regulatory minimums legally or operationally unavailable at the reporting date?", "Confirm whether separate 6m user cash is already excluded from 513m total."],
+    },
+    "FHTX": {
+        "instrument_types": ["us_government_agency_securities", "commercial_paper", "corporate_notes_and_bonds"],
+        "issuer_cash_equivalent_definition": "Cash equivalents use original maturities of three months or less.",
+        "maturity_profile": "Marketable securities may have maturities beyond one year while remaining classified short-term due to liquidity and current-operations availability.",
+        "liquidity_evidence": "Issuer describes the available-for-sale portfolio as highly liquid and available for current operations.",
+        "restriction_or_encumbrance": "Restricted cash is separately pledged as collateral for lease-related letters of credit.",
+        "provisional_mfi_treatment": "Keep 78.018m marketable securities separate from cash equivalents; exclude pledged restricted cash.",
+        "unresolved_questions": ["Instrument-level contractual maturity and settlement timing for each security.", "Whether any balances are subject to sale, transfer or regulatory restrictions."],
+    },
+    "NRIX": {
+        "instrument_types": ["us_treasury_securities", "money_market_funds"],
+        "issuer_cash_equivalent_definition": "Money market funds are included in cash equivalents; Treasury portfolio is separately presented as available-for-sale marketable securities.",
+        "maturity_profile": "345.981m Treasury securities; contractual maturities greater than 12 months are classified long-term.",
+        "liquidity_evidence": "Treasury securities are marketable; 241.364m money market funds are separately included in cash and cash equivalents.",
+        "restriction_or_encumbrance": "No specific encumbrance identified in this review; verify restrictions at the filing date.",
+        "provisional_mfi_treatment": "Do not combine Treasury securities with cash equivalents until a uniform maturity and liquidity rule is approved.",
+        "unresolved_questions": ["Security-by-security maturity and settlement data for the current tranche.", "Confirm absence of pledges or other restrictions."],
+    },
+    "PXED": {
+        "instrument_types": ["us_treasury_securities", "us_agency_securities", "commercial_paper", "corporate_debt_securities"],
+        "issuer_cash_equivalent_definition": "Investments with original maturities greater than three months are marketable securities rather than cash equivalents.",
+        "maturity_profile": "137.094m current with remaining maturities up to 12 months; 30.758m noncurrent; portfolio maturities within three years.",
+        "liquidity_evidence": "Investment grade, but issuer says deployability is constrained by Department of Education financial-responsibility composite-score requirements.",
+        "restriction_or_encumbrance": "Regulatory financial-responsibility requirements constrain available liquidity; 4.516m restricted cash is separate.",
+        "provisional_mfi_treatment": "Keep all 167.852m marketable securities separate; do not assume regulatory-constrained liquidity is freely deployable.",
+        "unresolved_questions": ["Quantify which securities are available for general corporate use after regulatory constraints.", "Determine maturity and settlement profile by instrument."],
+    },
+    "STRA": {
+        "instrument_types": ["term_deposits", "us_treasury_securities", "corporate_debt_securities"],
+        "issuer_cash_equivalent_definition": "Portfolio is held-to-maturity, not reported as cash equivalents in this review.",
+        "maturity_profile": "7.297m due within one year; 5.000m due after one year through five years.",
+        "liquidity_evidence": "Investment grade, but issuer states it does not intend or expect to need to sell before maturity.",
+        "restriction_or_encumbrance": "No specific pledge identified; held-to-maturity classification and intent limit assumptions about immediate deployment.",
+        "provisional_mfi_treatment": "Keep the full 12.297m held-to-maturity portfolio separate from unrestricted cash.",
+        "unresolved_questions": ["Confirm any early withdrawal or sale constraints on term deposits.", "Assess whether any portion meets a future uniform short-maturity cash-like rule."],
+    },
+    "ALEC": {
+        "instrument_types": ["money_market_funds", "us_treasury_securities", "corporate_bonds", "certificates_of_deposit", "commercial_paper"],
+        "issuer_cash_equivalent_definition": "Cash equivalents and marketable securities are separately presented; marketable securities are available-for-sale.",
+        "maturity_profile": "Combined cash-equivalent and marketable-securities table includes 214.4m within one year and 41.0m from one to two years; do not attribute combined totals solely to marketable securities.",
+        "liquidity_evidence": "Issuer describes the portfolio as available for current operations and carried at fair value.",
+        "restriction_or_encumbrance": "1.846m restricted cash separately reported.",
+        "provisional_mfi_treatment": "Keep 190.222m marketable securities separate; do not use combined maturity totals as if they describe only marketable securities.",
+        "unresolved_questions": ["Obtain instrument-level maturity split excluding cash equivalents.", "Confirm any portfolio-specific restrictions."],
+    },
+    "PLTK": {
+        "instrument_types": ["term_deposits", "commercial_paper"],
+        "issuer_cash_equivalent_definition": "Cash equivalents are highly liquid investments with maturities of three months or less; short-term investments exceed three months and are less than one year.",
+        "maturity_profile": "136.0m short-term investments: 71.8m term deposits and 64.2m commercial paper, with stated maturities greater than three months and less than one year.",
+        "liquidity_evidence": "Investment policy imposes maturity limits and permits bank deposits and highly rated fixed-income securities.",
+        "restriction_or_encumbrance": "No specific encumbrance identified in this review; verify security-level restrictions.",
+        "provisional_mfi_treatment": "Keep the 136.0m portfolio separate from cash equivalents under the issuer's own three-month definition.",
+        "unresolved_questions": ["Confirm instrument-level maturity dates and settlement access.", "Confirm whether any deposits are pledged or subject to withdrawal penalties."],
+    },
+    "ZVRA": {
+        "instrument_types": ["us_treasury_securities", "corporate_bonds"],
+        "issuer_cash_equivalent_definition": "Available-for-sale investment securities are separately presented from cash equivalents.",
+        "maturity_profile": "128.605m current due within one year; 47.879m noncurrent due in one to three years.",
+        "liquidity_evidence": "Securities are carried at fair value; issuer invests excess cash to fund future operations.",
+        "restriction_or_encumbrance": "No specific pledge identified in this review; verify restrictions at the reporting date.",
+        "provisional_mfi_treatment": "Keep all 176.484m separate; the one-to-three-year noncurrent tranche is not cash-like by default.",
+        "unresolved_questions": ["Determine whether current securities satisfy a future uniform short-maturity rule.", "Confirm instrument-level settlement and encumbrance details."],
+    },
+    "UPWK": {
+        "instrument_types": ["money_market_funds", "commercial_paper", "treasury_bills", "corporate_bonds", "other_fixed_income"],
+        "issuer_cash_equivalent_definition": "Marketable securities are separately presented from cash and cash equivalents.",
+        "maturity_profile": "Exact instrument-level maturity mix is not identified in this review; portfolio contains potentially short- and longer-duration instruments.",
+        "liquidity_evidence": "Issuer describes securities as available for current operations, but face-row disclosure does not establish composition or maturity eligibility.",
+        "restriction_or_encumbrance": "3.8m restricted cash; 180.752m customer escrow and funds in transit matched by escrow-funds-payable liability.",
+        "provisional_mfi_treatment": "Keep 378.425m marketable securities separate from 294.356m cash and cash equivalents; exclude 3.8m restricted cash and 180.752m matched customer escrow.",
+        "unresolved_questions": ["Obtain instrument-level composition, maturity and settlement data.", "Confirm whether any portfolio balances are pledged or otherwise restricted."],
+    },
+}
+
+
+# Controlled tags make the free-text filing notes comparable across issuers.
+FILING_EV_CASH_POLICY_TAGS: dict[str, dict[str, list[str]]] = {
+    "SGHC": {
+        "maturity_buckets": ["on_demand", "not_applicable_cash_balance"],
+        "credit_quality": ["not_applicable_cash_balance"],
+        "availability": ["on_demand_access", "regulatory_or_earmarked_balances_present"],
+    },
+    "FHTX": {
+        "maturity_buckets": ["mixed_or_security_level_detail_required", "over_12_months_possible"],
+        "credit_quality": ["mixed_or_not_fully_disclosed"],
+        "availability": ["available_for_current_operations", "restricted_cash_separately_pledged"],
+    },
+    "NRIX": {
+        "maturity_buckets": ["within_12_months", "over_12_months"],
+        "credit_quality": ["us_government_obligations"],
+        "availability": ["marketable_subject_to_settlement", "cash_equivalents_separately_reported"],
+    },
+    "PXED": {
+        "maturity_buckets": ["within_12_months", "1_to_3_years"],
+        "credit_quality": ["investment_grade"],
+        "availability": ["regulatory_or_earmarked_balances_present", "restricted_cash_separately_reported"],
+    },
+    "STRA": {
+        "maturity_buckets": ["within_12_months", "1_to_5_years"],
+        "credit_quality": ["investment_grade"],
+        "availability": ["held_to_maturity_no_intent_to_sell"],
+    },
+    "ALEC": {
+        "maturity_buckets": ["within_12_months", "1_to_2_years", "combined_cash_and_investment_schedule"],
+        "credit_quality": ["mixed_or_not_fully_disclosed"],
+        "availability": ["available_for_current_operations", "restricted_cash_separately_reported"],
+    },
+    "PLTK": {
+        "maturity_buckets": ["3_to_12_months"],
+        "credit_quality": ["highly_rated_fixed_income_policy"],
+        "availability": ["short_term_investments_separately_reported"],
+    },
+    "ZVRA": {
+        "maturity_buckets": ["within_12_months", "1_to_3_years"],
+        "credit_quality": ["mixed_or_not_fully_disclosed"],
+        "availability": ["available_for_future_operations", "settlement_timing_requires_review"],
+    },
+    "UPWK": {
+        "maturity_buckets": ["not_disclosed_in_review", "mixed_or_security_level_detail_required"],
+        "credit_quality": ["not_disclosed_in_review"],
+        "availability": ["issuer_says_available_for_current_operations", "customer_funds_and_restricted_cash_excluded"],
+    },
+}
+
 def filing_ev_scope_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
     """Attach issuer cash/investment note evidence only to its exact annual filing."""
     review = FILING_EV_SCOPE_NOTE_REVIEWS.get(symbol)
     if not review or not accession or review["accession"] != accession:
         return None
+    dimensions = FILING_EV_CASH_POLICY_DIMENSIONS.get(symbol)
+    if not dimensions:
+        return None
+    combined_dimensions = {
+        **dimensions,
+        **FILING_EV_CASH_POLICY_TAGS[symbol],
+    }
+    required_dimensions = (
+        "instrument_types", "issuer_cash_equivalent_definition", "maturity_profile",
+        "liquidity_evidence", "restriction_or_encumbrance",
+        "provisional_mfi_treatment", "unresolved_questions",
+        "maturity_buckets", "credit_quality", "availability",
+    )
     return {
         **review,
+        "cash_policy_dimensions": combined_dimensions,
+        "cash_policy_dimensions_complete": all(
+            combined_dimensions.get(key) for key in required_dimensions
+        ),
         "status": "review_only",
         "source": "curated_primary_annual_filing_cash_investment_note_review",
         "production_approved": False,
@@ -887,6 +1041,29 @@ def build_queue(
                 for row in rows for bucket in ("unrestricted_cash", "restricted_cash", "short_term_investments")
             )),
             "filing_ev_scope_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_ev_scope_note_review")),
+            "filing_ev_scope_policy_dimensions_complete": sum(
+                1 for row in rows
+                if (row.get("filing_ev_scope_note_review") or {}).get("cash_policy_dimensions_complete") is True
+            ),
+            "cash_policy_unresolved_questions": sum(
+                len((row.get("filing_ev_scope_note_review") or {}).get("cash_policy_dimensions", {}).get("unresolved_questions", []))
+                for row in rows
+            ),
+            "cash_policy_maturity_bucket_tags": dict(Counter(
+                tag
+                for row in rows
+                for tag in ((row.get("filing_ev_scope_note_review") or {}).get("cash_policy_dimensions", {}).get("maturity_buckets") or [])
+            )),
+            "cash_policy_credit_quality_tags": dict(Counter(
+                tag
+                for row in rows
+                for tag in ((row.get("filing_ev_scope_note_review") or {}).get("cash_policy_dimensions", {}).get("credit_quality") or [])
+            )),
+            "cash_policy_availability_tags": dict(Counter(
+                tag
+                for row in rows
+                for tag in ((row.get("filing_ev_scope_note_review") or {}).get("cash_policy_dimensions", {}).get("availability") or [])
+            )),
             "ev_scope_classification_rows": dict(Counter(
                 category
                 for row in rows for evidence in ((row.get("ev_scope_evidence") or {}).get("rows") or [])
