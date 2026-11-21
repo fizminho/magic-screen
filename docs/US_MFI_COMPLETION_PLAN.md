@@ -39,7 +39,7 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 |---|---|---|
 | A. Universe integrity | **Complete** | 30-symbol active US cohort, top 30 / $50m minimum, dynamic quote-date-aligned market caps and uniqueness checks |
 | B. Extraction and ingestion | **Complete** | Full run accepted 31/31 records including ADBE regression control; 28 supported, 2 explicitly unsupported, 0 awaiting evidence |
-| C. Accounting resolver | **Review pending** | Deterministic resolver and issuer evidence queue exist; 23 active-universe companies still need accounting/valuation review and the five ranked candidates remain unapproved |
+| C. Accounting resolver | **Review pending** | Deterministic resolver and issuer evidence queue exist; 26 supported issuers remain in accounting/valuation review; two are shadow-eligible but unranked because the five-name minimum is not met |
 | D. Shadow MFI | **Complete for shadow** | Classic ordinal rank sum, tie handling, minimum cohort, independent artifact validator and coverage accounting all pass |
 | E. Runtime migration | **In progress** | Side-by-side legacy Company Facts vs EdgarTools EY/ROC is displayed; per-issuer differences and rollback/cutover still need approval |
 | F. Production release | **Blocked** | Requires accounting policy sign-off, issuer review closure, legacy reconciliation and explicit release approval |
@@ -48,7 +48,7 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 
 - Confirm active MFI cohort and configured minimum market-cap/top-N settings against the source screener. The 30-symbol artifact is a cohort snapshot, not proof of full market coverage.
 - A successful scheduled/manual run is required to prove dynamic universe discovery and raw evidence ingestion; push CI is regression-only.
-- The latest sample had 28 supported issuers requiring accounting review; five shadow candidates were rankable but none production-approved.
+- The latest accepted full-universe run has 28 supported issuers: 2 shadow-eligible but unranked and 26 in accounting/valuation review; none production-approved.
 - Legacy Company Facts runtime remains alongside the EdgarTools evidence lane. Do not remove it or redirect production writes until side-by-side reconciliation is complete.
 - Keep market-cap freshness and quote-date alignment under CI validation; the dynamic source handoff is implemented and must remain covered by scheduled runs.
 - Keep unsupported-provider and accounting exclusions visible in coverage summaries.
@@ -64,7 +64,7 @@ See [P1 issuer review register](US_MFI_P1_ISSUER_REVIEW_REGISTER.md) for accessi
 
 ## Production decision packet
 
-See [US MFI production policy decisions](US_MFI_PRODUCTION_DECISION_PACKET.md) for the recommended default accounting and ranking policies, quantified ranking sensitivities, issuer-specific review points and the decisions that must be signed off before production cutover.
+See [US MFI production policy decisions](US_MFI_PRODUCTION_DECISION_PACKET.md) for the recommended default accounting and ranking policies, quantified ranking sensitivities, issuer-specific review points and the decisions that must be signed off before production cutover. See [US MFI lease and cash policy recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md) for the framework-aware lease proposal and security-level cash-like test.
 
 ## Safety boundary
 
@@ -465,3 +465,7 @@ Run **44926317787** completed successfully: https://github.com/fizminho/magic-sc
 The two shadow-eligible review-only candidates are **IRWD and SNDK**. The proposed minimum cohort is five, so the ranked output remains withheld. The 26 supported issuers outside eligibility remain in accounting/valuation review; the two unsupported names remain visible exclusions. All 31 raw records were ingested. The artifact confirms production_fundamentals_changed=false and rankings_changed=false; no production fundamentals, ratios, EV, ROC or rankings were modified.
 
 **Lease audit correction:** active-cohort counts exclude ADBE, which remains separately reported as an extraction regression control. Do not add embedded finance-lease ROU a second time to PP&E. SGHC's IFRS lease types remain unspecified. PRDO's unvalued aggregate ROU concept remains unknown and is not substituted for its separately valued operating and finance ROU assets.
+
+## Next policy decision packet (22 November 2026)
+
+The next accounting-owner review is the framework-aware lease and cash proposal in [US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md). No code or policy v1 change is authorized until the owner approves the US GAAP operating/finance split, IFRS 16 treatment, current financing-liability convention in invested capital, embedded ROU handling and marketable-security cash-like test.
