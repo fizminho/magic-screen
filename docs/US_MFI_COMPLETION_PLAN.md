@@ -396,3 +396,6 @@ This documentation commit triggers a fresh full-universe bakeoff so the correcte
 
 
 The first full-universe attempt after the initial Markdown fix (run 44924509279) exposed a second assertion mismatch: the report printed human-readable immutability labels while the test intentionally required the exact snake_case keys. PR #23 corrects the output to include `production_write=false`, `production_approved=false`, `production_fundamentals_changed=false` and `rankings_changed=false`. Its Build workflow passed. This commit triggers the full-universe bakeoff again; the audit must pass regression tests before extraction and ingestion proceed.
+
+
+The ROU classifier now matches the singular XBRL `RightOfUseAsset` concept directly, including labels that abbreviate the phrase. The missing-selected-period regression test was the source of the prior run failure; the fix is merged in PR #25 and the main Build passed (run 44925046268). A fresh full-universe run is required to produce the final cohort coverage artifact and validate the report on actual annual filings.
