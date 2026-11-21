@@ -366,3 +366,16 @@ PRDO FY2025 ordinary lease liabilities total $61.339m ($49.784m operating and $1
 The same review identifies $110.970m unrestricted cash, $21.310m restricted cash, $511.211m current available-for-sale debt securities, $43.290m operating ROU assets, $10.259m finance ROU assets and $196.000m consolidated operating income. The proposed policy excludes restricted cash from EV cash deductions and keeps marketable securities separate pending a uniform cash-like test. No conventional debt was identified in the supplied evidence.
 
 The review remains `REVIEW_REQUIRED`; production approval and writes remain false. This is an evidence milestone only. No resolver inputs, production fundamentals, EY/ROC, eligibility or rankings were changed.
+
+
+## Cohort-wide other-financing policy decision draft (22 November 2026)
+
+Added [the other-financing obligations decision draft](US_MFI_OTHER_FINANCING_POLICY_DECISION_DRAFT.md) to consolidate BCRX and VXRT royalty monetizations, PRDO failed sale-leaseback financing, PLTK acquisition contingent consideration and GTM tax receivable agreement obligations. The draft distinguishes accounting classification from EV inclusion and proposes typed categories, carrying-value safeguards, recourse attributes, evidence requirements and resolver regression gates. It does not change the proposed policy JSON or runtime behavior. All accounting-owner decisions remain pending.
+
+Recommended owner-review defaults:
+- BCRX/VXRT: separate royalty-financing bucket; candidate carrying-value debt-like EV adjustment, retaining recourse/limited-recourse attributes.
+- PRDO: separate failed-sale-leaseback bucket; candidate carrying-value EV adjustment, but require retained-asset / EBIT / invested-capital symmetry.
+- PLTK: separate acquisition contingent-consideration bucket; no automatic conventional-debt inclusion.
+- GTM: separate tax-receivable-agreement bucket; no automatic conventional-debt inclusion.
+
+The next implementation step is not to add these amounts to EV. First close the cohort-wide lease/ROU and invested-capital symmetry policy, then model the proposed debt-like adjustment as a separate shadow sensitivity and quantify its impact across the full supported cohort. Production approval and writes remain false.
