@@ -73,8 +73,6 @@ The latest ranking preview reports 5 eligible and 5 ranked, with 25 not ranked: 
 
 ### Latest shadow cohort snapshot
 
-<text>
-
 | Rank | Ticker | Earnings Yield | Candidate ROC | Rank sum | Review note |
 |---:|---|---:|---:|---:|---|
 | 1 | HRB | 14.594% | 331.771% | 3 | Filing-specific EBIT reconstruction, manual approval required |
@@ -82,8 +80,6 @@ The latest ranking preview reports 5 eligible and 5 ranked, with 25 not ranked: 
 | 3 | UPWK | 11.135% | 37.471% | 7 | Marketable-securities cash-scope sensitivity |
 | 4 | IRWD | 8.573% | 278.506% | 8 | Lease/debt scope review |
 | 4 | QTTB | 10.388% | 37.826% | 8 | Lease and restricted-cash scope review |
-
-</text>
 
 Metrics use the refreshed MFI snapshot (price date 19 November 2026, quarter date 30 September 2026). They are shadow candidates only. All five rows retain accounting review flags and `production_approved=false`. The rank-sum tie between IRWD and QTTB is intentional: they share competition rank 4.
 
