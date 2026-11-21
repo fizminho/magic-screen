@@ -5,7 +5,7 @@ function valueAt(row, period) {
 }
 export function buildLeaseRouCoverage(extraction, universe = null) {
   const universeSymbols = Array.isArray(universe?.symbols) ? new Set(universe.symbols) : null;
-  const issuers = (extraction?.companies ?? []).filter(c => c && typeof c.symbol === "string").map(c => {
+  const issuers = (extraction?.companies ?? []).filter(c => c && typeof c.symbol === "string" && (!universeSymbols || universeSymbols.has(c.symbol))).map(c => {
     const period = c.filing?.period_of_report ?? c.filing?.report_date ?? null;
     const currency = c.reporting_currency_review?.currency ?? c.reporting_currency ?? "unknown";
     const rou = [], leases = [], embedded = [], unclassified = [];
