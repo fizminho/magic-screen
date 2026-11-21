@@ -83,3 +83,8 @@ The full-universe path was exercised by a `[full-universe]` push run. Universe r
 - Production fundamentals and rankings were not changed.
 
 This is a verified pipeline milestone, not production approval. Next work is to reduce accounting review blockers and approve EBIT, invested-capital, debt and cash/EV policies. OTEX's near-zero positive invested-capital denominator and UPWK's cash/EV treatment remain material sensitivity items.
+
+
+## Next accounting-review work
+
+The next review batch should prioritize the five shadow-ranked issuers and any P1 items that can materially change EY or ROC. In particular, OTEX's working capital offsets 96.79% of net PP&E, leaving a small positive invested-capital candidate; UPWK's separately reported $378.425m fixed-income portfolio has mixed maturities and undisclosed instrument-level amounts. Neither a net-PP&E-only denominator nor treating the full UPWK portfolio as cash-like is approved. A generated sensitivity report compares those alternatives solely to quantify ranking impact before any policy decision.

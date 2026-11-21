@@ -68,6 +68,7 @@ jobs:
           python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
           node --experimental-strip-types --test worker/filing-specific-ebit.test.mjs
           python -m unittest discover -s scripts -p "test_validate_mfi_universe_coverage.py" -v
+          python -m unittest discover -s scripts -p "test_build_mfi_sensitivity_report.py" -v
       - name: Resolve active MFI universe
         id: universe
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))
@@ -249,6 +250,9 @@ jobs:
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
+      - name: Build top-cohort ranking sensitivity report
+        if: always() && hashFiles('edgartools-mfi-ranking-preview.json') != '' && hashFiles('accounting-review-queue.json') != ''
+        run: python scripts/build_mfi_sensitivity_report.py
       - name: Validate issuer debt-note review guardrails
         if: always() && hashFiles('accounting-review-queue.json') != ''
         run: |
@@ -293,5 +297,7 @@ jobs:
             accounting-review-queue.json
             accounting-review-queue.csv
             edgartools-mfi-ranking-preview.json
+            mfi-ranking-sensitivity.json
+            mfi-ranking-sensitivity.md
           if-no-files-found: warn
           retention-days: 7
