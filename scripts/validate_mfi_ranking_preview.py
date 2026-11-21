@@ -36,9 +36,8 @@ def validate(report: dict[str, Any]) -> list[str]:
     if summary.get("universe") != len(rows):
         errors.append("summary universe does not match preview rows")
     eligible = [row for row in rows if row.get("ranking_eligible") is True]
-    excluded = [row for row in rows if row.get("ranking_eligible") is not True]
-    if summary.get("eligible") != len(eligible) or summary.get("excluded") != len(excluded):
-        errors.append("eligible/excluded summary does not reconcile")
+    if summary.get("eligible") != len(eligible):
+        errors.append("eligible summary does not reconcile")
     unsupported = [row for row in rows if row.get("provider_status") == "unsupported_provider"]
     if any(row.get("eligibility_status") != "excluded_provider_unsupported" or row.get("magic_formula_rank") is not None for row in unsupported):
         errors.append("unsupported providers must remain visible but unranked with an explicit status")
@@ -47,6 +46,10 @@ def validate(report: dict[str, Any]) -> list[str]:
     ranked = [row for row in rows if row.get("magic_formula_rank") is not None]
     if summary.get("ranked") != len(ranked):
         errors.append("ranked summary does not reconcile")
+    # "excluded" means not included in the final ranked output. It includes
+    # otherwise-eligible rows when the minimum cohort size is not reached.
+    if summary.get("excluded") != len(rows) - len(ranked):
+        errors.append("excluded-from-ranking summary does not reconcile")
     minimum = int(report.get("minimum_eligible_cohort", 5))
     if len(eligible) >= minimum:
         if len(ranked) != len(eligible):
@@ -91,9 +94,9 @@ def validate(report: dict[str, Any]) -> list[str]:
                 errors.append("ranked rows are not ordered best-first")
     elif ranked:
         errors.append("numeric ranks must be withheld below the minimum eligible cohort")
-    for row in excluded:
-        if row.get("magic_formula_rank") is not None:
-            errors.append(f"{row.get('symbol')}: excluded row received a rank")
+    for row in rows:
+        if row.get("magic_formula_rank") is None and (row.get("earnings_yield_rank") is not None or row.get("return_on_capital_rank") is not None or row.get("magic_formula_score") is not None):
+            errors.append(f"{row.get('symbol')}: unranked row retained partial numeric ranks")
     for key in ("production_write", "production_fundamentals_changed", "rankings_changed"):
         if report.get(key) is not False:
             errors.append(f"{key} must remain false")

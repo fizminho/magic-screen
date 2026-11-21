@@ -12,7 +12,7 @@ def row(symbol, provider="supported", eligible=False, rank=None, ey=None, roc=No
 class RankingPreviewTests(unittest.TestCase):
     def report(self, rows, eligible, ranked, unsupported=0, minimum=5):
         return {"minimum_eligible_cohort": minimum, "summary": {"universe": len(rows), "eligible": eligible,
-                "ranked": ranked, "excluded": len(rows)-eligible, "unsupported_provider": unsupported},
+                "ranked": ranked, "excluded": len(rows)-ranked, "unsupported_provider": unsupported},
                 "rankings": rows, "production_write": False, "production_fundamentals_changed": False, "rankings_changed": False}
 
     def test_unsupported_visible_but_excluded(self):
@@ -55,6 +55,26 @@ class RankingPreviewTests(unittest.TestCase):
     def test_unsupported_count_must_reconcile(self):
         errors = validate(self.report([row("AAA", "unsupported_provider")], 0, 0, 0))
         self.assertTrue(any("coverage count" in error for error in errors))
+
+
+    def test_eligible_below_minimum_is_counted_as_not_ranked(self):
+        rows = [
+            row("AAA", eligible=True, ey_value=0.30, roc_value=0.40),
+            row("BBB", eligible=True, ey_value=0.20, roc_value=0.30),
+            row("CCC", eligible=True, ey_value=0.10, roc_value=0.20),
+            row("DDD", eligible=True, ey_value=0.05, roc_value=0.10),
+        ]
+        report = self.report(rows, 4, 0, minimum=5)
+        self.assertEqual(validate(report), [])
+
+    def test_excluded_count_uses_ranked_cohort_not_eligibility(self):
+        rows = [
+            row("AAA", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.30, roc_value=0.40),
+            row("BBB", eligible=True, rank=2, ey=2, roc=2, score=4, ey_value=0.20, roc_value=0.30),
+            row("CCC", eligible=False),
+        ]
+        report = self.report(rows, 2, 2, minimum=2)
+        self.assertEqual(validate(report), [])
 
     def test_production_write_must_remain_false(self):
         report = self.report([], 0, 0)
