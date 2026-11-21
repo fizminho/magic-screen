@@ -16,9 +16,14 @@ def ordinal(v:dict[str,float])->dict[str,float]:
  return out
 def lease_adjustment(x:dict[str,Any]|None)->dict[str,Any]:
  if not x:return {"status":"lease_evidence_unavailable","liability_total":None,"liability_current":None,"rou_total":None}
+ lease_rows=x.get("lease_liabilities",[]) or []
+ rou_rows=x.get("rou_assets",[]) or []
+ embedded_rows=x.get("embedded_rou_in_net_ppe",[]) or []
+ if not lease_rows and not rou_rows and not embedded_rows:
+  return {"status":"lease_rows_not_identified_unknown_not_zero","liability_total":None,"liability_current":None,"rou_total":None}
  all_leases=x.get("accounting_framework")=="IFRS" or x.get("lease_accounting_model")=="IFRS16_single_lessee_model"
- ls=[r for r in x.get("lease_liabilities",[]) if all_leases or r.get("lease_type")=="finance"]
- rs=[r for r in x.get("rou_assets",[]) if all_leases or r.get("lease_type")=="finance"]
+ ls=[r for r in lease_rows if all_leases or r.get("lease_type")=="finance"]
+ rs=[r for r in rou_rows if all_leases or r.get("lease_type")=="finance"]
  if not ls and not rs:return {"status":"no_debt_like_lease_adjustment_under_proposed_policy","liability_total":0.0,"liability_current":0.0,"rou_total":0.0}
  if any(not num(r.get("value")) for r in ls+rs):return {"status":"incomplete_lease_amounts","liability_total":None,"liability_current":None,"rou_total":None}
  return {"status":"calculated_framework_aware_candidate","liability_total":sum(r["value"] for r in ls),
