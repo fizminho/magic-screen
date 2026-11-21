@@ -617,6 +617,9 @@ class AccountingReviewQueueTests(unittest.TestCase):
                  "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 35}},
                 {"concept": "us-gaap_USGovernmentSecurities", "label": "U.S. Treasury securities",
                  "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 22}},
+                {"concept": "us-gaap_DebtSecuritiesAvailableForSaleExcludingAccruedInterestCurrent",
+                 "label": "Marketable securities", "parent_concept": "us-gaap_AssetsCurrent",
+                 "values": {"2025-12-31": 18}},
                 {"concept": "us-gaap_EquityMethodInvestments", "label": "Equity method investments",
                  "parent_concept": "us-gaap_Assets", "values": {"2025-12-31": 25}},
                 {"concept": "us-gaap_NotesReceivableNetCurrent", "label": "Notes receivable",
@@ -650,7 +653,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(result["category_counts"]["noncontrolling_interests"], 1)
         self.assertEqual(result["category_counts"]["customer_escrow_assets_and_payables"], 2)
         self.assertEqual(result["category_counts"]["marketable_equity_securities"], 1)
-        self.assertEqual(result["category_counts"]["marketable_debt_securities"], 1)
+        self.assertEqual(result["category_counts"]["marketable_debt_securities"], 2)
         self.assertEqual(result["category_counts"]["marketable_securities_unclassified"], 2)
         self.assertEqual(result["category_counts"]["equity_method_investments"], 1)
         self.assertEqual(result["category_counts"]["notes_receivable"], 1)
