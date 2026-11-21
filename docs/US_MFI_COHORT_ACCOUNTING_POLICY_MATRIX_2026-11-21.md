@@ -32,12 +32,12 @@ The latest shadow preview has two eligible review-only candidates, IRWD and SNDK
 | Filing-specific EBIT reconstruction | Allowed only as issuer-specific review evidence, never automatic production input | HRB $907.686m, PBI $341.680m and SGHC $357m reconstructions are separately documented | Accounting owner must approve each bridge or reject it; generic resolver remains unresolved |
 | Exceptional/nonrecurring items | Keep GAAP reported operating income unless a cohort-wide adjustment policy is approved | QTTB $53.737m customer-refund settlement collaboration revenue; VXRT $1.929m noncash royalty revenue from a sold royalty stream; BMBL $1,039.027m impairment line; other filing-specific one-offs | Decide whether and how exceptional items are adjusted consistently; do not selectively add back |
 | Invested capital | Current assets - current liabilities + net PP&E | Current candidate denominator across the cohort | Confirm whether rental equipment or other operating assets belong in net PP&E |
-| ROU assets and leases in ROC | Do not add ROU assets alone; if ROU is included, pair with matching lease-liability treatment | ROU assets and lease liabilities appear across multiple issuers | Approve whether operating/finance lease ROU enters invested capital and how EBIT is aligned |
+| ROU assets and leases in ROC | Framework-aware proposal: US GAAP operating ROU excluded; US GAAP finance and IFRS 16 ROU included once if matched policy is approved | 24 active issuers have separately reported ROU; 23 have lease-liability rows; 3 embedded ROU issuers; SGHC is IFRS 16 | Approve framework mapping and current financing-liability treatment in operating working capital |
 | Negative / near-zero denominator | Do not cap, floor or switch formula issuer by issuer; flag nonpositive or unstable denominator and withhold ROC ranking | OTEX candidate invested capital $16.745m; six high negative-working-capital offset risks | Approve exclusion/flag threshold and minimum denominator materiality rule |
 | Conventional debt | Current + noncurrent borrowing-instrument carrying values; no double count | OTEX $5,770.369m; BMBL $588.465m; PLTK $2,389.1m; SBC $42.833484m; ZVRA $61.928m | Approve carrying-value convention, treatment of unamortized costs and instrument scope |
 | Revolvers and undrawn facilities | Include only drawn borrowings; do not count availability or undrawn commitment as debt | MNTN, PXED, STRA named facilities report zero drawn; BMBL and PLTK revolving facilities separately identified | Confirm letter-of-credit treatment and facility-specific zero evidence requirements |
 | Other financing obligations | Keep in a separate bucket; include in debt-like EV only if the policy is approved cohort-wide | BCRX royalty financing $465.688m; PRDO failed sale-leaseback $56.992m; VXRT future-royalty liability $4.060m; PLTK contingent consideration $734m | Decide which obligations are debt-like, whether carrying value is used, and how limited recourse is flagged |
-| Operating and finance leases in EV | Exclude from conventional debt baseline; retain separate disclosure | 50 lease-liability classification rows in review queue | Approve if leases enter EV and require consistent EBIT/ROU treatment |
+| Lease liabilities in EV | US GAAP operating lease liabilities excluded; US GAAP finance and IFRS 16 recognized liabilities proposed as separate debt-like EV bucket | 50 lease-liability rows; examples MGTX, PRDO and SGHC; failed sale-leaseback remains separate | Approve framework-specific inclusion, current/noncurrent handling and debt overlap guardrails |
 | Noncontrolling interests | Keep separate; if consolidated EBIT is used, consider adding NCI to EV for perimeter symmetry | NCI evidence across 7 issuer rows; OTEX $1.962m; BMBL/PLTK also have ownership-perimeter considerations | Approve NCI valuation and treatment, including partnership structures |
 | Cash deduction | Unrestricted cash and cash equivalents only | Cash lines are separately reported for most supported issuers | Confirm that cash is accessible and not pledged, earmarked or customer-owned |
 | Restricted cash and customer funds | Exclude from unrestricted cash | HRB $19.195m restricted; UPWK $3.8m restricted and $180.752m escrow/in-transit; QTTB $0.647m collateral | Confirm restriction and customer-fund detection; missing value remains unknown |
@@ -57,12 +57,12 @@ Recommended starting point: direct consolidated GAAP operating income, with no i
 
 ### B. Invested capital and leases
 
-Recommended starting point: current assets less current liabilities plus net PP&E. Do not add ROU assets without matching lease-liability treatment. Define how rental equipment, finance leases and operating leases are handled. Define what happens when the denominator is negative, near zero or dominated by negative working capital. OTEX must not be allowed to dominate ROC because of a mathematically tiny denominator.
+Recommended starting point remains current assets less current liabilities plus net PP&E, but do not implement lease ROU additions yet. The framework-aware proposal is US GAAP operating ROU excluded; US GAAP finance and IFRS 16 ROU included once, only after deciding how current financing liabilities are removed from operating working capital. Embedded ROU already inside PP&E must not be added again. Define rental equipment and negative/near-zero denominator rules; OTEX must not dominate ROC because of a mathematically tiny denominator. See [lease and cash policy recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md).
 
 ### C. Enterprise value
 
-Recommended starting point: market capitalization plus conventional gross debt less unrestricted cash equivalents. Keep the following separate until a consistent policy is approved:
-- Operating and finance lease liabilities.
+Recommended starting point: market capitalization plus conventional gross debt less unrestricted cash equivalents. The proposed lease policy adds US GAAP finance and IFRS 16 recognized lease liabilities in a separate debt-like EV bucket, while US GAAP operating lease liabilities remain excluded because the single rent cost remains in EBIT. Keep the following separate until a consistent policy is approved:
+- US GAAP operating lease liabilities.
 - Royalty monetization financing.
 - Failed sale-leaseback financing.
 - Contingent acquisition consideration.
@@ -73,7 +73,7 @@ If consolidated EBIT is used, NCI should be considered for EV perimeter symmetry
 
 ### D. Cash and investments
 
-Recommended starting point: only issuer-defined cash equivalents with original maturities of three months or less, provided they are unrestricted and available to the company. Exclude restricted cash and customer funds. Keep securities with maturities beyond the cash-equivalent threshold separate until a common cash-like rule is approved. Do not use an issuer's phrase “available for current operations” as the only qualification.
+Recommended starting point: only unrestricted issuer-defined cash equivalents. For any optional marketable-security cash-like treatment, require instrument-level proof of original maturity at acquisition, convertibility to known cash, insignificant value risk, unrestricted availability and reconciliation to the portfolio total. Exclude restricted cash and customer funds. Do not use an issuer's phrase “available for current operations” as the only qualification. See [lease and cash policy recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md).
 
 ## 4. Ranking sensitivity and risk priorities
 
@@ -139,3 +139,7 @@ Bakeoff run 44889673041 validated 27 period-aligned partial comparisons and 72 f
 Added `config/us-mfi-accounting-policy-v1-proposed.json` as a machine-readable, versioned representation of the proposed defaults. It is deliberately marked `proposed_owner_approval_required`, shadow-only, and production-unapproved. A dedicated validator and regression tests enforce the critical guardrails: annual filings only, consolidated GAAP operating income, no selective exceptional-item adjustments, filing-specific EBIT reconstructions remain manual-review-only, no standalone ROU addition, negative denominators withhold ROC, undrawn facilities are not debt, restricted/customer funds are not unrestricted cash, missing values remain unknown, and fewer than five approved eligible names withholds final ranking.
 
 The specification is an executable review contract, not an accounting approval. Lease/ROU symmetry, NCI, other financing obligations, marketable securities, near-zero denominator materiality, quote staleness and production rollback remain explicit owner-approval gates. The CI bakeoff validates the policy file and includes it in the workflow artifact. No resolver input, production fundamentals, ratios or rankings are changed by this commit.
+
+## Framework-aware lease and cash recommendation (22 November 2026)
+
+The detailed evidence-backed recommendation is in [US MFI lease and cash policy recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md). The initial v1 lease exclusion is being reconsidered in favour of framework-aware treatment. This remains a proposal only; the machine-readable v1 policy and production controls are unchanged.

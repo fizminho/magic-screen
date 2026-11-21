@@ -2,7 +2,7 @@
 
 **Status:** recommendations for review, not production approval  
 **Current cohort:** 30 active US MFI candidates, top 30 with minimum market cap $50m  
-**Latest shadow cohort:** HRB, OTEX, UPWK, IRWD and QTTB  
+**Latest shadow preview:** IRWD and SNDK eligible for review; zero ranked because the proposed minimum eligible cohort is five  
 **Data snapshot:** MFI price date 19 November 2026; quarter date 30 September 2026
 
 ## Recommended defaults
@@ -22,17 +22,11 @@
 | Ties | Average occupied ordinal positions for metric ties; competition rank for equal combined scores | Deterministic and transparent |
 | Minimum cohort | Five eligible companies | Withhold ranks if fewer than five pass the current evidence gates |
 
-## Current shadow ranking
+## Current shadow ranking status
 
-| Rank | Ticker | EY | ROC | EY rank | ROC rank | Combined |
-|---:|---|---:|---:|---:|---:|---:|
-| 1 | HRB | 14.59% | 331.77% | 1 | 2 | 3 |
-| 2 | OTEX | 10.71% | 6,465.20% | 3 | 1 | 4 |
-| 3 | UPWK | 11.13% | 37.47% | 2 | 5 | 7 |
-| 4 | IRWD | 8.57% | 278.51% | 5 | 3 | 8 |
-| 4 | QTTB | 10.39% | 37.83% | 4 | 4 | 8 |
+The latest accepted full-universe run (22 November 2026, run `44926317787`) reports 30 active issuers, 28 supported and 2 unsupported. The shadow preview has **2 eligible review-only issuers (IRWD and SNDK), 0 ranked**, and 26 supported issuers still in accounting/valuation review. Because the proposed minimum approved cohort is five, no ranking is published. The earlier five-name snapshot is superseded and must not be presented as the current cohort.
 
-All five are shadow-only and retain accounting review flags. None is production-approved.
+All candidate values remain shadow-only. No issuer is production-approved and no production fundamentals, ratios or rankings have changed.
 
 ## Ranking-sensitive policy questions
 
@@ -50,7 +44,7 @@ Issuer descriptions such as "available for current operations" are not sufficien
 
 ### Leases and other financing obligations
 
-Operating leases, royalty financing, sale-leaseback financing, NCI and other financing obligations remain separately surfaced. The recommended default excludes them from conventional debt until the EBIT numerator is adjusted consistently and the policy is applied uniformly.
+Lease treatment is proposed on a framework-aware basis: US GAAP operating leases remain outside EV while their single lease cost remains in EBIT; US GAAP finance leases and IFRS 16 recognized lease liabilities are proposed as separate debt-like EV items, paired with ROU asset treatment in invested capital. The current-liability convention for invested capital must be approved before coding. Royalty financing, failed sale-leaseback financing, NCI and other obligations remain separate pending their own cohort-wide rules. See [lease and cash policy recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md).
 
 ## Issuer-specific review points
 
@@ -159,3 +153,7 @@ The blocker remains legacy debt coverage: 27/28 supported issuers have no legacy
 Added `config/us-mfi-accounting-policy-v1-proposed.json` as a machine-readable, versioned representation of the proposed defaults. It is deliberately marked `proposed_owner_approval_required`, shadow-only, and production-unapproved. A dedicated validator and regression tests enforce the critical guardrails: annual filings only, consolidated GAAP operating income, no selective exceptional-item adjustments, filing-specific EBIT reconstructions remain manual-review-only, no standalone ROU addition, negative denominators withhold ROC, undrawn facilities are not debt, restricted/customer funds are not unrestricted cash, missing values remain unknown, and fewer than five approved eligible names withholds final ranking.
 
 The specification is an executable review contract, not an accounting approval. Lease/ROU symmetry, NCI, other financing obligations, marketable securities, near-zero denominator materiality, quote staleness and production rollback remain explicit owner-approval gates. The CI bakeoff validates the policy file and includes it in the workflow artifact. No resolver input, production fundamentals, ratios or rankings are changed by this commit.
+
+## Framework-aware lease and cash policy recommendation (22 November 2026)
+
+The new [US MFI lease and cash policy recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md) records the framework-specific lease proposal, the current-liability question in invested capital, cohort evidence, and a security-level cash-equivalent test. It is not an approval and does not modify policy v1 or any calculation.
