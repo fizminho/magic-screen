@@ -1222,7 +1222,8 @@ export default {
           if(!Array.isArray(body.symbols)||body.symbols.length<1||body.symbols.length>30||
             body.symbols.some((value:any)=>typeof value!=="string"||!/^[A-Z0-9.-]{1,15}$/.test(value.trim().toUpperCase())))
             return json({error:"symbols must be an array of 1-30 valid ticker strings"},400);
-          const requested=[...new Set(body.symbols.map((value:string)=>value.trim().toUpperCase()))];
+          const requestedValues=body.symbols as string[];
+          const requested=[...new Set(requestedValues.map((value:string)=>value.trim().toUpperCase()))];
           const inactive=requested.filter((symbol:string)=>!symbolsActive.includes(symbol));
           if(inactive.length) return json({error:"Requested symbols are not in the active US universe",symbols:inactive},400);
           selectedSymbols=symbolsActive.filter((symbol:string)=>requested.includes(symbol));
