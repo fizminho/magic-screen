@@ -596,5 +596,81 @@ class AccountingReviewQueueTests(unittest.TestCase):
                 self.assertIs(review.get("resolver_input"), False)
                 self.assertIs(review.get("debt_candidate_promoted"), False)
 
+
+    def test_ev_scope_evidence_classifies_cash_restricted_investments_leases_and_nci(self):
+        from build_accounting_review_queue import extract_ev_scope_evidence
+
+        company = {
+            "filing": {"accession_number": "annual-accession", "period_of_report": "2025-12-31"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31"},
+            "statements": {"balance_sheet": {"rows": [
+                {"concept": "us-gaap_CashAndCashEquivalentsAtCarryingValue", "label": "Cash and cash equivalents",
+                 "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 100}},
+                {"concept": "us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+                 "label": "Restricted cash", "parent_concept": "us-gaap_AssetsCurrent",
+                 "values": {"2025-12-31": 20}},
+                {"concept": "us-gaap_MarketableSecuritiesCurrent", "label": "Marketable securities",
+                 "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 30}},
+                {"concept": "us-gaap_MarketableEquitySecurities", "label": "Marketable equity securities",
+                 "parent_concept": "us-gaap_Assets", "values": {"2025-12-31": 40}},
+                {"concept": "us-gaap_OperatingLeaseLiabilityCurrent", "label": "Operating lease liabilities",
+                 "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 50}},
+                {"concept": "us-gaap_LongTermDebtNoncurrent", "label": "Long-term debt",
+                 "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 60}},
+                {"concept": "us-gaap_NoncontrollingInterestInConsolidatedEntity",
+                 "label": "Noncontrolling interests", "parent_concept": "us-gaap_StockholdersEquity",
+                 "values": {"2025-12-31": 7}},
+                {"concept": "us-gaap_CustomerFundsReceivable", "label": "Customer funds in escrow",
+                 "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 80}},
+                {"concept": "us-gaap_CustomerFundsPayable", "label": "Customer funds payable",
+                 "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 80}},
+                {"concept": "us-gaap_CashAndCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+                 "label": "Restricted cash dimensional breakdown", "parent_concept": "us-gaap_Assets",
+                 "dimension": True, "values": {"2025-12-31": 999}},
+            ]}},
+        }
+        result = extract_ev_scope_evidence(company)
+        by_category = {}
+        for row in result["rows"]:
+            by_category.setdefault(row["category"], []).append(row)
+        self.assertEqual(result["category_counts"]["unrestricted_cash"], 1)
+        self.assertEqual(result["category_counts"]["restricted_cash"], 1)
+        self.assertEqual(result["category_counts"]["lease_liabilities"], 1)
+        self.assertEqual(result["category_counts"]["conventional_debt"], 1)
+        self.assertEqual(result["category_counts"]["noncontrolling_interests"], 1)
+        self.assertEqual(result["category_counts"]["customer_escrow_assets_and_payables"], 2)
+        self.assertEqual(result["category_counts"]["marketable_equity_securities"], 1)
+        self.assertTrue(all(row["accession"] == "annual-accession" for row in result["rows"]))
+        self.assertTrue(all(row["production_approved"] is False and row["resolver_input"] is False
+                            for row in result["rows"]))
+        self.assertEqual(by_category["restricted_cash"][0]["policy_status"],
+                         "exclude_from_unrestricted_cash_pending_policy")
+        self.assertFalse(result["production_approved"])
+        self.assertFalse(result["resolver_input"])
+
+    def test_ev_scope_evidence_is_attached_only_for_exact_accession(self):
+        preview = {
+            "production_fundamentals_changed": False, "rankings_changed": False,
+            "resolutions": [{"symbol": "CASH", "accession": "same-accession",
+                             "provider_status": "supported", "enterprise_value_candidate_review": {}}],
+        }
+        raw = {"companies": [{
+            "symbol": "CASH", "filing": {"accession_number": "same-accession"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31", "categories": {}},
+            "statements": {"balance_sheet": {"rows": [{
+                "concept": "us-gaap_CashAndCashEquivalentsAtCarryingValue",
+                "label": "Cash and cash equivalents", "parent_concept": "us-gaap_AssetsCurrent",
+                "values": {"2025-12-31": 100},
+            }]}},
+        }]}
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["ev_scope_evidence_source"], "fresh_extraction_artifact_same_accession")
+        self.assertEqual(item["ev_scope_evidence"]["rows"][0]["category"], "unrestricted_cash")
+
+        raw["companies"][0]["filing"]["accession_number"] = "different-accession"
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["ev_scope_evidence"])
+        self.assertEqual(item["ev_scope_evidence_source"], "stored_resolver_preview")
+
 if __name__ == "__main__":
     unittest.main()
