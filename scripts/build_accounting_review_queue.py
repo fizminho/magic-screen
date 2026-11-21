@@ -206,6 +206,95 @@ def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+EV_SCOPE_POLICY = {
+    "conventional_debt": "candidate_gross_debt_pending_debt_measurement_policy",
+    "restricted_cash": "exclude_from_unrestricted_cash_pending_policy",
+    "unrestricted_cash": "candidate_cash_pending_availability_and_EV_policy",
+    "marketable_debt_securities": "separate_liquidity_category_pending_cash_like_policy",
+    "marketable_equity_securities": "not_cash_equivalents_pending_explicit_policy",
+    "equity_method_investments": "not_cash_equivalents_pending_explicit_policy",
+    "notes_receivable": "not_cash_equivalents_pending_explicit_policy",
+    "lease_liabilities": "separate_lease_category_pending_consistent_EBIT_policy",
+    "noncontrolling_interests": "separate_EV_adjustment_pending_consolidated_EV_policy",
+    "customer_escrow_assets_and_payables": "exclude_matched_customer_funds_from_company_cash_and_debt",
+    "other_financing_obligations": "separate_financing_category_pending_debt_like_policy",
+}
+
+
+def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
+    """Classify selected annual balance-sheet face rows for EV policy review only."""
+    statement = ((raw_company.get("statements") or {}).get("balance_sheet") or {})
+    fiscal_period = (
+        (raw_company.get("balance_sheet_fact_review") or {}).get("fiscal_period")
+        or (raw_company.get("filing") or {}).get("period_of_report")
+    )
+    rows: list[dict[str, Any]] = []
+    for row in statement.get("rows", []):
+        if row.get("abstract") or row.get("dimension") or row.get("is_breakdown"):
+            continue
+        concept = str(row.get("concept") or "")
+        label = str(row.get("label") or "")
+        parent = str(row.get("parent_concept") or "")
+        searchable = (concept + " " + label).lower()
+        parent_lower = parent.lower()
+        values = row.get("values") or {}
+        amount = values.get(fiscal_period) if fiscal_period else None
+        if amount is None:
+            continue
+
+        category = None
+        if "noncontrollinginterest" in searchable or "non-controlling interest" in searchable:
+            category = "noncontrolling_interests"
+        elif "escrow" in searchable or ("customer funds" in searchable and "payable" in searchable):
+            category = "customer_escrow_assets_and_payables"
+        elif "lease" in searchable and ("liabilit" in searchable or "obligation" in searchable):
+            category = "lease_liabilities"
+        elif any(x in searchable for x in ("restricted cash", "cash restricted", "cash and cash equivalents restricted")):
+            category = "restricted_cash"
+        elif "cash" in searchable and any(x in parent_lower for x in ("asset", "cash")):
+            category = "unrestricted_cash"
+        elif any(x in searchable for x in ("marketable debt", "debt securities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
+            category = "marketable_debt_securities"
+        elif any(x in searchable for x in ("marketable equity", "equity securities", "equity method investment", "equity-method investment")):
+            category = "equity_method_investments" if "equity method" in searchable else "marketable_equity_securities"
+        elif any(x in searchable for x in ("notes receivable", "note receivable", "loans receivable")):
+            category = "notes_receivable"
+        elif any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities")):
+            category = "other_financing_obligations"
+        elif any(x in searchable for x in ("debt", "borrow", "loan payable", "notes payable", "note payable", "line of credit")) and "liabilit" in parent_lower:
+            category = "conventional_debt"
+        if category is None:
+            continue
+        rows.append({
+            "concept": concept,
+            "label": label,
+            "parent_concept": parent,
+            "amount": amount,
+            "fiscal_period": fiscal_period,
+            "category": category,
+            "explicit_zero": isinstance(amount, (int, float)) and amount == 0,
+            "policy_status": EV_SCOPE_POLICY[category],
+            "source": "selected_annual_filing_balance_sheet_face_row",
+            "accession": ((raw_company.get("filing") or {}).get("accession_number")
+                          or (raw_company.get("filing") or {}).get("accession_no")),
+            "dimension": False,
+            "production_approved": False,
+            "resolver_input": False,
+        })
+    rows.sort(key=lambda row: (row["category"], row["concept"], row["label"]))
+    counts = Counter(row["category"] for row in rows)
+    return {
+        "status": "evidence_found" if rows else "no_matching_EV_scope_face_rows",
+        "fiscal_period": fiscal_period,
+        "row_count": len(rows),
+        "category_counts": dict(counts),
+        "rows": rows,
+        "interpretation": "Face-row evidence only. Classification is a triage hint, not a cash/debt conclusion. Missing rows are unknown, explicit zero applies only to the exact reported row, and matched escrow/restricted cash are not unrestricted cash.",
+        "production_approved": False,
+        "resolver_input": False,
+    }
+
+
 
 # Curated filing-note checks. These are attached only to the exact accession
 # below; they are review evidence, never resolver inputs or approved debt values.
@@ -455,6 +544,8 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["debt_scope_evidence"] = extract_debt_scope_evidence(raw_company)
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            item["ev_scope_evidence"] = extract_ev_scope_evidence(raw_company)
+            item["ev_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["filing_debt_note_review"] = filing_debt_note_review(item["symbol"], raw_accession)
             item["filing_debt_note_review_source"] = (
                 "curated_primary_annual_filing_note_review_same_accession"
@@ -509,6 +600,8 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "stored_resolver_preview"
             item["debt_scope_evidence"] = None
             item["debt_scope_evidence_source"] = "stored_resolver_preview"
+            item["ev_scope_evidence"] = None
+            item["ev_scope_evidence_source"] = "stored_resolver_preview"
             item["filing_debt_note_review"] = None
             item["filing_debt_note_review_source"] = "stored_resolver_preview"
             item["invested_capital_denominator_diagnostics"] = None
@@ -539,6 +632,11 @@ def build_queue(
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
+            "ev_scope_classification_rows": dict(Counter(
+                category
+                for row in rows for evidence in ((row.get("ev_scope_evidence") or {}).get("rows") or [])
+                for category in [evidence["category"]]
+            )),
             "debt_scope_classification_rows": dict(Counter(
                 classification
                 for row in rows for evidence in ((row.get("debt_scope_evidence") or {}).get("rows") or [])
@@ -584,7 +682,7 @@ def main() -> int:
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
-        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "balance_sheet_reconciliation_review",
+        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
         "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
         "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
@@ -598,6 +696,7 @@ def main() -> int:
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
+            row["ev_scope_evidence"] = json.dumps(item.get("ev_scope_evidence"), separators=(",", ":"))
             row["filing_debt_note_review"] = json.dumps(item.get("filing_debt_note_review"), separators=(",", ":"))
             row["balance_sheet_reconciliation_review"] = json.dumps(
                 item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
