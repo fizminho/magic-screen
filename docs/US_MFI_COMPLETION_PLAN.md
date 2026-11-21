@@ -410,3 +410,32 @@ The audit is being tightened to consume the active-universe snapshot and report 
 ## Active-universe lease/ROU audit scope fix (22 November 2026)
 
 PR #30 is merged at `a5d1845d403dac3f3a2edf35976b0f7e030792a8`. The lease/ROU coverage builder now filters issuer counts and detail to the active MFI universe, while reporting extraction-only controls such as ADBE separately. The standard Build workflow now runs the dedicated regression suite; all PR checks passed, including the test that previously failed. This documentation-only `[full-universe]` trigger regenerates the full cohort evidence artifact against the corrected implementation. No accounting formula, production fundamentals, or ranking is changed.
+
+
+## Lease/ROU audit accepted against the active MFI cohort (22 November 2026)
+
+Full-universe run **44926031387** completed successfully. The regression suite passed, and the run completed universe discovery, annual filing extraction, raw evidence ingestion, read-only resolver/ranking previews, legacy reconciliation, policy and cohort validation, lease/ROU coverage, exception queue, policy assessment, ranking sensitivity and debt-note guardrails. Artifact: `edgartools-bakeoff` (artifact ID `14716265157`).
+
+The corrected audit is scoped to the active universe snapshot, excluding ADBE as a regression control:
+
+| Measure | Count |
+|---|---:|
+| Active MFI universe | 30 |
+| Supported | 28 |
+| Unsupported provider | 2 |
+| Issuers with separately reported ROU assets | 24 |
+| Issuers with lease-liability rows | 23 |
+| Issuers with ROU embedded in combined net PP&E | 3 |
+| Separately reported ROU rows | 28 |
+| Lease-liability rows | 50 |
+| Missing selected-period ROU candidate rows | 1 |
+| Missing selected-period lease-liability rows | 0 |
+| Unclassified lease-liability rows | 2 |
+
+Embedded finance-lease ROU / net-PP&E concepts occur for **CRNC, FHTX and PBI**. These assets must not be added again as separate ROU amounts. **SGHC**'s IFRS lease liability rows remain type-unspecified; the audit does not invent operating/finance classifications. **PRDO** has an unvalued custom aggregate ROU concept, while its separately reported operating and finance ROU assets have values of $43.290m and $10.259m. The aggregate remains unknown and is not summed.
+
+The current shadow preview reports **2 eligible, 0 ranked** because the proposed minimum approved cohort is 5. IRWD and SNDK are the two review-only eligible candidates. The other 26 supported issuers remain in accounting/valuation review; AFMJF and EGHSF remain visible unsupported-provider exclusions. Production-approved rows remain 0.
+
+The run ingested 31 records (30 active issuers plus ADBE regression control). `production_write=false`, `production_fundamentals_changed=false`, and `rankings_changed=false`. No production fundamentals, ratios, eligibility, EV, ROC or rankings were changed.
+
+**Decision:** the evidence-coverage audit is accepted as a reporting control. The lease/ROU accounting policy is still open. Next, define a coherent invested-capital and EBIT/EV treatment before producing lease-inclusive ROC sensitivities. Do not add ROU assets alone, do not double-count embedded finance-lease ROU, and do not force IFRS lease types into US GAAP operating/finance categories.
