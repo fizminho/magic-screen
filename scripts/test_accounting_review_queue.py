@@ -613,6 +613,14 @@ class AccountingReviewQueueTests(unittest.TestCase):
                  "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 30}},
                 {"concept": "us-gaap_MarketableEquitySecurities", "label": "Marketable equity securities",
                  "parent_concept": "us-gaap_Assets", "values": {"2025-12-31": 40}},
+                {"concept": "issuer_MarketableSecurities", "label": "Marketable securities",
+                 "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 35}},
+                {"concept": "us-gaap_EquityMethodInvestments", "label": "Equity method investments",
+                 "parent_concept": "us-gaap_Assets", "values": {"2025-12-31": 25}},
+                {"concept": "us-gaap_NotesReceivableNetCurrent", "label": "Notes receivable",
+                 "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 15}},
+                {"concept": "issuer_CommercialPaperPayableCurrent", "label": "Commercial paper payable",
+                 "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 10}},
                 {"concept": "us-gaap_OperatingLeaseLiabilityCurrent", "label": "Operating lease liabilities",
                  "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 50}},
                 {"concept": "us-gaap_LongTermDebtNoncurrent", "label": "Long-term debt",
@@ -640,6 +648,11 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(result["category_counts"]["noncontrolling_interests"], 1)
         self.assertEqual(result["category_counts"]["customer_escrow_assets_and_payables"], 2)
         self.assertEqual(result["category_counts"]["marketable_equity_securities"], 1)
+        self.assertEqual(result["category_counts"]["marketable_debt_securities"], 1)
+        self.assertEqual(result["category_counts"]["equity_method_investments"], 1)
+        self.assertEqual(result["category_counts"]["notes_receivable"], 1)
+        debt_labels = [row["label"] for row in by_category["conventional_debt"]]
+        self.assertIn("Commercial paper payable", debt_labels)
         self.assertTrue(all(row["accession"] == "annual-accession" for row in result["rows"]))
         self.assertTrue(all(row["production_approved"] is False and row["resolver_input"] is False
                             for row in result["rows"]))
