@@ -10,6 +10,8 @@ on:
       - "scripts/test_accounting_review_queue.py"
       - "scripts/validate_mfi_ranking_preview.py"
       - "scripts/test_validate_mfi_ranking_preview.py"
+      - "scripts/validate_edgartools_pipeline.py"
+      - "scripts/test_validate_edgartools_pipeline.py"
       - "docs/US_MFI_COMPLETION_PLAN.md"
       - "README.md"
       - "worker/index.ts"
@@ -78,7 +80,24 @@ jobs:
           curl --fail-with-body --silent --show-error --retry 3 --max-time 60 \
             -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
             "$BASE_URL/api/fundamentals/edgartools/universe" > edgartools-universe.json
-          SYMBOLS=$(python -c 'import json; d=json.load(open("edgartools-universe.json")); s=d.get("symbols", []); print(",".join(s + (["ADBE"] if "ADBE" not in s else [])))')
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          report = json.loads(Path("edgartools-universe.json").read_text())
+          symbols = report.get("symbols")
+          if report.get("primary_provider") != "EdgarTools" or report.get("market") != "US":
+              raise SystemExit("Universe response is not the active US EdgarTools universe.")
+          if not isinstance(symbols, list) or not symbols:
+              raise SystemExit("The Worker returned an empty or invalid active MFI universe.")
+          if report.get("count") != len(symbols):
+              raise SystemExit("Universe count does not match the returned symbol list.")
+          if len(symbols) != len(set(symbols)):
+              raise SystemExit("Universe contains duplicate symbols.")
+          if any(not isinstance(symbol, str) or not re.fullmatch(r"[A-Z0-9.-]{1,15}", symbol) for symbol in symbols):
+              raise SystemExit("Universe contains an invalid ticker.")
+          print(f"Validated {len(symbols)} unique active US MFI symbols.")
+          PY
+          SYMBOLS=$(python -c 'import json; d=json.load(open("edgartools-universe.json")); s=d["symbols"]; print(",".join(s + (["ADBE"] if "ADBE" not in s else [])))')
           if [ -z "$SYMBOLS" ]; then
             echo "::error::The Worker returned an empty active MFI universe."
             exit 1
@@ -92,7 +111,30 @@ jobs:
           BAKEOFF_SYMBOLS: "${{ (github.event_name == 'push' && !contains(github.event.head_commit.message, '[full-universe]')) && 'ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM' || (github.event.inputs.symbols != '' && github.event.inputs.symbols || steps.universe.outputs.symbols) }}"
           MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '2026-11-18' }}"
           MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || '' }}"
-        run: python scripts/edgartools_bakeoff.py
+        run: |
+          python scripts/edgartools_bakeoff.py
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = json.loads(Path("edgartools-bakeoff.json").read_text())
+          requested = {symbol.strip().upper() for symbol in os.environ["BAKEOFF_SYMBOLS"].split(",") if symbol.strip()}
+          companies = report.get("companies", [])
+          actual = [str(company.get("symbol", "")).upper() for company in companies]
+          if report.get("primary_provider") != "EdgarTools" or report.get("production_data_modified") is not False:
+              raise SystemExit("Extraction report failed provider or production-immutability checks.")
+          if len(actual) != len(set(actual)) or set(actual) != requested:
+              raise SystemExit(f"Extraction coverage mismatch: requested={len(requested)}, returned={len(actual)}.")
+          allowed = {"supported", "unsupported_provider", "extraction_error"}
+          for company in companies:
+              status = company.get("provider_status")
+              if status not in allowed:
+                  raise SystemExit(f"{company.get('symbol')}: invalid provider status {status!r}.")
+              if status == "supported":
+                  filing = company.get("filing") or {}
+                  if not (filing.get("accession_number") or filing.get("accession")) or not (filing.get("period_of_report") or filing.get("period")):
+                      raise SystemExit(f"{company.get('symbol')}: supported extraction is missing accession/period.")
+          print(f"Validated extraction coverage for all {len(actual)} requested symbols.")
+          PY
       # Pushes remain regression-only unless the commit message explicitly contains
       # [full-universe]. Scheduled/manual/full-universe runs post raw evidence after discovery.
       - name: Ingest EdgarTools filing evidence (raw, no ranking changes)
@@ -110,7 +152,22 @@ jobs:
             -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
             -H "Content-Type: application/json" \
             --data-binary @edgartools-bakeoff.json \
-            "$EDGARTOOLS_INGEST_URL"
+            "$EDGARTOOLS_INGEST_URL" > edgartools-ingest-response.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          extraction = json.loads(Path("edgartools-bakeoff.json").read_text())
+          response = json.loads(Path("edgartools-ingest-response.json").read_text())
+          expected = len(extraction.get("companies", []))
+          unsupported = sorted(company["symbol"] for company in extraction["companies"] if company.get("provider_status") == "unsupported_provider")
+          if response.get("received") != expected or response.get("ingested") != expected:
+              raise SystemExit(f"Raw evidence ingestion incomplete: expected={expected}, received={response.get('received')}, ingested={response.get('ingested')}.")
+          if sorted(response.get("unsupported_provider", [])) != unsupported:
+              raise SystemExit("Ingestion unsupported-provider coverage does not match extraction report.")
+          if response.get("production_fundamentals_changed") is not False or response.get("rankings_changed") is not False:
+              raise SystemExit("Ingestion did not confirm production immutability.")
+          print(f"Validated raw ingestion: {response['ingested']} / {expected} company records accepted; unsupported={len(unsupported)}.")
+          PY
       - name: Run read-only accounting resolver preview
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
         env:
@@ -137,6 +194,13 @@ jobs:
           if report.get("production_fundamentals_changed") is not False or report.get("rankings_changed") is not False:
               raise SystemExit("Resolver preview did not confirm production and ranking immutability.")
           print(f"Resolver: {report.get('resolver')}; rows: {len(report.get('resolutions', []))}")
+          universe = json.loads(Path("edgartools-universe.json").read_text())
+          if summary.get("active_universe") != universe.get("count"):
+              raise SystemExit("Resolver active-universe count does not match the refreshed MFI universe.")
+          if summary.get("awaiting_evidence") != 0:
+              raise SystemExit("Some active-universe companies are still missing EdgarTools evidence after ingestion.")
+          if summary.get("supported", 0) + summary.get("unsupported_provider", 0) != summary.get("active_universe"):
+              raise SystemExit("Resolver provider coverage does not reconcile to the active universe.")
           PY
       - name: Run read-only MFI ranking preview
         if: hashFiles('edgartools-resolver-preview.json') != '' && vars.EDGARTOOLS_INGEST_URL != ''
@@ -167,6 +231,15 @@ jobs:
         run: |
           python -m unittest discover -s scripts -p "test_validate_mfi_ranking_preview.py" -v
           python scripts/validate_mfi_ranking_preview.py edgartools-mfi-ranking-preview.json
+      - name: Validate full-universe extraction and ingestion
+        if: always() && hashFiles('edgartools-universe.json') != '' && hashFiles('edgartools-bakeoff.json') != '' && hashFiles('edgartools-ingest-response.json') != '' && hashFiles('edgartools-resolver-preview.json') != '' && hashFiles('edgartools-mfi-ranking-preview.json') != ''
+        run: |
+          python scripts/validate_edgartools_pipeline.py \
+            --universe edgartools-universe.json \
+            --extraction edgartools-bakeoff.json \
+            --ingestion edgartools-ingest-response.json \
+            --resolver edgartools-resolver-preview.json \
+            --ranking edgartools-mfi-ranking-preview.json
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
@@ -207,7 +280,9 @@ jobs:
         with:
           name: edgartools-bakeoff
           path: |
+            edgartools-universe.json
             edgartools-bakeoff.json
+            edgartools-ingest-response.json
             edgartools-resolver-preview.json
             accounting-review-queue.json
             accounting-review-queue.csv
