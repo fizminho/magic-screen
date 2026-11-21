@@ -164,6 +164,7 @@ The accounting review queue now classifies selected annual balance-sheet face ro
 | Notes receivable / loans receivable | Separate financial asset | Do not treat strategic or affiliate notes as cash equivalents |
 | Lease liabilities | Separate lease category | If included in EV, align EBIT/operating-lease expense treatment consistently |
 | Noncontrolling interests | Separate EV adjustment | Decide consistently whether consolidated EBIT requires NCI in EV |
+| Total shareholders equity including NCI | Not an NCI amount | Never substitute the entire equity subtotal for the separately reported NCI balance |
 | Customer escrow assets and related payables | Exclude matched customer funds from company cash and debt | Reconcile asset/payable pairing; never count customer funds as unrestricted corporate cash |
 | Royalty, sale-leaseback and other financing obligations | Separate financing category | Require instrument-level debt-like assessment; do not classify by keyword alone |
 
@@ -182,6 +183,7 @@ The accounting review queue now classifies selected annual balance-sheet face ro
 - The queue's ev_scope_evidence is derived from non-dimensional, non-abstract annual balance-sheet face rows only.
 - Each row carries its exact filing accession, fiscal period, amount, classification, policy status and production_approved=false / resolver_input=false.
 - The queue does not infer an absent asset or liability, aggregate rows, net restricted cash, pair escrow balances, approve a policy, or change candidate EV.
+- NCI evidence requires a separately identified noncontrolling/minority-interest line; a total shareholders-equity subtotal that merely includes NCI is not classified as NCI.
 - Classification is a triage hint. For example, a generic marketable securities label is not proof of debt-security composition or cash equivalence; inspect the issuer note before any policy decision.
 - The category inventory is intentionally broader than conventional debt so the review does not lose sight of leases, investments, customer funds, NCI and financing-like obligations.
 
