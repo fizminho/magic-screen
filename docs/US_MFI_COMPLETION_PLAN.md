@@ -146,3 +146,15 @@ The next P1 pass now has accession-matched FY2025 filing evidence for PBI and SG
 - **PBI:** invested-capital arithmetic reproduces **-$261.427m**, but Pitney Bowes has substantial finance receivables, customer deposit liabilities, rental equipment and lease assets. The standard operating-company denominator and EBIT reconstruction are not ready for promotion.
 - **SGHC:** the FY2025 20-F explicitly presents USD millions. The $357m operating subtotal can be reconstructed from the operating lines, but a $17.3m noncurrent facility balance coexists with on-demand NGN loans of unspecified amount, leaving current borrowing unresolved. $6m of amounts segregated for users and $16m fixed deposits remain separate from the $513m cash-equivalent line.
 - Both issuers remain review-only. No production fundamentals, ratios, eligibility or rankings were changed.
+
+
+## Third P1 filing review: GTM, HPQ, HRMY, SSTK and XPOF (21 November 2026)
+
+The remaining five P1 issuers now have a filing-level evidence worksheet: [GTM, HPQ, HRMY, SSTK and XPOF review](US_MFI_GTM_HPQ_HRMY_SSTK_XPOF_REVIEW_2026-11-21.md). This closes several evidence-location questions but leaves the negative or unresolved invested-capital candidates unranked.
+
+- **GTM:** $225.7m is directly reported GAAP income from operations. The -$16.3m denominator reproduces from current assets, current liabilities and net PP&E; $175.9m cash, $4.0m short-term investments and $9.8m restricted cash are distinct. Large unearned revenue, lease liabilities and a $2,731.9m tax receivable agreement liability need scope review.
+- **HPQ:** $3,174m is directly reported earnings from operations. The -$3,756m denominator reproduces. The filing separately reports $3,690m cash and $15m restricted cash, correcting the earlier register description that treated the cash line as combined.
+- **HRMY:** $208.469m is directly reported operating income. The balance sheet reports $907.014m current assets and $252.132m current liabilities, but no separate PP&E line was located; invested capital stays unresolved rather than assuming PP&E is zero.
+- **SSTK:** $75.059m is directly reported income from operations. Current debt of $158.110m includes a $155m revolver; the $116.639m noncurrent term loan and $25.582m lease liabilities are separate. Negative working capital is heavily influenced by deferred revenue and contributor royalties payable.
+- **XPOF:** $19.848m is directly reported operating income. The filing note separates $33.7m cash from $12.2m restricted cash. The -$10.438m denominator reproduces; 28% noncontrolling ownership in XPO LLC and the debt carrying-value bridge remain review points.
+- All five remain review-only. No production fundamentals, ratios, eligibility or rankings were changed.
