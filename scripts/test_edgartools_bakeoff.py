@@ -893,6 +893,17 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
         self.assertTrue(
             diagnostics["near_zero_positive_denominator_from_negative_working_capital"]
         )
+        self.assertTrue(
+            diagnostics["negative_working_capital_offsets_at_least_95pct_of_net_ppe"]
+        )
+        self.assertFalse(
+            diagnostics["negative_working_capital_offsets_at_least_99pct_of_net_ppe"]
+        )
+        self.assertAlmostEqual(
+            diagnostics["invested_capital_as_pct_of_net_ppe"], 3.2064, places=3
+        )
+        self.assertEqual(diagnostics["net_ppe_only_reference_denominator"], 522_197_000)
+        self.assertTrue(diagnostics["net_ppe_only_is_sensitivity_not_alternative_policy"])
 
     def test_invested_capital_does_not_flag_positive_working_capital_as_offset(self):
         result = invested_capital_review({

@@ -363,3 +363,14 @@ These are candidate-evidence dispositions, not approved debt classifications. Th
 - Every record remains `automatic_aggregation=false`, `production_approved=false`, `resolver_input=false` and `debt_candidate_promoted=false`.
 
 The CSV export was verified in the same successful workflow artifact and contains the `debt_candidate_evidence_review` and source columns. No production fundamentals, EV, earnings yield, return on capital, eligibility or ranking changed.
+
+
+## Invested-capital denominator sensitivity diagnostics (21 Nov 2026)
+
+The deterministic review now adds two stricter negative-working-capital offset thresholds (95% and 99%), the calculated invested-capital denominator as a percentage of net PP&E, and the net-PP&E-only reference denominator. These are sensitivity indicators, not a replacement formula or an alternative policy.
+
+For example, the existing regression fixture with working capital of **-$505.452m** and net PP&E of **$522.197m** produces invested capital of **$16.745m**, only **3.2064% of net PP&E**. Negative working capital offsets **96.7936%** of net PP&E. The 95% flag is therefore true, while the 99% flag is false.
+
+The net-PP&E-only amount is explicitly labelled a reference denominator. It is not used to calculate candidate ROC, eligibility or ranking. No working-capital floor, denominator adjustment or automatic exclusion is introduced. The existing formula remains current assets minus current liabilities plus net PP&E, and all outputs remain review-only.
+
+Regression coverage verifies the 95%/99% thresholds, denominator-to-PP&E ratio and sensitivity-only guardrail. Production fundamentals, ratios and rankings remain unchanged.

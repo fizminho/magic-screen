@@ -1021,6 +1021,19 @@ def invested_capital_review(balance_review: dict[str, Any]) -> dict[str, Any]:
             negative_working_capital_offset_ratio >= 0.90
             if negative_working_capital_offset_ratio is not None else False
         ),
+        "negative_working_capital_offsets_at_least_95pct_of_net_ppe": (
+            negative_working_capital_offset_ratio >= 0.95
+            if negative_working_capital_offset_ratio is not None else False
+        ),
+        "negative_working_capital_offsets_at_least_99pct_of_net_ppe": (
+            negative_working_capital_offset_ratio >= 0.99
+            if negative_working_capital_offset_ratio is not None else False
+        ),
+        "invested_capital_as_pct_of_net_ppe": (
+            round((value / net_ppe) * 100, 4) if net_ppe != 0 else None
+        ),
+        "net_ppe_only_reference_denominator": round(net_ppe, 2),
+        "net_ppe_only_is_sensitivity_not_alternative_policy": True,
         "near_zero_positive_denominator_from_negative_working_capital": (
             value > 0 and negative_working_capital_offset_ratio is not None
             and negative_working_capital_offset_ratio >= 0.90
