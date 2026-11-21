@@ -216,3 +216,8 @@ The queue summary exposes `filing_debt_note_manual_reviews_available`; rows with
 ### Actionable scope review metadata
 
 Each accession-bound filing debt-note record also carries an explicit `evidence_scope`, `manual_review_questions` and `prohibited_inferences` list. This separates instrument-level evidence (for example, an undrawn revolver or royalty financing arrangement) from issuer-wide debt conclusions. Reviewers receive exact follow-up questions and unsafe inferences to avoid. These fields remain descriptive triage metadata only: no priority escalation, debt amount adjustment, resolver input, eligibility change or production write is triggered by them.
+
+
+### CI guard for curated debt-note evidence
+
+The EdgarTools workflow runs the accounting review-queue regression suite and validates every accession-bound debt-note review in the generated artifact. CI checks that the summary count matches the attached rows, each review includes its evidence scope and manual-review guidance, and every review remains `review_only`, outside resolver inputs, and unpromoted to conventional debt. The queue must also continue to confirm `production_write=false`. This is a regression guard only; it does not change accounting classifications or ranking policy.
