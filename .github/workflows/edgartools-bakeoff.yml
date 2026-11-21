@@ -298,7 +298,7 @@ jobs:
         run: python scripts/validate_mfi_universe_coverage.py --universe edgartools-universe.json --extraction edgartools-bakeoff.json --resolver edgartools-resolver-preview.json --ranking edgartools-mfi-ranking-preview.json
       - name: Build lease and ROU evidence coverage audit
         if: always() && hashFiles('edgartools-bakeoff.json') != ''
-        run: node scripts/build_lease_rou_coverage_report.mjs
+        run: node scripts/build_lease_rou_coverage_report.mjs edgartools-bakeoff.json lease-rou-coverage.json lease-rou-coverage.md edgartools-universe.json
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
