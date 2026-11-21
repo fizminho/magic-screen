@@ -3,7 +3,8 @@ function valueAt(row, period) {
   const v = row?.values?.[period];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
-export function buildLeaseRouCoverage(extraction) {
+export function buildLeaseRouCoverage(extraction, universe = null) {
+  const universeSymbols = Array.isArray(universe?.symbols) ? new Set(universe.symbols) : null;
   const issuers = (extraction?.companies ?? []).filter(c => c && typeof c.symbol === "string").map(c => {
     const period = c.filing?.period_of_report ?? c.filing?.report_date ?? null;
     const currency = c.reporting_currency_review?.currency ?? c.reporting_currency ?? "unknown";
@@ -35,7 +36,8 @@ export function buildLeaseRouCoverage(extraction) {
   const supported = issuers.filter(x=>x.provider_status==="supported");
   const rou = supported.flatMap(x=>x.rou_assets), leases=supported.flatMap(x=>x.lease_liabilities), embedded=supported.flatMap(x=>x.embedded_rou_in_net_ppe);
   return { generated_at:new Date().toISOString(), primary_provider:extraction?.primary_provider ?? null,
-    summary:{ extracted_supported_issuers:supported.length,
+    summary:{ active_universe_issuers:issuers.length, supported_active_issuers:supported.length,
+      unsupported_active_issuers:issuers.filter(x=>x.provider_status==="unsupported_provider").length,
       issuers_with_separately_reported_rou_assets:supported.filter(x=>x.rou_assets.length).length,
       issuers_with_lease_liability_rows:supported.filter(x=>x.lease_liabilities.length).length,
       issuers_with_rou_embedded_in_net_ppe:supported.filter(x=>x.embedded_rou_in_net_ppe.length).length,
@@ -70,9 +72,10 @@ export function renderLeaseRouCoverageMarkdown(report) {
   return lines.join("\n");
 }
 if (process.argv[1] && import.meta.url === new URL("file://"+process.argv[1]).href) {
-  const input=process.argv[2]??"edgartools-bakeoff.json", jsonOut=process.argv[3]??"lease-rou-coverage.json", mdOut=process.argv[4]??"lease-rou-coverage.md";
-  const report=buildLeaseRouCoverage(JSON.parse(fs.readFileSync(input,"utf8")));
+  const input=process.argv[2]??"edgartools-bakeoff.json", jsonOut=process.argv[3]??"lease-rou-coverage.json", mdOut=process.argv[4]??"lease-rou-coverage.md", universePath=process.argv[5];
+  const universe=universePath && fs.existsSync(universePath) ? JSON.parse(fs.readFileSync(universePath,"utf8")) : null;
+  const report=buildLeaseRouCoverage(JSON.parse(fs.readFileSync(input,"utf8")), universe);
   fs.writeFileSync(jsonOut,JSON.stringify(report,null,2)+"\n");
   fs.writeFileSync(mdOut,renderLeaseRouCoverageMarkdown(report)+"\n");
-  console.log("Built lease/ROU evidence coverage for "+report.summary.extracted_supported_issuers+" supported issuers; production unchanged.");
+  console.log("Built lease/ROU evidence coverage for "+report.summary.supported_active_issuers+" supported issuers; production unchanged.");
 }
