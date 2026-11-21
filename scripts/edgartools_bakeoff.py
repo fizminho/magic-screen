@@ -435,6 +435,70 @@ def manual_enterprise_value_scenario_review(
     }
 
 
+NOTE_FOCUS_TERMS = ["Debt", "Cash", "Lease", "Equity", "Financing", "Commitments", "Contingencies", "Related Party"]
+NOTE_TOPIC_PATTERNS = {
+    "debt_scope": re.compile(r"\b(debt|borrowings?|loans?|credit facilities|commercial paper|notes payable)\b", re.I),
+    "cash_scope": re.compile(r"\b(cash and cash equivalents|restricted cash|escrow|customer funds|marketable securities|short.?term investments)\b", re.I),
+    "lease_scope": re.compile(r"\b(lease liabilities?|right.of.use|\bROU\b|sale.leaseback)\b", re.I),
+    "nci_scope": re.compile(r"\b(non.?controlling interest|minority interest|ownership interest|noncontrolling interests)\b", re.I),
+    "financing_scope": re.compile(r"\b(supplier finance|vendor financing|factoring|receivables financing|royalty financing|tax receivable agreement|failed sale.leaseback|sale.leaseback financing|construction financing)\b", re.I),
+}
+
+
+def filing_note_review(filing_obj: Any) -> dict[str, Any]:
+    """Extract bounded, topic-matched snippets from notes in the selected annual filing."""
+    try:
+        notes = getattr(filing_obj, "notes", None)
+        if notes is None:
+            return {"status": "not_available", "candidate_count": 0, "candidates": [],
+                    "note": "EdgarTools did not expose structured notes for this filing object."}
+        markdown = notes.to_markdown(focus=NOTE_FOCUS_TERMS)
+        if not isinstance(markdown, str) or not markdown.strip():
+            return {"status": "no_matching_notes", "candidate_count": 0, "candidates": []}
+        headings = list(re.finditer(r"(?m)^#{1,6}\s+(.+?)\s*$", markdown))
+        sections = []
+        if headings:
+            for index, heading in enumerate(headings):
+                end = headings[index + 1].start() if index + 1 < len(headings) else len(markdown)
+                sections.append((heading.group(1).strip(), markdown[heading.end():end]))
+        else:
+            sections.append(("Focused filing notes", markdown))
+        candidates = []
+        for title, body in sections:
+            lines = body.splitlines()
+            matched_indexes = {
+                index for index, line in enumerate(lines)
+                if any(pattern.search(line) for pattern in NOTE_TOPIC_PATTERNS.values())
+            }
+            if not matched_indexes:
+                continue
+            selected_indexes = set()
+            for index in matched_indexes:
+                selected_indexes.update(range(max(0, index - 2), min(len(lines), index + 3)))
+            excerpt = "\n".join(lines[index] for index in sorted(selected_indexes)).strip()
+            topics = [topic for topic, pattern in NOTE_TOPIC_PATTERNS.items() if pattern.search(excerpt)]
+            if not topics:
+                continue
+            candidates.append({
+                "note_id": f"note:{len(candidates)}",
+                "title": title[:180],
+                "topics": topics,
+                "excerpt": excerpt[:1200],
+            })
+            if len(candidates) >= 12:
+                break
+        return {
+            "status": "candidates_found" if candidates else "no_matching_note_evidence",
+            "candidate_count": len(candidates),
+            "candidates": candidates,
+            "source": "selected_annual_filing_structured_notes",
+            "guardrail": "Bounded note excerpts are untrusted filing evidence for review only; they do not approve accounting classifications or production values.",
+        }
+    except Exception as exc:
+        return {"status": "extraction_error", "candidate_count": 0, "candidates": [],
+                "error": f"{type(exc).__name__}: {exc}"}
+
+
 def filing_metadata(filing: Any) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name in METADATA_FIELDS:
@@ -1749,6 +1813,7 @@ def extract_company(symbol: str) -> dict[str, Any]:
         # ratios, eligibility decisions or Magic Formula ranking.
         result["ebit_bridge"] = build_ebit_bridge(result["statements"]["income_statement"])
         fiscal_period = str(result["filing"].get("period_of_report") or "")
+        result["filing_note_review"] = filing_note_review(filing_obj)
         result["filing_specific_review"] = filing_specific_review(
             symbol, result["filing"], result["ebit_bridge"], result["statements"]
         )
