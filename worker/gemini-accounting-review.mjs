@@ -175,10 +175,7 @@ function categoryEvidence(company, key) {
       parent_abstract_concept: cleanText(candidate?.parent_abstract_concept, 180),
       level: finiteNumber(candidate?.level),
       balance: cleanText(candidate?.balance, 30),
-      row_index: Number.isInteger(candidate?.row_index) ? candidate.row_index : null,
-      parent_concept: cleanText(candidate?.parent_concept, 180),
-      parent_abstract_concept: cleanText(candidate?.parent_abstract_concept, 180),
-      level: finiteNumber(candidate?.level)
+      row_index: Number.isInteger(candidate?.row_index) ? candidate.row_index : null
     }))
   };
 }
