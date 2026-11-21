@@ -123,3 +123,5 @@ The review queue now attaches each issuer's current shadow rank, combined score,
 - The frontend exposes an all-cohort legacy-versus-shadow reconciliation table for all 30 active MFI candidates. It includes missing legacy rows and unranked shadow rows instead of limiting comparison to the five ranked names.
 - The next review pass should close evidence questions issuer by issuer, starting with P1 names and the five shadow-ranked issuers. Policy sign-off remains a human accounting decision.
 - Production cutover remains blocked until accounting review, reconciliation and explicit release approval are complete.
+
+The latest review-triage update adds deterministic issuer-specific next actions to both the JSON and CSV accounting queues, and the frontend now provides a full 30-name legacy-versus-shadow reconciliation view. The accounting regression tests, queue generation, shadow ranking validator and build passed on the updated code. A fresh full-universe run is being triggered to revalidate dynamic universe refresh and raw ingestion with these changes.
