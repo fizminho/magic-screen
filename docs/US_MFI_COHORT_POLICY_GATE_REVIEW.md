@@ -1,7 +1,7 @@
 # US MFI cohort policy gate review
 
 **As of:** 21 November 2026  
-**Source run:** EdgarTools bakeoff run 44894196880, commit `ca685fa809c731e9601df75b33f7f96d4dbf04ad`  
+**Source run:** EdgarTools bakeoff run 44900789031, commit `4a5447c29db81b1794aeecfe127391dd0fe71e66`  
 **Policy:** `us_mfi_accounting_policy_v1_proposed`  
 **Status:** review-only; owner approval required  
 **Production writes / fundamentals / rankings changed:** no / no / no
@@ -13,13 +13,13 @@
 | Universe | 30 |
 | EdgarTools supported | 28 |
 | Provider unsupported | 2 |
-| Shadow eligible | 0 |
+| Shadow eligible | 1 (IRWD) |
 | Shadow ranked | 0 |
-| Accounting / valuation review | 28 |
+| Accounting / valuation review | 27 |
 | Production approved | 0 |
 | Assessment validation errors | 0 |
 
-The ranking preview now fails closed. No candidate from this cohort is currently eligible for a published or production MFI ranking. The earlier five-name shadow preview (HRB, OTEX, UPWK, IRWD, QTTB) is superseded by the stricter policy-scope gates.
+The preview identifies one shadow-eligible candidate (IRWD), but does not publish numeric ranks because the minimum eligible cohort is five. This is not a production ranking or an accounting approval. The earlier five-name shadow preview (HRB, OTEX, UPWK, IRWD, QTTB) is superseded by the stricter accounting and valuation gates.
 
 ## Most common evidence flags
 
@@ -54,7 +54,7 @@ Counts are issuer occurrences, not mutually exclusive categories. Generic `balan
 1. The immediate bottleneck is no longer data extraction. The latest pipeline successfully generated the 30-company cohort assessment and ranking preview.
 2. Most supported issuers have one or more accounting classification questions. These should be resolved through shared cohort-wide policy decisions, not by inventing issuer-specific formula overrides.
 3. Generic candidate flags must not be treated as confirmed debt, cash, lease, NCI or rental-equipment balances. The filing note and exact period remain the source of classification.
-4. Explicit unresolved scope flags currently block ranking. This is intentionally conservative while the policy is proposed and unapproved.
+4. Explicit unresolved cash, NCI, company-perimeter and separate-financing scope flags block ranking. Generic balance-sheet candidate buckets are evidence-discovery signals, not hard blockers. Mere ROU / lease presence is disclosed but is not a blocker under the proposed baseline, which excludes ROU assets from invested capital and lease liabilities from conventional debt. Owner approval is still required.
 5. A direct-reported EBIT candidate is not the same as an approved EBIT input. Filing-specific EBIT reconstruction remains manual-review-only.
 6. Unsupported providers remain visible exclusions. No fallback provider is silently substituted.
 
@@ -62,7 +62,7 @@ Counts are issuer occurrences, not mutually exclusive categories. Generic `balan
 
 ### Gate 1: owner policy decisions
 
-- Lease liabilities and ROU assets: baseline invested-capital and EV symmetry.
+- Lease liabilities and ROU assets: confirm the proposed baseline (exclude ROU assets from invested capital and lease liabilities from conventional debt) or approve a consistent alternative. Mere presence is not itself a ranking blocker.
 - Cash: unrestricted cash and cash equivalents only; restricted cash, escrow, customer funds and in-transit funds excluded.
 - Marketable securities: separate from cash until a uniform eligibility test is approved.
 - NCI: decide whether and how to adjust EV for non-wholly-owned operating perimeters.
@@ -91,8 +91,8 @@ Counts are issuer occurrences, not mutually exclusive categories. Generic `balan
 
 - No production writes or ranking changes.
 - Missing values remain unknown, never zero.
-- Do not double-count aggregate debt with current/noncurrent components.
+- Do not double-count aggregate debt with current/noncurrent components. If an aggregate debt fact is present, require it to reconcile to uniquely identified current and noncurrent components; if no aggregate fact exists and both components are unique, the missing aggregate is not itself a blocker.
 - Do not deduct restricted cash, escrow or customer funds as unrestricted cash.
-- Do not add ROU assets without the matching approved lease-liability treatment.
+- Do not include ROU assets or lease liabilities in the baseline inputs unless a matching cohort-wide treatment is approved.
 - Do not rank a negative or high-risk near-zero invested-capital denominator.
 - Do not use pre-separation financials against a post-separation market capitalization without an approved comparable bridge.

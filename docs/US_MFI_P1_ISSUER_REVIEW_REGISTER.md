@@ -1,7 +1,7 @@
 # US MFI P1 issuer review register
 
 **As of:** 21 November 2026  
-**Source:** latest successful full-universe EdgarTools run and accession-matched accounting review queue  
+**Source:** EdgarTools bakeoff run 44900789031, commit `4a5447c29db81b1794aeecfe127391dd0fe71e66`, and accession-matched accounting review queue  
 **Purpose:** prioritise human review; not accounting approval  
 **Production writes:** none
 
@@ -12,8 +12,8 @@
 | Active US MFI cohort | 30 |
 | EdgarTools supported | 28 |
 | Provider unsupported | 2 |
-| Shadow eligible / ranked | 0 |
-| Accounting / valuation review exclusions | 28 |
+| Shadow eligible / ranked | 1 / 0 |
+| Accounting / valuation review exclusions | 27 |
 | P1 / P2 / P3 queue | 10 / 10 / 10 |
 | Balance sheets reconciled / unavailable | 28 / 2 |
 | Production-approved shadow rows | 0 |
@@ -36,16 +36,18 @@ Amounts below are the candidate values selected from the stated annual filing pe
 
 ## Current shadow ranking status
 
-The latest successful full-universe run (21 November 2026, commit `ca685fa`) produced **zero eligible and zero ranked issuers**. All 28 EdgarTools-supported issuers remain in accounting / valuation review; two issuers are explicitly excluded because provider evidence is unsupported. This is a deliberate fail-closed result after applying the cohort-wide lease, cash, NCI and financing-scope gates. It is not a production ranking.
+The latest successful full-universe run (21 November 2026, bakeoff run `44900789031`, commit `4a5447c`) produced **one shadow-eligible issuer (IRWD) and zero ranked issuers**. The ranking remains withheld because the proposed policy requires at least five eligible issuers. Twenty-seven supported issuers remain in accounting / valuation review; two issuers are explicitly excluded because provider evidence is unsupported. This is a shadow-only result, not a production ranking or approval.
 
-The five names that appeared in an earlier preview (HRB, OTEX, UPWK, IRWD and QTTB) are no longer eligible under the stricter gates. Their earlier candidate yields and ROC values must not be presented as current ranks or recommendations.
+IRWD passes the current mechanical shadow gates: direct-reported EBIT, a positive invested-capital candidate, uniquely identified current and noncurrent conventional debt components, and a separately identified unrestricted-cash candidate. The filing has no aggregate-debt candidate, so there is no aggregate figure to reconcile against the component sum. This absence is not a mismatch. IRWD still requires owner policy approval and issuer-level sign-off before production use.
+
+The earlier five-name preview (HRB, OTEX, UPWK, IRWD and QTTB) remains superseded. Only IRWD is currently shadow-eligible; the other four are still excluded by their specific EBIT, denominator or scope blockers.
 
 ### Priority evidence requiring sign-off
 
 - **HRB:** FY2026 EBIT candidate $907.686m is reconstructed as revenue less operating expenses and cross-checked against the pretax bridge. It remains manual-review-only. The generic resolver does not select it as a direct reported EBIT.
 - **OTEX:** Note 11 current and noncurrent debt components reconcile exactly to total debt carrying value. Invested capital is only $16.745m because negative working capital offsets most of net PP&E. The candidate ROC is highly denominator-sensitive and must remain withheld.
 - **UPWK:** annual convertible-note carrying value is $359.770m, current; cash/equivalents $294.356m; marketable securities $378.425m remain separate. Restricted cash and customer escrow are excluded from unrestricted cash.
-- **IRWD:** FY2025 convertible notes and revolver balances are annual-period inputs. Later interim repayments must not overwrite the FY2025 snapshot.
+- **IRWD:** the FY2025 direct EBIT, positive invested-capital candidate and unique debt components currently pass shadow eligibility. No aggregate-debt fact is present to reconcile; this is not a debt mismatch. Later interim repayments must not overwrite the FY2025 snapshot. Remains shadow-only pending policy-owner and issuer review.
 - **QTTB:** FY2025 term-loan carrying value is $9.708m, with $6.235m current and $3.473m noncurrent. Restricted cash of $0.647m collateralises venture debt and lease LOCs and is not unrestricted cash.
 
 ## Review order
