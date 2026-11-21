@@ -374,3 +374,25 @@ For example, the existing regression fixture with working capital of **-$505.452
 The net-PP&E-only amount is explicitly labelled a reference denominator. It is not used to calculate candidate ROC, eligibility or ranking. No working-capital floor, denominator adjustment or automatic exclusion is introduced. The existing formula remains current assets minus current liabilities plus net PP&E, and all outputs remain review-only.
 
 Regression coverage verifies the 95%/99% thresholds, denominator-to-PP&E ratio and sensitivity-only guardrail. Production fundamentals, ratios and rankings remain unchanged.
+
+## Top-five invested-capital composition review (21 Nov 2026)
+
+The successful read-only EdgarTools bakeoff artifact from run **44861336228** (commit `0941ee27d8179c83cb0e393f0b09b4f334a7dd58`) was used to compare the current invested-capital denominator with net PP&E for the five shadow-ranked issuers. Values below use the exact annual-filing snapshot attached to that run. Percentages are descriptive; the net-PP&E-only ROC is a sensitivity calculation and is not an alternative Magic Formula policy.
+
+| Issuer | Candidate ROC | Working capital / net PP&E | Invested capital / net PP&E | Net-PP&E-only ROC sensitivity | Interpretation |
+|---|---:|---:|---:|---:|---|
+| OTEX | 6,465.20% | -96.79% | 3.21% | 207.32% | Near-cancellation: negative working capital offsets almost all net PP&E. Highest denominator-risk case in the current top five. |
+| SNDK | 157.36% | 1,068.10% | 1,168.10% | 1,838.13% | Positive working capital is the dominant component; not a negative-working-capital near-zero denominator case. |
+| IRWD | 278.51% | 937.79% | 1,037.79% | 2,890.32% | Positive working capital is much larger than net PP&E; investigate working-capital composition and operating context. |
+| QTTB | 37.83% | 4,464.15% | 4,564.15% | 1,726.46% | Extremely small net PP&E relative to positive working capital; PP&E-only sensitivity is especially unrepresentative. |
+| UPWK | 37.47% | 676.85% | 776.85% | 291.09% | Positive working capital dominates net PP&E; denominator is not near-zero from negative working capital. |
+
+### Review disposition
+
+- **OTEX:** retain the high-severity denominator flag. Its $16.745m invested-capital candidate is only 3.21% of $522.197m net PP&E because $505.452m negative working capital offsets 96.79% of PP&E. The 6,465% ROC should not be interpreted without this warning.
+- **SNDK, IRWD, QTTB and UPWK:** their positive working-capital balances exceed net PP&E by approximately 6.8x to 44.6x. This is a working-capital-dominated capital structure, not the same failure mode as OTEX. Do not replace the denominator with net PP&E; doing so would materially increase the sensitivity ROC for each of these issuers.
+- The six universe members triggering the existing 90% negative-working-capital offset diagnostic are GTM, HPQ, OTEX, PBI, RGS and SSTK. The 95%/99% thresholds further distinguish severity but do not create exclusions.
+- Working-capital composition, seasonality, deferred revenue/customer funding, operating liabilities and business-model context should be reviewed before interpreting extreme ROC. A high ratio alone is not proof of an extraction defect or an economically invalid business.
+- No denominator floor, net-PP&E substitution, issuer exclusion, production approval or ranking adjustment is introduced. The candidate formula remains current assets minus current liabilities plus net PP&E.
+
+The queue reports six high negative-working-capital-offset cases. All top-five composition figures and sensitivities are review-only; production fundamentals, ratios, eligibility and rankings remain unchanged.
