@@ -200,3 +200,16 @@ Full-universe workflow run **44887816976** completed successfully on commit 0d7d
 - Production-approved rows: **0**. Production fundamentals and rankings were not changed.
 
 The subsequent code commit 54c209ba690bec9b54f70d0a7b768f13b6598ec6 makes curated filing-quality and company-perimeter warnings attach directly from the resolver's exact accession, even when the current extraction artifact does not contain that issuer. This avoids losing a valid curated warning simply because a regression sample omitted the raw issuer record. The new regression test passes; a fresh full-universe run is triggered by the current commit to validate the same behavior across the complete cohort.
+
+
+## P2 financing-obligation filing review: BCRX, PRDO and VXRT (21 November 2026)
+
+The first three debt-like financing cases now have a filing-level worksheet: [BCRX, PRDO and VXRT financing-obligation review](US_MFI_P2_FINANCING_OBLIGATION_REVIEW_2026-11-21.md). The filings show three distinct structures, all of which create an identifiable claim on future cash flows but should remain separate from conventional bank/term borrowings until a uniform EV policy is approved.
+
+- **BCRX:** $465.688m royalty financing obligations ($38.455m current and $427.233m noncurrent) accrete effective interest, are repaid from ORLADEYO sales-based royalties, and generated $53.163m non-cash interest expense plus $22.883m principal payments in FY2025. This is strongly financing-like even though the Pharmakon secured term loan was paid off.
+- **PRDO:** $56.992m failed sale-leaseback financing is the remaining liability from a 25-year USAHS campus arrangement. The company retains and depreciates the asset; monthly payments are interest and liability reduction, not rent. Future contractual payments total $154.067m, including $5.043m in 2026. Treat it as a financing claim, not an ordinary operating lease line.
+- **VXRT:** $4.060m sale-of-future-royalties liability ($1.381m current, $2.679m noncurrent) accretes imputed interest. HCRP receives specified Inavir royalty streams through 24 December 2029, and the company states it is not obligated to pay beyond royalties received from Daiichi Sankyo. This is a royalty-limited financing claim, distinct from conventional recourse debt.
+
+A consistent **candidate** EV policy is to surface these balances in a separate financing-obligations bucket and include them in debt-like EV only after accounting-owner approval. Keep conventional borrowings, royalty financing, failed sale-leaseback financing, finance leases and operating leases separately identifiable. Do not add the same amount twice, and do not adjust EBIT selectively issuer by issuer. The candidate policy is not implemented in the resolver or ranking.
+
+The full-universe workflow triggered by commit 260e2c3 is still running at the time of this note; accept its artifact only after it completes successfully. Production fundamentals, ratios, eligibility and rankings remain unchanged.
