@@ -401,7 +401,7 @@ FILING_DEBT_REVIEW_ACTIONS: dict[str, dict[str, Any]] = {
     "UPWK": {"evidence_scope": "reconciled_convertible_note_debt_with_customer_escrow_restricted_cash_and_marketable_securities", "manual_review_questions": ["Confirm 359.770m debt carrying value and August 15, 2026 maturity at the annual reporting date.", "Keep 3.8m restricted cash and 180.752m customer escrow funds outside unrestricted cash.", "Decide whether the 378.425m marketable securities qualify as cash-like assets under a consistent EV policy.", "Determine whether subsequent debt repayment data should affect a current-market-cap ranking that otherwise uses annual filing fundamentals."], "prohibited_inferences": ["Do not count customer escrow assets as company cash when matched by escrow liabilities.", "Do not treat restricted cash as unrestricted.", "Do not automatically add marketable securities to cash equivalents or ignore debt maturity timing."]},
 }
 def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
-    """Attach exact-accession evidence to the review queue only; never approve or promote resolver candidates."""
+    """Attach exact-accession evidence to the read-only review queue only; never approve or promote resolver candidates."""
     review = FILING_DEBT_NOTE_REVIEWS.get(symbol)
     if not review or not accession or review["accession"] != accession:
         return None
