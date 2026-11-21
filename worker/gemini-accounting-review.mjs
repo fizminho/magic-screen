@@ -247,6 +247,37 @@ export async function runGeminiAccountingReview(env, input) {
   });
   if (!response.ok) {
     const body = await response.text();
+    let providerMessage = "";
+    try {
+      const parsedError = JSON.parse(body);
+      providerMessage = String(parsedError?.error?.message ?? "");
+    } catch {
+      providerMessage = body;
+    }
+    const quotaExceeded = [429, 403].includes(response.status)
+      && /quota.{0,40}(exceeded|exhausted)|exceeded.{0,40}quota|current quota/i.test(providerMessage);
+    if (quotaExceeded) {
+      return {
+        symbol: input.symbol, accession: input.accession, task: input.task,
+        status: "QUOTA_EXHAUSTED", review_state: "PENDING_RETRY",
+        cached: false, ai_review_only: true, retryable: false,
+        provider_http_status: response.status,
+        note: "Gemini reported that the project quota is exhausted. No accounting conclusion was produced or cached; this review remains pending until quota is available.",
+        input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
+        model, production_approved: false, production_write: false
+      };
+    }
+    if (response.status === 429) {
+      return {
+        symbol: input.symbol, accession: input.accession, task: input.task,
+        status: "RATE_LIMITED", review_state: "PENDING_RETRY",
+        cached: false, ai_review_only: true, retryable: true,
+        provider_http_status: response.status,
+        note: "Gemini rate-limited this request. No accounting conclusion was produced or cached; retry later.",
+        input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
+        model, production_approved: false, production_write: false
+      };
+    }
     throw new Error("Gemini API HTTP " + response.status + ": " + body.slice(0, 350));
   }
   const payload = await response.json();
