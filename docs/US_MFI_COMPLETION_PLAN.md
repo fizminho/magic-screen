@@ -171,3 +171,8 @@ The remaining three current shadow-ranked issuers now have accession-matched fil
 
 
 The accounting review queue now also carries accession-bound operating-income quality notes for material nonrecurring items. QTTB's FY2025 reported EBIT of $16.902m includes $53.737m of collaboration-arrangement settlement revenue. The queue surfaces this as manual review context only; it does not adjust EBIT, eligibility or rank.
+
+
+## P1 entity-perimeter exception: VSNT
+
+A further P1 comparability blocker has been identified for VSNT. Its FY2025 10-K contains combined historical statements for operations previously run within Comcast, and explicitly warns that those statements may not represent a standalone company. VSNT began regular-way trading on 5 January 2026, after the 2 January separation. The FY2025 balance sheet includes $983m long-term debt and $1,034m restricted cash from senior-note proceeds held in escrow; the major term loans funded on the separation date. The accounting queue now raises an accession-bound P1 entity-perimeter warning and keeps VSNT out of ranked output until comparable standalone annual statements or an approved pro forma bridge exist. No production or ranking inputs are changed.

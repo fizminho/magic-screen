@@ -1223,5 +1223,61 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(item["filing_operating_income_quality_review"]["production_approved"])
         self.assertFalse(item["production_write"])
 
+
+    def test_vsnt_company_perimeter_review_is_accession_bound_and_non_promoting(self):
+        from build_accounting_review_queue import (
+            FILING_COMPANY_PERIMETER_REVIEWS,
+            filing_company_perimeter_review,
+        )
+
+        review = filing_company_perimeter_review("VSNT", "0002067876-26-000010")
+        self.assertIsNotNone(review)
+        self.assertIn("combined historical financial statements", " ".join(review["observations"]))
+        self.assertIn("January 2, 2026", " ".join(review["observations"]))
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertFalse(review["ranking_input_changed"])
+        self.assertIsNone(filing_company_perimeter_review("VSNT", "different-accession"))
+
+    def test_queue_promotes_vsnt_perimeter_mismatch_to_p1_without_changing_rank(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "VSNT",
+                "accession": "0002067876-26-000010",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {
+                    "conventional_debt_status": "incomplete_or_ambiguous_debt_inputs",
+                    "unrestricted_cash_candidate": 55_000_000,
+                },
+            }],
+        }
+        ranking = {
+            "production_write": False,
+            "rankings_changed": False,
+            "rankings": [{
+                "symbol": "VSNT", "magic_formula_rank": None, "magic_formula_score": None,
+                "earnings_yield": None, "return_on_capital": None,
+                "eligibility_status": "excluded_accounting_review", "ranking_eligible": False,
+                "production_approved": False,
+            }],
+        }
+        raw = {"companies": [{
+            "symbol": "VSNT",
+            "filing": {"accession_number": "0002067876-26-000010"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31", "categories": {}},
+            "statements": {"balance_sheet": {"rows": []}},
+        }]}
+        item = build_queue(preview, raw, ranking)["items"][0]
+        self.assertEqual(item["priority"], "P1")
+        self.assertIn("filing_company_perimeter_not_comparable_manual_review", item["issues"])
+        self.assertTrue(any("post-separation" in action for action in item["next_review_actions"]))
+        self.assertIsNone(item["mfi_shadow_ranking"]["rank"])
+        self.assertFalse(item["filing_company_perimeter_review"]["production_approved"])
+        self.assertFalse(item["production_write"])
+
 if __name__ == "__main__":
     unittest.main()

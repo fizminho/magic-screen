@@ -71,3 +71,12 @@ These five are the only names currently passing the preview eligibility gates. A
 - Do not switch to a more favourable invested-capital or cash policy because it improves rank.
 - No queue classification or issuer note in this document authorises a production write.
 
+
+
+## Additional P1 exception: VSNT company-perimeter mismatch
+
+| Ticker | FY2025 accession | Evidence | Review disposition | Next action |
+|---|---|---|---|---|
+| VSNT | 0002067876-26-000010 | FY2025 Form 10-K reports combined historical financial statements for the pre-separation Comcast-operated business; separation completed 2 Jan 2026 and regular-way trading began 5 Jan 2026. Year-end balance sheet includes $983m long-term debt and $1,034m restricted cash from senior-note proceeds in escrow; $1bn Term Loan A and $1bn Term Loan B funded on separation. | **P1 entity-perimeter mismatch** | Do not rank against post-spin-off market cap using pre-spin-off combined financials. Wait for comparable standalone annual statements or an approved pro forma bridge. Keep in coverage and explicitly excluded. |
+
+This is a comparability/period-perimeter blocker, not simply a missing debt tag. The 2025 statements themselves caution that they may not represent results as an independent company.

@@ -1157,6 +1157,46 @@ FILING_OPERATING_INCOME_QUALITY_REVIEWS: dict[str, dict[str, Any]] = {
 }
 
 
+FILING_COMPANY_PERIMETER_REVIEWS: dict[str, dict[str, Any]] = {
+    "VSNT": {
+        "accession": "0002067876-26-000010",
+        "fiscal_period": "2025-12-31",
+        "review_classification": "pre_separation_combined_financials_not_comparable_to_standalone_public_equity",
+        "observations": [
+            "The FY2025 Form 10-K states that the separation from Comcast completed on January 2, 2026 and regular-way trading under VSNT began on January 5, 2026.",
+            "The FY2025 statements are combined historical financial statements for operations previously run within Comcast; the issuer says they are not necessarily representative of results as an independent company and may not reliably indicate future results.",
+            "At December 31, 2025, the combined balance sheet reports 983m long-term debt and 1,034m restricted cash, primarily senior-note proceeds held in escrow pending the separation.",
+            "The 1.0bn Term Loan A and 750m revolving facility were funded/available in connection with the January 2, 2026 separation; an additional 1.0bn Term Loan B was also funded on January 2, 2026.",
+            "The FY2025 filing reports 1,272m operating income, 2,502m current assets, 622m current liabilities and 423m net PP&E, but those amounts describe the pre-separation combined perimeter."
+        ],
+        "interpretation": "Using a post-spin-off VSNT market capitalization with pre-separation combined FY2025 financial statements creates a company-perimeter mismatch. The 2025 cash/debt snapshot also straddles the separation financing: senior-note proceeds were in restricted escrow at year-end, while major term-loan borrowings funded after year-end. This is not a routine missing-debt issue.",
+        "manual_review_questions": [
+            "Should VSNT remain excluded from the MFI ranked cohort until the first standalone annual financial statements are available?",
+            "If any pre-separation historical figures are used for coverage or comparison, define a standalone pro forma bridge and align the debt/cash perimeter to the listed equity."
+        ],
+        "prohibited_inferences": [
+            "Do not treat pre-separation combined financial statements as directly comparable to post-separation standalone market capitalization.",
+            "Do not add the post-year-end term loans to FY2025 debt while also retaining the FY2025 escrow cash without a pro forma separation bridge.",
+            "Do not rank VSNT using these FY2025 combined statements until the company-perimeter issue is resolved."
+        ],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/2067876/000206787626000010/vsnt-20251231.htm",
+        "source": "curated_primary_annual_filing_company_perimeter_review",
+        "status": "review_only",
+        "production_approved": False,
+        "resolver_input": False,
+        "ranking_input_changed": False
+    }
+}
+
+
+def filing_company_perimeter_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
+    """Attach exact-accession entity-perimeter warnings without changing resolver or rank inputs."""
+    review = FILING_COMPANY_PERIMETER_REVIEWS.get(symbol)
+    if not review or not accession or review["accession"] != accession:
+        return None
+    return dict(review)
+
+
 def filing_operating_income_quality_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
     """Attach accession-bound operating-income quality observations without adjusting EBIT."""
     review = FILING_OPERATING_INCOME_QUALITY_REVIEWS.get(symbol)
@@ -1269,6 +1309,18 @@ def build_queue(
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["ev_scope_evidence"] = extract_ev_scope_evidence(raw_company)
             item["ev_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            item["filing_company_perimeter_review"] = filing_company_perimeter_review(item["symbol"], raw_accession)
+            item["filing_company_perimeter_review_source"] = (
+                "curated_primary_annual_filing_company_perimeter_review_same_accession"
+                if item["filing_company_perimeter_review"] else "not_available"
+            )
+            if item["filing_company_perimeter_review"]:
+                item["issues"].append("filing_company_perimeter_not_comparable_manual_review")
+                item["next_review_actions"].append(
+                    "Do not compare post-separation market capitalization with pre-separation combined financial statements; keep the issuer out of ranked output until a comparable standalone annual filing or approved pro forma bridge exists."
+                )
+                item["priority"] = "P1"
+                item["issue_count"] = len(item["issues"])
             item["filing_operating_income_quality_review"] = filing_operating_income_quality_review(item["symbol"], raw_accession)
             item["filing_operating_income_quality_review_source"] = (
                 "curated_primary_annual_filing_operating_income_quality_review_same_accession"
@@ -1341,6 +1393,8 @@ def build_queue(
             item["debt_scope_evidence_source"] = "stored_resolver_preview"
             item["ev_scope_evidence"] = None
             item["ev_scope_evidence_source"] = "stored_resolver_preview"
+            item["filing_company_perimeter_review"] = None
+            item["filing_company_perimeter_review_source"] = "stored_resolver_preview"
             item["filing_operating_income_quality_review"] = None
             item["filing_operating_income_quality_review_source"] = "stored_resolver_preview"
             item["filing_debt_note_review"] = None
@@ -1381,6 +1435,7 @@ def build_queue(
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
             "filing_operating_income_quality_manual_reviews_available": sum(1 for row in rows if row.get("filing_operating_income_quality_review")),
+            "filing_company_perimeter_manual_reviews_available": sum(1 for row in rows if row.get("filing_company_perimeter_review")),
             "filing_debt_note_review_classifications": dict(Counter(
                 (row.get("filing_debt_note_review") or {}).get("review_classification", "unclassified")
                 for row in rows if row.get("filing_debt_note_review")
@@ -1479,7 +1534,7 @@ def main() -> int:
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
         "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
-        "filing_specific_ebit_review_source", "filing_operating_income_quality_review", "filing_operating_income_quality_review_source", "candidate_vs_policy_assessment", "next_review_actions", "production_write",
+        "filing_specific_ebit_review_source", "filing_operating_income_quality_review", "filing_operating_income_quality_review_source", "filing_company_perimeter_review", "filing_company_perimeter_review_source", "candidate_vs_policy_assessment", "next_review_actions", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -1508,6 +1563,9 @@ def main() -> int:
             )
             row["filing_operating_income_quality_review"] = json.dumps(
                 item.get("filing_operating_income_quality_review"), separators=(",", ":")
+            )
+            row["filing_company_perimeter_review"] = json.dumps(
+                item.get("filing_company_perimeter_review"), separators=(",", ":")
             )
             row["mfi_shadow_ranking"] = json.dumps(item.get("mfi_shadow_ranking"), separators=(",", ":"))
             row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))
