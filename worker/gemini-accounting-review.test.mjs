@@ -93,7 +93,7 @@ test("recognizes NCI escalation in the real EdgarTools underscore-based evidence
 
 test("supplies only exact evidence IDs and rejects invalid Gemini finding fields precisely", async () => {
   const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
-  const evidence = { categories: { current_debt: { candidates: [{ evidence_id: "current_debt:0" }] } } };
+  const evidence = { categories: { current_debt: { candidates: [{ evidence_id: "current_debt:0", source_kind: "filing_fact_candidate" }] } } };
   const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
     { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported borrowing.", confidence: "medium" }
   ], unresolved_questions: [] };
@@ -101,4 +101,45 @@ test("supplies only exact evidence IDs and rejects invalid Gemini finding fields
   assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], evidence_id: "current_debt_candidate_0" }] }, "debt_scope", evidence), /evidence_id is missing or not in the supplied evidence allowlist/);
   assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], classification: "debt" }] }, "debt_scope", evidence), /classification is missing or not in the allowed classification list/);
   assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], confidence: "certain" }] }, "debt_scope", evidence), /confidence must be low, medium, or high/);
+});
+
+
+test("only filing-fact candidate IDs are eligible for Gemini findings", async () => {
+  const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
+  const evidence = {
+    categories: { current_debt: { candidates: [
+      { evidence_id: "current_debt:0", source_kind: "filing_fact_candidate" }
+    ] } },
+    structured_review_evidence: [
+      { evidence_id: "ev:conventional_gross_debt_candidate", source_kind: "resolver_summary" },
+      { evidence_id: "ev:lease_liabilities", source_kind: "resolver_summary" }
+    ]
+  };
+  const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
+    { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported current borrowing.", confidence: "high" }
+  ], unresolved_questions: [] };
+  assert.equal(validateGeminiAccountingResponse(base, "debt_scope", evidence).findings.length, 1);
+  for (const evidence_id of ["ev:conventional_gross_debt_candidate", "ev:lease_liabilities"]) {
+    assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], evidence_id }] }, "debt_scope", evidence), /evidence_id is missing or not in the supplied evidence allowlist/);
+  }
+});
+
+
+test("supplies raw NCI and separate financing obligation filing candidates to their tasks", () => {
+  const company = { balance_sheet_fact_review: { categories: {
+    noncontrolling_interest_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [
+      { concept: "us-gaap_NoncontrollingInterestInConsolidatedEntity", label: "Noncontrolling interest in consolidated entity", value: 12000000 }
+    ] },
+    nondebt_financing_obligation_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [
+      { concept: "issuer_SaleLeaseBackFinancingLiability", label: "Sale leaseback financing liability", value: 56000000 }
+    ] }
+  }, unresolved_categories: ["noncontrolling_interest_candidates", "nondebt_financing_obligation_candidates"] } };
+  const resolver = { symbol: "ABC", accession: "a", fiscal_period: "2025-12-31", review_flags: [
+    "noncontrolling_interest_candidates", "nondebt_financing_obligation_candidates"
+  ] };
+  const tasks = listGeminiAccountingEscalations("ABC", company, resolver);
+  const nci = tasks.find(item => item.task === "nci_scope");
+  const financing = tasks.find(item => item.task === "financing_scope");
+  assert.equal(nci?.evidence_count, 1);
+  assert.equal(financing?.evidence_count, 1);
 });
