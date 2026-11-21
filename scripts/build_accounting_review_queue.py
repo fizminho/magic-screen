@@ -318,6 +318,23 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
 # Accession-bound cash / investment scope reviews. These explain the nature and
 # liquidity of selected investment balances; they are not cash-equivalent approvals.
 FILING_EV_SCOPE_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
+    "SGHC": {
+        "accession": "0001628280-26-025609",
+        "method": "cash_availability_regulatory_segregation_and_customer_funds_review",
+        "observations": [
+            "FY2025 cash and cash equivalents total 513m: 45m cash-in-transit and 468m bank balances. Of bank balances, 129m of processor balances are held in wallets accessible on demand.",
+            "The issuer separately reports 6m cash segregated for users under licensing regulations; keep this separate from corporate cash unless the statement presentation proves it is already included in the 513m total.",
+            "The 468m bank-balance disclosure includes 19m in designated regulatory accounts, typically subject to minimum balances, and 12m earmarked for corporate social responsibility programs.",
+            "The issuer says regulatory cash is available for corporate use but minimum balances typically must be maintained. CSR cash is earmarked for community programs."
+        ],
+        "interpretation": "The 513m cash-equivalent total is the reported face candidate, but its accessibility includes processor wallet balances, regulatory minimums and CSR earmarks. The separate 6m user-segregated cash must not be confused with unrestricted corporate cash.",
+        "limitations": [
+            "Do not add the separately disclosed 6m user-segregated cash to corporate cash.",
+            "Do not automatically deduct the 19m regulatory or 12m CSR components from reported cash; assess availability and restrictions consistently across the universe.",
+            "Do not assume processor balances are unavailable: the issuer says the 129m wallet balances are accessible on demand."
+        ],
+        "source_url": "https://s205.q4cdn.com/195659402/files/doc_financials/2025/ar/Super-Group-SGHC-Limited-20-F-Annual-and-Transition-Report-foreign-issuer.pdf",
+    },
     "FHTX": {
         "accession": "0001628280-26-016814",
         "method": "available_for_sale_marketable_securities_composition_and_maturity_policy",
@@ -489,18 +506,35 @@ FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
     },
     "SGHC": {
         "accession": "0001628280-26-025609",
-        "method": "ifrs_borrowing_facility_maturity_review",
-        "observations": ["The 20-F presents 17m interest-bearing borrowings as noncurrent; Note 24 identifies Waterview Facilities A and B maturing March 7, 2030, with combined carrying amount 17.3m.", "The same note lists other loans payable on demand with an unspecified facility amount."],
-        "interpretation": "Noncurrent borrowing candidate is supported; current borrowing scope remains unresolved.",
-        "limitations": ["Do not infer current debt is zero from the missing current face-statement row."],
-        "source_url": "https://s205.q4cdn.com/195659402/files/doc_financials/2025/ar/Super-Group-SGHC-Limited-20-F-Annual-and-Transition-Report-foreign-private-issuer.pdf",
+        "method": "ifrs_borrowing_facility_maturity_and_on_demand_scope_review",
+        "observations": [
+            "The FY2025 20-F reports 17m of interest-bearing loans and borrowings as noncurrent. Note 24 identifies Waterview Facilities A and B, both maturing March 7, 2030, with combined carrying amount 17.3m.",
+            "The same facility table lists other loans denominated in NGN, payable on demand, at 0% interest, but gives the facility amount as unspecified. The filing does not quantify a year-end drawn balance for this row.",
+            "The issuer says it complied with the Waterview financial covenants throughout FY2025 and reported no indication of difficulty complying at the next test. This is not evidence that no default or acceleration could ever occur."
+        ],
+        "interpretation": "The Waterview facilities support a noncurrent borrowing candidate. The separate on-demand NGN loan line has an unspecified facility amount and no disclosed carrying balance in the cited table, so total current debt cannot be concluded from this note alone.",
+        "limitations": [
+            "Do not infer the on-demand NGN loan balance is zero from its unspecified facility amount.",
+            "Do not infer current debt is zero from the 17m noncurrent face-statement row.",
+            "Do not add lease liabilities to conventional debt without a separate lease policy."
+        ],
+        "source_url": "https://s205.q4cdn.com/195659402/files/doc_financials/2025/ar/Super-Group-SGHC-Limited-20-F-Annual-and-Transition-Report-foreign-issuer.pdf",
     },
     "ZVRA": {
         "accession": "0001434647-26-000011",
-        "method": "term_loan_maturity_schedule_review",
-        "observations": ["Debt note reconciles 63.608m principal less 1.680m unamortized discount, issuance costs and PIK interest to 61.928m long-term debt.", "Future principal schedule shows 63.608m due in 2029 and no scheduled principal in 2026-2028."],
-        "interpretation": "Supports noncurrent classification of the reported carrying amount; current debt remains unresolved in the generic resolver.",
-        "limitations": ["Do not convert the current bucket to zero without reviewing acceleration and on-demand provisions."],
+        "method": "term_loan_maturity_schedule_and_subsequent_repayment_review",
+        "observations": [
+            "FY2025 debt note reconciles 63.608m principal less 1.680m unamortized discount, issuance costs and PIK interest to 61.928m long-term debt.",
+            "The contractual maturity is April 5, 2029; the FY2025 principal schedule shows no scheduled payments in 2026, 2027 or 2028 and 63.608m due in 2029.",
+            "The credit agreement permits acceleration upon customary events of default, including non-payment, covenant defaults, insolvency, material judgments and inaccurate representations. This is a contractual remedy, not evidence that an event of default existed at FY2025 year-end.",
+            "Subsequent-event context only: the Q1 2026 Form 10-Q says all outstanding obligations were repaid in full on March 12, 2026, with approximately 63.1m principal including PIK interest plus 1.4m accrued cash interest; the credit agreement and related loan documents were terminated and liens released."
+        ],
+        "interpretation": "The FY2025 filing supports a noncurrent 61.928m carrying-value candidate with no scheduled principal in the next three calendar years. The March 2026 payoff is a subsequent event and must not overwrite the FY2025 balance-sheet snapshot. The generic resolver's current bucket remains unknown pending explicit policy.",
+        "limitations": [
+            "Do not convert the current bucket to zero solely from the maturity schedule; retain the acceleration/default caveat.",
+            "Do not use the March 2026 repayment to rewrite FY2025 debt or mix it with annual EBIT unless the ranking's point-in-time policy explicitly selects subsequent interim data."
+        ],
+        "subsequent_event_source_url": "https://www.sec.gov/Archives/edgar/data/1434647/000143464726000031/zvra-20260331.htm",
         "source_url": "https://www.sec.gov/Archives/edgar/data/1434647/000143464726000011/zvra-20251231.htm",
     },
     "PXED": {
