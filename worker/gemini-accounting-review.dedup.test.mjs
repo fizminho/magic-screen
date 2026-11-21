@@ -32,6 +32,13 @@ class FakeD1 {
         }
         throw new Error("Unexpected D1 first query: " + sql);
       },
+      async all() {
+        if (sql.includes("SELECT response_json") && sql.includes("task<>?")) {
+          const [symbol, accession, task] = values;
+          return { results: [...db.cache.values()].filter(row => row.symbol === symbol && row.accession === accession && row.task !== task).map(row => ({ response_json: row.response_json })) };
+        }
+        return { results: [] };
+      },
       async run() {
         if (sql.includes("CREATE TABLE")) return { success: true };
         if (sql.includes("DELETE FROM gemini_accounting_review_locks")) {
@@ -87,7 +94,7 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
       task: "debt_scope",
       status: "REVIEW_REQUIRED",
       summary: "Two current-debt candidates require instrument-level review.",
-      findings: [{ evidence_id: "current_debt:0", classification: "conventional_debt",
+      findings: [{ evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"], classification: "conventional_debt",
         rationale: "The filing label identifies a debt instrument, but aggregation remains unresolved.",
         confidence: "medium" }],
       unresolved_questions: ["Which candidate represents the reported current-debt total?"]
@@ -175,7 +182,7 @@ test("uses the next model successfully after the preferred model quota is exhaus
     }
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({
       task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Second model completed the review.",
-      findings: [{ evidence_id: "current_debt:0", classification: "conventional_debt",
+      findings: [{ evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"], classification: "conventional_debt",
         rationale: "The filing identifies a debt instrument.", confidence: "medium" }], unresolved_questions: []
     }) }] } }] }), { status: 200, headers: { "content-type": "application/json" } });
   };

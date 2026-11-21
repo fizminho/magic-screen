@@ -95,7 +95,7 @@ test("supplies only exact evidence IDs and rejects invalid Gemini finding fields
   const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
   const evidence = { categories: { current_debt: { candidates: [{ evidence_id: "current_debt:0", source_kind: "filing_fact_candidate" }] } } };
   const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
-    { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported borrowing.", confidence: "medium" }
+    { evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"], classification: "conventional_debt", rationale: "Reported borrowing.", confidence: "medium" }
   ], unresolved_questions: [] };
   assert.equal(validateGeminiAccountingResponse(base, "debt_scope", evidence).findings.length, 1);
   assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], evidence_id: "current_debt_candidate_0" }] }, "debt_scope", evidence), /evidence_id is missing or not in the supplied evidence allowlist/);
@@ -116,7 +116,7 @@ test("only filing-fact candidate IDs are eligible for Gemini findings", async ()
     ]
   };
   const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
-    { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported current borrowing.", confidence: "high" }
+    { evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"], classification: "conventional_debt", rationale: "Reported current borrowing.", confidence: "high" }
   ], unresolved_questions: [] };
   assert.equal(validateGeminiAccountingResponse(base, "debt_scope", evidence).findings.length, 1);
   for (const evidence_id of ["ev:conventional_gross_debt_candidate", "ev:lease_liabilities"]) {
@@ -163,7 +163,7 @@ test("allows exact filing-note evidence IDs but still rejects resolver summaries
     structured_review_evidence: [{ evidence_id: "ev:lease_liabilities", source_kind: "resolver_summary" }]
   };
   const base = { task: "lease_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
-    { evidence_id: "filing_note:0", classification: "lease_liability", rationale: "The note describes lease obligations.", confidence: "medium" }
+    { evidence_id: "filing_note:0", evidence_ids: ["filing_note:0"], classification: "lease_liability", rationale: "The note describes lease obligations.", confidence: "medium" }
   ], unresolved_questions: [] };
   assert.equal(validateGeminiAccountingResponse(base, "lease_scope", evidence).findings.length, 1);
   assert.throws(() => validateGeminiAccountingResponse({
@@ -203,7 +203,7 @@ test("uses distinct failed sale-leaseback and lease liability classifications", 
   const evidence = { filing_note_candidates: [{ evidence_id: "filing_note:1", source_kind: "filing_note_candidate" }] };
   const result = validateGeminiAccountingResponse({
     task: "financing_scope", status: "REVIEW_REQUIRED", summary: "Separate financing treatment requires review.",
-    findings: [{ evidence_id: "filing_note:1", classification: "failed_sale_leaseback_financing", rationale: "The note describes failed sale-leaseback financing.", confidence: "medium" }],
+    findings: [{ evidence_id: "filing_note:1", evidence_ids: ["filing_note:1"], classification: "failed_sale_leaseback_financing", rationale: "The note describes failed sale-leaseback financing.", confidence: "medium" }],
     unresolved_questions: []
   }, "financing_scope", evidence);
   assert.equal(result.findings[0].classification, "failed_sale_leaseback_financing");
@@ -235,4 +235,48 @@ test("reserves a shared request slot in D1 and defaults to a conservative six re
   assert.match(statements[0], /CREATE TABLE IF NOT EXISTS gemini_api_request_gate/);
   assert.match(statements[1], /ON CONFLICT\(gate_key\) DO UPDATE/);
   assert.match(statements[1], /RETURNING next_allowed_at - \? AS scheduled_at/);
+});
+
+
+test("requires every filing evidence ID cited in rationale to be explicitly supported", async () => {
+  const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
+  const evidence = { categories: { financing: { candidates: [
+    { evidence_id: "nondebt_financing_obligation:0", source_kind: "filing_fact_candidate" }
+  ] } }, filing_note_candidates: [
+    { evidence_id: "filing_note:1", source_kind: "filing_note_candidate" }
+  ] };
+  const finding = { evidence_id: "nondebt_financing_obligation:0", evidence_ids: ["nondebt_financing_obligation:0"],
+    classification: "failed_sale_leaseback_financing",
+    rationale: "Filing note filing_note:1 confirms failed sale-leaseback treatment.", confidence: "high" };
+  const base = { task: "financing_scope", status: "ACCEPTED_CANDIDATE", summary: "Supported.", findings: [finding], unresolved_questions: [] };
+  assert.throws(() => validateGeminiAccountingResponse(base, "financing_scope", evidence), /every filing evidence ID cited in rationale/);
+  const accepted = validateGeminiAccountingResponse({ ...base, findings: [{ ...finding,
+    evidence_ids: ["nondebt_financing_obligation:0", "filing_note:1"] }] }, "financing_scope", evidence);
+  assert.deepEqual(accepted.findings[0].evidence_ids, ["nondebt_financing_obligation:0", "filing_note:1"]);
+});
+
+test("grouping preserves all primary and supporting evidence IDs", async () => {
+  const { groupGeminiAccountingFindings } = await import("./gemini-accounting-review.mjs");
+  const evidence = { categories: { financing: { candidates: [
+    { evidence_id: "fact:0", source_kind: "filing_fact_candidate", value: 56 }
+  ] } }, filing_note_candidates: [
+    { evidence_id: "filing_note:1", source_kind: "filing_note_candidate", excerpt: "Failed sale-leaseback." }
+  ] };
+  const grouped = groupGeminiAccountingFindings([{ evidence_id: "fact:0", evidence_ids: ["fact:0", "filing_note:1"],
+    classification: "failed_sale_leaseback_financing", rationale: "Note filing_note:1 supports classification.", confidence: "high" }], evidence);
+  assert.deepEqual(grouped[0].evidence_ids, ["fact:0", "filing_note:1"]);
+  assert.deepEqual(grouped[0].supporting_evidence.map(item => item.evidence_id), ["fact:0", "filing_note:1"]);
+});
+
+test("cross-task reconciliation flags one evidence ID classified differently", async () => {
+  const { reconcileGeminiCrossTaskFindings } = await import("./gemini-accounting-review.mjs");
+  const conflicts = reconcileGeminiCrossTaskFindings([
+    { evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }
+  ], [{ findings: [{ evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "lease_liability" }] }]);
+  assert.equal(conflicts.length, 1);
+  assert.equal(conflicts[0].evidence_id, "fact:0");
+  assert.deepEqual(conflicts[0].prior_classifications, ["lease_liability"]);
+  assert.deepEqual(reconcileGeminiCrossTaskFindings([
+    { evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }
+  ], [{ findings: [{ evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }] }]), []);
 });
