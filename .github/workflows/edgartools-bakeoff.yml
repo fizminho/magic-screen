@@ -158,6 +158,37 @@ jobs:
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
+      - name: Validate issuer debt-note review guardrails
+        if: always() && hashFiles('accounting-review-queue.json') != ''
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          queue = json.loads(Path("accounting-review-queue.json").read_text())
+          reviews = [
+              item["filing_debt_note_review"]
+              for item in queue.get("items", [])
+              if item.get("filing_debt_note_review")
+          ]
+          expected = queue.get("summary", {}).get("filing_debt_note_manual_reviews_available")
+          if expected != len(reviews):
+              raise SystemExit(f"Debt-note review summary mismatch: summary={expected}, rows={len(reviews)}")
+          for review in reviews:
+              if review.get("status") != "review_only":
+                  raise SystemExit("A curated debt-note review is not marked review_only.")
+              if review.get("production_approved") is not False:
+                  raise SystemExit("A curated debt-note review is production-approved.")
+              if review.get("resolver_input") is not False:
+                  raise SystemExit("A curated debt-note review entered resolver inputs.")
+              if review.get("debt_candidate_promoted") is not False:
+                  raise SystemExit("A curated debt-note review promoted a debt candidate.")
+              for field in ("evidence_scope", "manual_review_questions", "prohibited_inferences"):
+                  if not review.get(field):
+                      raise SystemExit(f"Curated debt-note review missing {field}.")
+          if queue.get("production_write") is not False:
+              raise SystemExit("Accounting review queue does not confirm production_write=false.")
+          print(f"Validated {len(reviews)} accession-bound debt-note reviews; no resolver or production promotion.")
+          PY
       - name: Upload test and resolver reports
         if: always()
         uses: actions/upload-artifact@v4
