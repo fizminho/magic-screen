@@ -616,7 +616,7 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
 type MfiPreviewRow = {
   symbol:string; company_name:string|null; market_cap:number|null; provider_status:string; reporting_currency:string|null;
   ebit_candidate:number|null; invested_capital_candidate:number|null; ebit_status:string;
-  invested_capital_status:string; enterprise_value_candidate_review:any; review_flags:string[];
+  invested_capital_status:string; enterprise_value_candidate_review:any; balance_sheet_candidate_review:any; review_flags:string[];
 };
 function ordinalRanks(rows:any[], key:"earnings_yield"|"return_on_capital") {
   // Classic Greenblatt ordering: highest EY/ROC receives rank 1.
