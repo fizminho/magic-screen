@@ -10,8 +10,9 @@ A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
 - Quote snapshots cached in Cloudflare D1
 - EdgarTools is the designated primary extraction provider for US fundamentals (Python extraction lane; runtime cutover in progress)
 - SEC EDGAR filings remain the underlying source; Company Facts is not a planned fallback provider
-- Earnings Yield and Return on Capital remain gated by deterministic accounting validation and complete-universe checks
-- Combined Magic Formula ranking is published only after every active MFI candidate has usable fundamentals
+- Earnings Yield and Return on Capital remain candidate metrics until deterministic accounting validation and full-universe checks are approved
+- The shadow US MFI preview ranks the accounting-validated subset using classic Greenblatt ordinal-rank sums; unsupported and unresolved candidates remain visible in coverage and are excluded from the ranked subset
+- Production US rankings remain gated until the full universe, accounting policy and shadow validation are approved
 - SEC fundamentals sync runs in the background every 10 minutes, processing up to 10 candidates per invocation
 - Search, sort, market switcher, watchlist and Shariah-status filtering
 - Shariah status remains **Unverified** until a credible screening source is integrated
@@ -19,7 +20,7 @@ A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
 ## Data sources and limitations
 
 - **US candidate list:** Magic Formula Investing. Its screening results are a candidate universe, not a ranked result list.
-- **US financial statements:** SEC EDGAR Company Facts. Current calculations require USD-denominated facts because MFI market capitalisation is in USD. Non-USD facts remain unavailable until an auditable FX conversion process is implemented.
+- **US financial statements:** SEC EDGAR annual filings extracted through EdgarTools. The older Company Facts runtime lane remains a legacy comparison path during migration and is not the designated long-term provider.
 - **Quotes:** Yahoo Finance's unofficial chart endpoint, provided on a best-effort basis without an uptime or usage guarantee.
 - **Bursa Malaysia universe:** imported through the protected universe-import endpoint. Verify listing data against Bursa sources.
 - **Shariah:** no compliance status is inferred from a company name, ticker or sector.

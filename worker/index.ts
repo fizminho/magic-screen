@@ -600,15 +600,16 @@ type MfiPreviewRow = {
   ebit_candidate:number|null; invested_capital_candidate:number|null; ebit_status:string;
   invested_capital_status:string; enterprise_value_candidate_review:any; review_flags:string[];
 };
-function percentileRanks(rows:any[], key:"earnings_yield"|"return_on_capital") {
-  const sorted=[...rows].sort((a:any,b:any)=>a[key]-b[key] || a.symbol.localeCompare(b.symbol));
+function ordinalRanks(rows:any[], key:"earnings_yield"|"return_on_capital") {
+  // Classic Greenblatt ordering: highest EY/ROC receives rank 1.
+  // Exact ties share the average occupied ordinal positions.
+  const sorted=[...rows].sort((a:any,b:any)=>b[key]-a[key] || a.symbol.localeCompare(b.symbol));
   const result=new Map<string,number>();
   for(let i=0;i<sorted.length;) {
     let end=i+1;
     while(end<sorted.length && sorted[end][key]===sorted[i][key]) end++;
     const averageRank=((i+1)+end)/2;
-    const percentile=averageRank/sorted.length*100;
-    for(let j=i;j<end;j++) result.set(sorted[j].symbol,percentile);
+    for(let j=i;j<end;j++) result.set(sorted[j].symbol,averageRank);
     i=end;
   }
   return result;
@@ -637,23 +638,33 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
       if(typeof row.invested_capital_candidate!=="number" || !Number.isFinite(row.invested_capital_candidate) || row.invested_capital_candidate<=0) exclusionReasons.push("Invested capital missing or non-positive");
     }
     const eligible=exclusionReasons.length===0;
+    const eligibilityStatus=eligible?"eligible":row.provider_status==="unsupported_provider"
+      ?"excluded_provider_unsupported":row.provider_status!=="supported"
+      ?"excluded_filing_evidence_unavailable":"excluded_accounting_or_valuation_review";
     return {...row,enterprise_value_candidate:ev,
       earnings_yield:eligible?row.ebit_candidate!/ev!:null,
       return_on_capital:eligible?row.ebit_candidate!/row.invested_capital_candidate!:null,
-      ranking_eligible:eligible,exclusion_reasons:exclusionReasons};
+      ranking_eligible:eligible,eligibility_status:eligibilityStatus,exclusion_reasons:exclusionReasons};
   });
   const eligible=evaluated.filter(row=>row.ranking_eligible);
   const minimumCohort=5;
   if(eligible.length>=minimumCohort) {
-    const ey=percentileRanks(eligible as any,"earnings_yield");
-    const roc=percentileRanks(eligible as any,"return_on_capital");
+    const ey=ordinalRanks(eligible as any,"earnings_yield");
+    const roc=ordinalRanks(eligible as any,"return_on_capital");
     for(const row of eligible as any[]) {
       row.earnings_yield_rank=ey.get(row.symbol)??null;
       row.return_on_capital_rank=roc.get(row.symbol)??null;
-      row.magic_formula_score=(row.earnings_yield_rank+row.return_on_capital_rank)/2;
+      // Classic MFI combines ordinal ranks; lower score is better.
+      row.magic_formula_score=row.earnings_yield_rank+row.return_on_capital_rank;
     }
-    eligible.sort((a:any,b:any)=>b.magic_formula_score-a.magic_formula_score || a.symbol.localeCompare(b.symbol));
-    eligible.forEach((row:any,index:number)=>{row.magic_formula_rank=index+1;});
+    eligible.sort((a:any,b:any)=>a.magic_formula_score-b.magic_formula_score || a.symbol.localeCompare(b.symbol));
+    let previousScore:number|null=null;
+    let previousRank=0;
+    eligible.forEach((row:any,index:number)=>{
+      if(previousScore===null || row.magic_formula_score!==previousScore) previousRank=index+1;
+      row.magic_formula_rank=previousRank;
+      previousScore=row.magic_formula_score;
+    });
   }
   const ranked=new Set(eligible.length>=minimumCohort?eligible.map(row=>row.symbol):[]);
   for(const row of evaluated as any[]) {
@@ -665,14 +676,20 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
     row.production_write=false;
   }
   return {
-    methodology:"Greenblatt-inspired cross-sectional percentile ranking",
-    formulas:{earnings_yield:"EBIT / (market_cap + conventional_gross_debt - unrestricted_cash)",return_on_capital:"EBIT / invested_capital",combined_score:"(EY percentile + ROC percentile) / 2"},
-    ranking_direction:"Higher earnings yield and higher return on capital rank better; ties receive average percentile ranks.",
+    methodology:"Classic Greenblatt Magic Formula ordinal rank sum",
+    formulas:{earnings_yield:"EBIT / (market_cap + conventional_gross_debt - unrestricted_cash)",return_on_capital:"EBIT / invested_capital",combined_score:"EY ordinal rank + ROC ordinal rank"},
+    ranking_direction:"Higher earnings yield and higher return on capital receive lower (better) ordinal ranks; exact metric ties share average occupied ranks; lower combined rank sum is better. Exact combined-score ties share competition rank.",
     minimum_eligible_cohort:minimumCohort,
-    summary:{universe:evaluated.length,eligible:eligible.length,ranked:ranked.size,excluded:evaluated.length-ranked.size},
-    rankings:evaluated.sort((a:any,b:any)=>a.magic_formula_rank==null?(b.magic_formula_rank==null?a.symbol.localeCompare(b.symbol):1):b.magic_formula_rank==null?-1:a.magic_formula_rank-b.magic_formula_rank),
+    summary:{
+      universe:evaluated.length,eligible:eligible.length,ranked:ranked.size,excluded:evaluated.length-ranked.size,
+      unsupported_provider:evaluated.filter(row=>row.eligibility_status==="excluded_provider_unsupported").length,
+      filing_evidence_unavailable:evaluated.filter(row=>row.eligibility_status==="excluded_filing_evidence_unavailable").length,
+      accounting_or_valuation_review:evaluated.filter(row=>row.eligibility_status==="excluded_accounting_or_valuation_review").length
+    },
+    methodology_version:"classic_mfi_ordinal_rank_sum_v1",
+    rankings:evaluated.sort((a:any,b:any)=>a.magic_formula_rank==null?(b.magic_formula_rank==null?a.symbol.localeCompare(b.symbol):1):b.magic_formula_rank==null?-1:a.magic_formula_rank-b.magic_formula_rank || a.symbol.localeCompare(b.symbol)),
     production_fundamentals_changed:false,rankings_changed:false,production_write:false,
-    guardrail:"Shadow preview only. Candidate accounting inputs are not policy-approved. No production fundamentals, ratios, eligibility or rankings are written."
+    guardrail:"Shadow preview only. Candidate accounting inputs are not policy-approved. Unsupported providers remain visible in coverage and are excluded from the ranked subset. No production fundamentals, ratios, eligibility or rankings are written."
   };
 }
 

@@ -8,6 +8,10 @@ on:
       - "scripts/test_edgartools_bakeoff.py"
       - "scripts/build_accounting_review_queue.py"
       - "scripts/test_accounting_review_queue.py"
+      - "scripts/validate_mfi_ranking_preview.py"
+      - "scripts/test_validate_mfi_ranking_preview.py"
+      - "docs/US_MFI_COMPLETION_PLAN.md"
+      - "README.md"
       - "worker/index.ts"
       - "src/App.tsx"
       - "src/styles.css"
@@ -155,6 +159,11 @@ jobs:
               raise SystemExit("Ranking preview did not confirm production immutability.")
           print("Preview-only ranking rows:", len(report.get("rankings", [])))
           PY
+      - name: Validate US MFI ranking policy and coverage
+        if: always() && hashFiles('edgartools-mfi-ranking-preview.json') != ''
+        run: |
+          python -m unittest discover -s scripts -p "test_validate_mfi_ranking_preview.py" -v
+          python scripts/validate_mfi_ranking_preview.py edgartools-mfi-ranking-preview.json
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
