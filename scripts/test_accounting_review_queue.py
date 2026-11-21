@@ -694,5 +694,54 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertIsNone(item["ev_scope_evidence"])
         self.assertEqual(item["ev_scope_evidence_source"], "stored_resolver_preview")
 
+
+    def test_curated_ev_scope_note_reviews_are_accession_bound_and_non_promoting(self):
+        from build_accounting_review_queue import FILING_EV_SCOPE_NOTE_REVIEWS, filing_ev_scope_note_review
+
+        expected = {
+            "FHTX": "0001628280-26-016814",
+            "NRIX": "0001549595-26-000016",
+            "PXED": "0001193125-26-445323",
+            "STRA": "0001013934-26-000006",
+            "ALEC": "0001193125-26-071593",
+            "PLTK": "0001828016-26-000010",
+            "ZVRA": "0001434647-26-000011",
+            "UPWK": "0001627475-26-000012",
+        }
+        self.assertEqual(set(FILING_EV_SCOPE_NOTE_REVIEWS), set(expected))
+        for symbol, accession in expected.items():
+            with self.subTest(symbol=symbol):
+                review = filing_ev_scope_note_review(symbol, accession)
+                self.assertIsNotNone(review)
+                self.assertEqual(review["status"], "review_only")
+                self.assertTrue(review["observations"])
+                self.assertTrue(review["limitations"])
+                self.assertFalse(review["production_approved"])
+                self.assertFalse(review["resolver_input"])
+                self.assertFalse(review["cash_candidate_promoted"])
+                self.assertIsNone(filing_ev_scope_note_review(symbol, "different-accession"))
+
+    def test_queue_attaches_ev_scope_note_review_only_for_matching_accession(self):
+        preview = {
+            "production_fundamentals_changed": False, "rankings_changed": False,
+            "resolutions": [{"symbol": "PXED", "accession": "0001193125-26-445323",
+                             "provider_status": "supported", "enterprise_value_candidate_review": {}}],
+        }
+        raw = {"companies": [{
+            "symbol": "PXED", "filing": {"accession_number": "0001193125-26-445323"},
+            "balance_sheet_fact_review": {"fiscal_period": "2026-08-31", "categories": {}},
+            "statements": {"balance_sheet": {"rows": []}},
+        }]}
+        item = build_queue(preview, raw)["items"][0]
+        self.assertEqual(item["filing_ev_scope_note_review"]["status"], "review_only")
+        self.assertFalse(item["filing_ev_scope_note_review"]["cash_candidate_promoted"])
+        self.assertEqual(item["filing_ev_scope_note_review_source"],
+                         "curated_primary_annual_filing_cash_investment_note_review_same_accession")
+
+        raw["companies"][0]["filing"]["accession_number"] = "different-accession"
+        item = build_queue(preview, raw)["items"][0]
+        self.assertIsNone(item["filing_ev_scope_note_review"])
+        self.assertEqual(item["filing_ev_scope_note_review_source"], "stored_resolver_preview")
+
 if __name__ == "__main__":
     unittest.main()
