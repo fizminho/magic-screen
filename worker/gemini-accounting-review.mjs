@@ -1,4 +1,4 @@
-const PROMPT_VERSION = "gemini-accounting-review-v7";
+const PROMPT_VERSION = "gemini-accounting-review-v8";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const SUPPORTED_TEXT_MODELS = new Set([
@@ -153,7 +153,8 @@ function categoryEvidence(company, key) {
       parent_concept: cleanText(candidate?.parent_concept, 180),
       parent_abstract_concept: cleanText(candidate?.parent_abstract_concept, 180),
       level: finiteNumber(candidate?.level),
-      balance: cleanText(candidate?.balance, 30)
+      balance: cleanText(candidate?.balance, 30),
+      row_index: Number.isInteger(candidate?.row_index) ? candidate.row_index : null
     }))
   };
 }
@@ -345,9 +346,15 @@ export function reconcileGeminiLeaseFinancingOverlap(currentTask, currentFinding
   const currentLeaseRows = candidates("current_lease_liability_candidates");
   const noncurrentLeaseRows = candidates("noncurrent_lease_liability_candidates");
   const noteReconciliation = company?.filing_note_review?.lease_financing_reconciliation ?? {};
+  const faceRows = [...saleLeasebackRows, ...currentLeaseRows, ...noncurrentLeaseRows];
+  const faceRowIndexes = faceRows.map(item => item?.row_index);
+  const distinctFaceRows = faceRows.length >= 3
+    && faceRowIndexes.every(Number.isInteger)
+    && new Set(faceRowIndexes).size === faceRows.length;
   const filingSupportsSeparateObligations =
-    noteReconciliation.status === "separate_obligations_supported_by_filing"
-    && saleLeasebackRows.length > 0 && currentLeaseRows.length > 0 && noncurrentLeaseRows.length > 0;
+    noteReconciliation.status === "financing_treatment_supported"
+    && saleLeasebackRows.length === 1 && currentLeaseRows.length > 0
+    && noncurrentLeaseRows.length > 0 && distinctFaceRows;
   return {
     requires_manual_reconciliation: !filingSupportsSeparateObligations,
     relationship: filingSupportsSeparateObligations
@@ -359,11 +366,25 @@ export function reconcileGeminiLeaseFinancingOverlap(currentTask, currentFinding
         status: noteReconciliation.status,
         matched_signals: noteReconciliation.matched_signals ?? [],
         evidence_excerpt: String(noteReconciliation.evidence_excerpt ?? "").slice(0, 2800),
-        separate_balance_sheet_line_item: saleLeasebackRows[0],
+        separate_balance_sheet_line_item: {
+          evidence_id: "nondebt_financing_obligation:0",
+          concept: saleLeasebackRows[0].concept ?? null,
+          label: saleLeasebackRows[0].label ?? null,
+          value: saleLeasebackRows[0].value,
+          row_index: saleLeasebackRows[0].row_index,
+          parent_concept: saleLeasebackRows[0].parent_concept ?? null
+        },
+        ordinary_lease_balance_sheet_rows: faceRows.slice(1).map(item => ({
+          concept: item.concept ?? null,
+          label: item.label ?? null,
+          value: item.value ?? null,
+          row_index: item.row_index,
+          parent_concept: item.parent_concept ?? null
+        })),
         ordinary_lease_current_candidate_count: currentLeaseRows.length,
         ordinary_lease_noncurrent_candidate_count: noncurrentLeaseRows.length
       },
-      note: "The annual filing separately presents the sale-leaseback financing obligation and the ordinary operating/finance lease liability schedule. The overlap concern is resolved as separate obligations; EV inclusion remains subject to the approved accounting policy."
+      note: "The filing note supports failed sale-leaseback financing treatment, and the same annual filing presents it on a distinct balance-sheet face row from the operating/finance lease-liability rows. The overlap concern is resolved as separate obligations; EV inclusion remains subject to the approved accounting policy."
     } : {
       note: "Both lease-liability and failed sale-leaseback financing findings exist for this issuer and annual filing. Their balances must not be added together unless the filing explicitly proves they are separate obligations."
     })

@@ -446,7 +446,11 @@ NOTE_TOPIC_PATTERNS = {
 
 
 def lease_financing_reconciliation_review(markdown: str) -> dict[str, Any]:
-    """Identify explicit filing evidence that failed sale-leaseback financing is separate from ordinary lease liabilities."""
+    """Identify filing-note evidence for failed sale-leaseback financing treatment.
+
+    Separation from ordinary lease liabilities is determined separately by the
+    Worker using distinct balance-sheet face-row identities from this filing.
+    """
     text = re.sub(r"\s+", " ", str(markdown or ""))
     required_patterns = {
         "failed_sale_leaseback_identified": re.compile(r"failed sale[ -]leaseback", re.I),
@@ -455,9 +459,6 @@ def lease_financing_reconciliation_review(markdown: str) -> dict[str, Any]:
         "payments_reduce_financing_liability": re.compile(
             r"monthly rent payments.{0,500}interest expense and a reduction of the outstanding liability", re.I
         ),
-        "ordinary_lease_liability_schedule_separate": re.compile(
-            r"operating leases total.{0,1200}finance leases total.{0,1200}total lease liabilities", re.I
-        ),
     }
     matched = [name for name, pattern in required_patterns.items() if pattern.search(text)]
     if len(matched) != len(required_patterns):
@@ -465,15 +466,15 @@ def lease_financing_reconciliation_review(markdown: str) -> dict[str, Any]:
             "status": "insufficient_evidence",
             "matched_signals": matched,
             "required_signals": list(required_patterns),
-            "guardrail": "No overlap conclusion is made unless the filing separately identifies the financing obligation and ordinary operating/finance lease liability schedule.",
+            "guardrail": "The note must identify the failed sale-leaseback and explain its financing-liability and payment treatment. Balance-sheet line separation is checked independently.",
         }
     start = re.search(r"failed sale[ -]leaseback", text, re.I).start()
     excerpt = text[max(0, start - 300):min(len(text), start + 2600)]
     return {
-        "status": "separate_obligations_supported_by_filing",
+        "status": "financing_treatment_supported",
         "matched_signals": matched,
         "evidence_excerpt": excerpt[:2800],
-        "guardrail": "This resolves only whether the disclosed balances are separate obligations. It does not decide whether failed sale-leaseback financing or ordinary lease liabilities belong in the production EV definition.",
+        "guardrail": "This supports the accounting nature of the failed sale-leaseback financing only. Distinct balance-sheet face rows must independently establish separation from ordinary lease liabilities, and EV inclusion still requires policy approval.",
     }
 
 
