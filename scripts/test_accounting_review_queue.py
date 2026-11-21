@@ -558,18 +558,21 @@ class AccountingReviewQueueTests(unittest.TestCase):
                          "stored_resolver_preview")
 
     def test_every_curated_debt_note_review_is_scoped_and_non_promoting(self):
-        from build_accounting_review_queue import FILING_DEBT_NOTE_REVIEWS
+        from build_accounting_review_queue import FILING_DEBT_NOTE_REVIEWS, filing_debt_note_review
 
         self.assertGreaterEqual(len(FILING_DEBT_NOTE_REVIEWS), 1)
-        for symbol, review in FILING_DEBT_NOTE_REVIEWS.items():
+        for symbol, source_review in FILING_DEBT_NOTE_REVIEWS.items():
             with self.subTest(symbol=symbol):
+                review = filing_debt_note_review(symbol, source_review["accession"])
+                self.assertIsNotNone(review)
                 self.assertTrue(review.get("accession"))
                 self.assertTrue(review.get("evidence_scope"))
                 self.assertTrue(review.get("manual_review_questions"))
                 self.assertTrue(review.get("prohibited_inferences"))
-                self.assertFalse(review.get("production_approved", False))
-                self.assertFalse(review.get("resolver_input", False))
-                self.assertFalse(review.get("debt_candidate_promoted", False))
+                self.assertEqual(review.get("status"), "review_only")
+                self.assertIs(review.get("production_approved"), False)
+                self.assertIs(review.get("resolver_input"), False)
+                self.assertIs(review.get("debt_candidate_promoted"), False)
 
 if __name__ == "__main__":
     unittest.main()
