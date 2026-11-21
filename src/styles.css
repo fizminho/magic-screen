@@ -345,6 +345,7 @@
 .preview-table td{font-size:10px}
 .preview-table td b{display:block;color:#e4ebf7;font-size:10px}
 .preview-symbol{display:block;color:#7888a3;font:9px "DM Mono";margin-top:3px}
+.preview-legacy-value{display:block;color:#91a0b8;font-size:9px;margin-top:3px}
 .preview-warning{color:#e4c17c;font-size:9px;background:#2a2418;border-radius:4px;padding:4px 6px}
 .preview-empty{padding:20px 0;color:#8795ae;font-size:11px}
 .preview-footnote{margin-top:12px}
