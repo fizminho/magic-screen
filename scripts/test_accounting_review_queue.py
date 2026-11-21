@@ -1279,5 +1279,30 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(item["filing_company_perimeter_review"]["production_approved"])
         self.assertFalse(item["production_write"])
 
+
+    def test_curated_filing_reviews_attach_from_resolver_accession_without_raw_company(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "VSNT",
+                "accession": "0002067876-26-000010",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {},
+            }],
+        }
+        item = build_queue(preview)["items"][0]
+        self.assertEqual(item["priority"], "P1")
+        self.assertEqual(item["filing_company_perimeter_review"]["accession"], "0002067876-26-000010")
+        self.assertIn("filing_company_perimeter_not_comparable_manual_review", item["issues"])
+        self.assertEqual(
+            item["filing_company_perimeter_review_source"],
+            "curated_primary_annual_filing_company_perimeter_review_same_accession",
+        )
+        self.assertFalse(item["filing_company_perimeter_review"]["production_approved"])
+        self.assertFalse(item["production_write"])
+
 if __name__ == "__main__":
     unittest.main()

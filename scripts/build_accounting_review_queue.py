@@ -1259,6 +1259,34 @@ def build_queue(
             "production_approved": shadow.get("production_approved") is True,
             "methodology_version": (ranking_preview or {}).get("methodology_version"),
         } if shadow else None)
+        resolution_accession = resolution.get("accession")
+        item["filing_operating_income_quality_review"] = filing_operating_income_quality_review(
+            item["symbol"], resolution_accession
+        )
+        item["filing_operating_income_quality_review_source"] = (
+            "curated_primary_annual_filing_operating_income_quality_review_same_accession"
+            if item["filing_operating_income_quality_review"] else "not_available"
+        )
+        if item["filing_operating_income_quality_review"]:
+            item["issues"].append("filing_operating_income_quality_review_available_manual_review")
+            item["next_review_actions"].append(
+                "Review material nonrecurring items in the reported operating-income subtotal; do not silently adjust EBIT or change the ranking formula."
+            )
+            item["issue_count"] = len(item["issues"])
+        item["filing_company_perimeter_review"] = filing_company_perimeter_review(
+            item["symbol"], resolution_accession
+        )
+        item["filing_company_perimeter_review_source"] = (
+            "curated_primary_annual_filing_company_perimeter_review_same_accession"
+            if item["filing_company_perimeter_review"] else "not_available"
+        )
+        if item["filing_company_perimeter_review"]:
+            item["issues"].append("filing_company_perimeter_not_comparable_manual_review")
+            item["next_review_actions"].append(
+                "Do not compare post-separation market capitalization with pre-separation combined financial statements; keep the issuer out of ranked output until a comparable standalone annual filing or approved pro forma bridge exists."
+            )
+            item["priority"] = "P1"
+            item["issue_count"] = len(item["issues"])
         raw_company = raw_by_symbol.get(item["symbol"])
         raw_accession = (
             (raw_company or {}).get("filing", {}).get("accession_number")
@@ -1309,29 +1337,6 @@ def build_queue(
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["ev_scope_evidence"] = extract_ev_scope_evidence(raw_company)
             item["ev_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
-            item["filing_company_perimeter_review"] = filing_company_perimeter_review(item["symbol"], raw_accession)
-            item["filing_company_perimeter_review_source"] = (
-                "curated_primary_annual_filing_company_perimeter_review_same_accession"
-                if item["filing_company_perimeter_review"] else "not_available"
-            )
-            if item["filing_company_perimeter_review"]:
-                item["issues"].append("filing_company_perimeter_not_comparable_manual_review")
-                item["next_review_actions"].append(
-                    "Do not compare post-separation market capitalization with pre-separation combined financial statements; keep the issuer out of ranked output until a comparable standalone annual filing or approved pro forma bridge exists."
-                )
-                item["priority"] = "P1"
-                item["issue_count"] = len(item["issues"])
-            item["filing_operating_income_quality_review"] = filing_operating_income_quality_review(item["symbol"], raw_accession)
-            item["filing_operating_income_quality_review_source"] = (
-                "curated_primary_annual_filing_operating_income_quality_review_same_accession"
-                if item["filing_operating_income_quality_review"] else "not_available"
-            )
-            if item["filing_operating_income_quality_review"]:
-                item["issues"].append("filing_operating_income_quality_review_available_manual_review")
-                item["next_review_actions"].append(
-                    "Review material nonrecurring items in the reported operating-income subtotal; do not silently adjust EBIT or change the ranking formula."
-                )
-                item["issue_count"] = len(item["issues"])
             item["filing_debt_note_review"] = filing_debt_note_review(item["symbol"], raw_accession)
             item["filing_debt_note_review_source"] = (
                 "curated_primary_annual_filing_note_review_same_accession"
@@ -1393,10 +1398,6 @@ def build_queue(
             item["debt_scope_evidence_source"] = "stored_resolver_preview"
             item["ev_scope_evidence"] = None
             item["ev_scope_evidence_source"] = "stored_resolver_preview"
-            item["filing_company_perimeter_review"] = None
-            item["filing_company_perimeter_review_source"] = "stored_resolver_preview"
-            item["filing_operating_income_quality_review"] = None
-            item["filing_operating_income_quality_review_source"] = "stored_resolver_preview"
             item["filing_debt_note_review"] = None
             item["filing_debt_note_review_source"] = "stored_resolver_preview"
             item["filing_ev_scope_note_review"] = None
