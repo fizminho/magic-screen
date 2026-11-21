@@ -8,7 +8,8 @@ def row(symbol, provider="supported", eligible=False, rank=None, ey=None, roc=No
             "magic_formula_rank": rank, "earnings_yield_rank": ey, "return_on_capital_rank": roc,
             "magic_formula_score": score, "earnings_yield": ey_value, "return_on_capital": roc_value,
             "ebit_status": "direct_reported_candidate_review_only", "review_flags": [],
-            "enterprise_value_candidate_review": {"debt_reconciliation_status": "reconciled"}}
+            "enterprise_value_candidate_review": {"debt_reconciliation_status": "insufficient_unique_inputs"},
+            "balance_sheet_candidate_review": {"aggregate_debt": {"candidate_count": 0}}}
 
 
 class RankingPreviewTests(unittest.TestCase):
@@ -90,11 +91,16 @@ class RankingPreviewTests(unittest.TestCase):
         errors = validate(self.report([item], 1, 1, minimum=1))
         self.assertTrue(any("high-risk near-zero" in error for error in errors))
 
-    def test_unreconciled_debt_note_cannot_be_ranked(self):
+    def test_missing_aggregate_debt_does_not_block_unique_components(self):
         item = row("AAA", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.2, roc_value=0.3)
-        item["enterprise_value_candidate_review"]["debt_reconciliation_status"] = "insufficient_unique_inputs"
+        self.assertEqual(item["enterprise_value_candidate_review"]["debt_reconciliation_status"], "insufficient_unique_inputs")
+        self.assertEqual(validate(self.report([item], 1, 1, minimum=1)), [])
+
+    def test_present_aggregate_debt_must_reconcile_to_components(self):
+        item = row("AAA", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.2, roc_value=0.3)
+        item["balance_sheet_candidate_review"]["aggregate_debt"]["candidate_count"] = 1
         errors = validate(self.report([item], 1, 1, minimum=1))
-        self.assertTrue(any("debt note and maturity reconciliation" in error for error in errors))
+        self.assertTrue(any("aggregate debt must reconcile" in error for error in errors))
 
     def test_lease_scope_presence_is_disclosed_not_a_hard_blocker(self):
         lease_flags = [

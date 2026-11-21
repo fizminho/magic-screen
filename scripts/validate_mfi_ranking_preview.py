@@ -59,8 +59,11 @@ def validate(report: dict[str, Any]) -> list[str]:
         if unresolved_scope:
             errors.append(f"{symbol}: unresolved lease, cash, NCI or financing scope cannot be ranked before cohort-policy approval")
         ev_review = row.get("enterprise_value_candidate_review") or {}
-        if ev_review.get("debt_reconciliation_status") != "reconciled":
-            errors.append(f"{symbol}: debt note and maturity reconciliation must be complete before ranking")
+        balance_review = row.get("balance_sheet_candidate_review") or {}
+        aggregate_debt = balance_review.get("aggregate_debt") or {}
+        aggregate_debt_count = aggregate_debt.get("candidate_count", 0)
+        if aggregate_debt_count > 0 and ev_review.get("debt_reconciliation_status") != "reconciles_within_1":
+            errors.append(f"{symbol}: aggregate debt must reconcile to unique current and noncurrent components before ranking")
     if summary.get("eligible") != len(eligible):
         errors.append("eligible summary does not reconcile")
     unsupported = [row for row in rows if row.get("provider_status") == "unsupported_provider"]
