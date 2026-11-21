@@ -261,6 +261,19 @@ class CurrencyNormalizationTests(unittest.TestCase):
         ):
             self.assertEqual(mfi_market_cap_usd_millions("EGHSF"), 650.0)
 
+
+    def test_partial_market_cap_override_never_falls_back_to_pinned_values(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "MFI_PRICE_DATE": "2026-11-19",
+                "MFI_MARKET_CAPS_JSON": '{"EGHSF": 650.0}',
+            },
+            clear=False,
+        ):
+            self.assertEqual(mfi_market_cap_usd_millions("EGHSF"), 650.0)
+            self.assertIsNone(mfi_market_cap_usd_millions("ALEC"))
+
     def test_enghouse_usd_market_cap_converts_to_cad_at_mfi_price_date(self):
         market_cap_usd = mfi_market_cap_usd_millions("EGHSF") * 1_000_000
         result = currency_normalization_review(

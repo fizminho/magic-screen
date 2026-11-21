@@ -91,13 +91,13 @@ FRANKFURTER_RATE_CACHE: dict[tuple[str, str, str], dict[str, Any]] = {}
 
 def mfi_market_cap_usd_millions(symbol: str) -> float | None:
     """Return the snapshot's USD market cap in millions, with an optional run override."""
-    values = dict(DEFAULT_MFI_MARKET_CAPS_MILLIONS)
     raw_override = os.environ.get("MFI_MARKET_CAPS_JSON", "").strip()
     requested_price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
-    # INTENTIONAL: never reuse an old market-cap snapshot with a newly selected
-    # quote date. A new date requires a matching explicit market_caps_json map.
+    # INTENTIONAL: an explicit map replaces the pinned snapshot entirely. Never
+    # fill missing tickers from an older market-cap date.
     if not raw_override and requested_price_date != MFI_SNAPSHOT_PRICE_DATE:
         return None
+    values = {} if raw_override else dict(DEFAULT_MFI_MARKET_CAPS_MILLIONS)
     if raw_override:
         parsed = json.loads(raw_override)
         if not isinstance(parsed, dict):
@@ -1784,8 +1784,8 @@ def extract_company(symbol: str) -> dict[str, Any]:
             "value_usd_millions": market_cap_millions,
             "currency": "USD",
             "price_date": mfi_price_date,
-            "snapshot_as_of": MFI_SNAPSHOT_AS_OF if mfi_price_date == MFI_SNAPSHOT_PRICE_DATE else None,
-            "source": "Magic Formula Investing MFI screen snapshot",
+            "snapshot_as_of": market_cap_snapshot_as_of,
+            "source": market_cap_source,
         }
         fx_review = None
         if reporting_currency and reporting_currency != "USD":
@@ -1838,17 +1838,30 @@ def main() -> int:
     if not symbols or any(not re.fullmatch(r"[A-Z0-9.-]{1,12}", symbol) for symbol in symbols):
         raise ValueError("BAKEOFF_SYMBOLS must be a comma-separated list of valid ticker symbols")
 
+    mfi_price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
+    market_cap_source = os.environ.get(
+        "MFI_MARKET_CAPS_SOURCE",
+        "pinned_regression_snapshot" if mfi_price_date == MFI_SNAPSHOT_PRICE_DATE else "workflow_override",
+    )
+    market_cap_snapshot_as_of = (
+        os.environ.get("MFI_MARKET_CAP_SNAPSHOT_AS_OF")
+        if market_cap_source == "active_universe_snapshot"
+        else MFI_SNAPSHOT_AS_OF if market_cap_source == "pinned_regression_snapshot" and mfi_price_date == MFI_SNAPSHOT_PRICE_DATE
+        else None
+    )
+    market_cap_quarter_date = os.environ.get("MFI_QUARTER_DATE", MFI_SNAPSHOT_QUARTER_DATE)
     report = {
         "service": "Magic Screen EdgarTools bakeoff",
         "symbol_input": raw_symbols,
         "symbol_input_source": "workflow_dispatch_or_environment" if os.environ.get("BAKEOFF_SYMBOLS") else "default_control_cases",
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "mfi_price_date": os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE),
+        "mfi_price_date": mfi_price_date,
         "mfi_market_cap_snapshot": {
             "source": "Magic Formula Investing",
-            "as_of": MFI_SNAPSHOT_AS_OF if os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE) == MFI_SNAPSHOT_PRICE_DATE else None,
-            "price_date": os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE),
-            "quarter_date": MFI_SNAPSHOT_QUARTER_DATE,
+            "input_source": market_cap_source,
+            "as_of": market_cap_snapshot_as_of,
+            "price_date": mfi_price_date,
+            "quarter_date": market_cap_quarter_date,
             "market_cap_unit": "USD millions",
             "override_supported": "MFI_MARKET_CAPS_JSON",
         },
