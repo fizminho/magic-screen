@@ -9,6 +9,7 @@ from typing import Any
 
 def validate_pipeline(
     universe: dict[str, Any],
+    market_cap_inputs: dict[str, Any],
     extraction: dict[str, Any],
     ingestion: dict[str, Any],
     resolver: dict[str, Any],
@@ -52,6 +53,45 @@ def validate_pipeline(
             if not (filing.get("period_of_report") or filing.get("period")):
                 errors.append(f"{company.get('symbol')}: supported filing has no fiscal period")
 
+    snapshot = extraction.get("mfi_market_cap_snapshot") or {}
+    input_source = snapshot.get("input_source")
+    if extraction.get("mfi_price_date") != snapshot.get("price_date"):
+        errors.append("extraction market-cap snapshot date does not match MFI price date")
+    if input_source == "active_universe_snapshot":
+        cap_map = market_cap_inputs.get("market_caps_usd_millions") or {}
+        if market_cap_inputs.get("source") != "active_universe_snapshot":
+            errors.append("active-universe market-cap inputs have the wrong source")
+        if market_cap_inputs.get("price_date") != snapshot.get("price_date"):
+            errors.append("active-universe market-cap date does not match extraction")
+        if market_cap_inputs.get("as_of") != snapshot.get("as_of"):
+            errors.append("active-universe market-cap as-of timestamp does not match extraction")
+        if set(market_cap_inputs.get("symbols") or []) != set(symbols) or set(cap_map) != set(symbols):
+            errors.append("active-universe market-cap map does not cover every active symbol")
+        for symbol in symbols:
+            company = next((item for item in companies if str(item.get("symbol", "")).upper() == symbol), None)
+            market_input = (company or {}).get("mfi_market_cap_input") or {}
+            value = market_input.get("value_usd_millions")
+            expected = cap_map.get(symbol)
+            if not isinstance(value, (int, float)) or value <= 0:
+                errors.append(f"{symbol}: active-universe market cap is missing from extraction")
+            elif not isinstance(expected, (int, float)) or abs(float(value) - float(expected)) > 0.000001:
+                errors.append(f"{symbol}: extracted market cap does not match active-universe snapshot")
+            if market_input.get("price_date") != snapshot.get("price_date"):
+                errors.append(f"{symbol}: market-cap input uses a different quote date")
+            if market_input.get("source") != "active_universe_snapshot":
+                errors.append(f"{symbol}: market-cap input source is not the active universe")
+    elif input_source == "workflow_override":
+        for symbol in symbols:
+            company = next((item for item in companies if str(item.get("symbol", "")).upper() == symbol), None)
+            market_input = (company or {}).get("mfi_market_cap_input") or {}
+            value = market_input.get("value_usd_millions")
+            if not isinstance(value, (int, float)) or value <= 0:
+                errors.append(f"{symbol}: workflow market-cap override is missing or incomplete")
+            if market_input.get("price_date") != snapshot.get("price_date"):
+                errors.append(f"{symbol}: workflow market-cap override date does not match extraction")
+    else:
+        errors.append("full-universe extraction must not use a pinned regression market-cap snapshot")
+
     expected_count = len(companies)
     if ingestion.get("received") != expected_count or ingestion.get("ingested") != expected_count:
         errors.append("raw ingestion count does not match extracted company count")
@@ -87,10 +127,17 @@ def validate_pipeline(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    for name in ("universe", "extraction", "ingestion", "resolver", "ranking"):
+    for name in ("universe", "market-cap-inputs", "extraction", "ingestion", "resolver", "ranking"):
         parser.add_argument("--" + name, required=True)
     args = parser.parse_args()
-    reports = {name: json.loads(Path(getattr(args, name)).read_text()) for name in ("universe", "extraction", "ingestion", "resolver", "ranking")}
+    reports = {
+        "universe": json.loads(Path(args.universe).read_text()),
+        "market_cap_inputs": json.loads(Path(args.market_cap_inputs).read_text()),
+        "extraction": json.loads(Path(args.extraction).read_text()),
+        "ingestion": json.loads(Path(args.ingestion).read_text()),
+        "resolver": json.loads(Path(args.resolver).read_text()),
+        "ranking": json.loads(Path(args.ranking).read_text()),
+    }
     errors = validate_pipeline(**reports)
     if errors:
         for error in errors:

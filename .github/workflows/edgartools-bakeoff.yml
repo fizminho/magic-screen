@@ -14,6 +14,8 @@ on:
       - "scripts/test_validate_mfi_universe_coverage.py"
       - "scripts/validate_edgartools_pipeline.py"
       - "scripts/test_validate_edgartools_pipeline.py"
+      - "scripts/prepare_mfi_market_caps.py"
+      - "scripts/test_prepare_mfi_market_caps.py"
       - "docs/US_MFI_COMPLETION_PLAN.md"
       - "README.md"
       - "worker/index.ts"
@@ -32,14 +34,13 @@ on:
         default: ""
         type: string
       mfi_price_date:
-        description: "MFI market-price date used to align the historical USD-to-reporting-currency FX rate"
+        description: "Optional MFI market-price date. Blank uses the active universe's matching quote date."
         required: false
-        default: "2026-11-18"
+        default: ""
         type: string
-      # INTENTIONAL: changing the quote date without a matching market-cap map
-      # causes the script to withhold the pinned market caps rather than reuse stale values.
+      # INTENTIONAL: a custom quote date requires a matching complete market-cap map.
       market_caps_json:
-        description: "Optional JSON object of ticker to MFI market cap in USD millions; blank uses the pinned 2026-11-20 snapshot"
+        description: "Optional complete ticker-to-market-cap map in USD millions. Blank uses the refreshed active-universe snapshot or the pinned regression snapshot."
         required: false
         default: ""
         type: string
@@ -75,6 +76,8 @@ jobs:
         env:
           EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
           UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
+          REQUESTED_MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '' }}"
+          HAS_CUSTOM_MARKET_CAPS: "${{ github.event.inputs.market_caps_json != '' }}"
         run: |
           if [ -z "$EDGARTOOLS_INGEST_URL" ] || [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
             echo "::error::EDGARTOOLS_INGEST_URL and UNIVERSE_SYNC_TOKEN are required for dynamic universe discovery."
@@ -101,6 +104,14 @@ jobs:
               raise SystemExit("Universe contains an invalid ticker.")
           print(f"Validated {len(symbols)} unique active US MFI symbols.")
           PY
+          CUSTOM_CAPS_ARGS=()
+          if [ "$HAS_CUSTOM_MARKET_CAPS" = "true" ]; then CUSTOM_CAPS_ARGS+=(--has-custom-market-caps); fi
+          python scripts/prepare_mfi_market_caps.py \
+            --universe edgartools-universe.json \
+            --output edgartools-market-cap-inputs.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --requested-price-date "$REQUESTED_MFI_PRICE_DATE" \
+            "${CUSTOM_CAPS_ARGS[@]}"
           SYMBOLS=$(python -c 'import json; d=json.load(open("edgartools-universe.json")); s=d["symbols"]; print(",".join(s + (["ADBE"] if "ADBE" not in s else [])))')
           if [ -z "$SYMBOLS" ]; then
             echo "::error::The Worker returned an empty active MFI universe."
@@ -113,8 +124,11 @@ jobs:
           EDGAR_IDENTITY: "Magic Screen research support@binalah.co"
           OUTPUT_PATH: "edgartools-bakeoff.json"
           BAKEOFF_SYMBOLS: "${{ (github.event_name == 'push' && !contains(github.event.head_commit.message, '[full-universe]')) && 'ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM' || (github.event.inputs.symbols != '' && github.event.inputs.symbols || steps.universe.outputs.symbols) }}"
-          MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '2026-11-18' }}"
-          MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || '' }}"
+          MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || steps.universe.outputs.price_date || '2026-11-18' }}"
+          MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || steps.universe.outputs.market_caps_json || '' }}"
+          MFI_MARKET_CAPS_SOURCE: "${{ github.event.inputs.market_caps_json != '' && 'workflow_override' || (steps.universe.outputs.market_caps_json != '' && 'active_universe_snapshot' || 'pinned_regression_snapshot') }}"
+          MFI_MARKET_CAP_SNAPSHOT_AS_OF: "${{ steps.universe.outputs.snapshot_as_of || '' }}"
+          MFI_QUARTER_DATE: "${{ steps.universe.outputs.quarter_date || '2026-09-30' }}"
         run: |
           python scripts/edgartools_bakeoff.py
           python - <<'PY'
@@ -126,6 +140,8 @@ jobs:
           actual = [str(company.get("symbol", "")).upper() for company in companies]
           if report.get("primary_provider") != "EdgarTools" or report.get("production_data_modified") is not False:
               raise SystemExit("Extraction report failed provider or production-immutability checks.")
+          if report.get("mfi_price_date") != (report.get("mfi_market_cap_snapshot") or {}).get("price_date"):
+              raise SystemExit("Market-cap snapshot date does not match the FX quote date.")
           if len(actual) != len(set(actual)) or set(actual) != requested:
               raise SystemExit(f"Extraction coverage mismatch: requested={len(requested)}, returned={len(actual)}.")
           allowed = {"supported", "unsupported_provider", "extraction_error"}
@@ -240,6 +256,7 @@ jobs:
         run: |
           python scripts/validate_edgartools_pipeline.py \
             --universe edgartools-universe.json \
+            --market-cap-inputs edgartools-market-cap-inputs.json \
             --extraction edgartools-bakeoff.json \
             --ingestion edgartools-ingest-response.json \
             --resolver edgartools-resolver-preview.json \
@@ -291,6 +308,7 @@ jobs:
           name: edgartools-bakeoff
           path: |
             edgartools-universe.json
+            edgartools-market-cap-inputs.json
             edgartools-bakeoff.json
             edgartools-ingest-response.json
             edgartools-resolver-preview.json
