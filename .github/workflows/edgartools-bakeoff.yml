@@ -62,7 +62,7 @@ jobs:
           python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
       - name: Resolve active MFI universe
         id: universe
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '')
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))
         env:
           EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
           UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
@@ -86,14 +86,14 @@ jobs:
         env:
           EDGAR_IDENTITY: "Magic Screen research support@binalah.co"
           OUTPUT_PATH: "edgartools-bakeoff.json"
-          BAKEOFF_SYMBOLS: "${{ github.event_name == 'push' && 'ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM' || (github.event.inputs.symbols != '' && github.event.inputs.symbols || steps.universe.outputs.symbols) }}"
+          BAKEOFF_SYMBOLS: "${{ (github.event_name == 'push' && !contains(github.event.head_commit.message, '[full-universe]')) && 'ADBE,ALEC,AFMJF,BCRX,BMBL,EGHSF,FHTX,HRB,HRMY,HPQ,IRWD,MGTX,MNTN,NRIX,OTEX,PRDO,PXED,PBI,PLTK,QTTB,RGS,SNDK,SBC,SSTK,SPRO,STRA,SGHC,UPWK,VXRT,ZVRA,GTM' || (github.event.inputs.symbols != '' && github.event.inputs.symbols || steps.universe.outputs.symbols) }}"
           MFI_PRICE_DATE: "${{ github.event.inputs.mfi_price_date || '2026-11-18' }}"
           MFI_MARKET_CAPS_JSON: "${{ github.event.inputs.market_caps_json || '' }}"
         run: python scripts/edgartools_bakeoff.py
-      # INTENTIONAL: push-based runs are regression-only. Scheduled and manual runs
-      # post raw EdgarTools evidence after dynamic universe discovery.
+      # Pushes remain regression-only unless the commit message explicitly contains
+      # [full-universe]. Scheduled/manual/full-universe runs post raw evidence after discovery.
       - name: Ingest EdgarTools filing evidence (raw, no ranking changes)
-        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && vars.EDGARTOOLS_INGEST_URL != ''
+        if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))) && vars.EDGARTOOLS_INGEST_URL != ''
         env:
           EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
           UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
