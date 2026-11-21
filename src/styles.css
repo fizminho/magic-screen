@@ -348,6 +348,7 @@
 .preview-warning{color:#e4c17c;font-size:9px;background:#2a2418;border-radius:4px;padding:4px 6px}
 .preview-empty{padding:20px 0;color:#8795ae;font-size:11px}
 .preview-footnote{margin-top:12px}
+.preview-cohort-note{margin:0 0 14px;padding:10px 12px;border-left:2px solid #8f7444;background:#17243a;color:#c4cede;font-size:10px;line-height:1.6}
 @media(max-width:760px){.mfi-preview-panel{padding:14px;margin:18px 0 28px}.mfi-preview-head{display:block}.preview-updated{margin-top:10px}.preview-stats{gap:6px}.preview-stats div{min-width:0;flex:1;padding:9px}.preview-stats b{font-size:17px}}
 
 .mfi-excluded-toggle{margin-top:12px}
