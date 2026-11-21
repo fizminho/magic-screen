@@ -181,3 +181,58 @@ test("does not call Gemini when a task has no filing evidence", async () => {
   assert.equal(result.status, "NOT_APPLICABLE");
   assert.match(result.note, /Gemini was not called/);
 });
+
+test("groups duplicate financing classifications while preserving every evidence ID and reported amount", async () => {
+  const { groupGeminiAccountingFindings } = await import("./gemini-accounting-review.mjs");
+  const evidence = { categories: { obligations: { candidates: [
+    { evidence_id: "financing:0", source_kind: "filing_fact_candidate", concept: "CurrentRoyaltyFinancing", label: "Current royalty financing", value: 38455000 },
+    { evidence_id: "financing:1", source_kind: "filing_fact_candidate", concept: "NoncurrentRoyaltyFinancing", label: "Noncurrent royalty financing", value: 427233000 }
+  ] } } };
+  const grouped = groupGeminiAccountingFindings([
+    { evidence_id: "financing:0", classification: "royalty_financing", rationale: "Current portion.", confidence: "high" },
+    { evidence_id: "financing:1", classification: "royalty_financing", rationale: "Noncurrent portion.", confidence: "medium" }
+  ], evidence);
+  assert.equal(grouped.length, 1);
+  assert.deepEqual(grouped[0].evidence_ids, ["financing:0", "financing:1"]);
+  assert.deepEqual(grouped[0].supporting_evidence.map(x => x.reported_value), [38455000, 427233000]);
+  assert.equal(grouped[0].confidence, "medium");
+});
+
+test("uses distinct failed sale-leaseback and lease liability classifications", async () => {
+  const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
+  const evidence = { filing_note_candidates: [{ evidence_id: "filing_note:1", source_kind: "filing_note_candidate" }] };
+  const result = validateGeminiAccountingResponse({
+    task: "financing_scope", status: "REVIEW_REQUIRED", summary: "Separate financing treatment requires review.",
+    findings: [{ evidence_id: "filing_note:1", classification: "failed_sale_leaseback_financing", rationale: "The note describes failed sale-leaseback financing.", confidence: "medium" }],
+    unresolved_questions: []
+  }, "financing_scope", evidence);
+  assert.equal(result.findings[0].classification, "failed_sale_leaseback_financing");
+});
+
+test("Gemini transient retries use exponential backoff, jitter, and provider retry-after", async () => {
+  const { getGeminiRetryDelayMs, parseGeminiRetryAfterMs, isGeminiQuotaExhaustion } = await import("./gemini-accounting-review.mjs");
+  assert.equal(getGeminiRetryDelayMs(0, 0, 0.5), 1500);
+  assert.equal(getGeminiRetryDelayMs(1, 5000, 0), 5000);
+  assert.equal(parseGeminiRetryAfterMs("3"), 3000);
+  assert.equal(parseGeminiRetryAfterMs(null, '{"error":{"details":[{"retryDelay":"12.5s"}]}}'), 12500);
+  assert.equal(isGeminiQuotaExhaustion(429, "You exceeded your current quota"), true);
+  assert.equal(isGeminiQuotaExhaustion(429, "Requests per minute limit reached"), false);
+  assert.equal(isGeminiQuotaExhaustion(503, "quota exhausted"), false);
+});
+
+test("reserves a shared request slot in D1 and defaults to a conservative six requests per minute", async () => {
+  const { waitForGeminiRequestSlot } = await import("./gemini-accounting-review.mjs");
+  const statements = [];
+  const env = { DB: { prepare(sql) {
+    statements.push(sql);
+    return { run: async () => ({}), bind(...args) {
+      return { first: async () => ({ scheduled_at: Date.now() }), args };
+    } };
+  } } };
+  const result = await waitForGeminiRequestSlot(env);
+  assert.equal(result.interval_ms, 10000);
+  assert.equal(result.delay_ms, 0);
+  assert.match(statements[0], /CREATE TABLE IF NOT EXISTS gemini_api_request_gate/);
+  assert.match(statements[1], /ON CONFLICT\(gate_key\) DO UPDATE/);
+  assert.match(statements[1], /RETURNING next_allowed_at - \? AS scheduled_at/);
+});
