@@ -256,3 +256,16 @@ Current shadow rank order remains HRB 1, OTEX 2, UPWK 3, IRWD 4, QTTB 4. All fiv
 The three P3 issuers currently passing shadow ranking eligibility (UPWK, IRWD and QTTB) have a dedicated issuer/sensitivity worksheet: [P3 ranked-issuer review](US_MFI_P3_RANKED_REVIEW_2026-11-21.md). An independent accession cross-check corrected three document-reference errors in that worksheet: UPWK is 0001627475-26-000012, IRWD is 0001104659-26-020489, and QTTB is 0001193125-26-099339. These were documentation cross-reference corrections; the resolver's accession-matched data and ranking inputs were not changed.
 
 The current review set now covers all five shadow-ranked issuers, all ten P1 cases (including VSNT's company-perimeter exception), and all ten P2 debt/EV cases. Remaining work is the P3 unranked cohort, cohort-wide accounting-policy sign-off, and legacy-versus-EdgarTools reconciliation. The latest VXRT EBIT-quality flag is included in the queue code; a full-universe run is triggered by this commit to validate the current 30-issuer state.
+
+
+## P3 supported-but-unranked review: ALEC, BMBL, CRNC, MGTX and PLTK (21 November 2026)
+
+The five supported P3 names that are not currently ranked now have a consolidated filing worksheet: [ALEC, BMBL, CRNC, MGTX and PLTK review](US_MFI_P3_UNRANKED_REVIEW_2026-11-21.md). All five have negative reported operating income in their selected annual filing, so their negative candidate ROC is not a reason to alter the ranking formula. BMBL has a large impairment line that could change the sign of EBIT if adjusted; that is a separate accounting-quality decision, not an automatic add-back.
+
+- **ALEC:** EBIT -$156.007m; invested capital $207.790m; conventional debt $9.689m. Cash $65.802m, marketable securities $190.222m and restricted cash $1.846m remain separate. Term-loan maturity note reconciles to approximately $9.7m carrying value.
+- **BMBL:** EBIT -$805.778m; invested capital $174.170m; debt $588.465m; cash $175.760m. The operating statement includes $1,039.027m impairment loss, including $396.3m and $258.1m goodwill charges disclosed for separate 2025 triggering events. A mechanical impairment add-back would yield $233.249m operating income, but is sensitivity-only and requires a common exceptional-item policy.
+- **CRNC:** FY2025 ended 30 September 2025; EBIT -$2.291m; debt $199.693m entirely long-term; cash $84.017m and marketable securities $3.433m. The current debt portion is explicitly nil in the debt note.
+- **MGTX:** EBIT -$105.968m; debt $74.337m; cash $65.931m; restricted cash $2.262m. Lease liabilities total $14.349m across operating and finance leases.
+- **PLTK:** EBIT -$5.1m; debt $2,389.1m; cash $684.2m; restricted cash $1.5m; short-term investments $136.0m. Acquisition contingent consideration is $734.0m and must remain a separate EV-scope question; operating lease liabilities total $142.9m.
+
+**P3 evidence milestone:** all eight supported P3 issuers now have filing review worksheets (three ranked plus five unranked). AFMJF and EGHSF remain unsupported-provider exclusions, visible in coverage with no fallback. Next, consolidate the complete 30-name cohort into a single accounting policy matrix and close policy approval gates before resolver implementation or cutover.

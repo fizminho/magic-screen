@@ -109,3 +109,18 @@ The current candidate formula remains EBIT / (market capitalization + convention
 - Do not mechanically remove QTTB's $53.737m revenue from reported EBIT. The resulting -$36.835m operating result is a diagnostic sensitivity only; any exceptional-item adjustment needs an approved, cohort-wide rule.
 - Net-PP&E-only ROC sensitivities are diagnostic only. They do not authorize a change from current assets minus current liabilities plus net PP&E.
 - All three issuers remain shadow-only and accounting-review flagged.
+
+
+### P3 supported-but-unranked issuer findings
+
+The five remaining supported P3 names have negative reported operating income in their selected annual filings. They remain outside the ranked cohort under the current positive-EBIT gate.
+
+| Issuer | Annual filing period | Reported operating income | Debt candidate | Cash candidate | Key review |
+|---|---|---:|---:|---:|---|
+| ALEC | FY2025 | -$156.007m | $9.689m | $65.802m | $190.222m marketable securities and $1.846m restricted cash; $9.7m term-loan carrying-value tie-out |
+| BMBL | FY2025 | -$805.778m | $588.465m | $175.760m | $1,039.027m impairment line; possible +$233.249m mechanical add-back is sensitivity-only |
+| CRNC | FY2025 ended 30 Sep 2025 | -$2.291m | $199.693m | $84.017m | Current debt portion explicitly nil; $3.433m marketable securities and $17.427m lease liabilities separate |
+| MGTX | FY2025 | -$105.968m | $74.337m | $65.931m | $2.262m restricted cash and $14.349m combined operating/finance lease liabilities |
+| PLTK | FY2025 | -$5.1m | $2,389.1m | $684.2m | $136.0m short-term investments, $734.0m acquisition contingent consideration and $142.9m lease liabilities |
+
+No issuer-specific impairment or exceptional-item add-back is approved. BMBL's impairment adjustment must not be used to make it eligible without an explicit policy applied consistently to all issuers. PLTK contingent consideration remains a separate financing/EV-scope item, not conventional borrowing by default.
