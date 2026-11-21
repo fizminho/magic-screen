@@ -73,3 +73,20 @@ Operating leases, royalty financing, sale-leaseback financing, NCI and other fin
 - [ ] Explicit production cutover approval is recorded.
 
 Until these items are approved, the shadow panel remains diagnostic only. No production fundamentals, ratios, eligibility or rankings should be changed.
+
+
+## Additional ranked-issuer filing review (21 November 2026)
+
+### UPWK — cash-like securities and escrow must remain distinct
+
+FY2025 operating income is $129.307m. The $378.425m marketable-securities portfolio is available for current operations but consists of multiple instrument types, including money-market funds, commercial paper, Treasury bills, corporate bonds, U.S. government securities, asset-backed securities and foreign-government/entity debt securities, with contractual maturities within 36 months of purchase. The filing does not provide a complete instrument-by-instrument amount/maturity breakdown in the reviewed disclosure. It should not be merged wholesale into unrestricted cash. Cash and cash equivalents are $294.356m; restricted cash is $3.8m; customer funds held in escrow and funds in transit are $180.752m and are matched by escrow funds payable. The $359.770m convertible-note carrying amount is current at 31 December 2025. These distinctions are material to EY and EV.
+
+### IRWD — annual debt snapshot differs from later repayment status
+
+FY2025 operating income is $98.502m. The filing reports $199.680m current convertible senior notes carrying value and $385.0m outstanding principal under the secured revolving credit facility. The $215.456m cash and cash-equivalents balance includes money-market funds, U.S. Treasury securities and commercial paper. The convertible notes matured and were repaid in June 2026, after the FY2025 reporting date. The annual MFI snapshot must retain FY2025 debt values unless the application explicitly adopts a newer annual filing; do not substitute an interim repayment into the FY2025 annual accounting inputs.
+
+### QTTB — direct GAAP operating income contains a major nonrecurring item
+
+FY2025 operating income is $16.902m, but the income statement reports $53.737m collaboration-arrangement revenue and $36.835m operating expenses. The filing explains that the collaboration revenue arose from settlement of the customer refund liability following the Amgen amendment. This is not ordinary product revenue: QTTB states it has not commercialized product candidates and does not expect product sales for several years, if at all. The $16.902m direct GAAP operating-income candidate is arithmetically valid, but its use as a recurring EBIT proxy is a significant accounting-quality and ranking-stability question. Do not silently remove the revenue or replace reported EBIT; require a documented, cohort-consistent decision on exceptional/nonrecurring operating items.
+
+QTTB's $9.708m venture-debt carrying value reconciles to $6.235m current and $3.473m noncurrent. Cash and cash equivalents are $48.297m, while $0.647m restricted cash is held as collateral for venture debt and lease letters of credit. Operating lease liabilities total $5.636m. Keep all these categories separate pending policy approval.
