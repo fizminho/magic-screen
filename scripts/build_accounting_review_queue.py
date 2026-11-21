@@ -246,7 +246,19 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
         category = None
         is_asset = "asset" in parent_lower
         is_liability = "liabilit" in parent_lower
-        if "noncontrollinginterest" in searchable or "non-controlling interest" in searchable:
+        concept_lower = concept.lower()
+        label_lower = label.lower()
+        is_explicit_nci = (
+            "noncontrolling interest" in label_lower
+            or "non-controlling interest" in label_lower
+            or "minority interest" in label_lower
+            or (
+                "noncontrollinginterest" in concept_lower
+                and "stockholdersequity" not in concept_lower
+            )
+            or concept_lower.endswith("_minorityinterest")
+        )
+        if is_explicit_nci:
             category = "noncontrolling_interests"
         elif "escrow" in searchable or ("customer funds" in searchable and ("payable" in searchable or is_asset)):
             category = "customer_escrow_assets_and_payables"
