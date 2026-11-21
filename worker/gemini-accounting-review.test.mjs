@@ -89,3 +89,16 @@ test("recognizes NCI escalation in the real EdgarTools underscore-based evidence
   const tasks = listGeminiAccountingEscalations("GTM", company, resolver).map(item => item.task);
   assert.deepEqual(tasks.sort(), ["cash_scope", "debt_scope", "financing_scope", "lease_scope", "nci_scope"].sort());
 });
+
+
+test("supplies only exact evidence IDs and rejects invalid Gemini finding fields precisely", async () => {
+  const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
+  const evidence = { categories: { current_debt: { candidates: [{ evidence_id: "current_debt:0" }] } } };
+  const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
+    { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported borrowing.", confidence: "medium" }
+  ], unresolved_questions: [] };
+  assert.equal(validateGeminiAccountingResponse(base, "debt_scope", evidence).findings.length, 1);
+  assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], evidence_id: "current_debt_candidate_0" }] }, "debt_scope", evidence), /evidence_id is missing or not in the supplied evidence allowlist/);
+  assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], classification: "debt" }] }, "debt_scope", evidence), /classification is missing or not in the allowed classification list/);
+  assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], confidence: "certain" }] }, "debt_scope", evidence), /confidence must be low, medium, or high/);
+});
