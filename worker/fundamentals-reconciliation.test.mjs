@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import testCase from "node:test";
-import { buildFundamentalsReconciliationPreview, classifyDebtReconciliation } from "./fundamentals-reconciliation.ts";
+import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation.ts";
 function row(overrides={}){return {
   symbol:"TEST",company_name:"Test Inc",current_market_cap:100000000,market_cap_updated_at:"2026-11-20T10:00:00.000Z",
   legacy_status:"calculated",legacy_source:"SEC EDGAR Company Facts",legacy_fiscal_period:"2025-12-31",legacy_filed_at:"2026-02-20",
@@ -35,42 +35,3 @@ testCase("does not compare uncalculated legacy fundamentals",()=>{const x=buildF
 testCase("keeps unsupported providers visible but non-comparable",()=>{const r=row();r.edgar.provider_status="unsupported_provider";const x=buildFundamentalsReconciliationPreview([r]).rows[0];assert.equal(x.status,"edgartools_unsupported_or_missing");assert.equal(x.edgartools.metrics,null);});
 testCase("flags market-cap drift while using current snapshot for both metrics",()=>{const x=buildFundamentalsReconciliationPreview([row({legacy_market_cap:90000000})]).rows[0];assert.equal(x.legacy.metrics.enterprise_value,105000000);assert.ok(x.edgartools.review_flags.includes("legacy_market_cap_differs_from_current_snapshot"));});
 testCase("rejects incomplete EdgarTools debt inputs from comparison",()=>{const r=row();r.edgar.enterprise_value_candidate_review.conventional_debt_status="incomplete_or_ambiguous_debt_inputs";const x=buildFundamentalsReconciliationPreview([r]).rows[0];assert.equal(x.status,"edgartools_inputs_incomplete");assert.equal(x.metric_deltas,null);});
-
-testCase("classifies unique debt components without aggregate as not reported, not insufficient",()=>{
-  const status=classifyDebtReconciliation({
-    current_debt_candidates:{candidate_count:1,candidates:[{value:5_900_000}]},
-    noncurrent_debt_candidates:{candidate_count:1,candidates:[{value:1_318_100_000}]},
-    aggregate_debt_candidates:{candidate_count:0,candidates:[]}
-  });
-  assert.equal(status,"aggregate_not_reported_components_unique");
-});
-testCase("reconciles a unique aggregate against unique maturity components",()=>{
-  const status=classifyDebtReconciliation({
-    current_debt_candidates:{candidate_count:1,candidates:[{value:25}]},
-    noncurrent_debt_candidates:{candidate_count:1,candidates:[{value:125}]},
-    aggregate_debt_candidates:{candidate_count:1,candidates:[{value:150}]}
-  });
-  assert.equal(status,"reconciles_within_1");
-});
-testCase("detects aggregate debt mismatch",()=>{
-  const status=classifyDebtReconciliation({
-    current_debt_candidates:{candidate_count:1,candidates:[{value:25}]},
-    noncurrent_debt_candidates:{candidate_count:1,candidates:[{value:120}]},
-    aggregate_debt_candidates:{candidate_count:1,candidates:[{value:150}]}
-  });
-  assert.equal(status,"does_not_reconcile");
-});
-testCase("keeps ambiguous aggregate and missing components unresolved",()=>{
-  const ambiguous=classifyDebtReconciliation({
-    current_debt_candidates:{candidate_count:1,candidates:[{value:25}]},
-    noncurrent_debt_candidates:{candidate_count:1,candidates:[{value:125}]},
-    aggregate_debt_candidates:{candidate_count:2,candidates:[{value:150},{value:151}]}
-  });
-  const missing=classifyDebtReconciliation({
-    current_debt_candidates:{candidate_count:1,candidates:[{value:25}]},
-    noncurrent_debt_candidates:{candidate_count:0,candidates:[]},
-    aggregate_debt_candidates:{candidate_count:0,candidates:[]}
-  });
-  assert.equal(ambiguous,"aggregate_present_not_uniquely_resolved");
-  assert.equal(missing,"insufficient_unique_inputs");
-});

@@ -1,5 +1,6 @@
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
-import { buildFundamentalsReconciliationPreview, classifyDebtReconciliation } from "./fundamentals-reconciliation";
+import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation";
+import { classifyDebtReconciliation } from "./debt-reconciliation.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { runGeminiAccountingReview, listGeminiAccountingEscalations } from "./gemini-accounting-review.mjs";
 

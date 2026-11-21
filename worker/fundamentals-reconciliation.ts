@@ -10,26 +10,6 @@ function calculateMetrics(ebit:unknown,investedCapital:unknown,grossDebt:unknown
   return {ebit:e,invested_capital:invested,gross_debt:debt,unrestricted_cash:cash,enterprise_value:enterpriseValue,earnings_yield:e/enterpriseValue,return_on_capital:e/invested};
 }
 
-export function classifyDebtReconciliation(categories:any):string {
-  const uniqueValue=(name:string):number|null=>{
-    const category=categories?.[name]??{};
-    const candidates=Array.isArray(category.candidates)?category.candidates:[];
-    if(category.candidate_count!==1||candidates.length!==1) return null;
-    return finiteNumber(candidates[0]?.value);
-  };
-  const current=uniqueValue("current_debt_candidates");
-  const noncurrent=uniqueValue("noncurrent_debt_candidates");
-  const aggregateCategory=categories?.aggregate_debt_candidates??{};
-  const aggregateCount=Number.isInteger(aggregateCategory.candidate_count)?aggregateCategory.candidate_count:0;
-  const aggregate=uniqueValue("aggregate_debt_candidates");
-  const componentSum=current!==null&&noncurrent!==null?current+noncurrent:null;
-  if(aggregateCount>0) {
-    if(aggregate!==null&&componentSum!==null) return Math.abs(aggregate-componentSum)<=1?"reconciles_within_1":"does_not_reconcile";
-    return "aggregate_present_not_uniquely_resolved";
-  }
-  if(componentSum!==null) return "aggregate_not_reported_components_unique";
-  return "insufficient_unique_inputs";
-}
 function inputDelta(legacy:number,edgar:number){return {legacy,edgartools:edgar,delta:edgar-legacy};}
 function materiallyDifferent(values:Array<{delta:number}|null>):boolean{return values.some(value=>value!==null&&Math.abs(value.delta)>0.01);}
 export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|null=null){
