@@ -125,7 +125,7 @@ No separate conventional-debt face-statement row was identified in the reviewed 
 
 - Conventional borrowing: unknown pending full note-coverage confirmation; do not label debt-free.
 - Cash: $80.876m candidate.
-- Restricted cash: $1.250m excluded from unrestricted cash.
+- Restricted cash: $3.250m total, comprising $1.250m current and $2.000m noncurrent; excluded from unrestricted cash. The noncurrent $2.000m secures a letter of credit associated with the New Lease.
 - Marketable securities: $78.018m, all due within one year but comprising agency securities, commercial paper and corporate bonds; apply a uniform maturity, credit and liquidity rule.
 - Operating leases: $0.923m current and $40.347m noncurrent, separate from conventional debt.
 
@@ -170,3 +170,22 @@ No conventional borrowing row was identified in the reviewed balance sheet and n
 | NRIX | No borrowing row found; debt-note completeness not closed | $345.981m current U.S. Treasuries and $0.968m restricted cash | Review-only |
 
 **P2 documentation milestone:** filing-level worksheets now exist for all ten P2 issuers. That completes evidence triage documentation, not accounting approval. The queue remains open until the same rules are applied to conventional borrowings, royalty and sale-leaseback financing, leases, restricted cash, marketable securities and unknown debt categories. Do not change production fundamentals, ratios, eligibility or rankings.
+
+
+## Revalidation against full-universe extraction (22 November 2026)
+
+All five selected annual filings were re-extracted in successful run **44926317787**, artifact **14716380518**. Accession numbers and periods match the existing issuer reviews. The new balance-sheet evidence confirms the following key inputs (USD millions):
+
+| Issuer | Cash & equivalents | Restricted cash | Marketable securities | Lease liabilities (current / noncurrent) | Debt evidence status |
+|---|---:|---:|---:|---:|---|
+| MNTN | 210.160 | Not identified in selected face rows | Not identified | No lease rows in this extract | Current note payable $0 and convertible debt $0; noncurrent debt not identified. Named revolver $0 drawn remains facility-specific. |
+| PXED | 159.363 | 4.516 | 137.094 current + 30.758 noncurrent | 10.136 / 52.872 | No conventional debt row identified; named $100m revolver $0 drawn. $28.4m LOC is not funded debt. |
+| STRA | 140.757 | 8.754 per filing note | 7.297 current + 5.000 noncurrent | 15.905 / 93.216 | No conventional debt row identified; named $250m revolver $0 drawn. |
+| FHTX | 80.876 | **3.250** (1.250 current + 2.000 noncurrent) | 78.018 | 0.923 / 40.347 | No conventional debt row identified; full debt-note completeness remains open. |
+| NRIX | 246.960 | 0.968 | 345.981 current U.S. Treasury securities | 2.824 / 52.906 | No conventional debt row identified; full debt-note completeness remains open. |
+
+FHTX's $2.000m noncurrent restricted-cash balance is specifically required to secure a letter of credit associated with the New Lease. The FY2025 10-K's cash reconciliation reports $3.250m total restricted cash (current and noncurrent), while the balance sheet splits $1.250m current and $2.000m noncurrent. Keep the full $3.250m outside unrestricted cash. Source: https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm
+
+The refreshed deterministic queue keeps all five issuers in P2. For PXED, STRA, FHTX and NRIX, missing face-statement debt candidates remain unknown, not zero, despite the named-facility disclosures or absence of a debt caption. MNTN's two explicit-zero current instrument rows do not establish a zero noncurrent balance or complete debt-note scope. The audit does not promote any issuer to debt-free status.
+
+The latest run did not change accounting policy, production fundamentals, EV, ROC, eligibility or rankings. All five reviews remain evidence-only pending complete note coverage and cohort-wide policy approval.
