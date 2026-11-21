@@ -260,7 +260,7 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             category = "equity_method_investments"
         elif is_asset and any(x in searchable for x in ("marketable equity", "equity securities")):
             category = "marketable_equity_securities"
-        elif is_asset and any(x in searchable for x in ("marketable debt", "debt securities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
+        elif is_asset and any(x in searchable for x in ("marketable debt", "debt securities", "debtsecurities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
             category = "marketable_debt_securities"
         elif is_asset and "marketable securities" in searchable:
             category = "marketable_securities_unclassified"
