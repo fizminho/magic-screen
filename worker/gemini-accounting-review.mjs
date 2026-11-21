@@ -1,4 +1,4 @@
-const PROMPT_VERSION = "gemini-accounting-review-v9";
+const PROMPT_VERSION = "gemini-accounting-review-v10";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const SUPPORTED_TEXT_MODELS = new Set([
@@ -379,6 +379,15 @@ export function validateGeminiAccountingResponse(parsed, task, evidence) {
     production_approved: false, production_write: false };
 }
 
+function areGeminiClassificationsCompatible(left, right) {
+  if (left === right) return true;
+  // A generic financing/liability bucket may be refined by a supported subtype.
+  // This is not compatible with lease-liability labels or unrelated financing classes.
+  const saleLeasebackPair = new Set([left, right]);
+  return saleLeasebackPair.has("other_financing_or_liability")
+    && saleLeasebackPair.has("failed_sale_leaseback_financing");
+}
+
 export function reconcileGeminiCrossTaskFindings(currentFindings, priorReviews) {
   const priorClassificationByEvidence = new Map();
   for (const review of priorReviews ?? []) {
@@ -397,7 +406,7 @@ export function reconcileGeminiCrossTaskFindings(currentFindings, priorReviews) 
     const ids = [finding.evidence_id];
     for (const id of ids) {
       const prior = priorClassificationByEvidence.get(id);
-      if (prior && [...prior].some(classification => classification !== finding.classification)) {
+      if (prior && [...prior].some(classification => !areGeminiClassificationsCompatible(classification, finding.classification))) {
         conflicts.push({ evidence_id: id, current_classification: finding.classification, prior_classifications: [...prior] });
       }
     }

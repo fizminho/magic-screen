@@ -268,6 +268,15 @@ test("grouping preserves all primary and supporting evidence IDs", async () => {
   assert.deepEqual(grouped[0].supporting_evidence.map(item => item.evidence_id), ["fact:0", "filing_note:1"]);
 });
 
+test("cross-task reconciliation treats generic financing label as compatible with a specific sale-leaseback subtype", async () => {
+  const { reconcileGeminiCrossTaskFindings } = await import("./gemini-accounting-review.mjs");
+  const current = [{ evidence_id: "nondebt_financing_obligation:0", classification: "failed_sale_leaseback_financing" }];
+  const prior = [{ findings: [{ evidence_id: "nondebt_financing_obligation:0", classification: "other_financing_or_liability" }] }];
+  assert.deepEqual(reconcileGeminiCrossTaskFindings(current, prior), []);
+  const genuineConflict = [{ findings: [{ evidence_id: "nondebt_financing_obligation:0", classification: "operating_lease_liability" }] }];
+  assert.equal(reconcileGeminiCrossTaskFindings(current, genuineConflict).length, 1);
+});
+
 test("cross-task reconciliation flags one evidence ID classified differently", async () => {
   const { reconcileGeminiCrossTaskFindings } = await import("./gemini-accounting-review.mjs");
   const conflicts = reconcileGeminiCrossTaskFindings([
