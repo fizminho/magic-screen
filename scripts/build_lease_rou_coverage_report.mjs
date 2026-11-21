@@ -17,7 +17,7 @@ export function buildLeaseRouCoverage(extraction) {
       if (/PropertyPlantAndEquipmentAndFinanceLeaseRightOfUseAsset/i.test(concept)) {
         embedded.push({ ...item, disposition: "embedded_in_net_ppe_do_not_add_again" }); continue;
       }
-      if (/right.?of.?use asset|rightofuseassets/i.test(text)) {
+      if (/right.?of.?use asset|rightofuseasset|rightofuseassets/i.test(text)) {
         rou.push({ ...item, lease_type: /finance/i.test(text) ? "finance" : /operat/i.test(text) ? "operating" : "unspecified" }); continue;
       }
       if (/lease liabilities|lease liability|lease obligations|lease obligation/i.test(text) || /LeaseLiabilit|LeaseObligation/i.test(concept)) {
