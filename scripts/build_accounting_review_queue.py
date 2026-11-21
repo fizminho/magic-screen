@@ -243,25 +243,27 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             continue
 
         category = None
+        is_asset = "asset" in parent_lower
+        is_liability = "liabilit" in parent_lower
         if "noncontrollinginterest" in searchable or "non-controlling interest" in searchable:
             category = "noncontrolling_interests"
-        elif "escrow" in searchable or ("customer funds" in searchable and "payable" in searchable):
+        elif "escrow" in searchable or ("customer funds" in searchable and ("payable" in searchable or is_asset)):
             category = "customer_escrow_assets_and_payables"
-        elif "lease" in searchable and ("liabilit" in searchable or "obligation" in searchable):
+        elif is_liability and "lease" in searchable and ("liabilit" in searchable or "obligation" in searchable):
             category = "lease_liabilities"
-        elif any(x in searchable for x in ("restricted cash", "cash restricted", "cash and cash equivalents restricted")):
+        elif is_asset and any(x in searchable for x in ("restricted cash", "cash restricted", "cash and cash equivalents restricted")):
             category = "restricted_cash"
-        elif "cash" in searchable and any(x in parent_lower for x in ("asset", "cash")):
+        elif is_asset and "cash" in searchable:
             category = "unrestricted_cash"
-        elif any(x in searchable for x in ("marketable debt", "marketable securities", "debt securities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
+        elif is_asset and any(x in searchable for x in ("marketable debt", "marketable securities", "debt securities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
             category = "marketable_debt_securities"
-        elif any(x in searchable for x in ("marketable equity", "equity securities", "equity method investment", "equity-method investment")):
+        elif is_asset and any(x in searchable for x in ("marketable equity", "equity securities", "equity method investment", "equity-method investment")):
             category = "equity_method_investments" if "equity method" in searchable else "marketable_equity_securities"
-        elif any(x in searchable for x in ("notes receivable", "note receivable", "loans receivable")):
+        elif is_asset and any(x in searchable for x in ("notes receivable", "note receivable", "loans receivable")):
             category = "notes_receivable"
-        elif any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities")):
+        elif is_liability and any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities")):
             category = "other_financing_obligations"
-        elif any(x in searchable for x in ("debt", "borrow", "loan payable", "notes payable", "note payable", "line of credit")) and "liabilit" in parent_lower:
+        elif is_liability and any(x in searchable for x in ("debt", "borrow", "loan payable", "notes payable", "note payable", "line of credit")):
             category = "conventional_debt"
         if category is None:
             continue
