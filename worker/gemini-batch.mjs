@@ -121,7 +121,7 @@ export async function runBatchPage({ symbols, cursor = null, loadIssuer, runRevi
 
 function rollUp(taskResults) {
   const statuses = taskResults.map(task => task.status);
-  for (const status of [BATCH_STATUS.QUOTA_EXHAUSTED, BATCH_STATUS.PENDING_RETRY, BATCH_STATUS.PROCESSING, BATCH_STATUS.FAILED, BATCH_STATUS.REVIEW_REQUIRED]) {
+  for (const status of [BATCH_STATUS.QUOTA_EXHAUSTED, BATCH_STATUS.PENDING_RETRY, BATCH_STATUS.PROCESSING, BATCH_STATUS.FAILED, BATCH_STATUS.REVIEW_REQUIRED, BATCH_STATUS.PENDING]) {
     if (statuses.includes(status)) return status;
   }
   return statuses.length && statuses.every(s => s === BATCH_STATUS.SKIPPED_DETERMINISTIC) ? BATCH_STATUS.SKIPPED_DETERMINISTIC : BATCH_STATUS.COMPLETED;

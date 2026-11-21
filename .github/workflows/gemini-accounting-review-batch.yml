@@ -9,6 +9,10 @@ on:
         description: "Resume after this ticker (blank = from the start)"
         required: false
         default: ""
+      symbols:
+        description: "Optional comma-separated active US tickers (blank = entire active universe)"
+        required: false
+        default: ""
       dry_run:
         description: "Plan only; do not call Gemini"
         type: boolean
@@ -42,6 +46,7 @@ jobs:
           WORKER_BASE_URL: ${{ vars.WORKER_BASE_URL || 'https://magic-screen.96muhdhafiz.workers.dev' }}
           UNIVERSE_SYNC_TOKEN: ${{ secrets.UNIVERSE_SYNC_TOKEN }}
           START_CURSOR: ${{ inputs.start_cursor }}
+          SYMBOLS: ${{ inputs.symbols }}
           DRY_RUN: ${{ inputs.dry_run }}
           INCLUDE_FULL_SCOPE: ${{ inputs.include_full_scope }}
           MAX_NEW_CALLS: ${{ inputs.max_new_calls }}

@@ -75,6 +75,7 @@ testCase("dry run plans tasks and never calls Gemini", async () => {
   const page = await runBatchPage({ symbols: ["A"], loadIssuer: loader({ A: supported(["cash_scope", "debt_scope"]) }), runReview: async () => { called++; return {}; }, dryRun: true });
   assert.equal(called, 0);
   assert.equal(page.counts.PENDING, 2);
+  assert.equal(page.issuers[0].status, S.PENDING);
 });
 
 testCase("orchestrator waits out quota with the same cursor, then finishes", async () => {
