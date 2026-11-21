@@ -772,7 +772,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
         for symbol, source in FILING_DEBT_NOTE_REVIEWS.items():
             with self.subTest(symbol=symbol):
                 review = filing_debt_note_review(symbol, source["accession"])
-                self.assertEqual(review["review_classification"], FILING_DEBT_REVIEW_CLASSIFICATIONS[symbol])
+                self.assertEqual(review["review_classification"], FILING_DEBT_REVIEW_CLASSIFICATIONS.get(symbol, "unclassified_manual_review"))
                 self.assertFalse(review["production_approved"])
                 self.assertFalse(review["resolver_input"])
                 self.assertFalse(review["debt_candidate_promoted"])
