@@ -1,9 +1,42 @@
 import unittest
 
-from build_accounting_review_queue import build_queue, classify
+from build_accounting_review_queue import build_queue, classify, extract_ev_scope_evidence
 
 
 class AccountingReviewQueueTests(unittest.TestCase):
+    def test_combined_cash_and_restricted_cash_face_row_is_not_unrestricted_cash(self):
+        evidence = extract_ev_scope_evidence({
+            "symbol": "COMBINED",
+            "filing": {"accession_number": "0000000000-26-000001"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31"},
+            "statements": {"balance_sheet": {"rows": [{
+                "concept": "us-gaap:CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+                "label": "Cash and cash equivalents, including restricted cash",
+                "parent_concept": "us-gaap:AssetsCurrent",
+                "values": {"2025-12-31": 125000000},
+            }]}}
+        })
+        self.assertEqual(evidence["row_count"], 1)
+        row = evidence["rows"][0]
+        self.assertEqual(row["category"], "cash_and_restricted_cash_combined")
+        self.assertIn("do_not_treat_as_unrestricted", row["policy_status"])
+        self.assertFalse(row["production_approved"])
+        self.assertFalse(row["resolver_input"])
+
+    def test_separately_reported_restricted_cash_remains_restricted_category(self):
+        evidence = extract_ev_scope_evidence({
+            "symbol": "RESTRICTED",
+            "filing": {"accession_number": "0000000000-26-000002"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31"},
+            "statements": {"balance_sheet": {"rows": [{
+                "concept": "us-gaap:RestrictedCashCurrent",
+                "label": "Restricted cash",
+                "parent_concept": "us-gaap:AssetsCurrent",
+                "values": {"2025-12-31": 5000000},
+            }]}}
+        })
+        self.assertEqual(evidence["rows"][0]["category"], "restricted_cash")
+
     def test_next_review_actions_are_actionable_and_preserve_unknowns(self):
         item = classify({
             "symbol": "UPWK",

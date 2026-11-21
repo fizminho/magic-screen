@@ -309,6 +309,7 @@ def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
 EV_SCOPE_POLICY = {
     "conventional_debt": "candidate_gross_debt_pending_debt_measurement_policy",
     "restricted_cash": "exclude_from_unrestricted_cash_pending_policy",
+    "cash_and_restricted_cash_combined": "combined_cash_scope_do_not_treat_as_unrestricted_without_note_reconciliation",
     "unrestricted_cash": "candidate_cash_pending_availability_and_EV_policy",
     "marketable_debt_securities": "separate_liquidity_category_pending_cash_like_policy",
     "marketable_securities_unclassified": "composition_unknown_do_not_assume_debt_or_cash_equivalent",
@@ -364,6 +365,13 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             category = "customer_escrow_assets_and_payables"
         elif is_liability and "lease" in searchable and ("liabilit" in searchable or "obligation" in searchable):
             category = "lease_liabilities"
+        elif is_asset and "restricted" in searchable and "cash" in searchable and (
+            "cash and cash equivalents" in label_lower
+            or "cash, cash equivalents" in label_lower
+            or "cashcashequivalentsrestrictedcash" in concept_lower
+        ):
+            # Combined face rows do not isolate the unrestricted portion.
+            category = "cash_and_restricted_cash_combined"
         elif is_asset and "restricted" in searchable and "cash" in searchable:
             category = "restricted_cash"
         elif is_asset and "cash" in searchable:
