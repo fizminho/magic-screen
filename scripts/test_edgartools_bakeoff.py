@@ -1115,6 +1115,33 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
             result["review_flags"],
         )
 
+    def test_missing_aggregate_debt_is_not_misreported_as_insufficient_inputs(self):
+        result = enterprise_value_scope_review({
+            "categories": {
+                "current_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 5_900_000}],
+                },
+                "noncurrent_debt_candidates": {
+                    "candidate_count": 1, "candidates": [{"value": 1_318_100_000}],
+                },
+            }
+        })
+        review = result["debt_reconciliation_review"]
+        self.assertEqual(
+            review["status"], "aggregate_not_reported_components_unique"
+        )
+        self.assertIsNone(review["aggregate_debt_candidate"])
+        self.assertEqual(
+            review["current_plus_noncurrent_candidate"], 1_324_000_000
+        )
+        self.assertEqual(
+            result["selection_policy_review"]["conventional_debt"]["status"],
+            "identified_from_unique_current_and_noncurrent_components",
+        )
+        self.assertEqual(
+            result["conventional_gross_debt_candidate"], 1_324_000_000
+        )
+
     def test_aggregate_debt_reconciliation_reports_matching_components(self):
         result = enterprise_value_scope_review({
             "categories": {

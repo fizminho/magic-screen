@@ -1261,6 +1261,8 @@ def enterprise_value_scope_review(balance_review: dict[str, Any] | None) -> dict
             and abs(aggregate_debt - debt_component_sum) <= 1.0
             else "does_not_reconcile"
             if aggregate_debt is not None and debt_component_sum is not None
+            else "aggregate_not_reported_components_unique"
+            if aggregate_debt is None and debt_component_sum is not None
             else "insufficient_unique_inputs"
         ),
     }
