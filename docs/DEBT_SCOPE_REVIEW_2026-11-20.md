@@ -148,3 +148,40 @@ Additional isolated scope checks:
 - OTEX's near-zero invested-capital denominator remains the largest ROC sensitivity. The existing denominator diagnostics and P1 escalation remain in force.
 
 These figures are scenario arithmetic only. They do not change the five-stock shadow ranking, accounting approval state, or production data.
+## Universe-wide EV scope evidence framework (review-only)
+
+The accounting review queue now classifies selected annual balance-sheet face rows into a separate EV-scope evidence layer. This is an evidence inventory, not a policy decision and not an input to the resolver or ranking preview. It is attached only when the raw extraction accession exactly matches the resolver preview accession.
+
+| Evidence category | Current review treatment | Guardrail |
+|---|---|---|
+| Conventional borrowings | Candidate gross debt | Require unique, complete current/noncurrent buckets and an approved carrying-value/overlap rule |
+| Unrestricted cash and cash equivalents | Candidate cash deduction | Require evidence that the balance is available to the consolidated group |
+| Restricted cash | Exclude from unrestricted cash | Do not net collateral, deposits or restricted balances against debt |
+| Marketable debt securities / short-term investments | Separate liquidity category | Decide cash-like treatment using common maturity, credit-risk, liquidity and availability criteria |
+| Marketable equity securities | Not cash equivalents | Do not treat strategic/equity investments as cash without explicit policy |
+| Equity-method investments | Separate investment asset | Do not net against EV automatically |
+| Notes receivable / loans receivable | Separate financial asset | Do not treat strategic or affiliate notes as cash equivalents |
+| Lease liabilities | Separate lease category | If included in EV, align EBIT/operating-lease expense treatment consistently |
+| Noncontrolling interests | Separate EV adjustment | Decide consistently whether consolidated EBIT requires NCI in EV |
+| Customer escrow assets and related payables | Exclude matched customer funds from company cash and debt | Reconcile asset/payable pairing; never count customer funds as unrestricted corporate cash |
+| Royalty, sale-leaseback and other financing obligations | Separate financing category | Require instrument-level debt-like assessment; do not classify by keyword alone |
+
+### Candidate policy sequence (not yet approved)
+
+1. Define conventional debt using explicit borrowing instruments and carrying values, with independent current and noncurrent maturity buckets. Do not sum overlapping subtotals or principal plus carrying values.
+2. Define cash deduction as unrestricted cash and cash equivalents available to the consolidated group. Restricted cash, collateral, customer escrow and deposits stay outside.
+3. Decide whether highly liquid marketable debt securities qualify as cash-like. Criteria should be uniform across issuers and include instrument type, maturity, credit risk, settlement liquidity, restrictions and operational availability. UPWK's separately reported $378.425m portfolio is a material sensitivity, not a reason for an issuer-specific exception.
+4. Keep marketable equity securities, equity-method investments and notes receivable separate from cash equivalents unless a separately approved policy establishes otherwise.
+5. Decide on NCI treatment as part of a consolidated enterprise-value definition and apply it consistently.
+6. Decide on lease and other financing obligations together with the corresponding EBIT treatment. Do not add lease liabilities to EV in isolation and call the result a final Magic Formula yield.
+7. Require a complete, accession-bound evidence trail. Missing categories remain unknown, not zero.
+
+### Implementation guardrails
+
+- The queue's ev_scope_evidence is derived from non-dimensional, non-abstract annual balance-sheet face rows only.
+- Each row carries its exact filing accession, fiscal period, amount, classification, policy status and production_approved=false / resolver_input=false.
+- The queue does not infer an absent asset or liability, aggregate rows, net restricted cash, pair escrow balances, approve a policy, or change candidate EV.
+- Classification is a triage hint. For example, a generic marketable securities label is not proof of debt-security composition or cash equivalence; inspect the issuer note before any policy decision.
+- The category inventory is intentionally broader than conventional debt so the review does not lose sight of leases, investments, customer funds, NCI and financing-like obligations.
+
+No production fundamentals, ratios, eligibility decisions or rankings are changed by this evidence layer.
