@@ -379,3 +379,10 @@ Recommended owner-review defaults:
 - GTM: separate tax-receivable-agreement bucket; no automatic conventional-debt inclusion.
 
 The next implementation step is not to add these amounts to EV. First close the cohort-wide lease/ROU and invested-capital symmetry policy, then model the proposed debt-like adjustment as a separate shadow sensitivity and quantify its impact across the full supported cohort. Production approval and writes remain false.
+
+
+## Lease and ROU evidence coverage audit (22 November 2026)
+
+Added a deterministic Node.js audit that reads the selected annual filing's balance-sheet rows and emits JSON/Markdown coverage for separately reported ROU assets and current/noncurrent lease liabilities. It also flags combined PP&E concepts that already include finance-lease ROU, preventing a second addition to net PP&E. The audit excludes dimensional breakdowns, binds values to each issuer's selected filing period, retains accession and currency, and leaves missing amounts unknown. It is coverage evidence only; it does not calculate an alternative invested-capital formula or change EV, ROC or rankings.
+
+The workflow now runs regression tests for the audit, builds the report from each extraction, and retains both outputs in the bakeoff artifact. The next full-universe run will quantify ROU/lease coverage and identify embedded-asset cases before any lease-inclusive sensitivity is designed. Operating lease expense / EBIT alignment, finance-lease treatment, current lease liabilities within working capital, and any debt-like EV treatment remain owner-policy decisions. Production writes and ranking changes remain disabled.
