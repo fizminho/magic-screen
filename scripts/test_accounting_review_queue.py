@@ -607,7 +607,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
                 {"concept": "us-gaap_CashAndCashEquivalentsAtCarryingValue", "label": "Cash and cash equivalents",
                  "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 100}},
                 {"concept": "us-gaap_CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
-                 "label": "Restricted cash", "parent_concept": "us-gaap_AssetsCurrent",
+                 "label": "Cash and cash equivalents", "parent_concept": "us-gaap_AssetsCurrent",
                  "values": {"2025-12-31": 20}},
                 {"concept": "us-gaap_MarketableSecuritiesCurrent", "label": "Marketable securities",
                  "parent_concept": "us-gaap_AssetsCurrent", "values": {"2025-12-31": 30}},
