@@ -1309,7 +1309,7 @@ def main() -> int:
     Path(args.json_output).write_text(json.dumps(queue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     fields = [
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
-        "debt_status", "debt_resolution_gap", "cash_scope_resolution", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
+        "debt_status", "debt_resolution_gap", "debt_candidate_evidence_review", "debt_candidate_evidence_review_source", "cash_scope_resolution", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
@@ -1325,6 +1325,7 @@ def main() -> int:
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["debt_resolution_gap"] = json.dumps(item.get("debt_resolution_gap"), separators=(",", ":"))
+            row["debt_candidate_evidence_review"] = json.dumps(item.get("debt_candidate_evidence_review"), separators=(",", ":"))
             row["cash_scope_resolution"] = json.dumps(item.get("cash_scope_resolution"), separators=(",", ":"))
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
             row["ev_scope_evidence"] = json.dumps(item.get("ev_scope_evidence"), separators=(",", ":"))
