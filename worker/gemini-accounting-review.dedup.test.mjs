@@ -44,26 +44,27 @@ class FakeD1 {
 
 function reviewInput(DB) {
   return {
-    DB,
-    GEMINI_API_KEY: "test-key",
-    task: "debt_scope",
-    symbol: "ABC",
-    accession: "0000000000-25-000001",
-    company: { balance_sheet_fact_review: { categories: {
-      current_debt_candidates: { status: "ambiguous", candidate_count: 2, candidates: [
-        { concept: "NotesPayableCurrent", label: "Notes payable", value: 100 },
-        { concept: "CreditFacilityCurrent", label: "Credit facility", value: 200 }
-      ] }
-    }, unresolved_categories: [] } },
-    resolver: { symbol: "ABC", accession: "0000000000-25-000001", fiscal_period: "2025-12-31",
-      review_flags: ["ambiguous current debt candidates"],
-      enterprise_value_candidate_review: { conventional_debt_status: "incomplete_or_ambiguous_debt_inputs" } }
+    env: { DB, GEMINI_API_KEY: "test-key" },
+    input: {
+      task: "debt_scope",
+      symbol: "ABC",
+      accession: "0000000000-25-000001",
+      company: { balance_sheet_fact_review: { categories: {
+        current_debt_candidates: { status: "ambiguous", candidate_count: 2, candidates: [
+          { concept: "NotesPayableCurrent", label: "Notes payable", value: 100 },
+          { concept: "CreditFacilityCurrent", label: "Credit facility", value: 200 }
+        ] }
+      }, unresolved_categories: [] } },
+      resolver: { symbol: "ABC", accession: "0000000000-25-000001", fiscal_period: "2025-12-31",
+        review_flags: ["ambiguous current debt candidates"],
+        enterprise_value_candidate_review: { conventional_debt_status: "incomplete_or_ambiguous_debt_inputs" } }
+    }
   };
 }
 
 test("identical concurrent Gemini reviews make one API call and later reuse the cache", async () => {
   const DB = new FakeD1();
-  const input = reviewInput(DB);
+  const { env, input } = reviewInput(DB);
   const originalFetch = globalThis.fetch;
   let apiCalls = 0;
   let releaseFetch;
@@ -87,9 +88,9 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
   };
 
   try {
-    const firstPromise = runGeminiAccountingReview(input.DB ? { ...input, DB } : { ...input });
+    const firstPromise = runGeminiAccountingReview(env, input);
     await fetchStarted;
-    const duplicate = await runGeminiAccountingReview({ ...input, DB });
+    const duplicate = await runGeminiAccountingReview(env, input);
     assert.equal(duplicate.status, "IN_PROGRESS");
     assert.equal(duplicate.duplicate_request, true);
     assert.equal(apiCalls, 1);
@@ -99,7 +100,7 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
     assert.equal(first.status, "REVIEW_REQUIRED");
     assert.equal(first.cached, false);
 
-    const cached = await runGeminiAccountingReview({ ...input, DB });
+    const cached = await runGeminiAccountingReview(env, input);
     assert.equal(cached.status, "REVIEW_REQUIRED");
     assert.equal(cached.cached, true);
     assert.equal(apiCalls, 1);
