@@ -309,6 +309,75 @@ FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
         "limitations": ["Absence of a face-statement debt row is not proof of zero debt."],
         "source_url": "https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm",
     },
+    "OTEX": {
+        "accession": "0001002638-26-000068",
+        "method": "debt_note_rollforward_and_cash_restriction_scope_review",
+        "observations": [
+            "Note 11 reports total debt carrying amount 5,770.369m after 66.156m unamortized discounts and issuance costs; current portion 35.850m plus noncurrent 5,734.519m reconciles exactly.",
+            "The debt note lists five instrument groups: Senior Notes 2031 650m, 2030 900m, 2029 850m, 2028 900m, Senior Secured Notes 2027 1,000m, and Acquisition Term Loan 1,536.525m principal.",
+            "The FY2026 cash-flow reconciliation reports 956.024m cash and cash equivalents plus 1.230m restricted cash.",
+            "Note 9 separately reports deposits and restricted cash of 4.824m current and 16.334m noncurrent; Note 9 also reports 112.022m equity-method investments and 45.142m available-for-sale financial assets.",
+            "Operating lease liabilities are separately reported at 63.612m current and 138.425m noncurrent; noncontrolling interests are 1.962m."
+        ],
+        "interpretation": "Current and noncurrent conventional-debt carrying values reconcile to the debt-note carrying amount. Unrestricted cash is separately reported. Restricted cash, security deposits, investments, leases and noncontrolling interests remain distinct EV-scope questions.",
+        "limitations": ["Do not add restricted cash or deposits to unrestricted cash.", "Do not treat equity-method investments or available-for-sale financial assets as cash equivalents.", "Do not add lease liabilities or noncontrolling interests without an approved EV policy.", "Do not replace carrying value with principal or contractual payments without an explicit debt measurement policy."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1002638/000100263826000068/otex-20260630.htm",
+    },
+    "SNDK": {
+        "accession": "0001628280-26-057406",
+        "method": "term_loan_settlement_and_undrawn_revolver_review",
+        "observations": [
+            "The FY2026 10-K reports current and noncurrent long-term debt as explicit zero balances.",
+            "Note 8 states the remaining Term Loan Facility principal was repaid in full on March 4, 2026; the company had drawn no amounts under its 1.5bn Revolving Credit Facility at July 3, 2026.",
+            "Cash and cash equivalents were 4,762m; 2,879m was held outside the United States, with no material unaccrued repatriation tax consequences disclosed.",
+            "Marketable equity securities of 1,777m and notes receivable/investments in Flash Ventures of 678m are separately presented from cash and cash equivalents.",
+            "Operating lease liabilities total 201m, comprising 24m current and 177m noncurrent."
+        ],
+        "interpretation": "The explicit zero debt rows are corroborated by note-level settlement and undrawn-facility disclosures for the reviewed reporting date. Cash equivalents are separately identified; strategic equity investments, notes receivable and lease liabilities remain outside conventional cash/debt pending policy.",
+        "limitations": ["The zero balance applies to the named facilities and FY2026 reporting date only.", "Do not add marketable equity securities or Flash Ventures notes/investments to cash equivalents.", "Do not include operating lease liabilities in conventional debt without lease-policy approval."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/2023554/000162828026057406/sndk-20260703.htm",
+    },
+    "IRWD": {
+        "accession": "0001104659-26-020489",
+        "method": "convertible_note_and_revolver_debt_note_reconciliation",
+        "observations": [
+            "At December 31, 2025, the 2026 Convertible Notes had 200m principal and 199.680m net carrying value after 0.320m unamortized issuance costs; the notes were classified current.",
+            "The Revolving Credit Facility had 385m outstanding principal at December 31, 2025; the facility commitment was 550m and included a 10m letter-of-credit subfacility.",
+            "The two balance-sheet debt candidates total 584.680m, matching 199.680m convertible-note carrying value plus 385m revolver principal.",
+            "Cash and cash equivalents were 215.456m, including money market funds, U.S. Treasury securities and commercial paper.",
+            "Operating lease liabilities are separately reported at 3.252m current and 9.870m noncurrent; 0.6m of letters of credit supports lease obligations."
+        ],
+        "interpretation": "Both conventional borrowing candidates have direct instrument-note support and reconcile to the reported balances. Lease liabilities and lease-supporting letters of credit remain separate. The annual filing is a December 31, 2025 snapshot.",
+        "limitations": ["Do not count the 0.6m lease letter of credit as drawn debt.", "Do not include operating lease liabilities without lease-policy approval.", "Do not substitute subsequent interim repayments into the annual-period debt snapshot without an approved point-in-time data policy."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1446847/000110465926020489/irwd-20251231x10k.htm",
+    },
+    "QTTB": {
+        "accession": "0001193125-26-099339",
+        "method": "venture_debt_carrying_value_and_restricted_cash_reconciliation",
+        "observations": [
+            "Note 11 reports 9.375m term-loan principal less 0.333m unamortized debt discount and issuance costs, yielding 9.708m carrying amount.",
+            "The carrying amount reconciles to 6.235m current portion plus 3.473m long-term debt.",
+            "Restricted cash of 0.647m is explicitly identified as collateral for venture debt and letters of credit related to lease arrangements; cash and cash equivalents are 48.297m.",
+            "A separate 4.943m noncurrent operating lease liability is reported."
+        ],
+        "interpretation": "Venture debt is supported by a note-level carrying-value reconciliation. The 0.647m restricted balance must remain excluded from unrestricted cash; lease liability remains a separate category.",
+        "limitations": ["Do not add restricted cash to unrestricted cash.", "Do not use gross principal in place of carrying value without an approved debt measurement policy.", "Do not include operating lease liabilities in conventional debt without lease-policy approval."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1661998/000119312526099339/qttb-20251231.htm",
+    },
+    "UPWK": {
+        "accession": "0001627475-26-000012",
+        "method": "convertible_note_and_customer_escrow_cash_scope_review",
+        "observations": [
+            "Note 10 reports 360.998m convertible-note principal less 1.228m unamortized debt issuance costs, yielding 359.770m carrying value, all classified current at December 31, 2025.",
+            "The notes mature August 15, 2026; the 10-K explicitly classifies them as current because maturity falls within twelve months of the balance-sheet date.",
+            "Cash and cash equivalents were 294.356m; marketable securities were 378.425m and separately classified.",
+            "Restricted cash was 3.8m; customer funds held in escrow, including funds in transit, were 180.752m with an equal escrow-funds-payable liability.",
+            "The marketable-securities note states they are available for current operations; their portfolio includes money-market funds, commercial paper, Treasury bills, corporate bonds and other fixed-income securities."
+        ],
+        "interpretation": "Debt carrying value and current classification are directly supported. Company cash is distinct from restricted cash and customer escrow. Marketable securities are a separate liquidity category requiring an explicit EV cash-like-asset policy.",
+        "limitations": ["Do not subtract restricted cash or customer escrow funds as unrestricted company cash.", "Do not automatically combine marketable securities with cash equivalents; require a documented cash-like-asset policy.", "Do not count escrow funds payable as conventional debt.", "Do not ignore the note maturity date or mix a later interim balance into this annual filing snapshot without a point-in-time policy."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1627475/000162747526000012/upwk-20251231.htm",
+    },
 }
 
 
@@ -325,6 +394,11 @@ FILING_DEBT_REVIEW_ACTIONS: dict[str, dict[str, Any]] = {
     "STRA": {"evidence_scope": "named_revolver_undrawn_status", "manual_review_questions": ["Confirm whether any other debt instruments exist outside the disclosed revolver.", "Review other financing and lease note disclosures before resolving enterprise value."], "prohibited_inferences": ["Do not infer company-wide zero debt from the undrawn revolver."]},
     "FHTX": {"evidence_scope": "face_statement_absence_and_off_balance_sheet_disclosure", "manual_review_questions": ["Review all debt, commitment, collaboration and financing notes for instruments not separately presented on the face balance sheet.", "Retain debt as unresolved unless complete note evidence supports a conclusion."], "prohibited_inferences": ["Do not infer zero debt solely because no separate conventional-debt face row is presented."]},
     "NRIX": {"evidence_scope": "face_statement_absence_only", "manual_review_questions": ["Review the complete annual filing notes for borrowings, credit facilities, financing arrangements and guarantees.", "Retain debt as unresolved until note-level coverage is complete."], "prohibited_inferences": ["Do not infer zero debt solely because no separate conventional-debt face row is presented."]},
+    "OTEX": {"evidence_scope": "reconciled_instrument_debt_with_restricted_cash_investment_lease_and_nci_scope", "manual_review_questions": ["Confirm whether the EV debt input should use the reconciled 5,770.369m carrying value or another documented debt measure.", "Keep 1.230m restricted cash and separately disclosed security deposits/restricted cash outside unrestricted cash.", "Decide whether the 112.022m equity-method investments or 45.142m available-for-sale financial assets qualify as cash-like assets.", "Set explicit treatment for 202.037m operating lease liabilities and 1.962m noncontrolling interests."], "prohibited_inferences": ["Do not treat all deposits and restricted cash as unrestricted cash.", "Do not automatically add investment assets, leases or NCI to EV inputs."]},
+    "SNDK": {"evidence_scope": "FY2026_zero_facility_debt_with_separate_investment_and_lease_categories", "manual_review_questions": ["Confirm the explicit zero balances and the March 4, 2026 term-loan settlement against the FY2026 period.", "Keep 1,777m marketable equity securities and 678m Flash Ventures notes/investments distinct from cash equivalents.", "Decide whether 201m operating lease liabilities belong in the chosen EV debt policy."], "prohibited_inferences": ["Do not infer all future or unreported debt categories are zero from the reviewed facilities.", "Do not treat equity investments or notes receivable as cash equivalents."]},
+    "IRWD": {"evidence_scope": "reconciled_convertible_note_and_revolver_debt_with_cash_and_lease_separation", "manual_review_questions": ["Confirm the 199.680m note carrying value plus 385m revolver balance against the 584.680m debt candidates.", "Keep lease liabilities and lease-supporting letters of credit outside drawn conventional debt.", "Confirm whether the annual-period snapshot or a later interim debt snapshot is required by the ranking point-in-time policy."], "prohibited_inferences": ["Do not treat undrawn letter-of-credit capacity as debt drawn.", "Do not mix subsequent interim repayments into annual data without an explicit policy."]},
+    "QTTB": {"evidence_scope": "reconciled_venture_debt_and_collateral_restricted_cash", "manual_review_questions": ["Confirm the 9.708m debt carrying value and its 6.235m/3.473m maturity split.", "Keep 0.647m collateral restricted cash outside unrestricted cash.", "Decide whether the 4.943m noncurrent operating lease liability is excluded under the chosen EV policy."], "prohibited_inferences": ["Do not add restricted cash to unrestricted cash.", "Do not merge lease liabilities into conventional borrowings automatically."]},
+    "UPWK": {"evidence_scope": "reconciled_convertible_note_debt_with_customer_escrow_restricted_cash_and_marketable_securities", "manual_review_questions": ["Confirm 359.770m debt carrying value and August 15, 2026 maturity at the annual reporting date.", "Keep 3.8m restricted cash and 180.752m customer escrow funds outside unrestricted cash.", "Decide whether the 378.425m marketable securities qualify as cash-like assets under a consistent EV policy.", "Determine whether subsequent debt repayment data should affect a current-market-cap ranking that otherwise uses annual filing fundamentals."], "prohibited_inferences": ["Do not count customer escrow assets as company cash when matched by escrow liabilities.", "Do not treat restricted cash as unrestricted.", "Do not automatically add marketable securities to cash equivalents or ignore debt maturity timing."]},
 }
 def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
     """Return curated note evidence only for the exact issuer and filing accession."""
