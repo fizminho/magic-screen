@@ -557,6 +557,28 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(item["invested_capital_denominator_diagnostics_source"],
                          "stored_resolver_preview")
 
+    def test_top_five_ranked_issuer_note_reviews_are_accession_bound(self):
+        from build_accounting_review_queue import filing_debt_note_review
+
+        cases = {
+            "OTEX": ("0001002638-26-000068", "5,770.369m"),
+            "SNDK": ("0001628280-26-057406", "March 4, 2026"),
+            "IRWD": ("0001104659-26-020489", "584.680m"),
+            "QTTB": ("0001193125-26-099339", "9.708m"),
+            "UPWK": ("0001627475-26-000012", "359.770m"),
+        }
+        for symbol, (accession, expected_text) in cases.items():
+            with self.subTest(symbol=symbol):
+                review = filing_debt_note_review(symbol, accession)
+                self.assertIsNotNone(review)
+                self.assertEqual(review["status"], "review_only")
+                self.assertIn(expected_text, " ".join(review["observations"]))
+                self.assertTrue(review["evidence_scope"])
+                self.assertFalse(review["production_approved"])
+                self.assertFalse(review["resolver_input"])
+                self.assertFalse(review["debt_candidate_promoted"])
+                self.assertIsNone(filing_debt_note_review(symbol, "0000000000-00-000000"))
+
     def test_every_curated_debt_note_review_is_scoped_and_non_promoting(self):
         from build_accounting_review_queue import FILING_DEBT_NOTE_REVIEWS, filing_debt_note_review
 
