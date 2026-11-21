@@ -592,6 +592,133 @@ FILING_EV_CASH_POLICY_DIMENSIONS: dict[str, dict[str, Any]] = {
 
 
 # Controlled tags make the free-text filing notes comparable across issuers.
+# Security/cash portfolio details are issuer-note evidence, in USD millions.
+# Amounts are populated only where the filing review disclosed them explicitly.
+# A null amount is intentionally unknown; combined maturity schedules are labelled
+# as such and must never be allocated to marketable securities alone.
+FILING_EV_PORTFOLIO_COMPOSITION: dict[str, dict[str, Any]] = {
+    "SGHC": {
+        "portfolio_type": "cash_and_cash_equivalents",
+        "reported_total_millions": 513.0,
+        "components": [
+            {"instrument_type": "cash_in_transit", "amount_millions": 45.0, "amount_status": "disclosed"},
+            {"instrument_type": "bank_balances", "amount_millions": 468.0, "amount_status": "disclosed",
+             "subcomponents": [
+                 {"instrument_type": "processor_wallet_balances", "amount_millions": 129.0, "amount_status": "disclosed"},
+                 {"instrument_type": "regulatory_designated_accounts", "amount_millions": 19.0, "amount_status": "disclosed"},
+                 {"instrument_type": "csr_earmarked_balances", "amount_millions": 12.0, "amount_status": "disclosed"},
+             ]},
+        ],
+        "separate_items": [{"instrument_type": "user_segregated_cash", "amount_millions": 6.0,
+                            "amount_status": "disclosed", "included_in_reported_total": False}],
+        "reconciliation_status": "top_level_components_reconcile; nested balances are subsets and must not be added again",
+    },
+    "FHTX": {
+        "portfolio_type": "marketable_debt_securities",
+        "reported_total_millions": 78.018,
+        "components": [
+            {"instrument_type": "us_government_agency_securities", "amount_millions": 1.500, "amount_status": "disclosed"},
+            {"instrument_type": "commercial_paper", "amount_millions": 35.287, "amount_status": "disclosed"},
+            {"instrument_type": "corporate_notes_and_bonds", "amount_millions": 41.231, "amount_status": "disclosed"},
+        ],
+        "reconciliation_status": "components_reconcile_to_reported_total",
+    },
+    "NRIX": {
+        "portfolio_type": "marketable_debt_securities",
+        "reported_total_millions": 345.981,
+        "components": [{"instrument_type": "us_treasury_securities", "amount_millions": 345.981, "amount_status": "disclosed"}],
+        "separate_items": [{"instrument_type": "money_market_funds_in_cash_equivalents", "amount_millions": 241.364,
+                            "amount_status": "disclosed", "included_in_reported_total": False}],
+        "maturity_buckets": [{"bucket": "current_face_classification", "amount_millions": 345.981, "scope": "marketable_securities_face_row"},
+                             {"bucket": "over_12_months", "amount_millions": None, "scope": "issuer_policy_classifies_contractual_maturities_over_12_months_as_long_term"}],
+        "reconciliation_status": "marketable_security_total_identified; security_level_maturity_split_not_disclosed",
+    },
+    "PXED": {
+        "portfolio_type": "marketable_debt_securities",
+        "reported_total_millions": 167.852,
+        "components": [
+            {"instrument_type": "us_treasury_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "us_agency_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "commercial_paper", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "corporate_debt_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+        ],
+        "maturity_buckets": [
+            {"bucket": "within_12_months", "amount_millions": 137.094, "scope": "current_marketable_securities"},
+            {"bucket": "over_12_months", "amount_millions": 30.758, "scope": "noncurrent_marketable_securities"},
+        ],
+        "reconciliation_status": "maturity_buckets_reconcile_to_reported_total; instrument_amounts_not_disclosed",
+    },
+    "STRA": {
+        "portfolio_type": "held_to_maturity_debt_investments",
+        "reported_total_millions": 12.297,
+        "components": [
+            {"instrument_type": "term_deposits", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "us_treasury_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "corporate_debt_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+        ],
+        "maturity_buckets": [
+            {"bucket": "within_12_months", "amount_millions": 7.297, "scope": "held_to_maturity_portfolio"},
+            {"bucket": "1_to_5_years", "amount_millions": 5.000, "scope": "held_to_maturity_portfolio"},
+        ],
+        "reconciliation_status": "maturity_buckets_reconcile_to_reported_total; instrument_amounts_not_disclosed",
+    },
+    "ALEC": {
+        "portfolio_type": "marketable_debt_securities",
+        "reported_total_millions": 190.222,
+        "components": [
+            {"instrument_type": "money_market_funds", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "us_treasury_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "corporate_bonds", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "certificates_of_deposit", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "commercial_paper", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+        ],
+        "maturity_buckets": [
+            {"bucket": "within_12_months", "amount_millions": 214.4, "scope": "combined_cash_equivalents_and_marketable_securities"},
+            {"bucket": "1_to_2_years", "amount_millions": 41.0, "scope": "combined_cash_equivalents_and_marketable_securities"},
+        ],
+        "reconciliation_status": "combined_maturity_schedule_not_attributable_to_marketable_securities_alone",
+    },
+    "PLTK": {
+        "portfolio_type": "short_term_debt_investments",
+        "reported_total_millions": 136.0,
+        "components": [
+            {"instrument_type": "term_deposits", "amount_millions": 71.8, "amount_status": "disclosed"},
+            {"instrument_type": "commercial_paper", "amount_millions": 64.2, "amount_status": "disclosed"},
+        ],
+        "reconciliation_status": "components_reconcile_to_reported_total",
+    },
+    "ZVRA": {
+        "portfolio_type": "available_for_sale_debt_securities",
+        "reported_total_millions": 176.484,
+        "components": [
+            {"instrument_type": "us_treasury_securities", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "corporate_bonds", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+        ],
+        "maturity_buckets": [
+            {"bucket": "within_12_months", "amount_millions": 128.605, "scope": "current_investment_securities"},
+            {"bucket": "1_to_3_years", "amount_millions": 47.879, "scope": "noncurrent_investment_securities"},
+        ],
+        "reconciliation_status": "maturity_buckets_reconcile_to_reported_total; instrument_amounts_not_disclosed",
+    },
+    "UPWK": {
+        "portfolio_type": "marketable_fixed_income_securities",
+        "reported_total_millions": 378.425,
+        "components": [
+            {"instrument_type": "money_market_funds", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "commercial_paper", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "treasury_bills", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "corporate_bonds", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+            {"instrument_type": "other_fixed_income", "amount_millions": None, "amount_status": "not_disclosed_by_instrument"},
+        ],
+        "separate_items": [
+            {"instrument_type": "cash_and_cash_equivalents", "amount_millions": 294.356, "amount_status": "disclosed", "included_in_reported_total": False},
+            {"instrument_type": "restricted_cash", "amount_millions": 3.8, "amount_status": "disclosed", "included_in_reported_total": False},
+            {"instrument_type": "customer_escrow_and_funds_in_transit", "amount_millions": 180.752, "amount_status": "disclosed", "included_in_reported_total": False},
+        ],
+        "reconciliation_status": "instrument_level_amounts_not_disclosed; separate_cash_restricted_and_customer_funds_not_part_of_marketable_total",
+    },
+}
+
 FILING_EV_CASH_POLICY_TAGS: dict[str, dict[str, list[str]]] = {
     "SGHC": {
         "maturity_buckets": ["on_demand", "not_applicable_cash_balance"],
@@ -660,7 +787,10 @@ def filing_ev_scope_note_review(symbol: str, accession: str | None) -> dict[str,
     )
     return {
         **review,
-        "cash_policy_dimensions": combined_dimensions,
+        "cash_policy_dimensions": {
+            **combined_dimensions,
+            "portfolio_composition": FILING_EV_PORTFOLIO_COMPOSITION[symbol],
+        },
         "cash_policy_dimensions_complete": all(
             combined_dimensions.get(key) for key in required_dimensions
         ),

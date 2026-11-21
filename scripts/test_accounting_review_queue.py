@@ -871,7 +871,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
             "instrument_types", "issuer_cash_equivalent_definition", "maturity_profile",
             "liquidity_evidence", "restriction_or_encumbrance",
             "provisional_mfi_treatment", "unresolved_questions",
-            "maturity_buckets", "credit_quality", "availability",
+            "maturity_buckets", "credit_quality", "availability", "portfolio_composition",
         }
         for symbol, source in FILING_EV_SCOPE_NOTE_REVIEWS.items():
             with self.subTest(symbol=symbol):
@@ -883,6 +883,42 @@ class AccountingReviewQueueTests(unittest.TestCase):
                 self.assertFalse(review["production_approved"])
                 self.assertFalse(review["resolver_input"])
                 self.assertFalse(review["cash_candidate_promoted"])
+
+    def test_portfolio_composition_preserves_disclosed_amounts_and_unknowns(self):
+        from build_accounting_review_queue import (
+            FILING_EV_PORTFOLIO_COMPOSITION, FILING_EV_SCOPE_NOTE_REVIEWS,
+            filing_ev_scope_note_review,
+        )
+
+        self.assertEqual(set(FILING_EV_PORTFOLIO_COMPOSITION), set(FILING_EV_SCOPE_NOTE_REVIEWS))
+        for symbol, source in FILING_EV_SCOPE_NOTE_REVIEWS.items():
+            with self.subTest(symbol=symbol):
+                review = filing_ev_scope_note_review(symbol, source["accession"])
+                composition = review["cash_policy_dimensions"]["portfolio_composition"]
+                self.assertTrue(composition["portfolio_type"])
+                self.assertTrue(composition["reconciliation_status"])
+                self.assertFalse(review["production_approved"])
+                self.assertFalse(review["resolver_input"])
+
+        fhtx = FILING_EV_PORTFOLIO_COMPOSITION["FHTX"]
+        self.assertAlmostEqual(sum(x["amount_millions"] for x in fhtx["components"]), 78.018, places=6)
+        pltk = FILING_EV_PORTFOLIO_COMPOSITION["PLTK"]
+        self.assertAlmostEqual(sum(x["amount_millions"] for x in pltk["components"]), 136.0, places=6)
+        upwk = FILING_EV_PORTFOLIO_COMPOSITION["UPWK"]
+        self.assertTrue(all(x["amount_millions"] is None for x in upwk["components"]))
+        self.assertEqual(upwk["reported_total_millions"], 378.425)
+        alec = FILING_EV_PORTFOLIO_COMPOSITION["ALEC"]
+        self.assertTrue(all(x["scope"] == "combined_cash_equivalents_and_marketable_securities"
+                            for x in alec["maturity_buckets"]))
+        sghc = FILING_EV_PORTFOLIO_COMPOSITION["SGHC"]
+        bank = next(x for x in sghc["components"] if x["instrument_type"] == "bank_balances")
+        self.assertEqual(sum(x["amount_millions"] for x in bank["subcomponents"]), 160.0)
+        self.assertEqual(sghc["reported_total_millions"], 513.0)
+
+    def test_portfolio_composition_remains_accession_bound(self):
+        from build_accounting_review_queue import filing_ev_scope_note_review
+
+        self.assertIsNone(filing_ev_scope_note_review("FHTX", "different-accession"))
 
     def test_upwk_policy_dimensions_keep_marketable_securities_and_customer_escrow_separate(self):
         from build_accounting_review_queue import filing_ev_scope_note_review

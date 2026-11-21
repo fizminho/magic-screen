@@ -148,6 +148,19 @@ Additional isolated scope checks:
 - OTEX's near-zero invested-capital denominator remains the largest ROC sensitivity. The existing denominator diagnostics and P1 escalation remain in force.
 
 These figures are scenario arithmetic only. They do not change the five-stock shadow ranking, accounting approval state, or production data.
+## Structured issuer portfolio composition evidence (review-only)
+
+The cash-policy review now carries a structured `portfolio_composition` object for the nine issuer-note reviews. Amounts are in USD millions and are attached only to the exact reviewed annual-filing accession.
+
+- FHTX and PLTK have instrument-level amounts that reconcile to their reported marketable/short-term investment totals.
+- PXED, STRA and ZVRA have disclosed maturity-bucket amounts that reconcile to the portfolio total, while instrument-level allocations remain unknown.
+- NRIX identifies its marketable portfolio as U.S. Treasury securities and keeps the separately reported money-market cash equivalents outside that portfolio.
+- ALEC's maturity schedule is explicitly labelled as combined cash equivalents plus marketable securities; it is not allocated to marketable securities alone.
+- UPWK's instrument mix is known only at portfolio level. Instrument amounts remain null; separately reported cash, restricted cash and customer escrow are kept outside the marketable-securities total.
+- SGHC's 513m cash-equivalent components are represented as 45m cash-in-transit plus 468m bank balances. Processor wallets, regulatory balances and CSR earmarks are nested subsets of bank balances, not additive components; the separate 6m user-segregated balance remains outside the reported total.
+
+Unknown instrument amounts remain null, not zero. These details do not reclassify balance-sheet face rows, promote securities to cash equivalents, alter EV, change rankings, or enter the resolver. All remain review-only pending a uniform cash-like policy.
+
 ## Universe-wide EV scope evidence framework (review-only)
 
 The accounting review queue now classifies selected annual balance-sheet face rows into a separate EV-scope evidence layer. This is an evidence inventory, not a policy decision and not an input to the resolver or ranking preview. It is attached only when the raw extraction accession exactly matches the resolver preview accession.
