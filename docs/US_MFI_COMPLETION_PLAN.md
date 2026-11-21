@@ -236,3 +236,16 @@ The remaining five P2 issuers now have an accession-bound worksheet: [MNTN, PXED
 - **NRIX:** FY2025 ended 30 November 2025. The filing reports $246.960m cash and cash equivalents, $345.981m current U.S. Treasury marketable securities and $0.968m restricted cash. No conventional borrowing row was identified in the reviewed balance sheet; retain unknown status until note coverage is independently closed. Operating lease liabilities remain separate.
 
 **P2 evidence milestone:** all ten P2 issuer worksheets are now documented: BCRX, PRDO, VXRT, SBC, ZVRA, MNTN, PXED, STRA, FHTX and NRIX. They remain in review until conventional debt, debt-like financing, leases, cash and marketable-security policy are approved consistently. No issuer has been promoted to production and no production fundamentals, ratios, eligibility or rankings were changed.
+
+
+## P3 ranked-issuer review: UPWK, IRWD and QTTB (21 November 2026)
+
+The three P3 issuers that currently pass the shadow eligibility gates now have a consolidated review worksheet: [UPWK, IRWD and QTTB ranked-issuer review](US_MFI_P3_RANKED_REVIEW_2026-11-21.md). These are the lower three names in the five-stock shadow cohort, and each has a material policy sensitivity.
+
+- **UPWK:** FY2025 cash $294.356m, marketable securities $378.425m, restricted cash $3.8m and customer escrow/in-transit $180.752m. The marketable-securities cash-like sensitivity raises EY from 11.13% to 16.52% (+5.38 percentage points). Keep securities separate until a uniform maturity/credit/liquidity policy is approved.
+- **IRWD:** FY2025 debt consists of $199.680m convertible-note carrying value and $385.0m revolver borrowings; cash and equivalents are $215.456m. Later June 2026 repayment does not replace the annual FY2025 snapshot. Net-PP&E-only sensitivity increases ROC from 278.51% to 2,890.32%, demonstrating denominator sensitivity rather than a reason to change the formula.
+- **QTTB:** FY2025 direct operating income of $16.902m includes $53.737m collaboration-arrangement revenue from settlement of a customer refund liability. Removing that revenue mechanically would produce a -$36.835m operating result, but this is a sensitivity only, not an approved normalized EBIT. The exceptional-item policy must be consistent across the cohort.
+
+Current shadow rank order remains HRB 1, OTEX 2, UPWK 3, IRWD 4, QTTB 4. All five remain review-only; no rank is approved for production.
+
+**P3 next:** review the other supported P3 names (ALEC, BMBL, CRNC, MGTX and PLTK) for EBIT quality, invested-capital and debt/cash scope; retain unsupported AFMJF and EGHSF in coverage as provider exclusions. Then consolidate P1/P2/P3 findings into one cohort-wide accounting policy matrix and obtain explicit owner approval before any resolver cutover.

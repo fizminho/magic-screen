@@ -90,3 +90,22 @@ FY2025 operating income is $98.502m. The filing reports $199.680m current conver
 FY2025 operating income is $16.902m, but the income statement reports $53.737m collaboration-arrangement revenue and $36.835m operating expenses. The filing explains that the collaboration revenue arose from settlement of the customer refund liability following the Amgen amendment. This is not ordinary product revenue: QTTB states it has not commercialized product candidates and does not expect product sales for several years, if at all. The $16.902m direct GAAP operating-income candidate is arithmetically valid, but its use as a recurring EBIT proxy is a significant accounting-quality and ranking-stability question. Do not silently remove the revenue or replace reported EBIT; require a documented, cohort-consistent decision on exceptional/nonrecurring operating items.
 
 QTTB's $9.708m venture-debt carrying value reconciles to $6.235m current and $3.473m noncurrent. Cash and cash equivalents are $48.297m, while $0.647m restricted cash is held as collateral for venture debt and lease letters of credit. Operating lease liabilities total $5.636m. Keep all these categories separate pending policy approval.
+
+
+## P3 ranked-issuer review and quantified sensitivities (21 November 2026)
+
+The current candidate formula remains EBIT / (market capitalization + conventional debt - unrestricted cash equivalents). The following issuer evidence reinforces why marketable securities, leases and exceptional operating items must remain separate until a single cohort-wide policy is approved.
+
+| Issuer | Baseline shadow EY | Baseline shadow ROC | Main sensitivity / blocker | Production status |
+|---|---:|---:|---|---|
+| UPWK | 11.13% | 37.47% | Treating $378.425m marketable securities as cash-like raises EY to 16.52% (+5.38 pp); restricted cash and $180.752m customer escrow/in-transit are separate | Review only |
+| IRWD | 8.57% | 278.51% | Net-PP&E-only denominator sensitivity raises ROC to 2,890.32%; FY2025 debt remains $199.680m notes + $385.0m revolver even though repaid in June 2026 | Review only |
+| QTTB | 10.39% | 37.83% | $16.902m reported operating income includes $53.737m collaboration-arrangement revenue from customer-refund-liability settlement; exceptional-item policy unresolved | Review only |
+
+### Required guardrails
+
+- Do not treat all UPWK marketable securities as cash equivalents merely because the issuer says they are available for current operations. The portfolio includes multiple credit and maturity classes; apply a common maturity, credit-quality, liquidity and restriction test.
+- Do not replace IRWD's FY2025 annual debt with later interim repayment status. Annual ranking inputs must be period-aligned.
+- Do not mechanically remove QTTB's $53.737m revenue from reported EBIT. The resulting -$36.835m operating result is a diagnostic sensitivity only; any exceptional-item adjustment needs an approved, cohort-wide rule.
+- Net-PP&E-only ROC sensitivities are diagnostic only. They do not authorize a change from current assets minus current liabilities plus net PP&E.
+- All three issuers remain shadow-only and accounting-review flagged.
