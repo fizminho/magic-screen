@@ -307,3 +307,18 @@ The latest verified full-universe run before the VXRT EBIT-quality flag was adde
 An authenticated, read-only endpoint is being added at GET /api/fundamentals/edgartools/reconciliation-preview. It compares the legacy stock_fundamentals record against the accession-bound EdgarTools resolver candidate for every active US MFI issuer, using one current market-cap snapshot for both calculations. It exposes source periods, legacy filed date, EdgarTools accession, input deltas and EY/ROC percentage-point deltas only when fiscal periods match. The legacy table does not store accession numbers, so the report marks that limitation explicitly.
 
 The endpoint and workflow validator never write production fundamentals, ratios, eligibility or rankings. Period-mismatched rows are retained for triage but are not marked comparable. The next bakeoff must verify the full 30-row output and identify how many issuers have period-aligned, fully comparable legacy and EdgarTools metrics.
+
+
+## Latest full-universe validation with QTTB, VXRT and VSNT review flags (21 November 2026)
+
+Full-universe workflow run **44889130534** completed successfully on commit 91b6568b31a5d7202e76885b0ac2607bbe7ae3a1. Artifact **14700922346** confirms:
+
+- Active cohort **30**; EdgarTools-supported **28**; unsupported **2**; filing evidence unavailable **0**.
+- Shadow ranking **5 eligible / 5 ranked**; **25 excluded** (23 accounting/valuation review, 2 unsupported-provider).
+- Accounting queue **30** rows: **10 P1 / 10 P2 / 10 P3**.
+- Accession-bound operating-income quality reviews: **2** (QTTB and VXRT).
+- Accession-bound company-perimeter reviews: **1** (VSNT).
+- Balance sheets: **28 reconciled / 2 unavailable**; 15 debt-note reviews; 9 EV-scope note reviews; 18 cash-policy questions remain unresolved.
+- Production-approved rows **0**. Resolver and ranking artifacts confirm production writes, production fundamentals changes and ranking changes are all **false**.
+
+The full-universe run passed extraction, raw evidence ingestion, resolver preview, ranking preview, coverage validation, queue generation, sensitivity report and debt-note guardrails. This verifies the current review flags and 30-name coverage; it does not approve accounting policies or production cutover.

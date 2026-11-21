@@ -15,6 +15,8 @@
 | Current shadow eligible / ranked | 5 |
 | Accounting / valuation review exclusions | 23 |
 | P1 / P2 / P3 review lanes | 10 / 10 / 10 |
+| Accession-bound EBIT quality review flags | 2 |
+| Company-perimeter comparability flags | 1 |
 | Shadow production-approved | 0 |
 
 The current ranked set is HRB, OTEX, UPWK, IRWD and QTTB. All five remain review-only. AFMJF and EGHSF remain visible coverage exclusions with no fallback. The two unsupported issuers must not be silently dropped or assigned zero values.
