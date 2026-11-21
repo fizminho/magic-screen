@@ -316,12 +316,12 @@ test("resolves lease and failed sale-leaseback overlap only with explicit note a
   ] };
   const company = {
     balance_sheet_fact_review: { categories: {
-      nondebt_financing_obligation_candidates: { candidates: [{ label: "Sale lease-back financing", value: 56992000 }] },
-      current_lease_liability_candidates: { candidates: [{ label: "Lease liabilities - operating", value: 6032000 }] },
-      noncurrent_lease_liability_candidates: { candidates: [{ label: "Lease liabilities - operating", value: 43752000 }] }
+      nondebt_financing_obligation_candidates: { candidates: [{ concept: "prdo_SaleLeaseBackFinancing", label: "Sale lease-back financing", value: 56992000, row_index: 52, parent_concept: "us-gaap_LiabilitiesNoncurrent" }] },
+      current_lease_liability_candidates: { candidates: [{ concept: "us-gaap_OperatingLeaseLiabilityCurrent", label: "Lease liabilities - operating", value: 6032000, row_index: 39, parent_concept: "us-gaap_LiabilitiesCurrent" }] },
+      noncurrent_lease_liability_candidates: { candidates: [{ concept: "us-gaap_OperatingLeaseLiabilityNoncurrent", label: "Lease liabilities - operating", value: 43752000, row_index: 50, parent_concept: "us-gaap_LiabilitiesNoncurrent" }] }
     }},
     filing_note_review: { lease_financing_reconciliation: {
-      status: "separate_obligations_supported_by_filing",
+      status: "financing_treatment_supported",
       matched_signals: ["failed_sale_leaseback_identified", "financing_obligation_recognized"],
       evidence_excerpt: "The failed sale-leaseback is a separate financing obligation."
     }}
@@ -330,9 +330,20 @@ test("resolves lease and failed sale-leaseback overlap only with explicit note a
   assert.equal(resolved.requires_manual_reconciliation, false);
   assert.equal(resolved.relationship, "separate_obligations_supported_by_filing");
   assert.equal(resolved.filing_reconciliation.separate_balance_sheet_line_item.value, 56992000);
+  assert.equal(resolved.filing_reconciliation.separate_balance_sheet_line_item.row_index, 52);
+  assert.equal(resolved.filing_reconciliation.ordinary_lease_balance_sheet_rows[0].row_index, 39);
   const unproven = reconcileGeminiLeaseFinancingOverlap("lease_scope", leaseReview.findings, [financingReview], {
     ...company, filing_note_review: { lease_financing_reconciliation: { status: "insufficient_evidence" } }
   });
   assert.equal(unproven.requires_manual_reconciliation, true);
   assert.equal(unproven.relationship, "unresolved");
+  const duplicatedFaceRow = reconcileGeminiLeaseFinancingOverlap("lease_scope", leaseReview.findings, [financingReview], {
+    ...company,
+    balance_sheet_fact_review: { categories: {
+      ...company.balance_sheet_fact_review.categories,
+      current_lease_liability_candidates: { candidates: [{ concept: "us-gaap_OperatingLeaseLiabilityCurrent", label: "Lease liabilities - operating", value: 6032000, row_index: 52 }] }
+    }}
+  });
+  assert.equal(duplicatedFaceRow.requires_manual_reconciliation, true);
+  assert.equal(duplicatedFaceRow.relationship, "unresolved");
 });
