@@ -83,6 +83,7 @@ jobs:
           python -m unittest discover -s scripts -p "test_validate_fundamentals_reconciliation.py" -v
           python -m unittest discover -s scripts -p "test_validate_mfi_universe_coverage.py" -v
           python -m unittest discover -s scripts -p "test_build_mfi_sensitivity_report.py" -v
+          node --test scripts/test_build_lease_rou_coverage_report.mjs
       - name: Resolve active MFI universe
         id: universe
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))
@@ -295,6 +296,9 @@ jobs:
       - name: Validate full US MFI universe coverage
         if: always() && hashFiles('edgartools-universe.json') != '' && hashFiles('edgartools-resolver-preview.json') != '' && hashFiles('edgartools-mfi-ranking-preview.json') != ''
         run: python scripts/validate_mfi_universe_coverage.py --universe edgartools-universe.json --extraction edgartools-bakeoff.json --resolver edgartools-resolver-preview.json --ranking edgartools-mfi-ranking-preview.json
+      - name: Build lease and ROU evidence coverage audit
+        if: always() && hashFiles('edgartools-bakeoff.json') != ''
+        run: node scripts/build_lease_rou_coverage_report.mjs
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py
@@ -357,5 +361,7 @@ jobs:
             edgartools-reconciliation-preview.json
             mfi-ranking-sensitivity.json
             mfi-ranking-sensitivity.md
+            lease-rou-coverage.json
+            lease-rou-coverage.md
           if-no-files-found: warn
           retention-days: 7
