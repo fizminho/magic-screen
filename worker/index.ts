@@ -650,6 +650,20 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
       if(row.ebit_status!=="direct_reported_candidate_review_only") exclusionReasons.push("Direct reported consolidated EBIT required; filing-specific reconstructions remain manual-review-only");
       if(row.invested_capital_status!=="positive_denominator_candidate_review_only") exclusionReasons.push("Invested-capital denominator unresolved or non-positive");
       if(row.review_flags.includes("invested_capital_negative_working_capital_offset_high_risk_manual_review")) exclusionReasons.push("Near-zero / negative-working-capital offset risk requires manual review; ROC and ranking withheld");
+      const policyScopeFlags = [
+        "right_of_use_assets_present_review_invested_capital_scope",
+        "lease_liabilities_present_review_debt_and_invested_capital_treatment",
+        "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
+        "restricted_or_combined_cash_present_review_enterprise_value_cash_input",
+        "unrestricted_cash_not_uniquely_identified",
+        "restricted_cash_or_short_term_investments_require_cash_scope_review",
+        "noncontrolling_interest_present_review_enterprise_value_scope",
+        "noncontrolling_interest_requires_enterprise_value_adjustment_review",
+        "company_perimeter_mismatch_requires_manual_review",
+        "nondebt_financing_obligation_requires_enterprise_value_scope_review",
+        "separate_financing_obligation_requires_enterprise_value_policy_decision"
+      ];
+      if(policyScopeFlags.some(flag=>row.review_flags.includes(flag))) exclusionReasons.push("Unresolved lease, cash, NCI or financing scope requires cohort-policy approval before ranking");
       if(row.reporting_currency!=="USD") exclusionReasons.push("Reporting currency not confirmed as USD");
       if(row.enterprise_value_candidate_review?.conventional_debt_status!=="identified_from_unique_current_and_noncurrent_components") exclusionReasons.push("Conventional debt inputs incomplete or ambiguous");
       if(ev===null || ev<=0) exclusionReasons.push("Enterprise-value candidate unavailable or non-positive");

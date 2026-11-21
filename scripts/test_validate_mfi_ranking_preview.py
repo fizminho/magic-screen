@@ -89,6 +89,27 @@ class RankingPreviewTests(unittest.TestCase):
         errors = validate(self.report([item], 1, 1, minimum=1))
         self.assertTrue(any("high-risk near-zero" in error for error in errors))
 
+    def test_unresolved_accounting_scope_flags_cannot_be_ranked(self):
+        blocked_flags = [
+            "right_of_use_assets_present_review_invested_capital_scope",
+            "lease_liabilities_present_review_debt_and_invested_capital_treatment",
+            "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
+            "restricted_or_combined_cash_present_review_enterprise_value_cash_input",
+            "unrestricted_cash_not_uniquely_identified",
+            "restricted_cash_or_short_term_investments_require_cash_scope_review",
+            "noncontrolling_interest_present_review_enterprise_value_scope",
+            "noncontrolling_interest_requires_enterprise_value_adjustment_review",
+            "company_perimeter_mismatch_requires_manual_review",
+            "nondebt_financing_obligation_requires_enterprise_value_scope_review",
+            "separate_financing_obligation_requires_enterprise_value_policy_decision",
+        ]
+        for flag in blocked_flags:
+            with self.subTest(flag=flag):
+                item = row("AAA", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.2, roc_value=0.3)
+                item["review_flags"] = [flag]
+                errors = validate(self.report([item], 1, 1, minimum=1))
+                self.assertTrue(any("unresolved lease, cash, NCI or financing scope" in error for error in errors))
+
     def test_production_write_must_remain_false(self):
         report = self.report([], 0, 0)
         report["production_write"] = True

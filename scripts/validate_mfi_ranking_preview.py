@@ -42,6 +42,22 @@ def validate(report: dict[str, Any]) -> list[str]:
             errors.append(f"{symbol}: filing-specific EBIT reconstruction must remain manual-review-only and unranked")
         if "invested_capital_negative_working_capital_offset_high_risk_manual_review" in (row.get("review_flags") or []):
             errors.append(f"{symbol}: high-risk near-zero invested-capital denominator must withhold ROC and ranking")
+        policy_scope_flags = {
+            "right_of_use_assets_present_review_invested_capital_scope",
+            "lease_liabilities_present_review_debt_and_invested_capital_treatment",
+            "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
+            "restricted_or_combined_cash_present_review_enterprise_value_cash_input",
+            "unrestricted_cash_not_uniquely_identified",
+            "restricted_cash_or_short_term_investments_require_cash_scope_review",
+            "noncontrolling_interest_present_review_enterprise_value_scope",
+            "noncontrolling_interest_requires_enterprise_value_adjustment_review",
+            "company_perimeter_mismatch_requires_manual_review",
+            "nondebt_financing_obligation_requires_enterprise_value_scope_review",
+            "separate_financing_obligation_requires_enterprise_value_policy_decision",
+        }
+        unresolved_scope = policy_scope_flags.intersection(row.get("review_flags") or [])
+        if unresolved_scope:
+            errors.append(f"{symbol}: unresolved lease, cash, NCI or financing scope cannot be ranked before cohort-policy approval")
     if summary.get("eligible") != len(eligible):
         errors.append("eligible summary does not reconcile")
     unsupported = [row for row in rows if row.get("provider_status") == "unsupported_provider"]
