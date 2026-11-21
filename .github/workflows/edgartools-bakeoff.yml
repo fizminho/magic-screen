@@ -214,13 +214,17 @@ jobs:
           if report.get("production_fundamentals_changed") is not False or report.get("rankings_changed") is not False:
               raise SystemExit("Resolver preview did not confirm production and ranking immutability.")
           print(f"Resolver: {report.get('resolver')}; rows: {len(report.get('resolutions', []))}")
-          universe = json.loads(Path("edgartools-universe.json").read_text())
-          if summary.get("active_universe") != universe.get("count"):
-              raise SystemExit("Resolver active-universe count does not match the refreshed MFI universe.")
-          if summary.get("awaiting_evidence") != 0:
-              raise SystemExit("Some active-universe companies are still missing EdgarTools evidence after ingestion.")
-          if summary.get("supported", 0) + summary.get("unsupported_provider", 0) != summary.get("active_universe"):
-              raise SystemExit("Resolver provider coverage does not reconcile to the active universe.")
+          universe_path = Path("edgartools-universe.json")
+          if universe_path.exists():
+              universe = json.loads(universe_path.read_text())
+              if summary.get("active_universe") != universe.get("count"):
+                  raise SystemExit("Resolver active-universe count does not match the refreshed MFI universe.")
+              if summary.get("awaiting_evidence") != 0:
+                  raise SystemExit("Some active-universe companies are still missing EdgarTools evidence after ingestion.")
+              if summary.get("supported", 0) + summary.get("unsupported_provider", 0) != summary.get("active_universe"):
+                  raise SystemExit("Resolver provider coverage does not reconcile to the active universe.")
+          else:
+              print("Regression-only run: skipping dynamic-universe coverage assertions.")
           PY
       - name: Run read-only MFI ranking preview
         if: hashFiles('edgartools-resolver-preview.json') != '' && vars.EDGARTOOLS_INGEST_URL != ''
