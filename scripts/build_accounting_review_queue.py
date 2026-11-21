@@ -211,6 +211,7 @@ EV_SCOPE_POLICY = {
     "restricted_cash": "exclude_from_unrestricted_cash_pending_policy",
     "unrestricted_cash": "candidate_cash_pending_availability_and_EV_policy",
     "marketable_debt_securities": "separate_liquidity_category_pending_cash_like_policy",
+    "marketable_securities_unclassified": "composition_unknown_do_not_assume_debt_or_cash_equivalent",
     "marketable_equity_securities": "not_cash_equivalents_pending_explicit_policy",
     "equity_method_investments": "not_cash_equivalents_pending_explicit_policy",
     "notes_receivable": "not_cash_equivalents_pending_explicit_policy",
@@ -259,8 +260,10 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             category = "equity_method_investments"
         elif is_asset and any(x in searchable for x in ("marketable equity", "equity securities")):
             category = "marketable_equity_securities"
-        elif is_asset and any(x in searchable for x in ("marketable debt", "marketable securities", "debt securities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
+        elif is_asset and any(x in searchable for x in ("marketable debt", "debt securities", "commercial paper", "treasury securities", "treasury bills", "fixed income securities")):
             category = "marketable_debt_securities"
+        elif is_asset and "marketable securities" in searchable:
+            category = "marketable_securities_unclassified"
         elif is_asset and any(x in searchable for x in ("notes receivable", "note receivable", "loans receivable")):
             category = "notes_receivable"
         elif is_liability and any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities")):
