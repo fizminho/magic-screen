@@ -264,15 +264,15 @@ export function validateGeminiAccountingResponse(parsed, task, evidence) {
     if (!evidenceIds.includes(item.evidence_id) || evidenceIds.some(id => typeof id !== "string" || !ids.has(id))) {
       throw new Error(prefix + "evidence_ids must contain the primary evidence_id and only supplied filing evidence IDs");
     }
+    if (typeof item.rationale !== "string" || item.rationale.trim().length === 0 || item.rationale.length > 1000) {
+      throw new Error(prefix + "rationale must be a non-empty string of at most 1000 characters");
+    }
     const rationaleIds = [...new Set(item.rationale.match(/\b[a-z][a-z0-9_]*:\d+\b/gi) ?? [])];
     if (rationaleIds.some(id => !ids.has(id) || !evidenceIds.includes(id))) {
       throw new Error(prefix + "every filing evidence ID cited in rationale must be included in evidence_ids and the supplied evidence allowlist");
     }
     if (!CLASSIFICATIONS.has(item.classification)) {
       throw new Error(prefix + "classification is missing or not in the allowed classification list");
-    }
-    if (typeof item.rationale !== "string" || item.rationale.trim().length === 0 || item.rationale.length > 1000) {
-      throw new Error(prefix + "rationale must be a non-empty string of at most 1000 characters");
     }
     if (!["low", "medium", "high"].includes(item.confidence)) {
       throw new Error(prefix + "confidence must be low, medium, or high");
@@ -289,7 +289,7 @@ export function reconcileGeminiCrossTaskFindings(currentFindings, priorReviews) 
   const priorClassificationByEvidence = new Map();
   for (const review of priorReviews ?? []) {
     for (const finding of review?.findings ?? []) {
-      const ids = Array.isArray(finding.evidence_ids) ? finding.evidence_ids : [finding.evidence_id];
+      const ids = [finding.evidence_id];
       for (const id of ids) {
         if (typeof id !== "string") continue;
         const classifications = priorClassificationByEvidence.get(id) ?? new Set();
@@ -300,7 +300,7 @@ export function reconcileGeminiCrossTaskFindings(currentFindings, priorReviews) 
   }
   const conflicts = [];
   for (const finding of currentFindings ?? []) {
-    const ids = Array.isArray(finding.evidence_ids) ? finding.evidence_ids : [finding.evidence_id];
+    const ids = [finding.evidence_id];
     for (const id of ids) {
       const prior = priorClassificationByEvidence.get(id);
       if (prior && [...prior].some(classification => classification !== finding.classification)) {
