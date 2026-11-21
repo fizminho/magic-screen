@@ -250,7 +250,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
             "companies": [{
                 "symbol": "SBC",
                 "filing": {"accession_number": "0001193125-26-127557"},
-                "balance_sheet_fact_review": {
+                "balance_sheet_fact_review": {"fiscal_period": "2025-12-31",
                     "categories": {
                         "current_debt_candidates": {
                             "status": "ambiguous_candidates",
@@ -258,8 +258,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
                             "resolution_hint": "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
                             "automatic_aggregation": False,
                             "candidates": [
-                                {"concept": "us-gaap_LoansPayableCurrent", "parent_concept": "us-gaap_LiabilitiesCurrent", "value": 9_000_000},
-                                {"concept": "us-gaap_NotesPayableCurrent", "parent_concept": "us-gaap_LiabilitiesCurrent", "value": 0},
+                                {"concept": "us-gaap_LoansPayableCurrent", "parent_concept": "us-gaap_LiabilitiesCurrent", "value": 9_000_000, "fiscal_period": "2025-12-31"},
+                                {"concept": "us-gaap_NotesPayableCurrent", "parent_concept": "us-gaap_LiabilitiesCurrent", "value": 0, "fiscal_period": "2025-12-31"},
                             ],
                         },
                     },
@@ -273,6 +273,13 @@ class AccountingReviewQueueTests(unittest.TestCase):
             "multiple_distinct_instrument_candidates_manual_review_no_automatic_sum",
         )
         self.assertFalse(item["debt_instrument_evidence"]["current_debt"]["automatic_aggregation"])
+        current_gap = item["debt_resolution_gap"]["current"]
+        self.assertEqual(current_gap["disposition"], "ambiguous_manual_review")
+        self.assertEqual(current_gap["filing_evidence_disposition"], "one_nonzero_plus_explicit_zero_instruments_review_only")
+        self.assertEqual(current_gap["manual_nonzero_candidate_values"], [9_000_000])
+        self.assertFalse(current_gap["automatic_aggregation"])
+        self.assertFalse(current_gap["resolver_input"])
+        self.assertFalse(current_gap["production_approved"])
 
     def test_queue_does_not_mix_debt_evidence_from_different_accessions(self):
         preview = {

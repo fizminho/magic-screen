@@ -1128,6 +1128,30 @@ def build_queue(
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["debt_candidate_evidence_review"] = debt_candidate_evidence_review(raw_company)
             item["debt_candidate_evidence_review_source"] = "fresh_extraction_artifact_same_accession"
+            # Surface filing-specific evidence that narrows an ambiguous bucket without
+            # changing the resolver's disposition or promoting a value into EV inputs.
+            for bucket in ("current", "noncurrent"):
+                evidence = item["debt_candidate_evidence_review"]["buckets"].get(bucket, {})
+                gap = (item.get("debt_resolution_gap") or {}).get(bucket)
+                if gap is None:
+                    continue
+                gap["filing_evidence_disposition"] = evidence.get("disposition", "not_available")
+                gap["nonzero_candidate_count"] = evidence.get("nonzero_candidate_count", 0)
+                gap["explicit_zero_candidate_count"] = evidence.get("explicit_zero_candidate_count", 0)
+                gap["manual_nonzero_candidate_values"] = [
+                    candidate.get("value")
+                    for candidate in evidence.get("candidates", [])
+                    if isinstance(candidate.get("value"), (int, float)) and candidate.get("value") != 0
+                ]
+                gap["automatic_aggregation"] = False
+                gap["resolver_input"] = False
+                gap["production_approved"] = False
+                if evidence.get("disposition") == "one_nonzero_plus_explicit_zero_instruments_review_only":
+                    gap["manual_review_hint"] = (
+                        "One non-zero instrument plus separately reported explicit-zero instruments; "
+                        "review the non-zero line against filing notes and maturity schedule. "
+                        "The resolver remains ambiguous and no amount is promoted."
+                    )
             item["debt_scope_evidence"] = extract_debt_scope_evidence(raw_company)
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["ev_scope_evidence"] = extract_ev_scope_evidence(raw_company)
