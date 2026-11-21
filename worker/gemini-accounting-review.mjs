@@ -1,4 +1,4 @@
-const PROMPT_VERSION = "gemini-accounting-review-v5";
+const PROMPT_VERSION = "gemini-accounting-review-v6";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const SUPPORTED_TEXT_MODELS = new Set([
@@ -311,6 +311,31 @@ export function reconcileGeminiCrossTaskFindings(currentFindings, priorReviews) 
   return conflicts;
 }
 
+export function reconcileGeminiLeaseFinancingOverlap(currentTask, currentFindings, priorReviews) {
+  const currentFailedSaleLeaseback = (currentFindings ?? []).filter(item =>
+    item?.classification === "failed_sale_leaseback_financing");
+  const currentLeaseLiabilities = (currentFindings ?? []).filter(item =>
+    ["operating_lease_liability", "finance_lease_liability", "lease_liability"].includes(item?.classification));
+  const priorFindings = (priorReviews ?? []).flatMap(review => review?.findings ?? []);
+  const priorFailedSaleLeaseback = priorFindings.filter(item =>
+    item?.classification === "failed_sale_leaseback_financing");
+  const priorLeaseLiabilities = priorFindings.filter(item =>
+    ["operating_lease_liability", "finance_lease_liability", "lease_liability"].includes(item?.classification));
+  const hasCrossTaskPair = (currentTask === "lease_scope" && currentLeaseLiabilities.length && priorFailedSaleLeaseback.length)
+    || (currentTask === "financing_scope" && currentFailedSaleLeaseback.length && priorLeaseLiabilities.length);
+  if (!hasCrossTaskPair) return null;
+  const leaseFindings = [...currentLeaseLiabilities, ...priorLeaseLiabilities];
+  const financingFindings = [...currentFailedSaleLeaseback, ...priorFailedSaleLeaseback];
+  const ids = items => [...new Set(items.flatMap(item =>
+    [item.evidence_id, ...(Array.isArray(item.evidence_ids) ? item.evidence_ids : [])]).filter(id => typeof id === "string"))];
+  return {
+    requires_manual_reconciliation: true,
+    lease_evidence_ids: ids(leaseFindings),
+    failed_sale_leaseback_evidence_ids: ids(financingFindings),
+    note: "Both lease-liability and failed sale-leaseback financing findings exist for this issuer and annual filing. Their balances must not be added together unless the filing explicitly proves they are separate obligations."
+  };
+}
+
 export async function runGeminiAccountingReview(env, input) {
   if (!env?.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
   if (!ALLOWED_TASKS.has(input.task)) throw new Error("Unsupported or missing accounting review task");
@@ -443,6 +468,14 @@ export async function runGeminiAccountingReview(env, input) {
       try { return JSON.parse(row.response_json); } catch { return null; }
     }).filter(Boolean);
     const crossTaskConflicts = reconcileGeminiCrossTaskFindings(normalized.findings, priorReviews);
+    const leaseFinancingOverlap = reconcileGeminiLeaseFinancingOverlap(input.task, normalized.findings, priorReviews);
+    if (leaseFinancingOverlap) {
+      normalized = { ...normalized, status: normalized.status === "CONFLICTING_EVIDENCE" ? normalized.status : "REVIEW_REQUIRED",
+        summary: (normalized.summary + " Lease and failed sale-leaseback balances require explicit overlap reconciliation before EV treatment.").slice(0, 1200),
+        unresolved_questions: [...normalized.unresolved_questions,
+          "Do the failed sale-leaseback financing balance and reported operating/finance lease liabilities represent separate obligations, or does one include the other? Do not add them until the filing reconciles the amounts."].slice(0, 8),
+        lease_financing_overlap_review: leaseFinancingOverlap };
+    }
     if (crossTaskConflicts.length) {
       normalized = { ...normalized, status: "CONFLICTING_EVIDENCE",
         summary: (normalized.summary + " Cross-task evidence reconciliation found conflicting classifications; manual review is required.").slice(0, 1200),

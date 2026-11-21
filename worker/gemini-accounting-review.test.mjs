@@ -280,3 +280,26 @@ test("cross-task reconciliation flags one evidence ID classified differently", a
     { evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }
   ], [{ findings: [{ evidence_id: "fact:0", evidence_ids: ["fact:0"], classification: "failed_sale_leaseback_financing" }] }]), []);
 });
+
+
+test("flags potential overlap between failed sale-leaseback financing and lease liabilities without assuming double count", async () => {
+  const { reconcileGeminiLeaseFinancingOverlap } = await import("./gemini-accounting-review.mjs");
+  const leaseReview = { findings: [
+    { evidence_id: "current_lease_liabilities:0", evidence_ids: ["current_lease_liabilities:0", "noncurrent_lease_liabilities:0"], classification: "operating_lease_liability" },
+    { evidence_id: "current_lease_liabilities:1", evidence_ids: ["current_lease_liabilities:1", "noncurrent_lease_liabilities:1"], classification: "finance_lease_liability" }
+  ] };
+  const financingReview = { findings: [
+    { evidence_id: "nondebt_financing_obligation:0", evidence_ids: ["nondebt_financing_obligation:0", "filing_note:1"], classification: "failed_sale_leaseback_financing" }
+  ] };
+  const leaseSide = reconcileGeminiLeaseFinancingOverlap("lease_scope", leaseReview.findings, [financingReview]);
+  assert.equal(leaseSide.requires_manual_reconciliation, true);
+  assert.deepEqual(leaseSide.lease_evidence_ids, [
+    "current_lease_liabilities:0", "noncurrent_lease_liabilities:0",
+    "current_lease_liabilities:1", "noncurrent_lease_liabilities:1"
+  ]);
+  assert.deepEqual(leaseSide.failed_sale_leaseback_evidence_ids, ["nondebt_financing_obligation:0", "filing_note:1"]);
+  const financingSide = reconcileGeminiLeaseFinancingOverlap("financing_scope", financingReview.findings, [leaseReview]);
+  assert.equal(financingSide.requires_manual_reconciliation, true);
+  assert.match(financingSide.note, /must not be added together/);
+  assert.equal(reconcileGeminiLeaseFinancingOverlap("cash_scope", [], [leaseReview, financingReview]), null);
+});
