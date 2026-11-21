@@ -152,3 +152,10 @@ This prevents a conventional like-for-like cohort reconciliation. The read-only 
 The enhanced reconciliation passed in bakeoff run 44889673041: 27 period-aligned partial issuer comparisons, 72 field-level comparisons and zero differences. The five shadow-ranked issuers have 14 available field comparisons with zero differences. The only complete EV/EY/ROC comparison is BMBL, which matches exactly on both sides but has negative EBIT and is not ranked.
 
 The blocker remains legacy debt coverage: 27/28 supported issuers have no legacy total-debt value. None of the five ranked issuers can be fully compared to legacy EV/EY/ROC. The legacy path is therefore a useful partial cross-check, but not a complete validation baseline for cutover.
+
+
+## Versioned shadow policy specification v1
+
+Added `config/us-mfi-accounting-policy-v1-proposed.json` as a machine-readable, versioned representation of the proposed defaults. It is deliberately marked `proposed_owner_approval_required`, shadow-only, and production-unapproved. A dedicated validator and regression tests enforce the critical guardrails: annual filings only, consolidated GAAP operating income, no selective exceptional-item adjustments, filing-specific EBIT reconstructions remain manual-review-only, no standalone ROU addition, negative denominators withhold ROC, undrawn facilities are not debt, restricted/customer funds are not unrestricted cash, missing values remain unknown, and fewer than five approved eligible names withholds final ranking.
+
+The specification is an executable review contract, not an accounting approval. Lease/ROU symmetry, NCI, other financing obligations, marketable securities, near-zero denominator materiality, quote staleness and production rollback remain explicit owner-approval gates. The CI bakeoff validates the policy file and includes it in the workflow artifact. No resolver input, production fundamentals, ratios or rankings are changed by this commit.

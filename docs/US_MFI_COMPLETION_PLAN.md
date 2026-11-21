@@ -341,3 +341,10 @@ This is a legacy data-completeness blocker, not evidence of an EdgarTools metric
 The enhanced reconciliation artifact contains 30 issuer rows, 27 period-aligned partial comparisons and 72 field-level comparisons. All 72 available fields match exactly between legacy and EdgarTools. The single full metric comparison is BMBL: EV $1,208.625m, EY -66.67% and ROC -462.64%, identical on both sides; BMBL is not in the ranked cohort because EBIT is negative.
 
 The five shadow-ranked issuers have 14 available field comparisons with zero differences. HRB's legacy EBIT is missing because the EdgarTools value is a filing-specific reconstruction; OTEX, UPWK, IRWD and QTTB match on available EBIT, invested capital and cash. All five lack legacy debt, so none has a full legacy EV/EY/ROC comparison. This confirms strong agreement on available fundamentals but leaves a clear legacy debt-coverage gap.
+
+
+## Versioned shadow policy specification v1
+
+Added `config/us-mfi-accounting-policy-v1-proposed.json` as a machine-readable, versioned representation of the proposed defaults. It is deliberately marked `proposed_owner_approval_required`, shadow-only, and production-unapproved. A dedicated validator and regression tests enforce the critical guardrails: annual filings only, consolidated GAAP operating income, no selective exceptional-item adjustments, filing-specific EBIT reconstructions remain manual-review-only, no standalone ROU addition, negative denominators withhold ROC, undrawn facilities are not debt, restricted/customer funds are not unrestricted cash, missing values remain unknown, and fewer than five approved eligible names withholds final ranking.
+
+The specification is an executable review contract, not an accounting approval. Lease/ROU symmetry, NCI, other financing obligations, marketable securities, near-zero denominator materiality, quote staleness and production rollback remain explicit owner-approval gates. The CI bakeoff validates the policy file and includes it in the workflow artifact. No resolver input, production fundamentals, ratios or rankings are changed by this commit.

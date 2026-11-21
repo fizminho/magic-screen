@@ -8,6 +8,9 @@ on:
       - "scripts/test_edgartools_bakeoff.py"
       - "scripts/build_accounting_review_queue.py"
       - "scripts/test_accounting_review_queue.py"
+      - "config/us-mfi-accounting-policy-v1-proposed.json"
+      - "scripts/validate_us_mfi_accounting_policy.py"
+      - "scripts/test_validate_us_mfi_accounting_policy.py"
       - "scripts/validate_mfi_ranking_preview.py"
       - "scripts/test_validate_mfi_ranking_preview.py"
       - "scripts/validate_mfi_universe_coverage.py"
@@ -71,6 +74,8 @@ jobs:
         run: |
           python -m unittest discover -s scripts -p "test_edgartools_bakeoff.py" -v
           python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
+          python -m unittest discover -s scripts -p "test_validate_us_mfi_accounting_policy.py" -v
+          python scripts/validate_us_mfi_accounting_policy.py config/us-mfi-accounting-policy-v1-proposed.json
           node --experimental-strip-types --test worker/filing-specific-ebit.test.mjs
           node --experimental-strip-types --test worker/fundamentals-reconciliation.test.mjs
           python -m unittest discover -s scripts -p "test_validate_fundamentals_reconciliation.py" -v
@@ -332,6 +337,7 @@ jobs:
           name: edgartools-bakeoff
           path: |
             edgartools-universe.json
+            config/us-mfi-accounting-policy-v1-proposed.json
             edgartools-market-cap-inputs.json
             edgartools-bakeoff.json
             edgartools-ingest-response.json
