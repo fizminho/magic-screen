@@ -60,6 +60,43 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(item["balance_sheet_exceptions"], ["current_lease_liabilities=ambiguous_candidates(2)"])
         self.assertFalse(item["production_write"])
 
+    def test_missing_maturity_bucket_is_explicitly_unknown_not_zero(self):
+        item = classify({
+            "symbol": "SGHC",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "current_debt": {"status": "not_found", "candidate_count": 0},
+                "noncurrent_debt": {"status": "unique_candidate", "candidate_count": 1},
+            },
+            "enterprise_value_candidate_review": {
+                "conventional_debt_status": "incomplete_or_ambiguous_debt_inputs",
+            },
+        })
+        gap = item["debt_resolution_gap"]
+        self.assertEqual(gap["current"]["disposition"], "unknown_not_zero")
+        self.assertEqual(gap["noncurrent"]["disposition"], "unique_candidate_review_only")
+        self.assertFalse(gap["production_approved"])
+        self.assertIn("not zero", gap["interpretation"])
+
+    def test_ambiguous_maturity_bucket_is_not_automatically_aggregated(self):
+        item = classify({
+            "symbol": "SBC",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "current_debt": {"status": "ambiguous_candidates", "candidate_count": 2},
+                "noncurrent_debt": {"status": "unique_candidate", "candidate_count": 1},
+                "aggregate_debt": {"status": "unique_candidate", "candidate_count": 1},
+            },
+            "enterprise_value_candidate_review": {
+                "conventional_debt_status": "incomplete_or_ambiguous_debt_inputs",
+            },
+        })
+        gap = item["debt_resolution_gap"]
+        self.assertEqual(gap["current"]["disposition"], "ambiguous_manual_review")
+        self.assertEqual(gap["aggregate"]["disposition"], "unique_candidate_review_only")
+        self.assertIn("must not be added", gap["interpretation"])
+        self.assertFalse(gap["aggregate"]["production_approved"])
+
     def test_queue_sorts_by_priority_and_preserves_read_only_flags(self):
         report = {"resolver": "deterministic-preview-v1",
                   "production_fundamentals_changed": False, "rankings_changed": False,
