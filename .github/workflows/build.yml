@@ -15,6 +15,8 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Run Gemini accounting review contract tests
+        run: node --test worker/gemini-accounting-review.test.mjs
       - name: Validate EdgarTools test script syntax
         run: python3 -m py_compile scripts/edgartools_bakeoff.py
       # INTENTIONAL: validate Wrangler bundling and asset configuration without deploying.

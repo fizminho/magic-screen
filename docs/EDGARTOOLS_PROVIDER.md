@@ -221,3 +221,19 @@ Each accession-bound filing debt-note record also carries an explicit `evidence_
 ### CI guard for curated debt-note evidence
 
 The EdgarTools workflow runs the accounting review-queue regression suite and validates every accession-bound debt-note review in the generated artifact. CI checks that the summary count matches the attached rows, each review includes its evidence scope and manual-review guidance, and every review remains `review_only`, outside resolver inputs, and unpromoted to conventional debt. The queue must also continue to confirm `production_write=false`. This is a regression guard only; it does not change accounting classifications or ranking policy.
+
+
+## Optional Gemini accounting ambiguity reviewer (free tier)
+
+Gemini is an optional interpretation assistant, not a fundamentals provider or calculation engine. The protected `POST /api/fundamentals/edgartools/ai-review` endpoint reads the latest stored EdgarTools annual evidence and runs the existing deterministic resolver first. A `GET` request previews the escalation tasks without calling Gemini; a POST with `preview: true` does the same. A POST with a specific `task` invokes Gemini only if that task has an unresolved deterministic signal.
+
+- Supported tasks are debt scope, cash scope, lease/ROU scope, NCI scope and separate-financing scope. No task is sent merely because a category exists; a deterministic ambiguity or unresolved scope flag is required.
+- The request contains compact, grouped candidate evidence and the resolver's existing validation outcomes, not the full filing, complete Company Facts dataset, or the full EdgarTools payload.
+- The default model is `gemini-2.5-flash-lite`; only Flash-Lite model IDs may be configured. No automatic escalation to paid-tier models is performed.
+- A D1 cache key includes the evidence hash, task, prompt version, proposed policy version and model. Unchanged task evidence reuses the cached response.
+- The application enforces a maximum of 10 uncached calls per UTC day. This is an application guardrail, not a guarantee of Google's free quota.
+- Model output must pass a strict JSON contract and every finding must cite an evidence ID from the submitted package. Unknown evidence IDs, classifications or malformed responses are rejected.
+- Filing-derived labels and descriptions are untrusted input. Gemini has no tools, browsing or execution permissions.
+- AI output remains `*_REVIEW_REQUIRED` / candidate interpretation only. It never changes resolver results, production fundamentals, eligibility or ranking. Human review and existing deterministic validations remain mandatory.
+
+Configure `GEMINI_API_KEY` as a Cloudflare Worker secret (never a source-code or frontend variable). Optional `GEMINI_MODEL` may select an available Flash-Lite model. Do not call the endpoint until the Google project/key is confirmed active and the key is restricted to the Gemini API. The legacy Company Facts tag-discovery route now returns HTTP 410 so new workflows cannot accidentally use its broad fact-list prompt.

@@ -1,5 +1,6 @@
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
 import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation";
+import { runGeminiAccountingReview, listGeminiAccountingEscalations } from "./gemini-accounting-review";
 
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
@@ -1486,15 +1487,35 @@ export default {
         return json(await diagnoseSecExtensionFacts(env,symbol));
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC filing XBRL extension diagnostic"},503); }
     }
-    if (url.pathname==="/api/ai/fundamentals/extract" && request.method==="POST") {
+    if (url.pathname==="/api/fundamentals/edgartools/ai-review" && (request.method==="GET" || request.method==="POST")) {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
-        const payload:any=await request.json();
-        const symbol=String(payload.symbol??"").trim().toUpperCase();
+        await ensureSchema(env);
+        const payload:any=request.method==="POST"?await request.json():{};
+        const symbol=String(payload.symbol??url.searchParams.get("symbol")??"").trim().toUpperCase();
         if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
-        return json(await extractSecFactsWithGemini(env,symbol));
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC EDGAR Company Facts + Gemini"},503); }
+        const row=await env.DB.prepare(`SELECT e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json
+          FROM edgartools_filing_evidence e
+          WHERE e.symbol=? AND e.market='US'
+          ORDER BY e.ingested_at DESC,e.accession_key DESC LIMIT 1`).bind(symbol).first<any>();
+        if (!row || row.provider_status!=="supported" || !row.payload_json) return json({symbol,status:"evidence_unavailable",escalations:[],note:"No supported EdgarTools annual filing evidence is available."},404);
+        const company=JSON.parse(row.payload_json);
+        const resolver=resolveEdgarToolsEvidence(symbol,row.provider_status,row.accession,row.fiscal_period,company);
+        if (request.method==="GET" || payload.preview===true) {
+          return json({symbol,accession:row.accession,fiscal_period:row.fiscal_period,resolver_status:resolver.overall_status,
+            escalations:listGeminiAccountingEscalations(symbol,company,resolver),
+            production_write:false,production_fundamentals_changed:false,rankings_changed:false,
+            note:"Preview only. Gemini is called only for explicitly unresolved accounting interpretation tasks."});
+        }
+        if (!env.GEMINI_API_KEY) return json({error:"GEMINI_API_KEY is not configured as a Worker secret"},503);
+        const task=String(payload.task??"");
+        return json(await runGeminiAccountingReview(env,{symbol,accession:row.accession,fiscalPeriod:row.fiscal_period,
+          company,resolver,task,model:env.GEMINI_MODEL}));
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools + Gemini accounting review"},503); }
+    }
+    if (url.pathname==="/api/ai/fundamentals/extract" && request.method==="POST") {
+      return json({error:"This legacy Company Facts tag-discovery endpoint is retired. Use /api/fundamentals/edgartools/ai-review for cached, ambiguity-only review."},410);
     }
     if (url.pathname==="/api/mfi/screen") {
       try {
