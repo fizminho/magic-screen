@@ -137,3 +137,12 @@ The first two shadow-ranked issuers have now had their selected FY2026 annual fi
 - **HRB:** FY2026 current assets less current liabilities plus net PP&E reconciles to **$273.588m**. Unrestricted cash, restricted cash, conventional debt and operating-lease balances are separately identified. The $907.686m EBIT reconstruction remains subject to accounting-owner approval.
 - **OTEX:** FY2026 debt carrying value reconciles exactly to the maturity buckets. The **$16.745m** invested-capital candidate is the principal blocker: negative working capital offsets **96.79%** of net PP&E. Lease liabilities and NCI are quantified but remain separate policy questions.
 - No resolver, production fundamentals, EY/ROC, eligibility or ranking values were changed. Both issuers remain review-only and production_approved=false.
+
+
+## Second P1 filing review: PBI and SGHC (21 November 2026)
+
+The next P1 pass now has accession-matched FY2025 filing evidence for PBI and SGHC in [the PBI and SGHC review worksheet](US_MFI_PBI_SGHC_REVIEW_2026-11-21.md). This review confirms the presentation currency and clarifies major operating-model and debt-scope issues; it does not approve the candidates.
+
+- **PBI:** invested-capital arithmetic reproduces **-$261.427m**, but Pitney Bowes has substantial finance receivables, customer deposit liabilities, rental equipment and lease assets. The standard operating-company denominator and EBIT reconstruction are not ready for promotion.
+- **SGHC:** the FY2025 20-F explicitly presents USD millions. The $357m operating subtotal can be reconstructed from the operating lines, but a $17.3m noncurrent facility balance coexists with on-demand NGN loans of unspecified amount, leaving current borrowing unresolved. $6m of amounts segregated for users and $16m fixed deposits remain separate from the $513m cash-equivalent line.
+- Both issuers remain review-only. No production fundamentals, ratios, eligibility or rankings were changed.
