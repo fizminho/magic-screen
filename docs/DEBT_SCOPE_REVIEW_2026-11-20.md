@@ -328,3 +328,38 @@ This is a research and triage layer, not a policy engine. It does not change EV 
 The structured review now also exposes controlled, multi-value tags for maturity bands, credit-quality evidence and liquidity/availability constraints. Tags preserve uncertainty rather than filling gaps: for example, UPWK's instrument-level maturity and credit-quality details remain explicitly undisclosed in this review, while ALEC's combined cash-and-investment maturity schedule is tagged as combined rather than misattributed to marketable securities alone.
 
 The queue summary reports tag distributions across accession-matched issuer reviews. These distributions are descriptive coverage metrics only; they do not imply that current securities are cash-equivalent, that investment-grade assets are unrestricted, or that any issuer's candidate cash deduction is approved.
+
+
+## Instrument-level debt evidence snapshot (21 Nov 2026)
+
+The successful EdgarTools bakeoff artifact from run **44859999814** (commit `876753029e7e4031ef3e2951f8e8e914e14961bd`) now exports the candidate-instrument review to both JSON and CSV. The queue covers 30 universe members; the debt candidate evidence is accession- and fiscal-period-matched. It is a separate review layer and is not fed into the resolver.
+
+### Universe coverage
+
+| Maturity bucket | Unique nonzero candidate | All selected instrument lines explicit zero | One nonzero plus separate explicit-zero line | Unknown / no selected line | Not available |
+|---|---:|---:|---:|---:|---:|
+| Current | 14 | 3 | 1 | 10 | 2 |
+| Noncurrent | 16 | 3 | 1 | 8 | 2 |
+
+These are candidate-evidence dispositions, not approved debt classifications. The underlying resolver still reports 12 current buckets as unknown and 9 noncurrent buckets as unknown, with 2 current and 1 noncurrent ambiguous buckets. The review layer does not override those dispositions.
+
+### Six issuers with explicit-zero or mixed instrument evidence
+
+| Issuer | Exact selected face-row evidence | Resolver implication |
+|---|---|---|
+| HRB | Current portion of long-term debt: $0; noncurrent long-term debt: $1,491.493m | Resolver already identifies both maturity components. The zero applies only to the selected current-debt row. |
+| BCRX | Secured term loan, noncurrent: $0 | Current debt remains unknown. The separately disclosed royalty-financing obligation remains a distinct financing category and is not erased by the zero term-loan row. |
+| MNTN | Short-term note payable: $0; convertible debt: $0, both current | Current bucket remains a manual-review case because two separate instrument concepts are selected. Noncurrent debt remains unknown. |
+| SBC | Bank and other borrowings: $9.099046m current and $33.734438m noncurrent; related-party notes payable: $0 in both buckets | The positive borrowings and separate zero notes are preserved individually. The resolver still requires review of instrument scope and reconciliation before aggregation. |
+| SNDK | Current long-term debt: $0; noncurrent long-term debt: $0 | Resolver identifies both buckets. The annual filing note separately supports repayment of the term loan and an undrawn revolver at year-end. |
+| UPWK | Current debt: $359.770m; noncurrent debt: $0 | Resolver identifies both buckets. The zero is limited to the selected noncurrent debt line and does not offset the current convertible-note carrying value. |
+
+### Interpretation and guardrails
+
+- An explicit zero is evidence about one reported instrument, concept, fiscal period and accession. It is not a company-wide assertion that no debt exists.
+- A missing maturity bucket remains unknown, even when the filing note describes an undrawn facility or no scheduled principal maturity.
+- Multiple instruments are retained separately. A nonzero borrowing plus a zero related-party note is not automatically aggregated by this evidence layer.
+- Lease liabilities, royalty financing, sale-leaseback financing and other separate financing obligations remain outside the conventional-debt total pending a consistent policy.
+- Every record remains `automatic_aggregation=false`, `production_approved=false`, `resolver_input=false` and `debt_candidate_promoted=false`.
+
+The CSV export was verified in the same successful workflow artifact and contains the `debt_candidate_evidence_review` and source columns. No production fundamentals, EV, earnings yield, return on capital, eligibility or ranking changed.
