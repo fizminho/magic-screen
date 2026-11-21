@@ -1459,6 +1459,33 @@ The carrying amount of noncontrolling interest was $8 million.
         self.assertIn("nci_scope", by_title["Note 12 - Equity"]["topics"])
         self.assertLessEqual(len(by_title["Note 8 - Debt"]["excerpt"]), 1200)
 
+    def test_failed_sale_leaseback_is_separate_only_with_explicit_note_and_schedule_evidence(self):
+        markdown = """# Note 9 - Leases
+Operating Leases Total | Finance Leases Total | Total Lease Liabilities
+Present value of future minimum lease payments
+Failed Sale-Leaseback
+A financing obligation liability was recognized.
+The Company will not recognize rent expense related to the leased asset.
+Instead, monthly rent payments under the lease agreement will be recorded as interest expense and a reduction of the outstanding liability.
+"""
+        result = filing_note_review(type("FilingObject", (), {
+            "notes": type("Notes", (), {"to_markdown": lambda self, focus=None: markdown})()
+        })())
+        reconciliation = result["lease_financing_reconciliation"]
+        self.assertEqual(reconciliation["status"], "separate_obligations_supported_by_filing")
+        self.assertIn("payments_reduce_financing_liability", reconciliation["matched_signals"])
+        self.assertIn("ordinary_lease_liability_schedule_separate", reconciliation["matched_signals"])
+
+    def test_failed_sale_leaseback_does_not_resolve_overlap_without_all_signals(self):
+        markdown = """# Note 9 - Leases
+Failed Sale-Leaseback
+A financing obligation liability was recognized.
+"""
+        result = filing_note_review(type("FilingObject", (), {
+            "notes": type("Notes", (), {"to_markdown": lambda self, focus=None: markdown})()
+        })())
+        self.assertEqual(result["lease_financing_reconciliation"]["status"], "insufficient_evidence")
+
     def test_missing_structured_notes_is_transparent(self):
         result = filing_note_review(object())
         self.assertEqual(result["status"], "not_available")
