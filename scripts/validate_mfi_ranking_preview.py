@@ -42,10 +42,10 @@ def validate(report: dict[str, Any]) -> list[str]:
             errors.append(f"{symbol}: filing-specific EBIT reconstruction must remain manual-review-only and unranked")
         if "invested_capital_negative_working_capital_offset_high_risk_manual_review" in (row.get("review_flags") or []):
             errors.append(f"{symbol}: high-risk near-zero invested-capital denominator must withhold ROC and ranking")
+        # Lease / ROU presence is disclosed but not a hard blocker under the
+        # proposed baseline: ROU is excluded from invested capital and leases
+        # remain outside conventional debt unless a cohort-wide policy is approved.
         policy_scope_flags = {
-            "right_of_use_assets_present_review_invested_capital_scope",
-            "lease_liabilities_present_review_debt_and_invested_capital_treatment",
-            "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
             "restricted_or_combined_cash_present_review_enterprise_value_cash_input",
             "unrestricted_cash_not_uniquely_identified",
             "restricted_cash_or_short_term_investments_require_cash_scope_review",
