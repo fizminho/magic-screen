@@ -278,3 +278,25 @@ All 30 issuer review lanes are now documented: 10 P1, 10 P2 and 10 P3. The P3 se
 The matrix preserves the current candidate rules: annual consolidated operating income; invested capital = current assets - current liabilities + net PP&E; gross conventional debt at carrying value; unrestricted cash equivalents only; marketable securities, restricted cash, leases, NCI and other financing obligations kept separately visible. Exceptional items, lease/ROU treatment, NCI, marketable-securities cash-like treatment and debt-like financing inclusion require explicit cohort-wide decisions.
 
 No policy is marked approved. The matrix is a decision aid, not a production instruction. Implementation should begin only after the accounting owner signs off the policy and the full-universe shadow results are re-run against it.
+
+
+## Current issuer-review and policy-preparation status (21 November 2026)
+
+The filing-review work now covers the complete 30-symbol triage set:
+
+- **P1:** 10 cases, including nine issuer accounting reviews plus VSNT's pre-separation company-perimeter mismatch.
+- **P2:** 10 cases, with conventional debt reconciliations, named-facility evidence, and separate royalty / failed sale-leaseback financing reviews.
+- **P3:** 10 cases, including the five supported-but-unranked issuers with negative EBIT, the three ranked-but-unapproved issuers, and two unsupported-provider exclusions.
+
+Review worksheets: [P1 register](US_MFI_P1_ISSUER_REVIEW_REGISTER.md), [P2 debt-scope plan](US_MFI_P2_DEBT_SCOPE_REVIEW_2026-11-21.md), [P2 financing obligations](US_MFI_P2_FINANCING_OBLIGATION_REVIEW_2026-11-21.md), [P2 conventional debt](US_MFI_P2_SBC_ZVRA_REVIEW_2026-11-21.md), [P2 named facilities](US_MFI_P2_NAMED_FACILITY_REVIEW_2026-11-21.md), [P3 ranked review](US_MFI_P3_RANKED_REVIEW_2026-11-21.md), and [P3 supported-but-unranked review](US_MFI_P3_UNRANKED_REVIEW_2026-11-21.md).
+
+The cohort-wide [accounting policy matrix](US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md) consolidates proposed defaults and quantified sensitivities. It is a proposal for accounting-owner approval, not an approved policy. No issuer has been production-approved.
+
+The latest verified full-universe run before the VXRT EBIT-quality flag was added is run **44888647649**, artifact **14701466369**. It passed with 30 active issuers, 28 supported, 2 unsupported, 5 shadow-ranked, 10/10/10 P1/P2/P3, 0 production-approved, and one QTTB operating-income quality review plus one VSNT company-perimeter review. Commit **895c206e8fed48675a614f439fbe644b93523699** adds the second accession-bound operating-income quality review for VXRT; its regression tests passed. A new full-universe run is triggered by the current commit to verify both QTTB and VXRT warnings in the complete cohort.
+
+### Remaining release gates
+
+1. Accounting-owner sign-off on the policy matrix: EBIT and exceptional items, invested capital and negative denominator handling, conventional debt, other financing obligations, leases, NCI, cash equivalents and marketable securities.
+2. Close the all-30 legacy-versus-EdgarTools reconciliation and document material differences, period mismatches and rollback criteria.
+3. Re-run full-universe extraction, ingestion, resolver and ranking after every approved policy implementation.
+4. Obtain explicit production cutover approval. Until then, keep production writes disabled and the legacy Company Facts path intact.

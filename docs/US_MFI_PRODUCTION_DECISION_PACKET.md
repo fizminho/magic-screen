@@ -133,3 +133,8 @@ The detailed matrix is in [US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md]
 **Current state:** recommended defaults are documented, but none is accounting-owner approved. In particular, no production decision has been made on (1) exceptional/nonrecurring EBIT items, (2) operating/finance lease treatment and ROU asset symmetry, (3) NCI in EV, (4) marketable securities as cash-like, (5) royalty/failed-sale-leaseback/contingent consideration debt-like treatment, or (6) invested-capital handling for negative/near-zero denominators.
 
 The current shadow ranking is a diagnostic, not a final investable ranking. The current five-name cohort is exactly at the minimum eligibility count; any issuer removed at approval must be replaced by another fully evidenced eligible name or the ranking must be withheld until five approved names are available.
+
+
+## Cohort-wide policy matrix and remaining P3 review
+
+The proposed cohort-wide accounting policy matrix and the P3 supported-but-unranked issuer review are now available in the completion plan. The matrix remains unsigned. In particular, QTTB's settlement revenue, VXRT's noncash sold-royalty revenue and BMBL's impairment charge are examples of why exceptional-item treatment must be consistent across the entire cohort.
