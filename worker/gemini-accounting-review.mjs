@@ -257,11 +257,14 @@ export function validateGeminiAccountingResponse(parsed, task, evidence) {
     if (typeof item.evidence_id !== "string" || !ids.has(item.evidence_id)) {
       throw new Error(prefix + "evidence_id is missing or not in the supplied evidence allowlist");
     }
-    const evidenceIds = Array.isArray(item.evidence_ids) ? [...new Set(item.evidence_ids)] : [item.evidence_id];
+    if (!Array.isArray(item.evidence_ids)) {
+      throw new Error(prefix + "evidence_ids must explicitly list every filing evidence ID supporting this finding");
+    }
+    const evidenceIds = [...new Set(item.evidence_ids)];
     if (!evidenceIds.includes(item.evidence_id) || evidenceIds.some(id => typeof id !== "string" || !ids.has(id))) {
       throw new Error(prefix + "evidence_ids must contain the primary evidence_id and only supplied filing evidence IDs");
     }
-    const rationaleIds = [...new Set(item.rationale.match(/\\b[a-z][a-z0-9_]*:\\d+\\b/gi) ?? [])];
+    const rationaleIds = [...new Set(item.rationale.match(/\b[a-z][a-z0-9_]*:\d+\b/gi) ?? [])];
     if (rationaleIds.some(id => !ids.has(id) || !evidenceIds.includes(id))) {
       throw new Error(prefix + "every filing evidence ID cited in rationale must be included in evidence_ids and the supplied evidence allowlist");
     }

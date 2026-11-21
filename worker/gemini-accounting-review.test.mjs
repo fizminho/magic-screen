@@ -95,7 +95,7 @@ test("supplies only exact evidence IDs and rejects invalid Gemini finding fields
   const { validateGeminiAccountingResponse } = await import("./gemini-accounting-review.mjs");
   const evidence = { categories: { current_debt: { candidates: [{ evidence_id: "current_debt:0", source_kind: "filing_fact_candidate" }] } } };
   const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
-    { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported borrowing.", confidence: "medium" }
+    { evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"], classification: "conventional_debt", rationale: "Reported borrowing.", confidence: "medium" }
   ], unresolved_questions: [] };
   assert.equal(validateGeminiAccountingResponse(base, "debt_scope", evidence).findings.length, 1);
   assert.throws(() => validateGeminiAccountingResponse({ ...base, findings: [{ ...base.findings[0], evidence_id: "current_debt_candidate_0" }] }, "debt_scope", evidence), /evidence_id is missing or not in the supplied evidence allowlist/);
@@ -163,7 +163,7 @@ test("allows exact filing-note evidence IDs but still rejects resolver summaries
     structured_review_evidence: [{ evidence_id: "ev:lease_liabilities", source_kind: "resolver_summary" }]
   };
   const base = { task: "lease_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
-    { evidence_id: "filing_note:0", classification: "lease_liability", rationale: "The note describes lease obligations.", confidence: "medium" }
+    { evidence_id: "filing_note:0", evidence_ids: ["filing_note:0"], classification: "lease_liability", rationale: "The note describes lease obligations.", confidence: "medium" }
   ], unresolved_questions: [] };
   assert.equal(validateGeminiAccountingResponse(base, "lease_scope", evidence).findings.length, 1);
   assert.throws(() => validateGeminiAccountingResponse({
