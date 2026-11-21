@@ -10,6 +10,8 @@ on:
       - "scripts/test_accounting_review_queue.py"
       - "scripts/validate_mfi_ranking_preview.py"
       - "scripts/test_validate_mfi_ranking_preview.py"
+      - "scripts/validate_mfi_universe_coverage.py"
+      - "scripts/test_validate_mfi_universe_coverage.py"
       - "scripts/validate_edgartools_pipeline.py"
       - "scripts/test_validate_edgartools_pipeline.py"
       - "docs/US_MFI_COMPLETION_PLAN.md"
@@ -65,6 +67,7 @@ jobs:
           python -m unittest discover -s scripts -p "test_edgartools_bakeoff.py" -v
           python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
           node --experimental-strip-types --test worker/filing-specific-ebit.test.mjs
+          python -m unittest discover -s scripts -p "test_validate_mfi_universe_coverage.py" -v
       - name: Resolve active MFI universe
         id: universe
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))
@@ -240,6 +243,9 @@ jobs:
             --ingestion edgartools-ingest-response.json \
             --resolver edgartools-resolver-preview.json \
             --ranking edgartools-mfi-ranking-preview.json
+      - name: Validate full US MFI universe coverage
+        if: always() && hashFiles('edgartools-universe.json') != '' && hashFiles('edgartools-resolver-preview.json') != '' && hashFiles('edgartools-mfi-ranking-preview.json') != ''
+        run: python scripts/validate_mfi_universe_coverage.py --universe edgartools-universe.json --extraction edgartools-bakeoff.json --resolver edgartools-resolver-preview.json --ranking edgartools-mfi-ranking-preview.json
       - name: Build accounting exception queue
         if: always() && hashFiles('edgartools-resolver-preview.json') != ''
         run: python scripts/build_accounting_review_queue.py

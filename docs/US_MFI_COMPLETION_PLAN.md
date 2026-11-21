@@ -68,3 +68,18 @@ The latest ranking preview reports 5 eligible and 5 ranked, with 25 not ranked: 
 The accounting queue still contains 9 P1, 11 P2 and 10 P3 reviews; 28 balance sheets reconcile and 2 are unavailable; 15 filing-specific debt-note reviews and 9 EV-scope note reviews remain review-only; 18 cash-policy questions remain unresolved. The main blockers are accounting policy approval and legacy-versus-EdgarTools reconciliation, not extraction availability.
 
 The workflow now validates each handoff explicitly: unique active-universe symbols, extraction coverage for every requested issuer, accession/period completeness for supported filings, received-versus-ingested counts, unsupported-provider reconciliation, resolver coverage and production immutability. Universe and ingestion response reports are retained as CI artifacts for audit.
+
+
+## Latest verified full-universe run (21 Nov 2026)
+
+The full-universe path was exercised by a `[full-universe]` push run. Universe refresh, annual filing extraction, raw evidence ingestion, read-only resolver, shadow ranking, ranking-policy validation, accounting review queue and debt-note guardrail checks all succeeded.
+
+- MFI selection: minimum market cap **US$50 million**, **top 30**.
+- Active universe: **30**; extraction included those 30 plus **ADBE** as a regression control.
+- EdgarTools coverage: **28 supported**, **2 unsupported**; no automatic fallback.
+- Shadow ranking: **5 eligible/ranked**, **25 excluded** (2 provider unsupported, 23 accounting/valuation review).
+- Top shadow order: HRB, OTEX, UPWK, IRWD and QTTB. IRWD and QTTB tie at combined score 8.
+- Accounting queue: 30 issuers; 9 P1, 11 P2, 10 P3; 15 filing-specific debt-note reviews; 9 EV-scope reviews; 3 filing-specific EBIT reviews.
+- Production fundamentals and rankings were not changed.
+
+This is a verified pipeline milestone, not production approval. Next work is to reduce accounting review blockers and approve EBIT, invested-capital, debt and cash/EV policies. OTEX's near-zero positive invested-capital denominator and UPWK's cash/EV treatment remain material sensitivity items.
