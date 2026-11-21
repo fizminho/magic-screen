@@ -97,6 +97,63 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertIn("must not be added", gap["interpretation"])
         self.assertFalse(gap["aggregate"]["production_approved"])
 
+    def test_cash_scope_gaps_keep_missing_unknown_and_investments_separate(self):
+        item = classify({
+            "symbol": "UPWK",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "unrestricted_cash": {"status": "unique_candidate", "candidate_count": 1,
+                                     "candidates": [{"value": 294356000}]},
+                "restricted_cash": {"status": "unique_candidate", "candidate_count": 1,
+                                    "candidates": [{"value": 3800000}]},
+                "short_term_investments": {"status": "unique_candidate", "candidate_count": 1,
+                                           "candidates": [{"value": 378425000}]},
+            },
+            "enterprise_value_candidate_review": {
+                "unrestricted_cash_candidate": 294356000,
+            },
+        })
+        cash = item["cash_scope_resolution"]
+        self.assertEqual(cash["unrestricted_cash"]["disposition"], "unique_candidate_review_only")
+        self.assertEqual(cash["restricted_cash"]["disposition"], "unique_candidate_review_only")
+        self.assertEqual(cash["short_term_investments"]["disposition"], "unique_candidate_review_only")
+        self.assertEqual(cash["short_term_investments"]["candidate_values"], [378425000])
+        self.assertIn("remain separate", cash["interpretation"])
+        self.assertFalse(cash["production_approved"])
+        self.assertFalse(cash["cash_candidate_promoted"])
+
+    def test_missing_cash_evidence_is_unknown_not_zero(self):
+        item = classify({
+            "symbol": "NO_CASH",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "unrestricted_cash": {"status": "not_found", "candidate_count": 0},
+                "restricted_cash": {"status": "not_found", "candidate_count": 0},
+                "short_term_investments": {"status": "not_found", "candidate_count": 0},
+            },
+            "enterprise_value_candidate_review": {},
+        })
+        cash = item["cash_scope_resolution"]
+        self.assertEqual(cash["unrestricted_cash"]["disposition"], "unknown_not_zero")
+        self.assertEqual(cash["restricted_cash"]["disposition"], "unknown_not_zero")
+        self.assertIsNone(cash["candidate_cash_amount"])
+        self.assertFalse(cash["cash_candidate_promoted"])
+
+    def test_explicit_zero_cash_is_limited_to_the_reported_line(self):
+        item = classify({
+            "symbol": "ZERO_CASH",
+            "provider_status": "supported",
+            "balance_sheet_candidate_review": {
+                "unrestricted_cash": {"status": "unique_candidate", "candidate_count": 1,
+                                      "candidates": [{"value": 0}]},
+                "restricted_cash": {"status": "not_found", "candidate_count": 0},
+            },
+            "enterprise_value_candidate_review": {},
+        })
+        cash = item["cash_scope_resolution"]
+        self.assertTrue(cash["unrestricted_cash"]["explicit_zero_for_this_line_only"])
+        self.assertEqual(cash["restricted_cash"]["disposition"], "unknown_not_zero")
+
     def test_queue_sorts_by_priority_and_preserves_read_only_flags(self):
         report = {"resolver": "deterministic-preview-v1",
                   "production_fundamentals_changed": False, "rankings_changed": False,

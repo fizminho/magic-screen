@@ -262,3 +262,20 @@ The subsequent Q1 2026 10-Q reports that all obligations were repaid in full on 
 The generic resolver still does not infer a zero current-debt bucket from the maturity schedule. The evidence remains review-only and no EV or ranking inputs were promoted.
 
 No production fundamentals, ratios, eligibility decisions or rankings are changed by these issuer-note additions.
+
+
+## Cash-scope gap diagnostics (21 Nov 2026)
+
+The queue now reports the evidence state of three separate balance-sheet categories for each issuer: unrestricted cash and cash equivalents, restricted cash, and short-term investments. This is a visibility improvement only; it does not change the cash candidate used by the shadow EV preview.
+
+| Category | Queue treatment | Guardrail |
+|---|---|---|
+| Unrestricted cash and cash equivalents | Unique candidate, ambiguous candidates, or unknown | A missing candidate is unknown, not zero. An explicit zero applies only to that exact reported line. |
+| Restricted cash | Tracked separately | Never deduct it from EV as if it were unrestricted cash; do not infer it is available because it is current. |
+| Short-term / marketable investments | Tracked separately | Do not merge into cash equivalents until a uniform instrument, maturity, credit, liquidity, encumbrance and availability policy is approved. |
+
+Each category includes candidate status, candidate count, reported candidate values where available, and a review-only disposition. The JSON and CSV queue exports carry the same diagnostics, and the summary counts each category's disposition across the universe.
+
+This is particularly important for issuers such as UPWK, where the $378.425m marketable-securities portfolio is distinct from $294.356m cash and cash equivalents, and SGHC, where reported cash-equivalent balances include processor and earmarked balances requiring availability review. The tool must not treat a marketable-securities balance as cash simply because it is liquid or available for current operations.
+
+The diagnostics are not resolver inputs, do not promote cash candidates, do not approve EV policy, and do not change production fundamentals, ratios or rankings.

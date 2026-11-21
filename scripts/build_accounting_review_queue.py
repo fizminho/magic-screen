@@ -124,6 +124,46 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "interpretation": "A missing maturity bucket is unknown, not zero. Aggregate debt evidence is diagnostic and must not be added to maturity components.",
         "production_approved": False,
     }
+
+    def cash_bucket_scope(name: str) -> dict[str, Any]:
+        detail = balance.get(name) or {}
+        status = str(detail.get("status") or "not_found")
+        count = detail.get("candidate_count", 0)
+        if status in ("unique", "unique_candidate") and count == 1:
+            disposition = "unique_candidate_review_only"
+        elif status in ("ambiguous", "ambiguous_candidates") or (isinstance(count, int) and count > 1):
+            disposition = "ambiguous_manual_review"
+        else:
+            disposition = "unknown_not_zero"
+        candidates = detail.get("candidates") or []
+        values = [
+            candidate.get("value", candidate.get("amount"))
+            for candidate in candidates if isinstance(candidate, dict)
+        ]
+        explicit_zero = (
+            disposition == "unique_candidate_review_only"
+            and len(values) == 1
+            and isinstance(values[0], (int, float))
+            and values[0] == 0
+        )
+        return {
+            "candidate_status": status,
+            "candidate_count": count,
+            "candidate_values": values,
+            "disposition": disposition,
+            "explicit_zero_for_this_line_only": explicit_zero,
+            "production_approved": False,
+        }
+
+    cash_scope_resolution = {
+        "unrestricted_cash": cash_bucket_scope("unrestricted_cash"),
+        "restricted_cash": cash_bucket_scope("restricted_cash"),
+        "short_term_investments": cash_bucket_scope("short_term_investments"),
+        "candidate_cash_amount": cash,
+        "interpretation": "Missing unrestricted cash is unknown, not zero. Restricted cash is not deducted from EV. Short-term or marketable investments remain separate until a uniform cash-like policy is approved.",
+        "production_approved": False,
+        "cash_candidate_promoted": False,
+    }
     assessment = {
         "ebit": {
             "candidate_status": ebit,
@@ -160,6 +200,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "balance_sheet_exceptions": category_summary,
         "debt_instrument_evidence": debt_instrument_evidence,
         "debt_resolution_gap": debt_resolution_gap,
+        "cash_scope_resolution": cash_scope_resolution,
         "candidate_vs_policy_assessment": assessment,
         "production_write": False,
     }
@@ -841,6 +882,10 @@ def build_queue(
                 f"{bucket}:{(row.get('debt_resolution_gap') or {}).get(bucket, {}).get('disposition', 'not_available')}"
                 for row in rows for bucket in ("current", "noncurrent")
             )),
+            "cash_scope_dispositions": dict(Counter(
+                f"{bucket}:{(row.get('cash_scope_resolution') or {}).get(bucket, {}).get('disposition', 'not_available')}"
+                for row in rows for bucket in ("unrestricted_cash", "restricted_cash", "short_term_investments")
+            )),
             "filing_ev_scope_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_ev_scope_note_review")),
             "ev_scope_classification_rows": dict(Counter(
                 category
@@ -890,7 +935,7 @@ def main() -> int:
     Path(args.json_output).write_text(json.dumps(queue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     fields = [
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
-        "debt_status", "debt_resolution_gap", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
+        "debt_status", "debt_resolution_gap", "cash_scope_resolution", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
@@ -906,6 +951,7 @@ def main() -> int:
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["debt_resolution_gap"] = json.dumps(item.get("debt_resolution_gap"), separators=(",", ":"))
+            row["cash_scope_resolution"] = json.dumps(item.get("cash_scope_resolution"), separators=(",", ":"))
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
             row["ev_scope_evidence"] = json.dumps(item.get("ev_scope_evidence"), separators=(",", ":"))
             row["filing_debt_note_review"] = json.dumps(item.get("filing_debt_note_review"), separators=(",", ":"))
