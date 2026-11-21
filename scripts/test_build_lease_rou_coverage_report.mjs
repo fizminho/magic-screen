@@ -48,14 +48,16 @@ test("markdown includes guardrails and issuer-level detail",()=>{
  assert.match(md,/TEST/); assert.match(md,/production_write=false/);
 });
 
-test("restricts coverage totals to the active MFI universe when a snapshot is supplied",()=>{
- const companies=["PRDO","ADBE","AFMJF"].map(symbol=>({symbol,provider_status:symbol==="AFMJF"?"unsupported_provider":"supported",
-  filing:{period_of_report:"2025-12-31"},statements:{balance_sheet:{rows:[
-   row("us-gaap_OperatingLeaseRightOfUseAsset","Operating lease right-of-use asset",100,1)
-  ]}}}));
- const r=buildLeaseRouCoverage({companies},{symbols:["PRDO","AFMJF"]});
+test("scopes coverage counts to active universe and excludes regression controls",()=>{
+ const extraction={companies:[
+  {symbol:"PRDO",provider_status:"supported",filing:{period_of_report:"2025-12-31"},statements:{balance_sheet:{rows:[row("us-gaap_OperatingLeaseRightOfUseAsset","Operating lease ROU asset",100,1)]}}},
+  {symbol:"ADBE",provider_status:"supported",filing:{period_of_report:"2025-11-28"},statements:{balance_sheet:{rows:[row("us-gaap_OperatingLeaseRightOfUseAsset","Operating lease ROU asset",200,1)]}}},
+  {symbol:"AFMJF",provider_status:"unsupported_provider",filing:{},statements:{balance_sheet:{rows:[]}}}
+ ]};
+ const r=buildLeaseRouCoverage(extraction,{symbols:["PRDO","AFMJF"]});
  assert.deepEqual(r.issuers.map(x=>x.symbol),["AFMJF","PRDO"]);
  assert.equal(r.summary.active_universe_issuers,2);
- assert.equal(r.summary.supported_active_issuers,1);
- assert.equal(r.summary.unsupported_active_issuers,1);
+ assert.equal(r.summary.extracted_supported_issuers,1);
+ assert.equal(r.summary.out_of_universe_extraction_issuers,1);
+ assert.deepEqual(r.out_of_universe_extraction_symbols,["ADBE"]);
 });
