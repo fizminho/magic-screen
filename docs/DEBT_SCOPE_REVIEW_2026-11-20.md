@@ -103,3 +103,25 @@ FHTX's FY2025 balance sheet reports operating lease liabilities and other operat
 - **SPRO** (FY2025 accession `0001193125-26-126192`): the 10-K explicitly says the company has no debt in its lease accounting discussion. It separately reports operating lease liabilities of $2.895m and other long-term liabilities of $91k. The lease balances remain outside conventional debt pending policy; the $91k other liability is not classified as debt without further evidence. [SEC filing](https://www.sec.gov/Archives/edgar/data/1701108/000119312526126192/spro-20251231.htm)
 
 Both records are accession-bound and review-only. They do not promote debt candidates, change EV, or alter production rankings.
+
+
+## Top-five shadow-ranking issuer note checks (21 Nov 2026)
+
+The five current shadow-ranked companies were checked against the exact annual filing accessions used by the resolver preview. The observations below are filing evidence, not approvals or changes to the EV formula.
+
+| Issuer | Filing period / accession | Debt evidence | Cash and other scope |
+|---|---|---|---|
+| OTEX | FY2026 / 0001002638-26-000068 | Note 11 total carrying debt 5,770.369m; current 35.850m + noncurrent 5,734.519m reconciles exactly. | Cash equivalents 956.024m; restricted cash 1.230m. Separate deposits/restricted cash 4.824m current + 16.334m noncurrent, investments 112.022m equity method and 45.142m AFS, operating leases 202.037m and NCI 1.962m. |
+| SNDK | FY2026 / 0001628280-26-057406 | Current and noncurrent debt are explicit zero; Note 8 says the remaining term loan was repaid 4 Mar 2026 and the 1.5bn revolver was undrawn at 3 Jul 2026. | Cash equivalents 4,762m. Marketable equity securities 1,777m and Flash Ventures notes/investments 678m remain separate; operating lease liabilities 201m. |
+| IRWD | FY2025 / 0001104659-26-020489 | 199.680m net carrying convertible notes + 385m revolver principal = 584.680m debt candidates. | Cash equivalents 215.456m. Operating lease liabilities 3.252m current + 9.870m noncurrent; 0.6m letters of credit support leases. |
+| QTTB | FY2025 / 0001193125-26-099339 | 9.375m principal less 0.333m discount/issuance costs = 9.708m carrying value; 6.235m current + 3.473m noncurrent. | Cash equivalents 48.297m; 0.647m restricted cash collateralizes venture debt and lease letters of credit; noncurrent operating lease liability 4.943m. |
+| UPWK | FY2025 / 0001627475-26-000012 | 360.998m convertible-note principal less 1.228m issuance costs = 359.770m carrying value, all current; maturity 15 Aug 2026. | Cash equivalents 294.356m; marketable securities 378.425m separately classified; restricted cash 3.8m; customer escrow funds 180.752m matched by escrow payable. Operating lease liability 9.707m noncurrent. |
+
+### Review disposition
+
+- OTEX, IRWD and QTTB have note-to-face-statement carrying-value reconciliations for conventional debt.
+- SNDK's zero debt is supported by explicit zero balance-sheet rows and note-level settlement/undrawn-facility disclosures for FY2026.
+- UPWK's current debt and maturity are supported by the note; the 2026 maturity creates a point-in-time policy question if a later balance-sheet snapshot is ever mixed with annual EBIT.
+- Do not fold restricted cash, customer escrow, leases, equity-method investments, marketable equity securities, or noncontrolling interests into EV inputs without an explicit and consistently applied policy.
+- Marketable debt securities at UPWK are a separate liquid-investment category. Their possible cash-like treatment must be decided consistently across the universe, not issuer-by-issuer.
+- These five checks are attached to the queue only for the exact accession. They remain `review_only`, are not resolver inputs, do not promote debt candidates, and do not alter production fundamentals or rankings.
