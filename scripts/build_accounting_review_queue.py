@@ -315,6 +315,124 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
 
 
 
+# Accession-bound cash / investment scope reviews. These explain the nature and
+# liquidity of selected investment balances; they are not cash-equivalent approvals.
+FILING_EV_SCOPE_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
+    "FHTX": {
+        "accession": "0001628280-26-016814",
+        "method": "available_for_sale_marketable_securities_composition_and_maturity_policy",
+        "observations": [
+            "FY2025 marketable securities were 78.018m: U.S. government agency securities 1.500m, commercial paper 35.287m and corporate notes and bonds 41.231m.",
+            "The portfolio is available-for-sale and carried at fair value. The issuer says securities with maturities beyond one year may still be classified short-term because they are highly liquid and available for current operations.",
+            "Cash equivalents use an original maturity of three months or less. Restricted cash is separately pledged as collateral for lease-related letters of credit."
+        ],
+        "interpretation": "The marketable securities are debt instruments with a stated current-operations purpose, but they remain separate from cash equivalents and require a common maturity/liquidity policy.",
+        "limitations": ["Do not merge the 78.018m portfolio into cash equivalents solely because it is available for current operations.", "Keep restricted cash pledged for lease letters of credit outside unrestricted cash.", "Review instrument maturities and credit quality consistently across issuers."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm",
+    },
+    "NRIX": {
+        "accession": "0001549595-26-000016",
+        "method": "available_for_sale_treasury_securities_and_money_market_cash_equivalents",
+        "observations": [
+            "At November 30, 2025, marketable securities were 345.981m and consisted of U.S. Treasury securities; the face XBRL concept is DebtSecuritiesAvailableForSaleExcludingAccruedInterestCurrent.",
+            "The issuer separately reported 241.364m of money market funds in cash and cash equivalents.",
+            "The issuer describes marketable securities as money market funds, U.S. Treasuries and U.S. government agency securities, classified as available-for-sale; contractual maturities greater than 12 months are classified long-term."
+        ],
+        "interpretation": "The 345.981m face-row balance is confirmed as U.S. Treasury debt securities, not equity securities. Its current classification and liquidity are useful evidence, but it is not automatically cash-equivalent.",
+        "limitations": ["Do not combine the 345.981m marketable securities with the 241.364m cash-equivalent money market funds without an approved cash-like-asset rule.", "Do not treat the current classification alone as proof that every instrument meets a universal cash-equivalent maturity threshold."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm",
+    },
+    "PXED": {
+        "accession": "0001193125-26-445323",
+        "method": "marketable_debt_security_composition_maturity_and_deployability_review",
+        "observations": [
+            "FY2026 marketable securities were 167.852m: 137.094m current and 30.758m noncurrent. Cash and cash equivalents were 159.363m and restricted cash was 4.516m.",
+            "The issuer invests excess cash in money market funds and marketable debt securities including U.S. Treasury and agency securities, commercial paper and corporate debt securities. Investments with original maturities greater than three months are classified as marketable securities.",
+            "Current marketable securities have remaining contractual maturities of twelve months or less; noncurrent securities mature after twelve months. The portfolio maturities are within three years and securities are investment grade.",
+            "The issuer states that its ability to deploy currently available liquidity is constrained by Department of Education financial-responsibility composite-score requirements."
+        ],
+        "interpretation": "The portfolio is identified as debt securities and is relatively liquid, but noncurrent maturities and regulatory deployability constraints mean the full 167.852m should not be assumed freely available cash.",
+        "limitations": ["Do not net restricted cash against EV.", "Do not treat noncurrent securities as cash-like without a maturity rule.", "Consider the Department of Education composite-score constraint before treating the portfolio as freely deployable cash."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1600222/000119312526445323/pxed-20260831.htm",
+    },
+    "STRA": {
+        "accession": "0001013934-26-000006",
+        "method": "held_to_maturity_term_deposit_and_debt_security_maturity_review",
+        "observations": [
+            "FY2025 marketable securities totaled 12.297m: 7.297m due within one year and 5.000m due after one year through five years.",
+            "The 2025 maturity table classifies the portfolio as held-to-maturity; it consists of term deposits, U.S. Treasury securities and corporate debt securities. No available-for-sale balance was reported for 2025.",
+            "The issuer says investments are investment grade and reports no allowance for credit losses; it does not intend to sell the securities and does not expect to be required to sell them before recovery at maturity."
+        ],
+        "interpretation": "These are held-to-maturity investments rather than cash equivalents. The five-year maturity bucket and stated intent to hold make automatic cash-like treatment inappropriate.",
+        "limitations": ["Do not treat held-to-maturity securities as unrestricted cash by default.", "Do not assume the noncurrent 5.000m balance is immediately deployable.", "Apply the same treatment to other held-to-maturity portfolios."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1013934/000101393426000006/stra-20251231.htm",
+    },
+    "ALEC": {
+        "accession": "0001193125-26-071593",
+        "method": "available_for_sale_portfolio_composition_and_contractual_maturity_review",
+        "observations": [
+            "FY2025 marketable securities were 190.222m; cash and cash equivalents were 65.802m and restricted cash was 1.846m.",
+            "All marketable securities are available-for-sale and carried at fair value. The issuer considers the portfolio available for current operations and invests in money market funds, U.S. Treasury securities, corporate bonds, certificates of deposit and commercial paper.",
+            "The combined cash-equivalent and marketable-securities maturity disclosure reports 214.4m due within one year and 41.0m due after one year through two years."
+        ],
+        "interpretation": "The portfolio has observable market prices and is available for current operations, but includes multiple debt instruments and maturities extending beyond one year. Keep it separate pending a universe-wide maturity and liquidity rule.",
+        "limitations": ["Do not count restricted cash as unrestricted.", "Do not treat the entire 190.222m as cash equivalents merely because the portfolio is available for current operations.", "The combined maturity table includes cash equivalents; do not misattribute its entire amount to marketable securities."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1653087/000119312526071593/alec-20251231.htm",
+    },
+    "PLTK": {
+        "accession": "0001828016-26-000010",
+        "method": "short_term_term_deposit_and_commercial_paper_maturity_review",
+        "observations": [
+            "FY2025 short-term investments were 136.0m: term deposits 71.8m and commercial paper 64.2m.",
+            "The issuer defines cash equivalents as highly liquid investments with maturities of three months or less. Short-term investments have maturities greater than three months and less than one year.",
+            "The investment policy imposes maturity limits and restricts permitted investments to bank deposits and highly rated fixed-income securities."
+        ],
+        "interpretation": "The 136.0m portfolio is liquid, short-dated debt-like investment exposure but is explicitly outside cash equivalents under the issuer's own three-month definition.",
+        "limitations": ["Do not reclassify the 136.0m as cash equivalents without an explicit MFI cash-like policy.", "Keep maturity thresholds consistent with the treatment of other issuers' term deposits and commercial paper."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1828016/000182801626000010/playtika-20251231.htm",
+    },
+    "ZVRA": {
+        "accession": "0001434647-26-000011",
+        "method": "available_for_sale_treasury_and_corporate_debt_security_maturity_review",
+        "observations": [
+            "FY2025 securities at fair value totaled 176.484m: 128.605m current and 47.879m noncurrent.",
+            "The issuer says these available-for-sale investment securities primarily consist of U.S. Treasury securities and corporate bonds and are carried at fair value.",
+            "The 128.605m current balance matures within one year; the 47.879m noncurrent balance matures in one to three years. The issuer says excess cash is being invested to fund future operations."
+        ],
+        "interpretation": "The portfolio is explicitly debt securities and supports future operating needs, but 47.879m has one-to-three-year maturities. Cash-like treatment requires an explicit maturity cutoff and consistent liquidity policy.",
+        "limitations": ["Do not automatically deduct the full 176.484m from EV.", "Do not assume the one-to-three-year noncurrent tranche is cash-equivalent.", "Do not mix subsequent securities balances into the annual reporting-date snapshot."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1434647/000143464726000011/zvra-20251231.htm",
+    },
+    "UPWK": {
+        "accession": "0001627475-26-000012",
+        "method": "marketable_securities_composition_and_customer_funds_separation",
+        "observations": [
+            "FY2025 marketable securities were 378.425m, separately presented from 294.356m cash and cash equivalents.",
+            "The issuer describes the portfolio as money-market funds, commercial paper, Treasury bills, corporate bonds and other fixed-income securities available for current operations.",
+            "Restricted cash was 3.8m; customer funds held in escrow, including funds in transit, were 180.752m and matched by an escrow-funds-payable liability."
+        ],
+        "interpretation": "The portfolio contains cash-like and longer-duration fixed-income instruments, but the balance-sheet face row does not identify the exact composition and maturity mix. Keep it separate pending a uniform portfolio eligibility rule.",
+        "limitations": ["Do not count restricted cash or matched customer escrow as company cash.", "Do not treat the full marketable-securities balance as cash-equivalent without instrument-level maturity and liquidity evidence.", "Keep the annual debt snapshot and any subsequent repayment data on a consistent point-in-time basis."],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1627475/000162747526000012/upwk-20251231.htm",
+    },
+}
+
+
+def filing_ev_scope_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
+    """Attach issuer cash/investment note evidence only to its exact annual filing."""
+    review = FILING_EV_SCOPE_NOTE_REVIEWS.get(symbol)
+    if not review or not accession or review["accession"] != accession:
+        return None
+    return {
+        **review,
+        "status": "review_only",
+        "source": "curated_primary_annual_filing_cash_investment_note_review",
+        "production_approved": False,
+        "resolver_input": False,
+        "cash_candidate_promoted": False,
+    }
+
+
 # Curated filing-note checks. These are attached only to the exact accession
 # below; they are review evidence, never resolver inputs or approved debt values.
 FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
@@ -570,6 +688,11 @@ def build_queue(
                 "curated_primary_annual_filing_note_review_same_accession"
                 if item["filing_debt_note_review"] else "not_available"
             )
+            item["filing_ev_scope_note_review"] = filing_ev_scope_note_review(item["symbol"], raw_accession)
+            item["filing_ev_scope_note_review_source"] = (
+                "curated_primary_annual_filing_cash_investment_note_review_same_accession"
+                if item["filing_ev_scope_note_review"] else "not_available"
+            )
             if item["filing_debt_note_review"]:
                 item["issues"].append("filing_debt_note_review_available_manual_review")
                 item["issue_count"] = len(item["issues"])
@@ -623,6 +746,8 @@ def build_queue(
             item["ev_scope_evidence_source"] = "stored_resolver_preview"
             item["filing_debt_note_review"] = None
             item["filing_debt_note_review_source"] = "stored_resolver_preview"
+            item["filing_ev_scope_note_review"] = None
+            item["filing_ev_scope_note_review_source"] = "stored_resolver_preview"
             item["invested_capital_denominator_diagnostics"] = None
             item["invested_capital_denominator_diagnostics_source"] = "stored_resolver_preview"
             item["balance_sheet_reconciliation_review"] = None
@@ -651,6 +776,7 @@ def build_queue(
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
+            "filing_ev_scope_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_ev_scope_note_review")),
             "ev_scope_classification_rows": dict(Counter(
                 category
                 for row in rows for evidence in ((row.get("ev_scope_evidence") or {}).get("rows") or [])
@@ -701,7 +827,7 @@ def main() -> int:
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
-        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "balance_sheet_reconciliation_review",
+        "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
         "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
         "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
@@ -717,6 +843,7 @@ def main() -> int:
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
             row["ev_scope_evidence"] = json.dumps(item.get("ev_scope_evidence"), separators=(",", ":"))
             row["filing_debt_note_review"] = json.dumps(item.get("filing_debt_note_review"), separators=(",", ":"))
+            row["filing_ev_scope_note_review"] = json.dumps(item.get("filing_ev_scope_note_review"), separators=(",", ":"))
             row["balance_sheet_reconciliation_review"] = json.dumps(
                 item.get("balance_sheet_reconciliation_review"), separators=(",", ":")
             )
