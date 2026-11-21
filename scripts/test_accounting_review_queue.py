@@ -664,6 +664,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
                  "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 500}},
                 {"concept": "issuer_RoyaltyFinancingLiabilitiesNoncurrent", "label": "Royalty financing obligations",
                  "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 900}},
+                {"concept": "issuer_TaxReceivableAgreementLiability", "label": "Tax receivable agreement liability", "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 700}},
+                {"concept": "issuer_SupplierFinanceObligation", "label": "Supplier finance obligation", "parent_concept": "us-gaap_Liabilities", "values": {"2025-12-31": 300}},
                 {"concept": "us-gaap_NotesPayableCurrent", "label": "Short-term note payable",
                  "parent_concept": "us-gaap_LiabilitiesCurrent", "values": {"2025-12-31": 0}},
                 {"concept": "us-gaap_NotesPayableCurrent", "label": "Notes payables, current - related parties",
@@ -678,11 +680,13 @@ class AccountingReviewQueueTests(unittest.TestCase):
             ]}},
         }
         evidence = extract_debt_scope_evidence(company)
-        self.assertEqual(evidence["row_count"], 6)
+        self.assertEqual(evidence["row_count"], 8)
         by_type = {row["classification"]: row for row in evidence["rows"]}
         self.assertTrue(by_type["conventional_debt_candidate"]["explicit_zero"])
         self.assertEqual(by_type["lease_liability"]["amount"], 500)
-        self.assertEqual(by_type["separate_financing_obligation"]["amount"], 900)
+        self.assertTrue(any(x["classification"] == "separate_financing_obligation" and x["amount"] == 900 for x in evidence["rows"]))
+        self.assertTrue(any(x["classification"] == "other_financing_or_liability_review" and x["amount"] == 700 for x in evidence["rows"]))
+        self.assertTrue(any(x["classification"] == "separate_financing_obligation" and x["amount"] == 300 for x in evidence["rows"]))
         self.assertTrue(any(row["concept"] == "us-gaap_NotesPayableCurrent" and row["explicit_zero"]
                             for row in evidence["rows"]))
         self.assertTrue(any(row["concept"] == "us-gaap_OtherLongTermDebtNoncurrent"

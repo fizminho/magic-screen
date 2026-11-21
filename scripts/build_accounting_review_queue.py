@@ -240,7 +240,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
 
 DEBT_SCOPE_PATTERNS = (
     "debt", "borrow", "loan", "lease liabilit", "royalt", "sale lease-back",
-    "sale leaseback", "financing", "note payable", "notes payable", "notes payables", "notespayable",
+    "sale leaseback", "financing", "note payable", "notes payable", "notes payables", "notespayable", "tax receivable agreement", "supplier finance", "vendor financing", "factoring", "receivables financing", "receivable financing",
 )
 
 
@@ -273,8 +273,10 @@ def extract_debt_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             continue
         if "lease" in searchable and "liabilit" in searchable:
             classification = "lease_liability"
-        elif any(word in searchable for word in ("royalt", "sale lease", "financing")):
+        elif any(word in searchable for word in ("royalt", "sale lease", "financing", "supplier finance", "vendor financing", "factoring", "receivables financing", "receivable financing")):
             classification = "separate_financing_obligation"
+        elif "tax receivable agreement" in searchable:
+            classification = "other_financing_or_liability_review"
         elif "otherlongtermdebtnoncurrent" in concept.lower() and "other long-term liabilities" in label.lower():
             classification = "other_financing_or_liability_review"
         elif any(word in searchable for word in ("debt", "borrow", "loan", "note payable", "line of credit")):
@@ -386,7 +388,7 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             category = "marketable_securities_unclassified"
         elif is_asset and any(x in searchable for x in ("notes receivable", "note receivable", "loans receivable")):
             category = "notes_receivable"
-        elif is_liability and any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities")):
+        elif is_liability and any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities", "tax receivable agreement", "supplier finance", "vendor financing", "factoring", "receivables financing", "receivable financing")):
             category = "other_financing_obligations"
         elif is_liability and any(x in searchable for x in ("debt", "borrow", "loan payable", "notes payable", "note payable", "line of credit", "commercial paper")):
             category = "conventional_debt"
