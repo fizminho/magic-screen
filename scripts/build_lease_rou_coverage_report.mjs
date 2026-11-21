@@ -62,6 +62,7 @@ export function renderLeaseRouCoverageMarkdown(report) {
     for(const r of x.embedded_rou_in_net_ppe) lines.push("| Embedded ROU | finance / combined PP&E | n/a | "+(r.value??"unknown")+" | "+r.concept+" / "+r.label+" | "+(r.row_index??"?")+" |");
     lines.push("");
   }
+  lines.push("Production write: false; production approved: false; production fundamentals changed: false; rankings changed: false.","");
   lines.push("## Guardrails","","- Missing rows or amounts are unknown, not zero.","- Rows use the selected annual filing period only.",
     "- Dimensional breakdowns are excluded.","- Combined PP&E / finance-lease ROU concepts are flagged to prevent double counting.",
     "- Do not add ROU assets alone. Any lease-inclusive ROC/EV scenario needs matching EBIT and liability treatment and remains sensitivity-only.",
