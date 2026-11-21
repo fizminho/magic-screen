@@ -1,6 +1,8 @@
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
 import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { classifyDebtReconciliation } from "./debt-reconciliation.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { runGeminiAccountingReview, listGeminiAccountingEscalations } from "./gemini-accounting-review.mjs";
 
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; GEMINI_MODEL?: string; GEMINI_MIN_REQUEST_INTERVAL_MS?: string; }
@@ -274,6 +276,9 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
     typeof value==="number" && Number.isFinite(value)?value:null;
   const selectionPolicy=evReview.selection_policy_review??{};
   const debtReconciliation=evReview.debt_reconciliation_review??{};
+  const debtReconciliationStatus=balanceReview.categories
+    ? classifyDebtReconciliation(balanceReview.categories)
+    : (typeof debtReconciliation.status==="string"?debtReconciliation.status:"not_resolved");
   const enterpriseValueCandidateReview={
     status:typeof evReview.status==="string"?evReview.status:"not_resolved",
     conventional_debt_status:typeof selectionPolicy.conventional_debt?.status==="string"
@@ -281,7 +286,7 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
     conventional_gross_debt_candidate:candidateNumber(evReview.conventional_gross_debt_candidate),
     unrestricted_cash_candidate:candidateNumber(evReview.unrestricted_cash_candidate),
     conventional_net_debt_candidate:candidateNumber(evReview.conventional_net_debt_candidate),
-    debt_reconciliation_status:typeof debtReconciliation.status==="string"?debtReconciliation.status:"not_resolved",
+    debt_reconciliation_status:debtReconciliationStatus,
     approval_status:typeof selectionPolicy.approval_status==="string"
       ? selectionPolicy.approval_status:"review_only_no_production_ev_or_earnings_yield"
   };

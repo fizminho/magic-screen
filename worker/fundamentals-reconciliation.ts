@@ -9,6 +9,7 @@ function calculateMetrics(ebit:unknown,investedCapital:unknown,grossDebt:unknown
   if(!Number.isFinite(enterpriseValue)||enterpriseValue<=0) return null;
   return {ebit:e,invested_capital:invested,gross_debt:debt,unrestricted_cash:cash,enterprise_value:enterpriseValue,earnings_yield:e/enterpriseValue,return_on_capital:e/invested};
 }
+
 function inputDelta(legacy:number,edgar:number){return {legacy,edgartools:edgar,delta:edgar-legacy};}
 function materiallyDifferent(values:Array<{delta:number}|null>):boolean{return values.some(value=>value!==null&&Math.abs(value.delta)>0.01);}
 export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|null=null){
