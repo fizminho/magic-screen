@@ -13,6 +13,8 @@ on:
       - "docs/US_MFI_COMPLETION_PLAN.md"
       - "README.md"
       - "worker/index.ts"
+      - "worker/filing-specific-ebit.ts"
+      - "worker/filing-specific-ebit.test.ts"
       - "src/App.tsx"
       - "src/styles.css"
       - ".github/workflows/edgartools-bakeoff.yml"
@@ -60,6 +62,7 @@ jobs:
         run: |
           python -m unittest discover -s scripts -p "test_edgartools_bakeoff.py" -v
           python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
+          node --experimental-strip-types --test worker/filing-specific-ebit.test.ts
       - name: Resolve active MFI universe
         id: universe
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.symbols == '') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))

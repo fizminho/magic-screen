@@ -1,3 +1,5 @@
+import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
+
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
@@ -500,6 +502,7 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
   const directReview=company.direct_operating_income_review??{};
   let ebit:number|null=null;
   let ebitStatus="review_required";
+  let ebitMethod:string|null=null;
   if (directRows.length===1) {
     const values=directRows[0]?.values??{};
     const periodValues=Object.entries(values).filter(([key,value]:any)=>
@@ -512,11 +515,22 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
       && String(directReview.fiscal_period??"")===period) {
       ebit=rowValue;
       ebitStatus="direct_reported_candidate_review_only";
+      ebitMethod="direct_reported_operating_income";
     } else {
       flags.push("direct_ebit_row_and_review_did_not_reconcile");
     }
+  } else if (directRows.length===0) {
+    const filingSpecificEbit=resolveFilingSpecificEbitCandidate(company,filingAccession,period,directRows.length);
+    if (filingSpecificEbit) {
+      ebit=filingSpecificEbit.value;
+      ebitStatus="filing_specific_reconstruction_review_only";
+      ebitMethod=filingSpecificEbit.method;
+      flags.push("filing_specific_ebit_reconstruction_requires_manual_approval");
+    } else {
+      flags.push("direct_operating_income_not_found");
+    }
   } else {
-    flags.push(directRows.length===0?"direct_operating_income_not_found":"multiple_direct_operating_income_rows");
+    flags.push("multiple_direct_operating_income_rows");
   }
   const invested=company.invested_capital_review??{};
   const investedCapital=typeof invested.value==="number" && Number.isFinite(invested.value) ? invested.value : null;
@@ -583,9 +597,9 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
   const candidateRoc=ebit!==null && investedCapital!==null && investedCapital>0 ? Number((ebit/investedCapital*100).toFixed(4)) : null;
   return {
     symbol,provider_status:providerStatus,accession,fiscal_period:fiscalPeriod,
-    ebit_candidate:ebit,ebit_method:ebit!==null?"direct_reported_operating_income":null,
-    ebit_concept:ebit!==null?String(directRows[0]?.concept??""):null,
-    ebit_label:ebit!==null?String(directRows[0]?.label??""):null,ebit_status:ebitStatus,
+    ebit_candidate:ebit,ebit_method:ebitMethod,
+    ebit_concept:ebit!==null && ebitMethod==="direct_reported_operating_income"?String(directRows[0]?.concept??""):null,
+    ebit_label:ebitMethod==="filing_specific_statement_subtotal_reconstruction"?"Filing-specific statement subtotal reconstruction (review only)":ebit!==null?String(directRows[0]?.label??""):null,ebit_status:ebitStatus,
     invested_capital_candidate:investedCapital,invested_capital_status:investedStatus,
     reporting_currency:currency,candidate_roc:candidateRoc,review_flags:uniqueFlags,
     balance_sheet_candidate_review:balanceSheetCandidateReview,
@@ -629,7 +643,7 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
         ?"EdgarTools provider unsupported for this issuer"
         :"Annual filing evidence unavailable");
     } else {
-      if(row.ebit_status!=="direct_reported_candidate_review_only") exclusionReasons.push("Direct operating-income candidate unavailable or ambiguous");
+      if(!["direct_reported_candidate_review_only","filing_specific_reconstruction_review_only"].includes(row.ebit_status)) exclusionReasons.push("Direct or accession-matched filing-specific EBIT candidate unavailable or ambiguous");
       if(row.invested_capital_status!=="positive_denominator_candidate_review_only") exclusionReasons.push("Invested-capital denominator unresolved or non-positive");
       if(row.reporting_currency!=="USD") exclusionReasons.push("Reporting currency not confirmed as USD");
       if(row.enterprise_value_candidate_review?.conventional_debt_status!=="identified_from_unique_current_and_noncurrent_components") exclusionReasons.push("Conventional debt inputs incomplete or ambiguous");
