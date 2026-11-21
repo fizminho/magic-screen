@@ -249,3 +249,10 @@ The three P3 issuers that currently pass the shadow eligibility gates now have a
 Current shadow rank order remains HRB 1, OTEX 2, UPWK 3, IRWD 4, QTTB 4. All five remain review-only; no rank is approved for production.
 
 **P3 next:** review the other supported P3 names (ALEC, BMBL, CRNC, MGTX and PLTK) for EBIT quality, invested-capital and debt/cash scope; retain unsupported AFMJF and EGHSF in coverage as provider exclusions. Then consolidate P1/P2/P3 findings into one cohort-wide accounting policy matrix and obtain explicit owner approval before any resolver cutover.
+
+
+## P3 ranked-issuer review and accession cross-check (21 November 2026)
+
+The three P3 issuers currently passing shadow ranking eligibility (UPWK, IRWD and QTTB) have a dedicated issuer/sensitivity worksheet: [P3 ranked-issuer review](US_MFI_P3_RANKED_REVIEW_2026-11-21.md). An independent accession cross-check corrected three document-reference errors in that worksheet: UPWK is 0001627475-26-000012, IRWD is 0001104659-26-020489, and QTTB is 0001193125-26-099339. These were documentation cross-reference corrections; the resolver's accession-matched data and ranking inputs were not changed.
+
+The current review set now covers all five shadow-ranked issuers, all ten P1 cases (including VSNT's company-perimeter exception), and all ten P2 debt/EV cases. Remaining work is the P3 unranked cohort, cohort-wide accounting-policy sign-off, and legacy-versus-EdgarTools reconciliation. The latest VXRT EBIT-quality flag is included in the queue code; a full-universe run is triggered by this commit to validate the current 30-issuer state.

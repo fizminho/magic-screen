@@ -22,7 +22,8 @@ All values are review-only candidate metrics. All five issuers remain accounting
 ## UPWK — Upwork Inc.
 
 **FY ended:** 31 December 2025  
-**Filing accession:** 0001549346-26-000008  
+**Filing accession:** 0001627475-26-000012  
+**SEC filing:** https://www.sec.gov/Archives/edgar/data/1627475/000162747526000012/upwk-20251231.htm  
 **Primary issue:** marketable-securities cash treatment and customer funds
 
 ### FY2025 evidence
@@ -58,7 +59,8 @@ The sensitivity improves the earnings yield materially, but does not justify ado
 ## IRWD — IRWD / Ironwood Pharmaceuticals
 
 **FY ended:** 31 December 2025  
-**Filing accession:** 0001104659-26-018859  
+**Filing accession:** 0001104659-26-020489  
+**SEC filing:** https://www.sec.gov/Archives/edgar/data/1446847/000110465926020489/irwd-20251231x10k.htm  
 **Primary issue:** annual debt snapshot and invested-capital denominator sensitivity
 
 ### FY2025 evidence
@@ -91,7 +93,8 @@ The net-PP&E-only sensitivity produces an extreme ROC and materially changes ord
 ## QTTB — Q32 Bio Inc.
 
 **FY ended:** 31 December 2025  
-**Filing accession:** 0001628280-26-018859  
+**Filing accession:** 0001193125-26-099339  
+**SEC filing:** https://www.sec.gov/Archives/edgar/data/1661998/000119312526099339/qttb-20251231.htm  
 **Primary issue:** exceptional operating revenue quality and denominator sensitivity
 
 ### FY2025 EBIT evidence
