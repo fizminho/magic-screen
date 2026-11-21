@@ -213,3 +213,13 @@ The first three debt-like financing cases now have a filing-level worksheet: [BC
 A consistent **candidate** EV policy is to surface these balances in a separate financing-obligations bucket and include them in debt-like EV only after accounting-owner approval. Keep conventional borrowings, royalty financing, failed sale-leaseback financing, finance leases and operating leases separately identifiable. Do not add the same amount twice, and do not adjust EBIT selectively issuer by issuer. The candidate policy is not implemented in the resolver or ranking.
 
 The full-universe workflow triggered by commit 260e2c3 is still running at the time of this note; accept its artifact only after it completes successfully. Production fundamentals, ratios, eligibility and rankings remain unchanged.
+
+
+## P2 conventional-debt filing review: SBC and ZVRA (21 November 2026)
+
+The next two P2 debt cases now have accession-bound tie-outs in [the SBC and ZVRA review worksheet](US_MFI_P2_SBC_ZVRA_REVIEW_2026-11-21.md).
+
+- **SBC:** FY2025 bank and other borrowings total **$42.833484m**, split into $9.099046m current and $33.734438m noncurrent. The maturity schedule sums exactly to the carrying amount. The revolving facility has $1.915158m available and $1.212934m drawn; only the drawn amount is debt. A separate $2.692673m due-to-related-party balance is not automatically a borrowing.
+- **ZVRA:** FY2025 term-loan principal of $63.608m less $0.755m original issue discount and $0.925m debt issuance costs equals **$61.928m** carrying value. The annual filing schedules all principal in 2029 and none in 2026–2028; the balance sheet presents the balance as long-term debt. The $40m of optional additional tranches expired undrawn. Later repayment activity must not overwrite the FY2025 annual snapshot.
+
+Both debt carrying-value bridges are reconciled. They remain review-only pending the cohort-wide treatment of leases, other financing obligations and cash. Production fundamentals, ratios, eligibility and rankings remain unchanged.
