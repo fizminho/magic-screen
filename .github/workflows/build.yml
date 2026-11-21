@@ -17,6 +17,8 @@ jobs:
       - run: npm run build
       - name: Run Gemini accounting review contract and deduplication tests
         run: node --test worker/gemini-accounting-review*.test.mjs
+      - name: Run fundamentals reconciliation regression tests
+        run: node --test worker/fundamentals-reconciliation.test.mjs
       - name: Run lease and ROU coverage regression tests
         run: node --test scripts/test_build_lease_rou_coverage_report.mjs
       - name: Run US MFI policy sensitivity regression tests
