@@ -12,6 +12,12 @@
 6. **Shadow ranking:** candidate EY and ROC are calculated only for rows passing current evidence gates. Ranking uses classic Greenblatt ordinal rank sums. Unsupported and unresolved issuers remain visible in coverage but are not ranked.
 7. **Production:** the legacy Company Facts runtime lane and production stock table are not yet cut over. Shadow preview must not write production fundamentals, ratios, eligibility or rankings.
 
+## Market-cap snapshot and quote-date policy
+
+For scheduled, manual full-universe and explicit `[full-universe]` runs, market caps must come from the same refreshed Magic Formula Investing universe response as the active ticker list. The workflow converts the provider's USD market-cap values to USD millions and normalizes the provider's month/day quote and quarter dates using the snapshot's own `asOf` year. The extractor uses that exact quote date for USD-to-reporting-currency FX lookup and records the snapshot timestamp and source on every company, including SEC-unsupported issuers.
+
+The pinned 18 November 2026 market-cap map is retained only for fixed regression samples. A custom market-cap map replaces the pinned map completely; missing tickers remain missing rather than silently inheriting stale values. A custom quote date without a matching custom map is rejected. Full-universe validation compares every active issuer's extracted market cap and quote date with the refreshed universe snapshot before the run is accepted.
+
 ## Ranking methodology
 
 - Earnings Yield = EBIT / (market capitalisation + conventional gross debt - unrestricted cash).
@@ -44,7 +50,7 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 - A successful scheduled/manual run is required to prove dynamic universe discovery and raw evidence ingestion; push CI is regression-only.
 - The latest sample had 28 supported issuers requiring accounting review; five shadow candidates were rankable but none production-approved.
 - Legacy Company Facts runtime remains alongside the EdgarTools evidence lane. Do not remove it or redirect production writes until side-by-side reconciliation is complete.
-- Keep market-cap freshness and quote-date alignment current.
+- Keep market-cap freshness and quote-date alignment under CI validation; the dynamic source handoff is implemented and must remain covered by scheduled runs.
 - Keep unsupported-provider and accounting exclusions visible in coverage summaries.
 
 ## Reusable open-source code decision
