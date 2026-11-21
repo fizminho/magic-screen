@@ -7,7 +7,7 @@ const TASK_RULES = {
   debt_scope: { categories: ["current_debt", "noncurrent_debt", "aggregate_debt"], pattern: /debt|borrow|loan|credit|note payable/i },
   cash_scope: { categories: ["unrestricted_cash", "restricted_cash", "short_term_investments"], pattern: /cash|restricted|escrow|customer funds|marketable securities/i },
   lease_scope: { categories: ["current_lease_liabilities", "noncurrent_lease_liabilities"], pattern: /lease|right.of.use|rou asset/i },
-  nci_scope: { categories: [], pattern: /noncontrolling interest|non-controlling interest|nci|consolidation perimeter/i },
+  nci_scope: { categories: [], pattern: /noncontrolling[_ ]interest|non-controlling[_ ]interest|nci|consolidation[_ ]perimeter/i },
   financing_scope: { categories: [], pattern: /financing|supplier finance|vendor financing|factoring|receivables financing|royalty financing|tax receivable agreement|failed sale.leaseback/i }
 };
 const STATUS_VALUES = new Set(["ACCEPTED_CANDIDATE", "REVIEW_REQUIRED", "CONFLICTING_EVIDENCE", "INSUFFICIENT_EVIDENCE", "NOT_APPLICABLE"]);

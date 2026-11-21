@@ -37,3 +37,55 @@ test("does not escalate simply because an ordinary unique lease row exists", () 
   const resolver = { symbol: "ABC", accession: "a", fiscal_period: "2025-12-31", review_flags: [] };
   assert.deepEqual(listGeminiAccountingEscalations("ABC", company, resolver), []);
 });
+
+test("recognizes NCI escalation in the real EdgarTools underscore-based evidence shape", () => {
+  const company = {
+    balance_sheet_fact_review: {
+      categories: {
+        current_debt_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_LongTermDebtCurrent", label: "Current portion of long-term debt", value: 5900000 }] },
+        noncurrent_debt_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_LongTermDebtNoncurrent", label: "Long-term debt, net of current portion", value: 1318100000 }] },
+        aggregate_debt_candidates: { status: "not_found", candidate_count: 0, candidates: [] },
+        cash_unrestricted_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_CashAndCashEquivalentsAtCarryingValue", label: "Cash and cash equivalents", value: 175900000 }] },
+        cash_restricted_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_RestrictedCashNoncurrent", label: "Restricted cash, non-current", value: 9800000 }] },
+        short_term_investment_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_ShortTermInvestments", label: "Short-term investments", value: 4000000 }] },
+        current_lease_liability_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_OperatingLeaseLiabilityCurrent", label: "Current portion of operating lease liabilities", value: 6000000 }] },
+        noncurrent_lease_liability_candidates: { status: "unique_candidate", candidate_count: 1, candidates: [{ concept: "us-gaap_OperatingLeaseLiabilityNoncurrent", label: "Operating lease liabilities, net of current portion", value: 239200000 }] }
+      },
+      unresolved_categories: [
+        "cash_combined_or_investment_candidates",
+        "nondebt_financing_obligation_candidates",
+        "noncontrolling_interest_candidates",
+        "aggregate_debt_candidates"
+      ]
+    },
+    enterprise_value_scope_review: {
+      selection_policy_review: {
+        noncontrolling_interest: { treatment: "excluded_from_base_bridge_pending_consolidated_ebit_alignment_review", candidate_count: 0 },
+        separate_financing_obligations: { treatment: "excluded_from_conventional_debt_bridge_pending_instrument_review", candidate_count: 0 }
+      },
+      review_flags: [
+        "lease_liabilities_separate_from_conventional_debt_require_policy_decision",
+        "restricted_cash_or_short_term_investments_require_cash_scope_review"
+      ]
+    }
+  };
+  const resolver = {
+    symbol: "GTM",
+    accession: "0001794515-26-000012",
+    fiscal_period: "2025-12-31",
+    review_flags: [
+      "right_of_use_assets_present_review_invested_capital_scope",
+      "lease_liabilities_present_review_debt_and_invested_capital_treatment",
+      "restricted_cash_or_combined_cash_present_review_enterprise_value_cash_input",
+      "balance_sheet:nondebt_financing_obligation_candidates",
+      "balance_sheet:noncontrolling_interest_candidates",
+      "balance_sheet:aggregate_debt_candidates"
+    ],
+    enterprise_value_candidate_review: {
+      conventional_debt_status: "identified_from_unique_current_and_noncurrent_components",
+      debt_reconciliation_status: "insufficient_unique_inputs"
+    }
+  };
+  const tasks = listGeminiAccountingEscalations("GTM", company, resolver).map(item => item.task);
+  assert.deepEqual(tasks.sort(), ["cash_scope", "debt_scope", "financing_scope", "lease_scope", "nci_scope"].sort());
+});
