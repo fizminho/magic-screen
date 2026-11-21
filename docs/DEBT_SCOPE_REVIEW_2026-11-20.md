@@ -237,3 +237,27 @@ Eight exact-accession annual-filing reviews are now attached separately from the
 The issuers use materially different labels and classifications: cash equivalents, available-for-sale securities, held-to-maturity securities, current marketable securities and noncurrent marketable securities. Several portfolios are explicitly available for current operations, but this is not equivalent to the issuer's cash-equivalent definition. The future policy should define a consistent maturity ceiling, eligible instrument types, credit-quality standard, market-liquidity test, encumbrance test and operational-availability test. No issuer-specific exception should be used to improve a particular ranking.
 
 All eight reviews are exact-accession-bound and carry `status=review_only`, `production_approved=false`, `resolver_input=false` and `cash_candidate_promoted=false`. They are surfaced separately from conventional-debt note reviews.
+## Additional issuer-specific debt and cash follow-up (21 Nov 2026)
+
+### SGHC: on-demand loan ambiguity and cash availability
+
+The FY2025 20-F reports $17m of interest-bearing borrowings as noncurrent. Note 24 identifies Waterview Facilities A and B, maturing March 7, 2030, with combined carrying amount $17.3m. The same table lists separate NGN-denominated other loans payable on demand at 0% interest, but the facility amount is shown as unspecified and the filing does not quantify a year-end drawn balance for that row. SGHC says it complied with the Waterview financial covenants throughout FY2025 and reported no indication of difficulty at the next test. This supports the named Waterview facility assessment, but it does not resolve the separate on-demand loan. Keep current debt unresolved; do not infer zero. [FY2025 20-F, Note 24](https://s205.q4cdn.com/195659402/files/doc_financials/2025/ar/Super-Group-SGHC-Limited-20-F-Annual-and-Transition-Report-foreign-issuer.pdf)
+
+Cash-scope observations from the same filing:
+- Cash and cash equivalents total $513m, comprising $45m cash-in-transit and $468m bank balances.
+- $129m of processor bank balances are held in wallets the Group says it can access on demand.
+- The bank-balance disclosure includes $19m in regulatory-designated accounts, typically subject to minimum balances, and $12m earmarked for corporate social-responsibility programs.
+- A separate $6m cash-segregated-for-users disclosure is reported under licensing requirements. Do not add it to corporate cash; verify balance-sheet presentation before considering any offset.
+- Regulatory cash is described as available for corporate use, but minimum balances typically must be maintained. Do not mechanically deduct or ignore the regulatory and CSR components; apply a consistent availability policy.
+
+These debt and cash observations are attached only to SGHC's exact FY2025 accession and remain review-only. They do not resolve current debt or adjust the cash candidate.
+
+### ZVRA: 2026 payoff is subsequent to FY2025
+
+The FY2025 10-K supports $61.928m long-term debt carrying value from $63.608m principal less $1.680m of discount, issuance costs and PIK interest. Contractual maturity was April 5, 2029, with no scheduled principal payments in 2026-2028 and $63.608m due in 2029. The credit agreement permits acceleration on customary events of default, including non-payment, covenant defaults, insolvency, material judgments and inaccurate representations. This is a contractual remedy, not evidence that a default existed at FY2025 year-end. [FY2025 10-K](https://www.sec.gov/Archives/edgar/data/1434647/000143464726000011/zvra-20251231.htm)
+
+The subsequent Q1 2026 10-Q reports that all obligations were repaid in full on March 12, 2026: approximately $63.1m principal including PIK interest, plus $1.4m accrued cash interest, together with final premiums and fees. The credit agreement was terminated and liens released. This is later-period context only. It must not overwrite the FY2025 debt snapshot or be mixed into annual EBIT without an explicit point-in-time policy. [Q1 2026 Form 10-Q, Note E](https://www.sec.gov/Archives/edgar/data/1434647/000143464726000031/zvra-20260331.htm)
+
+The generic resolver still does not infer a zero current-debt bucket from the maturity schedule. The evidence remains review-only and no EV or ranking inputs were promoted.
+
+No production fundamentals, ratios, eligibility decisions or rankings are changed by these issuer-note additions.
