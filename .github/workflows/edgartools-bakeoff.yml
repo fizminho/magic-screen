@@ -17,6 +17,8 @@ on:
       - "scripts/test_validate_mfi_ranking_preview.py"
       - "scripts/validate_mfi_universe_coverage.py"
       - "scripts/test_validate_mfi_universe_coverage.py"
+      - "scripts/build_mfi_sensitivity_report.py"
+      - "scripts/test_build_mfi_sensitivity_report.py"
       - "scripts/validate_edgartools_pipeline.py"
       - "scripts/test_validate_edgartools_pipeline.py"
       - "scripts/prepare_mfi_market_caps.py"
@@ -311,7 +313,7 @@ jobs:
           python scripts/assess_us_mfi_policy_cohort.py
       - name: Build top-cohort ranking sensitivity report
         if: always() && hashFiles('edgartools-mfi-ranking-preview.json') != '' && hashFiles('accounting-review-queue.json') != ''
-        run: python scripts/build_mfi_sensitivity_report.py
+        run: python scripts/build_mfi_sensitivity_report.py --leases lease-rou-coverage.json
       - name: Validate issuer debt-note review guardrails
         if: always() && hashFiles('accounting-review-queue.json') != ''
         run: |
