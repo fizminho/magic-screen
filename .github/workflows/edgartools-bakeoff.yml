@@ -29,6 +29,8 @@ on:
       - "worker/fundamentals-reconciliation.test.mjs"
       - "scripts/validate_fundamentals_reconciliation.py"
       - "scripts/test_validate_fundamentals_reconciliation.py"
+      - "scripts/build_lease_rou_coverage_report.mjs"
+      - "scripts/test_build_lease_rou_coverage_report.mjs"
       - "worker/filing-specific-ebit.test.mjs"
       - "src/App.tsx"
       - "src/styles.css"
