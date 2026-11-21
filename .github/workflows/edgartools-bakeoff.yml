@@ -174,7 +174,8 @@ jobs:
           print(f"Validated extraction coverage for all {len(actual)} requested symbols.")
           PY
       # Pushes remain regression-only unless the commit message explicitly contains
-      # [full-universe]. Scheduled/manual/full-universe runs post raw evidence after discovery.
+      # [full-universe]. This explicit opt-in runs discovery, full-universe extraction,
+      # raw evidence ingestion, and read-only coverage validation. Scheduled/manual runs do likewise.
       - name: Ingest EdgarTools filing evidence (raw, no ranking changes)
         if: (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[full-universe]'))) && vars.EDGARTOOLS_INGEST_URL != ''
         env:
