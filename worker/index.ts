@@ -93,6 +93,14 @@ async function ensureSchema(env: Env) {
     }
   }
 }
+async function ensureEdgarToolsEvidenceSchema(env: Env) {
+  await ensureSchema(env);
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (
+    symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,
+    fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,
+    provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,
+    ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))`).run();
+}
 async function refreshQuotes(env: Env, onlyMarket?: "MY" | "US") {
   await ensureSchema(env);
   const started = new Date().toISOString();
@@ -1019,6 +1027,7 @@ export default {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
+        await ensureEdgarToolsEvidenceSchema(env);
         // INTENTIONAL: read-only resolver preview. It never writes stock_fundamentals,
         // stock_snapshot ratios, eligibility, or rankings.
         const rows=await env.DB.prepare(`SELECT m.symbol,m.company_name,e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json,e.ingested_at
@@ -1064,6 +1073,7 @@ export default {
         if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       }
       try {
+        await ensureEdgarToolsEvidenceSchema(env);
         const evidence=await env.DB.prepare(`SELECT m.symbol,m.company_name,e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json,e.ingested_at
           FROM stock_master m
           LEFT JOIN edgartools_filing_evidence e ON e.symbol=m.symbol AND e.accession_key=(
@@ -1101,6 +1111,7 @@ export default {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
       try {
+        await ensureEdgarToolsEvidenceSchema(env);
         // INTENTIONAL: compare legacy production fundamentals with accession-bound EdgarTools candidates without writing either side.
         const rows=await env.DB.prepare(`SELECT m.symbol,m.company_name,
           q.market_cap AS current_market_cap,q.updated_at AS market_cap_updated_at,
