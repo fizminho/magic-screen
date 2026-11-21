@@ -1461,7 +1461,7 @@ The carrying amount of noncontrolling interest was $8 million.
 
     def test_failed_sale_leaseback_note_requires_distinct_ordinary_and_financing_schedules(self):
         markdown = """# Note 9 - Leases
-Future minimum lease payments under leases which are included in our consolidated balance sheet are as follows:
+Future minimum lease payments under leases which are included in lease liabilities on our consolidated balance sheet are as follows:
 Present value of future minimum lease payments 61,339
 Failed Sale-Leaseback
 A financing obligation liability was recognized.
