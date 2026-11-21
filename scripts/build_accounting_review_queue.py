@@ -98,6 +98,32 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
             "aggregate_debt",
         )
     }
+
+    def debt_bucket_gap(name: str) -> dict[str, Any]:
+        detail = balance.get(name) or {}
+        status = str(detail.get("status") or "not_found")
+        count = detail.get("candidate_count", 0)
+        if status in ("unique", "unique_candidate") and count == 1:
+            disposition = "unique_candidate_review_only"
+        elif status in ("ambiguous", "ambiguous_candidates") or (isinstance(count, int) and count > 1):
+            disposition = "ambiguous_manual_review"
+        else:
+            disposition = "unknown_not_zero"
+        return {
+            "candidate_status": status,
+            "candidate_count": count,
+            "disposition": disposition,
+            "production_approved": False,
+        }
+
+    debt_resolution_gap = {
+        "current": debt_bucket_gap("current_debt"),
+        "noncurrent": debt_bucket_gap("noncurrent_debt"),
+        "aggregate": debt_bucket_gap("aggregate_debt"),
+        "overall_status": debt,
+        "interpretation": "A missing maturity bucket is unknown, not zero. Aggregate debt evidence is diagnostic and must not be added to maturity components.",
+        "production_approved": False,
+    }
     assessment = {
         "ebit": {
             "candidate_status": ebit,
@@ -133,6 +159,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "issues": issues,
         "balance_sheet_exceptions": category_summary,
         "debt_instrument_evidence": debt_instrument_evidence,
+        "debt_resolution_gap": debt_resolution_gap,
         "candidate_vs_policy_assessment": assessment,
         "production_write": False,
     }
@@ -810,6 +837,10 @@ def build_queue(
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
+            "debt_bucket_gap_dispositions": dict(Counter(
+                f"{bucket}:{(row.get('debt_resolution_gap') or {}).get(bucket, {}).get('disposition', 'not_available')}"
+                for row in rows for bucket in ("current", "noncurrent")
+            )),
             "filing_ev_scope_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_ev_scope_note_review")),
             "ev_scope_classification_rows": dict(Counter(
                 category
@@ -859,7 +890,7 @@ def main() -> int:
     Path(args.json_output).write_text(json.dumps(queue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     fields = [
         "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
-        "debt_status", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
+        "debt_status", "debt_resolution_gap", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
