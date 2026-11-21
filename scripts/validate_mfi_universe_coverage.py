@@ -5,6 +5,8 @@ import argparse
 import json
 from pathlib import Path
 from typing import Any
+from datetime import datetime
+from prepare_mfi_market_caps import normalize_mfi_date
 
 ALLOWED_REGRESSION_CONTROLS = {"ADBE"}
 ANNUAL_FORMS = {"10-K", "20-F", "40-F"}
@@ -88,9 +90,28 @@ def validate(universe: dict[str, Any], extraction: dict[str, Any],
 
     market_snapshot = extraction.get("mfi_market_cap_snapshot") or {}
     price_date = market_snapshot.get("price_date")
-    universe_price_date = (universe.get("universe_refresh") or {}).get("priceDate")
-    if price_date and universe_price_date and price_date != universe_price_date:
-        errors.append("extraction market-cap price date does not match discovered universe price date")
+    refresh = universe.get("universe_refresh") or {}
+    universe_price_date = refresh.get("priceDate")
+    universe_as_of = refresh.get("asOf")
+    if price_date and universe_price_date:
+        try:
+            year = datetime.fromisoformat(str(universe_as_of).replace("Z", "+00:00")).year if universe_as_of else int(str(price_date)[:4])
+            normalized_universe_price_date = normalize_mfi_date(universe_price_date, year)
+            if price_date != normalized_universe_price_date:
+                errors.append("extraction market-cap price date does not match discovered universe price date")
+        except (TypeError, ValueError):
+            errors.append("discovered universe price date or as-of timestamp is invalid")
+    if market_snapshot.get("input_source") == "active_universe_snapshot" and market_snapshot.get("as_of") != universe_as_of:
+        errors.append("extraction market-cap snapshot timestamp does not match discovered universe snapshot")
+    quarter_date = market_snapshot.get("quarter_date")
+    universe_quarter_date = refresh.get("quarterDate")
+    if quarter_date and universe_quarter_date:
+        try:
+            year = datetime.fromisoformat(str(universe_as_of).replace("Z", "+00:00")).year if universe_as_of else int(str(quarter_date)[:4])
+            if quarter_date != normalize_mfi_date(universe_quarter_date, year):
+                errors.append("extraction quarter date does not match discovered universe quarter date")
+        except (TypeError, ValueError):
+            errors.append("discovered universe quarter date or as-of timestamp is invalid")
 
     for name, report in (("resolver", resolver), ("ranking", ranking)):
         for flag in ("production_fundamentals_changed", "rankings_changed"):
