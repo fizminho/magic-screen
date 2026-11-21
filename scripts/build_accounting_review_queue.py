@@ -268,7 +268,7 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             category = "notes_receivable"
         elif is_liability and any(x in searchable for x in ("royalt", "sale lease-back", "sale leaseback", "financing obligation", "financing liabilities")):
             category = "other_financing_obligations"
-        elif is_liability and any(x in searchable for x in ("debt", "borrow", "loan payable", "notes payable", "note payable", "line of credit")):
+        elif is_liability and any(x in searchable for x in ("debt", "borrow", "loan payable", "notes payable", "note payable", "line of credit", "commercial paper")):
             category = "conventional_debt"
         if category is None:
             continue
