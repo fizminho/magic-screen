@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
-"""Validate invariants in a read-only US MFI ranking preview artifact."""
+"""Validate coverage and classic ordinal-rank invariants in a US MFI preview."""
 from __future__ import annotations
 import json
 import sys
 from pathlib import Path
 from typing import Any
+
+
+def _ordinal_ranks(rows: list[dict[str, Any]], key: str) -> dict[str, float]:
+    ordered = sorted(rows, key=lambda row: (-float(row[key]), str(row["symbol"]).upper()))
+    result: dict[str, float] = {}
+    index = 0
+    while index < len(ordered):
+        end = index + 1
+        while end < len(ordered) and float(ordered[end][key]) == float(ordered[index][key]):
+            end += 1
+        average_rank = ((index + 1) + end) / 2
+        for row in ordered[index:end]:
+            result[str(row["symbol"]).upper()] = average_rank
+        index = end
+    return result
 
 
 def validate(report: dict[str, Any]) -> list[str]:
@@ -32,16 +47,48 @@ def validate(report: dict[str, Any]) -> list[str]:
     ranked = [row for row in rows if row.get("magic_formula_rank") is not None]
     if summary.get("ranked") != len(ranked):
         errors.append("ranked summary does not reconcile")
-    if len(eligible) >= int(report.get("minimum_eligible_cohort", 5)):
-        for row in ranked:
-            ranks = (row.get("earnings_yield_rank"), row.get("return_on_capital_rank"), row.get("magic_formula_score"))
-            if not all(isinstance(value, (int, float)) for value in ranks):
-                errors.append(f"{row.get('symbol')}: ranked row has missing ordinal ranks")
-                continue
-            if abs(ranks[2] - (ranks[0] + ranks[1])) > 1e-9:
-                errors.append(f"{row.get('symbol')}: combined score is not the ordinal rank sum")
-        if [row.get("magic_formula_rank") for row in ranked] != sorted(row.get("magic_formula_rank") for row in ranked):
-            errors.append("ranked rows are not ordered by ascending (best-first) rank")
+    minimum = int(report.get("minimum_eligible_cohort", 5))
+    if len(eligible) >= minimum:
+        if len(ranked) != len(eligible):
+            errors.append("every eligible row must be ranked once the minimum cohort is met")
+        for row in eligible:
+            symbol = str(row.get("symbol", "")).upper()
+            for key in ("earnings_yield", "return_on_capital"):
+                value = row.get(key)
+                if not isinstance(value, (int, float)) or not __import__("math").isfinite(value):
+                    errors.append(f"{symbol}: missing or invalid {key} on eligible row")
+        valid_metrics = all(isinstance(row.get(key), (int, float)) for row in eligible for key in ("earnings_yield", "return_on_capital"))
+        if valid_metrics:
+            ey_ranks = _ordinal_ranks(eligible, "earnings_yield")
+            roc_ranks = _ordinal_ranks(eligible, "return_on_capital")
+            scores: dict[str, float] = {}
+            for row in eligible:
+                symbol = str(row["symbol"]).upper()
+                expected_ey, expected_roc = ey_ranks[symbol], roc_ranks[symbol]
+                if not isinstance(row.get("earnings_yield_rank"), (int, float)) or abs(row["earnings_yield_rank"] - expected_ey) > 1e-9:
+                    errors.append(f"{symbol}: earnings-yield ordinal rank is incorrect")
+                if not isinstance(row.get("return_on_capital_rank"), (int, float)) or abs(row["return_on_capital_rank"] - expected_roc) > 1e-9:
+                    errors.append(f"{symbol}: return-on-capital ordinal rank is incorrect")
+                expected_score = expected_ey + expected_roc
+                scores[symbol] = expected_score
+                if not isinstance(row.get("magic_formula_score"), (int, float)) or abs(row["magic_formula_score"] - expected_score) > 1e-9:
+                    errors.append(f"{symbol}: combined score is not the ordinal rank sum")
+            ordered = sorted(eligible, key=lambda row: (scores[str(row["symbol"]).upper()], str(row["symbol"]).upper()))
+            expected_final: dict[str, int] = {}
+            previous_score: float | None = None
+            previous_rank = 0
+            for index, row in enumerate(ordered):
+                score = scores[str(row["symbol"]).upper()]
+                if previous_score is None or score != previous_score:
+                    previous_rank = index + 1
+                expected_final[str(row["symbol"]).upper()] = previous_rank
+                previous_score = score
+            for row in eligible:
+                symbol = str(row["symbol"]).upper()
+                if row.get("magic_formula_rank") != expected_final[symbol]:
+                    errors.append(f"{symbol}: final competition rank is incorrect")
+            if [row.get("magic_formula_rank") for row in ranked] != sorted(row.get("magic_formula_rank") for row in ranked):
+                errors.append("ranked rows are not ordered best-first")
     elif ranked:
         errors.append("numeric ranks must be withheld below the minimum eligible cohort")
     for row in excluded:

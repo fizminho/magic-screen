@@ -56,3 +56,7 @@ EdgarTools is the primary provider. No automatic fallback is enabled. An unsuppo
 ## Safety boundary
 
 All EdgarTools resolver and ranking outputs remain preview-only. `production_write=false`, `production_fundamentals_changed=false` and `rankings_changed=false` are required invariants. Extraction success is not accounting approval. A successful shadow ranking is not production approval.
+
+## Latest regression artifact (21 November 2026)
+
+The push-triggered regression run for commit `90d8dd2` completed successfully, including build, Worker deployment, extraction, resolver preview, shadow ranking preview, policy validation and accounting-review guardrails. Its artifact reports a 50-symbol active-universe snapshot: 26 supported, 2 provider-unsupported and 22 awaiting filing evidence. Five rows passed current shadow eligibility gates and were ranked; 45 remained excluded. The five ranked symbols were OTEX, ADBE, UPWK, QTTB and IRWD. These are preview results only and remain subject to accounting approval. The push run intentionally skipped live universe refresh and raw-evidence ingestion, so this artifact is not evidence of a complete scheduled/manual refresh.
