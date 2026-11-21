@@ -27,11 +27,20 @@ class RankingPreviewTests(unittest.TestCase):
         errors = validate(self.report([item], 1, 1, minimum=1))
         self.assertTrue(any("ordinal rank sum" in error for error in errors))
 
-    def test_metric_ranks_and_competition_ties_are_recomputed(self):
+    def test_metric_ties_use_average_occupied_ordinal_positions(self):
         rows = [
-            row("AAA", eligible=True, rank=1, ey=1, roc=2, score=3, ey_value=0.30, roc_value=0.10),
-            row("BBB", eligible=True, rank=1, ey=2, roc=1, score=3, ey_value=0.20, roc_value=0.20),
-            row("CCC", eligible=True, rank=3, ey=2.5, roc=3, score=5.5, ey_value=0.20, roc_value=0.05),
+            row("AAA", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.30, roc_value=0.40),
+            row("BBB", eligible=True, rank=2, ey=2.5, roc=2, score=4.5, ey_value=0.20, roc_value=0.30),
+            row("CCC", eligible=True, rank=3, ey=2.5, roc=3, score=5.5, ey_value=0.20, roc_value=0.20),
+            row("DDD", eligible=True, rank=4, ey=4, roc=4, score=8, ey_value=0.10, roc_value=0.10),
+        ]
+        self.assertEqual(validate(self.report(rows, 4, 4, minimum=4)), [])
+
+    def test_combined_score_ties_share_competition_rank(self):
+        rows = [
+            row("AAA", eligible=True, rank=1, ey=1, roc=2, score=3, ey_value=0.30, roc_value=0.20),
+            row("BBB", eligible=True, rank=1, ey=2, roc=1, score=3, ey_value=0.20, roc_value=0.30),
+            row("CCC", eligible=True, rank=3, ey=3, roc=3, score=6, ey_value=0.10, roc_value=0.10),
         ]
         self.assertEqual(validate(self.report(rows, 3, 3, minimum=3)), [])
 
