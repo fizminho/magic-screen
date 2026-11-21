@@ -557,5 +557,19 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(item["invested_capital_denominator_diagnostics_source"],
                          "stored_resolver_preview")
 
+    def test_every_curated_debt_note_review_is_scoped_and_non_promoting(self):
+        from build_accounting_review_queue import FILING_DEBT_NOTE_REVIEWS
+
+        self.assertGreaterEqual(len(FILING_DEBT_NOTE_REVIEWS), 1)
+        for symbol, review in FILING_DEBT_NOTE_REVIEWS.items():
+            with self.subTest(symbol=symbol):
+                self.assertTrue(review.get("accession"))
+                self.assertTrue(review.get("evidence_scope"))
+                self.assertTrue(review.get("manual_review_questions"))
+                self.assertTrue(review.get("prohibited_inferences"))
+                self.assertFalse(review.get("production_approved", False))
+                self.assertFalse(review.get("resolver_input", False))
+                self.assertFalse(review.get("debt_candidate_promoted", False))
+
 if __name__ == "__main__":
     unittest.main()
