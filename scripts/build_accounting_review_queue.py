@@ -1426,7 +1426,7 @@ def main() -> int:
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
         "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
-        "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "production_write",
+        "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "next_review_actions", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -1434,6 +1434,7 @@ def main() -> int:
         for item in queue["items"]:
             row = dict(item)
             row["issues"] = " | ".join(item["issues"])
+            row["next_review_actions"] = " | ".join(item.get("next_review_actions", []))
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
             row["debt_resolution_gap"] = json.dumps(item.get("debt_resolution_gap"), separators=(",", ":"))
