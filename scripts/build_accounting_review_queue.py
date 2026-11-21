@@ -252,7 +252,7 @@ def extract_ev_scope_evidence(raw_company: dict[str, Any]) -> dict[str, Any]:
             category = "customer_escrow_assets_and_payables"
         elif is_liability and "lease" in searchable and ("liabilit" in searchable or "obligation" in searchable):
             category = "lease_liabilities"
-        elif is_asset and any(x in searchable for x in ("restricted cash", "cash restricted", "cash and cash equivalents restricted")):
+        elif is_asset and "restricted" in searchable and "cash" in searchable:
             category = "restricted_cash"
         elif is_asset and "cash" in searchable:
             category = "unrestricted_cash"
