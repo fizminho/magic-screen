@@ -58,6 +58,9 @@ def validate(report: dict[str, Any]) -> list[str]:
         unresolved_scope = policy_scope_flags.intersection(row.get("review_flags") or [])
         if unresolved_scope:
             errors.append(f"{symbol}: unresolved lease, cash, NCI or financing scope cannot be ranked before cohort-policy approval")
+        ev_review = row.get("enterprise_value_candidate_review") or {}
+        if ev_review.get("debt_reconciliation_status") != "reconciled":
+            errors.append(f"{symbol}: debt note and maturity reconciliation must be complete before ranking")
     if summary.get("eligible") != len(eligible):
         errors.append("eligible summary does not reconcile")
     unsupported = [row for row in rows if row.get("provider_status") == "unsupported_provider"]

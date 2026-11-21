@@ -666,6 +666,7 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
       if(policyScopeFlags.some(flag=>row.review_flags.includes(flag))) exclusionReasons.push("Unresolved lease, cash, NCI or financing scope requires cohort-policy approval before ranking");
       if(row.reporting_currency!=="USD") exclusionReasons.push("Reporting currency not confirmed as USD");
       if(row.enterprise_value_candidate_review?.conventional_debt_status!=="identified_from_unique_current_and_noncurrent_components") exclusionReasons.push("Conventional debt inputs incomplete or ambiguous");
+      if(row.enterprise_value_candidate_review?.debt_reconciliation_status!=="reconciled") exclusionReasons.push("Debt note and maturity reconciliation is not complete");
       if(ev===null || ev<=0) exclusionReasons.push("Enterprise-value candidate unavailable or non-positive");
       if(typeof row.ebit_candidate!=="number" || !Number.isFinite(row.ebit_candidate) || row.ebit_candidate<=0) exclusionReasons.push("EBIT candidate missing or non-positive");
       if(typeof row.invested_capital_candidate!=="number" || !Number.isFinite(row.invested_capital_candidate) || row.invested_capital_candidate<=0) exclusionReasons.push("Invested capital missing or non-positive");
