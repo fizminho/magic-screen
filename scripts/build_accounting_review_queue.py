@@ -905,6 +905,7 @@ def main() -> int:
             row["issues"] = " | ".join(item["issues"])
             row["balance_sheet_exceptions"] = " | ".join(item["balance_sheet_exceptions"])
             row["debt_instrument_evidence"] = json.dumps(item["debt_instrument_evidence"], separators=(",", ":"))
+            row["debt_resolution_gap"] = json.dumps(item.get("debt_resolution_gap"), separators=(",", ":"))
             row["debt_scope_evidence"] = json.dumps(item.get("debt_scope_evidence"), separators=(",", ":"))
             row["ev_scope_evidence"] = json.dumps(item.get("ev_scope_evidence"), separators=(",", ":"))
             row["filing_debt_note_review"] = json.dumps(item.get("filing_debt_note_review"), separators=(",", ":"))
