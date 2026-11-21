@@ -274,6 +274,27 @@ class CurrencyNormalizationTests(unittest.TestCase):
             self.assertEqual(mfi_market_cap_usd_millions("EGHSF"), 650.0)
             self.assertIsNone(mfi_market_cap_usd_millions("ALEC"))
 
+
+    def test_unsupported_edgar_ticker_keeps_dynamic_mfi_market_cap(self):
+        class CompanyNotFoundError(Exception):
+            pass
+
+        with patch.dict(
+            "os.environ",
+            {
+                "MFI_PRICE_DATE": "2026-11-19",
+                "MFI_MARKET_CAPS_JSON": '{"AFMJF": 953.85}',
+                "MFI_MARKET_CAPS_SOURCE": "active_universe_snapshot",
+                "MFI_MARKET_CAP_SNAPSHOT_AS_OF": "2026-11-21T08:00:00Z",
+            },
+            clear=False,
+        ):
+            with patch("edgartools_bakeoff.Company", side_effect=CompanyNotFoundError("not in SEC index")):
+                result = extract_company("AFMJF")
+        self.assertEqual(result["provider_status"], "unsupported_provider")
+        self.assertEqual(result["mfi_market_cap_input"]["value_usd_millions"], 953.85)
+        self.assertEqual(result["mfi_market_cap_input"]["price_date"], "2026-11-19")
+
     def test_enghouse_usd_market_cap_converts_to_cad_at_mfi_price_date(self):
         market_cap_usd = mfi_market_cap_usd_millions("EGHSF") * 1_000_000
         result = currency_normalization_review(

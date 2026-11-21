@@ -110,6 +110,40 @@ def mfi_market_cap_usd_millions(symbol: str) -> float | None:
             values[ticker.upper()] = float(amount)
     return values.get(symbol.upper())
 
+def mfi_market_cap_snapshot_metadata() -> dict[str, Any]:
+    """Describe the exact quote-date snapshot used by this extraction run."""
+    price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
+    input_source = os.environ.get(
+        "MFI_MARKET_CAPS_SOURCE",
+        "pinned_regression_snapshot" if price_date == MFI_SNAPSHOT_PRICE_DATE else "workflow_override",
+    )
+    as_of = (
+        os.environ.get("MFI_MARKET_CAP_SNAPSHOT_AS_OF")
+        if input_source == "active_universe_snapshot"
+        else MFI_SNAPSHOT_AS_OF if input_source == "pinned_regression_snapshot" and price_date == MFI_SNAPSHOT_PRICE_DATE
+        else None
+    )
+    return {
+        "source": "Magic Formula Investing",
+        "input_source": input_source,
+        "as_of": as_of,
+        "price_date": price_date,
+        "quarter_date": os.environ.get("MFI_QUARTER_DATE", MFI_SNAPSHOT_QUARTER_DATE),
+        "market_cap_unit": "USD millions",
+        "override_supported": "MFI_MARKET_CAPS_JSON",
+    }
+
+
+def mfi_market_cap_input(symbol: str) -> dict[str, Any]:
+    snapshot = mfi_market_cap_snapshot_metadata()
+    return {
+        "value_usd_millions": mfi_market_cap_usd_millions(symbol),
+        "currency": "USD",
+        "price_date": snapshot["price_date"],
+        "snapshot_as_of": snapshot["as_of"],
+        "source": snapshot["input_source"],
+    }
+
 
 def sec_company_facts(cik: Any) -> dict[str, Any]:
     """Fetch accession-scoped SEC Company Facts once per CIK for currency-unit review."""
@@ -1654,6 +1688,9 @@ def non_sec_issuer_review_case(symbol: str) -> dict[str, Any] | None:
 
 def extract_company(symbol: str) -> dict[str, Any]:
     result: dict[str, Any] = {"symbol": symbol, "status": "error", "provider_status": "extraction_error"}
+    # Market-cap provenance belongs to the MFI universe, not SEC provider support.
+    # Keep it even when EdgarTools cannot resolve an issuer.
+    result["mfi_market_cap_input"] = mfi_market_cap_input(symbol)
     try:
         company = Company(symbol)
         # INTENTIONAL: mirror the annual filing families used by the SEC pipeline.
@@ -1777,16 +1814,9 @@ def extract_company(symbol: str) -> dict[str, Any]:
             if filing_currency_override is not None:
                 result["reporting_currency_review"] = filing_currency_override
         reporting_currency = result["reporting_currency_review"].get("currency")
-        mfi_price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
-        market_cap_millions = mfi_market_cap_usd_millions(symbol)
+        mfi_price_date = result["mfi_market_cap_input"]["price_date"]
+        market_cap_millions = result["mfi_market_cap_input"]["value_usd_millions"]
         market_cap_usd = market_cap_millions * 1_000_000 if market_cap_millions is not None else None
-        result["mfi_market_cap_input"] = {
-            "value_usd_millions": market_cap_millions,
-            "currency": "USD",
-            "price_date": mfi_price_date,
-            "snapshot_as_of": market_cap_snapshot_as_of,
-            "source": market_cap_source,
-        }
         fx_review = None
         if reporting_currency and reporting_currency != "USD":
             fx_review = fetch_frankfurter_rate("USD", reporting_currency, mfi_price_date)
@@ -1838,33 +1868,15 @@ def main() -> int:
     if not symbols or any(not re.fullmatch(r"[A-Z0-9.-]{1,12}", symbol) for symbol in symbols):
         raise ValueError("BAKEOFF_SYMBOLS must be a comma-separated list of valid ticker symbols")
 
-    mfi_price_date = os.environ.get("MFI_PRICE_DATE", MFI_SNAPSHOT_PRICE_DATE)
-    market_cap_source = os.environ.get(
-        "MFI_MARKET_CAPS_SOURCE",
-        "pinned_regression_snapshot" if mfi_price_date == MFI_SNAPSHOT_PRICE_DATE else "workflow_override",
-    )
-    market_cap_snapshot_as_of = (
-        os.environ.get("MFI_MARKET_CAP_SNAPSHOT_AS_OF")
-        if market_cap_source == "active_universe_snapshot"
-        else MFI_SNAPSHOT_AS_OF if market_cap_source == "pinned_regression_snapshot" and mfi_price_date == MFI_SNAPSHOT_PRICE_DATE
-        else None
-    )
-    market_cap_quarter_date = os.environ.get("MFI_QUARTER_DATE", MFI_SNAPSHOT_QUARTER_DATE)
+    market_cap_snapshot = mfi_market_cap_snapshot_metadata()
+    mfi_price_date = market_cap_snapshot["price_date"]
     report = {
         "service": "Magic Screen EdgarTools bakeoff",
         "symbol_input": raw_symbols,
         "symbol_input_source": "workflow_dispatch_or_environment" if os.environ.get("BAKEOFF_SYMBOLS") else "default_control_cases",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "mfi_price_date": mfi_price_date,
-        "mfi_market_cap_snapshot": {
-            "source": "Magic Formula Investing",
-            "input_source": market_cap_source,
-            "as_of": market_cap_snapshot_as_of,
-            "price_date": mfi_price_date,
-            "quarter_date": market_cap_quarter_date,
-            "market_cap_unit": "USD millions",
-            "override_supported": "MFI_MARKET_CAPS_JSON",
-        },
+        "mfi_market_cap_snapshot": market_cap_snapshot,
         "fx_policy": "USD market cap is translated into filing currency at the MFI quote date using the ECB daily reference series via Frankfurter; the latest ECB observation on or before the quote date is selected within a bounded 7-day lookback. Reported debt/cash stay in filing currency at fiscal-period end; ROC remains a same-currency ratio. No EV/EY is approved by this review.",
         "edgartools_version": None,
         "symbols": list(symbols),
