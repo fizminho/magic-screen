@@ -116,7 +116,7 @@ test("only filing-fact candidate IDs are eligible for Gemini findings", async ()
     ]
   };
   const base = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Review required.", findings: [
-    { evidence_id: "current_debt:0", classification: "conventional_debt", rationale: "Reported current borrowing.", confidence: "high" }
+    { evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"], classification: "conventional_debt", rationale: "Reported current borrowing.", confidence: "high" }
   ], unresolved_questions: [] };
   assert.equal(validateGeminiAccountingResponse(base, "debt_scope", evidence).findings.length, 1);
   for (const evidence_id of ["ev:conventional_gross_debt_candidate", "ev:lease_liabilities"]) {
@@ -203,7 +203,7 @@ test("uses distinct failed sale-leaseback and lease liability classifications", 
   const evidence = { filing_note_candidates: [{ evidence_id: "filing_note:1", source_kind: "filing_note_candidate" }] };
   const result = validateGeminiAccountingResponse({
     task: "financing_scope", status: "REVIEW_REQUIRED", summary: "Separate financing treatment requires review.",
-    findings: [{ evidence_id: "filing_note:1", classification: "failed_sale_leaseback_financing", rationale: "The note describes failed sale-leaseback financing.", confidence: "medium" }],
+    findings: [{ evidence_id: "filing_note:1", evidence_ids: ["filing_note:1"], classification: "failed_sale_leaseback_financing", rationale: "The note describes failed sale-leaseback financing.", confidence: "medium" }],
     unresolved_questions: []
   }, "financing_scope", evidence);
   assert.equal(result.findings[0].classification, "failed_sale_leaseback_financing");
