@@ -71,6 +71,23 @@ A filing-specific HRB EBIT reconstruction is now accepted as a **shadow-only can
 
 The latest ranking preview reports 5 eligible and 5 ranked, with 25 not ranked: 23 held for accounting/valuation review and 2 provider-unsupported. Shadow order: HRB, OTEX, UPWK, IRWD and QTTB. IRWD and QTTB share the same combined rank because their rank sums tie. All five still have accounting review flags and remain `production_approved=false`; no production fundamentals or rankings were changed.
 
+### Latest shadow cohort snapshot
+
+<text>
+
+| Rank | Ticker | Earnings Yield | Candidate ROC | Rank sum | Review note |
+|---:|---|---:|---:|---:|---|
+| 1 | HRB | 14.594% | 331.771% | 3 | Filing-specific EBIT reconstruction, manual approval required |
+| 2 | OTEX | 10.712% | 6,465.196% | 4 | Near-zero positive invested-capital denominator; major ROC outlier |
+| 3 | UPWK | 11.135% | 37.471% | 7 | Marketable-securities cash-scope sensitivity |
+| 4 | IRWD | 8.573% | 278.506% | 8 | Lease/debt scope review |
+| 4 | QTTB | 10.388% | 37.826% | 8 | Lease and restricted-cash scope review |
+
+</text>
+
+Metrics use the refreshed MFI snapshot (price date 19 November 2026, quarter date 30 September 2026). They are shadow candidates only. All five rows retain accounting review flags and `production_approved=false`. The rank-sum tie between IRWD and QTTB is intentional: they share competition rank 4.
+
+
 The accounting queue still contains 9 P1, 11 P2 and 10 P3 reviews; 28 balance sheets reconcile and 2 are unavailable; 15 filing-specific debt-note reviews and 9 EV-scope note reviews remain review-only; 18 cash-policy questions remain unresolved. The main blockers are accounting policy approval and legacy-versus-EdgarTools reconciliation, not extraction availability.
 
 The workflow now validates each handoff explicitly: unique active-universe symbols, extraction coverage for every requested issuer, accession/period completeness for supported filings, received-versus-ingested counts, unsupported-provider reconciliation, resolver coverage and production immutability. Universe and ingestion response reports are retained as CI artifacts for audit.
