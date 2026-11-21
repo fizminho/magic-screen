@@ -461,6 +461,12 @@ def lease_financing_reconciliation_review(markdown: str) -> dict[str, Any]:
         "payments_reduce_financing_liability": re.compile(
             r"monthly rent payments.{0,500}interest expense and a reduction of the outstanding liability", re.I
         ),
+        "ordinary_lease_schedule_limited_to_reported_lease_liabilities": re.compile(
+            r"future minimum lease payments under leases which are included in lease liabilities on (?:our|the) consolidated balance sheet", re.I
+        ),
+        "failed_sale_leaseback_has_separate_payment_schedule": re.compile(
+            r"future minimum lease payments for failed sale[ -]leaseback financing transactions", re.I
+        ),
     }
     matched = [name for name, pattern in required_patterns.items() if pattern.search(text)]
     if len(matched) != len(required_patterns):
@@ -468,15 +474,23 @@ def lease_financing_reconciliation_review(markdown: str) -> dict[str, Any]:
             "status": "insufficient_evidence",
             "matched_signals": matched,
             "required_signals": list(required_patterns),
-            "guardrail": "The note must identify the failed sale-leaseback and explain its financing-liability and payment treatment. Balance-sheet line separation is checked independently.",
+            "guardrail": "The note must identify failed sale-leaseback financing, explain liability/payment treatment, and separately identify the ordinary lease-liability schedule and failed sale-leaseback payment schedule. Balance-sheet line separation is checked independently.",
         }
+    schedule_evidence = {}
+    for name in (
+        "ordinary_lease_schedule_limited_to_reported_lease_liabilities",
+        "failed_sale_leaseback_has_separate_payment_schedule",
+    ):
+        match = required_patterns[name].search(text)
+        schedule_evidence[name] = text[max(0, match.start() - 220):min(len(text), match.end() + 260)]
     start = re.search(r"failed sale[ -]leaseback", text, re.I).start()
     excerpt = text[max(0, start - 300):min(len(text), start + 2600)]
     return {
         "status": "financing_treatment_supported",
         "matched_signals": matched,
         "evidence_excerpt": excerpt[:2800],
-        "guardrail": "This supports the accounting nature of the failed sale-leaseback financing only. Distinct balance-sheet face rows must independently establish separation from ordinary lease liabilities, and EV inclusion still requires policy approval.",
+        "schedule_separation_evidence": schedule_evidence,
+        "guardrail": "This supports separate accounting presentation only when combined with distinct same-filing balance-sheet face rows. It does not approve EV inclusion; that remains subject to the approved accounting policy.",
     }
 
 

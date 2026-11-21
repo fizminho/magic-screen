@@ -1459,7 +1459,29 @@ The carrying amount of noncontrolling interest was $8 million.
         self.assertIn("nci_scope", by_title["Note 12 - Equity"]["topics"])
         self.assertLessEqual(len(by_title["Note 8 - Debt"]["excerpt"]), 1200)
 
-    def test_failed_sale_leaseback_note_supports_financing_treatment_without_relying_on_schedule_wording(self):
+    def test_failed_sale_leaseback_note_requires_distinct_ordinary_and_financing_schedules(self):
+        markdown = """# Note 9 - Leases
+Future minimum lease payments under leases which are included in our consolidated balance sheet are as follows:
+Present value of future minimum lease payments 61,339
+Failed Sale-Leaseback
+A financing obligation liability was recognized.
+The Company will not recognize rent expense related to the leased asset.
+Instead, monthly rent payments under the lease agreement will be recorded as interest expense and a reduction of the outstanding liability.
+Future minimum lease payments for failed sale-leaseback financing transactions as of December 31, 2025 are as follows:
+Sale Leaseback Payments 154,067
+"""
+        result = filing_note_review(type("FilingObject", (), {
+            "notes": type("Notes", (), {"to_markdown": lambda self, focus=None: markdown})()
+        })())
+        reconciliation = result["lease_financing_reconciliation"]
+        self.assertEqual(reconciliation["status"], "financing_treatment_supported")
+        self.assertEqual(len(reconciliation["matched_signals"]), 6)
+        self.assertIn("ordinary_lease_schedule_limited_to_reported_lease_liabilities",
+                      reconciliation["schedule_separation_evidence"])
+        self.assertIn("failed_sale_leaseback_has_separate_payment_schedule",
+                      reconciliation["schedule_separation_evidence"])
+
+    def test_failed_sale_leaseback_does_not_resolve_overlap_without_separate_schedules(self):
         markdown = """# Note 9 - Leases
 Failed Sale-Leaseback
 A financing obligation liability was recognized.
@@ -1469,9 +1491,7 @@ Instead, monthly rent payments under the lease agreement will be recorded as int
         result = filing_note_review(type("FilingObject", (), {
             "notes": type("Notes", (), {"to_markdown": lambda self, focus=None: markdown})()
         })())
-        reconciliation = result["lease_financing_reconciliation"]
-        self.assertEqual(reconciliation["status"], "financing_treatment_supported")
-        self.assertEqual(len(reconciliation["matched_signals"]), 4)
+        self.assertEqual(result["lease_financing_reconciliation"]["status"], "insufficient_evidence")
 
     def test_failed_sale_leaseback_does_not_resolve_overlap_without_all_signals(self):
         markdown = """# Note 9 - Leases
