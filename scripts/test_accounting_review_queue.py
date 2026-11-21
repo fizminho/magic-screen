@@ -774,6 +774,8 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["QTTB"], "conventional_term_loan_maturity_schedule")
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["SNDK"], "named_instrument_zero_or_undrawn_facility")
         self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["UPWK"], "conventional_borrowing_current_maturity")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["FHTX"], "face_statement_no_debt_line_note_review_incomplete")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["NRIX"], "face_statement_no_debt_line_note_review_incomplete")
         for symbol, source in FILING_DEBT_NOTE_REVIEWS.items():
             with self.subTest(symbol=symbol):
                 review = filing_debt_note_review(symbol, source["accession"])

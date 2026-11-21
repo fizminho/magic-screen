@@ -112,6 +112,7 @@ The queue now exposes a controlled `review_classification` for each accession-ma
 | Classification | Issuers | Meaning |
 |---|---|---|
 | `conventional_borrowing_maturity_reconciliation` | SBC | Filing note reconciles face-statement current and noncurrent borrowing buckets. |
+| `face_statement_no_debt_line_note_review_incomplete` | FHTX, NRIX | No conventional-debt line surfaced on the face statement; this is not proof of zero debt and complete note review remains outstanding. |
 | `conventional_borrowing_with_current_bucket_unresolved` | SGHC | Noncurrent borrowing has facility support, but a separate on-demand loan leaves current debt unresolved. |
 | `conventional_term_loan_maturity_schedule` | ZVRA | Term-loan maturity schedule supports noncurrent classification; current bucket is not automatically zero. |
 | `named_instrument_zero_or_undrawn_facility` | MNTN, PXED, STRA | Negative evidence applies only to the named instruments or facilities, not all possible debt. |
