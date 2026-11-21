@@ -223,3 +223,16 @@ The next two P2 debt cases now have accession-bound tie-outs in [the SBC and ZVR
 - **ZVRA:** FY2025 term-loan principal of $63.608m less $0.755m original issue discount and $0.925m debt issuance costs equals **$61.928m** carrying value. The annual filing schedules all principal in 2029 and none in 2026–2028; the balance sheet presents the balance as long-term debt. The $40m of optional additional tranches expired undrawn. Later repayment activity must not overwrite the FY2025 annual snapshot.
 
 Both debt carrying-value bridges are reconciled. They remain review-only pending the cohort-wide treatment of leases, other financing obligations and cash. Production fundamentals, ratios, eligibility and rankings remain unchanged.
+
+
+## Final P2 named-facility and debt-note review: MNTN, PXED, STRA, FHTX and NRIX (21 November 2026)
+
+The remaining five P2 issuers now have an accession-bound worksheet: [MNTN, PXED, STRA, FHTX and NRIX review](US_MFI_P2_NAMED_FACILITY_REVIEW_2026-11-21.md). This completes filing-level evidence worksheets for all ten issuers in the P2 queue, but does not close the human accounting and policy gates.
+
+- **MNTN:** FY2025 convertible notes were fully settled at the May 2025 IPO; the QuickFrame holdback note was settled in Q1 2025; and the $50m asset-based revolver had zero drawn at year-end, with $49.4m available. The remaining $181k partial-recourse employee note is a receivable asset, not company borrowing.
+- **PXED:** FY2026 $100m revolving facility had zero drawn; the $28.4m letter of credit is not a funded borrowing. Cash is $159.363m, restricted cash $4.516m and marketable securities $167.852m. The Department of Education composite-score requirement constrains liquidity deployment; do not treat all securities as unrestricted cash by default.
+- **STRA:** FY2025 $250m revolver had zero borrowings. Cash and cash equivalents were $140.757m; restricted cash was $8.754m; held-to-maturity securities were $12.297m, of which $7.297m mature within one year and $5.000m after one through five years.
+- **FHTX:** no separate conventional-debt face row was identified; debt-note coverage remains an explicit unknown rather than a debt-free conclusion. The filing reports $80.876m cash, $1.250m restricted cash and $78.018m marketable securities, all disclosed as due within one year. Operating lease liabilities remain separate.
+- **NRIX:** FY2025 ended 30 November 2025. The filing reports $246.960m cash and cash equivalents, $345.981m current U.S. Treasury marketable securities and $0.968m restricted cash. No conventional borrowing row was identified in the reviewed balance sheet; retain unknown status until note coverage is independently closed. Operating lease liabilities remain separate.
+
+**P2 evidence milestone:** all ten P2 issuer worksheets are now documented: BCRX, PRDO, VXRT, SBC, ZVRA, MNTN, PXED, STRA, FHTX and NRIX. They remain in review until conventional debt, debt-like financing, leases, cash and marketable-security policy are approved consistently. No issuer has been promoted to production and no production fundamentals, ratios, eligibility or rankings were changed.
