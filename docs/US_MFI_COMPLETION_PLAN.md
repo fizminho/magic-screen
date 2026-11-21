@@ -187,3 +187,16 @@ The next review queue contains ten P2 issuers after the newly identified VSNT pe
 - **Named facility zero/undrawn evidence:** MNTN's named notes/revolver and PXED/STRA revolvers have filing-specific zero-drawn evidence, but this does not prove every debt category is zero.
 - **No face debt row / incomplete note review:** FHTX and NRIX remain unknown, not debt-free. Their marketable securities portfolios also remain separate from cash equivalents.
 - **Full-universe verification is triggered by this commit.** The expected triage shift is VSNT P1 and ten remaining P2 cases; accept only the generated artifact's actual counts.
+
+
+## Latest verified full-universe run after issuer-quality and perimeter triage (21 November 2026)
+
+Full-universe workflow run **44887816976** completed successfully on commit 0d7d89583ee7717a2aa76c2223f149aab942e58d. Its artifact confirms:
+
+- Active MFI cohort: **30**; EdgarTools-supported: **28**; explicitly unsupported: **2**; awaiting evidence: **0**.
+- Shadow ranking: **5 eligible / 5 ranked**; **25 excluded** (23 accounting/valuation review, 2 provider-unsupported).
+- Accounting queue: **30** rows, **10 P1 / 10 P2 / 10 P3**. VSNT is now a P1 company-perimeter mismatch; QTTB has one accession-bound nonrecurring-EBIT quality review.
+- Balance-sheet reconciliation: **28 reconciled / 2 unavailable**; 15 debt-note reviews; 9 EV-scope note reviews; 18 unresolved cash-policy questions.
+- Production-approved rows: **0**. Production fundamentals and rankings were not changed.
+
+The subsequent code commit 54c209ba690bec9b54f70d0a7b768f13b6598ec6 makes curated filing-quality and company-perimeter warnings attach directly from the resolver's exact accession, even when the current extraction artifact does not contain that issuer. This avoids losing a valid curated warning simply because a regression sample omitted the raw issuer record. The new regression test passes; a fresh full-universe run is triggered by the current commit to validate the same behavior across the complete cohort.
