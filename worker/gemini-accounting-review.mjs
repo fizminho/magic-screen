@@ -1,6 +1,20 @@
 const PROMPT_VERSION = "gemini-accounting-review-v4";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
-const DEFAULT_MODEL = "gemini-2.5-flash-lite";
+const DEFAULT_MODEL = "gemini-3.1-flash-lite";
+const SUPPORTED_TEXT_MODELS = new Set([
+  "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite",
+  "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-2.5-flash",
+  "gemini-3.8-flash", "gemini-4-hydrogen"
+]);
+
+export function getGeminiModelCandidates(preferredModel, configuredFallbacks) {
+  const configured = typeof configuredFallbacks === "string"
+    ? configuredFallbacks.split(",").map(value => value.trim()).filter(Boolean) : [];
+  const fallbackPool = configured.length ? configured : [...SUPPORTED_TEXT_MODELS];
+  const preferred = typeof preferredModel === "string" && SUPPORTED_TEXT_MODELS.has(preferredModel)
+    ? preferredModel : DEFAULT_MODEL;
+  return [...new Set([preferred, ...fallbackPool])].filter(model => SUPPORTED_TEXT_MODELS.has(model));
+}
 const MAX_INPUT_BYTES = 12 * 1024;
 const ALLOWED_TASKS = new Set(["debt_scope", "cash_scope", "lease_scope", "nci_scope", "financing_scope"]);
 const TASK_RULES = {
@@ -278,9 +292,10 @@ export async function runGeminiAccountingReview(env, input) {
   }
   const serializedEvidence = JSON.stringify(evidence);
   if (new TextEncoder().encode(serializedEvidence).byteLength > MAX_INPUT_BYTES) throw new Error("Grouped accounting evidence exceeds the 12 KiB Gemini input limit");
-  const model = typeof input.model === "string" && /^gemini-[\w.-]*flash-lite$/.test(input.model) ? input.model : DEFAULT_MODEL;
+  const models = getGeminiModelCandidates(input.model, env.GEMINI_MODEL_FALLBACKS);
+  const modelPoolKey = models.join(",");
   const inputHash = await sha256(serializedEvidence);
-  const cacheKey = await sha256([inputHash, PROMPT_VERSION, POLICY_VERSION, model, input.task].join("|"));
+  const cacheKey = await sha256([inputHash, PROMPT_VERSION, POLICY_VERSION, modelPoolKey, input.task].join("|"));
   const now = new Date().toISOString();
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS gemini_accounting_review_cache (
     cache_key TEXT PRIMARY KEY, symbol TEXT NOT NULL, accession TEXT, task TEXT NOT NULL, input_hash TEXT NOT NULL,
@@ -304,7 +319,7 @@ export async function runGeminiAccountingReview(env, input) {
       model: latest.model, cached: true, cached_at: latest.created_at, input_hash: inputHash };
     return { symbol: input.symbol, accession: input.accession, task: input.task, status: "IN_PROGRESS",
       duplicate_request: true, input_hash: inputHash,
-      note: "An identical evidence, task, prompt, policy and model request is already being processed; no second Gemini request was sent.",
+      note: "An identical evidence, task, prompt, policy and ordered model-pool request is already being processed; no second Gemini request was sent.",
       production_approved: false, production_write: false };
   }
   try {
@@ -331,56 +346,50 @@ export async function runGeminiAccountingReview(env, input) {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { temperature: 0, responseMimeType: "application/json", maxOutputTokens: 1200 } });
   let response = null;
-  let responseBody = "";
-  let providerMessage = "";
-  let retryCount = 0;
-  let lastRetryDelayMs = 0;
-  for (let attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+  let model = null;
+  const modelFailures = [];
+  let terminalError = null;
+  for (const candidateModel of models) {
     await waitForGeminiRequestSlot(env);
-    response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent", {
+    const candidateResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + candidateModel + ":generateContent", {
       method: "POST",
       headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
       body: requestBody
     });
-    if (response.ok) break;
-    responseBody = await response.text();
+    if (candidateResponse.ok) {
+      response = candidateResponse;
+      model = candidateModel;
+      break;
+    }
+    const responseBody = await candidateResponse.text();
     let parsedError = null;
     try { parsedError = JSON.parse(responseBody); } catch { /* keep raw provider response */ }
-    providerMessage = String(parsedError?.error?.message ?? responseBody);
-    if (isGeminiQuotaExhaustion(response.status, providerMessage, parsedError)) {
-      return {
-        symbol: input.symbol, accession: input.accession, task: input.task,
-        status: "QUOTA_EXHAUSTED", review_state: "PENDING_RETRY",
-        cached: false, ai_review_only: true, retryable: false,
-        provider_http_status: response.status, attempts: attempt + 1,
-        note: "Gemini reported that the project quota or spend allowance is exhausted. No accounting conclusion was produced or cached; this review remains pending until the quota resets or the project allowance is restored.",
-        input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
-        model, production_approved: false, production_write: false
-      };
-    }
-    const transient = response.status === 429 || response.status === 408 || response.status >= 500;
-    if (!transient) throw new Error("Gemini API HTTP " + response.status + ": " + responseBody.slice(0, 350));
-    if (attempt < MAX_TRANSIENT_RETRIES) {
-      const retryAfterMs = parseGeminiRetryAfterMs(response.headers.get("retry-after"), responseBody);
-      lastRetryDelayMs = getGeminiRetryDelayMs(attempt, retryAfterMs);
-      retryCount++;
-      await sleep(lastRetryDelayMs);
-      continue;
-    }
+    const providerMessage = String(parsedError?.error?.message ?? responseBody);
+    const quotaExhausted = isGeminiQuotaExhaustion(candidateResponse.status, providerMessage, parsedError);
+    modelFailures.push({ model: candidateModel, provider_http_status: candidateResponse.status,
+      quota_exhausted: quotaExhausted, message: providerMessage.slice(0, 240) });
+    const shouldFailOver = quotaExhausted || candidateResponse.status === 404
+      || candidateResponse.status === 408 || candidateResponse.status === 429 || candidateResponse.status >= 500;
+    if (shouldFailOver) continue;
+    terminalError = new Error("Gemini API HTTP " + candidateResponse.status + ": " + responseBody.slice(0, 350));
     break;
   }
+  if (terminalError) throw terminalError;
   if (!response?.ok) {
-    const rateLimited = response?.status === 429;
-    const timedOut = response?.status === 408;
+    const allQuotaExhausted = modelFailures.length === models.length && modelFailures.every(item => item.quota_exhausted);
+    const retryable = !allQuotaExhausted && modelFailures.some(item => item.quota_exhausted
+      || item.provider_http_status === 408 || item.provider_http_status === 429 || item.provider_http_status >= 500);
     return {
       symbol: input.symbol, accession: input.accession, task: input.task,
-      status: rateLimited ? "RATE_LIMITED" : timedOut ? "REQUEST_TIMEOUT" : "PROVIDER_UNAVAILABLE",
-      review_state: "PENDING_RETRY", cached: false, ai_review_only: true, retryable: true,
-      provider_http_status: response?.status ?? null, attempts: retryCount + 1,
-      last_retry_delay_ms: lastRetryDelayMs,
-      note: "Gemini did not complete the review after bounded transient retries. No accounting conclusion was produced or cached; retry later.",
+      status: allQuotaExhausted ? "QUOTA_EXHAUSTED" : "MODEL_FALLBACK_EXHAUSTED",
+      review_state: "PENDING_RETRY", cached: false, ai_review_only: true, retryable,
+      provider_http_status: modelFailures.at(-1)?.provider_http_status ?? null,
+      attempts: modelFailures.length, model_failures: modelFailures,
+      note: allQuotaExhausted
+        ? "Every configured Gemini text model reported exhausted quota. No accounting conclusion was produced or cached; retry after quota reset or allowance restoration."
+        : "No configured Gemini text model completed the review. Failed models were skipped without caching an accounting conclusion; inspect model_failures before retrying.",
       input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
-      model, production_approved: false, production_write: false
+      model: modelFailures.at(-1)?.model ?? null, production_approved: false, production_write: false
     };
   }
   const payload = await response.json();
@@ -391,7 +400,8 @@ export async function runGeminiAccountingReview(env, input) {
   const validated = validateGeminiAccountingResponse(parsed, input.task, evidence);
     const normalized = { ...validated, findings: groupGeminiAccountingFindings(validated.findings, evidence) };
     const result = { ...normalized, symbol: input.symbol, accession: input.accession, fiscal_period: input.fiscalPeriod,
-      model, cached: false, input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
+      model, attempts: modelFailures.length + 1, ...(modelFailures.length ? { model_fallbacks: modelFailures } : {}),
+      cached: false, input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
       ai_review_only: true };
     await env.DB.prepare(`INSERT INTO gemini_accounting_review_cache
       (cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at,updated_at)
