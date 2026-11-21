@@ -194,7 +194,17 @@ function taskEvidence(task, company, resolver) {
       debt_reconciliation_status: resolver.enterprise_value_candidate_review?.debt_reconciliation_status ?? null,
       already_identified_flags: matchingFlags
     },
-    categories, filing_note_candidates: filingNoteCandidates, structured_review_evidence: notes.slice(0, 12)
+    categories, filing_note_candidates: filingNoteCandidates,
+    lease_financing_reconciliation_evidence: company?.filing_note_review?.lease_financing_reconciliation
+      ? {
+          status: cleanText(company.filing_note_review.lease_financing_reconciliation.status, 100),
+          matched_signals: Array.isArray(company.filing_note_review.lease_financing_reconciliation.matched_signals)
+            ? company.filing_note_review.lease_financing_reconciliation.matched_signals.slice(0, 8).map(x => cleanText(x, 100))
+            : [],
+          evidence_excerpt: cleanText(company.filing_note_review.lease_financing_reconciliation.evidence_excerpt, 1800)
+        }
+      : null,
+    structured_review_evidence: notes.slice(0, 12)
   };
 }
 

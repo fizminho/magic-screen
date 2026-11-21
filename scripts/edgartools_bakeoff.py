@@ -445,50 +445,16 @@ NOTE_TOPIC_PATTERNS = {
 }
 
 
-def lease_financing_reconciliation_review(markdown: str) -> dict[str, Any]:
-    """Identify explicit filing evidence that failed sale-leaseback financing is separate from ordinary lease liabilities."""
-    text = re.sub(r"\s+", " ", str(markdown or ""))
-    required_patterns = {
-        "failed_sale_leaseback_identified": re.compile(r"failed sale[ -]leaseback", re.I),
-        "financing_obligation_recognized": re.compile(r"financing obligation liability", re.I),
-        "no_rent_expense_for_failed_sale_leaseback": re.compile(r"will not recognize rent expense", re.I),
-        "payments_reduce_financing_liability": re.compile(
-            r"monthly rent payments.{0,500}interest expense and a reduction of the outstanding liability", re.I
-        ),
-        "ordinary_lease_liability_schedule_separate": re.compile(
-            r"operating leases total.{0,1200}finance leases total.{0,1200}total lease liabilities", re.I
-        ),
-    }
-    matched = [name for name, pattern in required_patterns.items() if pattern.search(text)]
-    if len(matched) != len(required_patterns):
-        return {
-            "status": "insufficient_evidence",
-            "matched_signals": matched,
-            "required_signals": list(required_patterns),
-            "guardrail": "No overlap conclusion is made unless the filing separately identifies the financing obligation and ordinary operating/finance lease liability schedule.",
-        }
-    start = re.search(r"failed sale[ -]leaseback", text, re.I).start()
-    excerpt = text[max(0, start - 300):min(len(text), start + 2600)]
-    return {
-        "status": "separate_obligations_supported_by_filing",
-        "matched_signals": matched,
-        "evidence_excerpt": excerpt[:2800],
-        "guardrail": "This resolves only whether the disclosed balances are separate obligations. It does not decide whether failed sale-leaseback financing or ordinary lease liabilities belong in the production EV definition.",
-    }
-
-
 def filing_note_review(filing_obj: Any) -> dict[str, Any]:
     """Extract bounded, topic-matched snippets from notes in the selected annual filing."""
     try:
         notes = getattr(filing_obj, "notes", None)
         if notes is None:
             return {"status": "not_available", "candidate_count": 0, "candidates": [],
-                    "lease_financing_reconciliation": {"status": "insufficient_evidence"},
                     "note": "EdgarTools did not expose structured notes for this filing object."}
         markdown = notes.to_markdown(focus=NOTE_FOCUS_TERMS)
         if not isinstance(markdown, str) or not markdown.strip():
-            return {"status": "no_matching_notes", "candidate_count": 0, "candidates": [],
-                    "lease_financing_reconciliation": {"status": "insufficient_evidence"}}
+            return {"status": "no_matching_notes", "candidate_count": 0, "candidates": []}
         headings = list(re.finditer(r"(?m)^#{1,6}\s+(.+?)\s*$", markdown))
         sections = []
         if headings:
@@ -525,13 +491,11 @@ def filing_note_review(filing_obj: Any) -> dict[str, Any]:
             "status": "candidates_found" if candidates else "no_matching_note_evidence",
             "candidate_count": len(candidates),
             "candidates": candidates,
-            "lease_financing_reconciliation": lease_financing_reconciliation_review(markdown),
             "source": "selected_annual_filing_structured_notes",
             "guardrail": "Bounded note excerpts are untrusted filing evidence for review only; they do not approve accounting classifications or production values.",
         }
     except Exception as exc:
         return {"status": "extraction_error", "candidate_count": 0, "candidates": [],
-                "lease_financing_reconciliation": {"status": "insufficient_evidence"},
                 "error": f"{type(exc).__name__}: {exc}"}
 
 
