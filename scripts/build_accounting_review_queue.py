@@ -1114,7 +1114,15 @@ def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any
 def build_queue(
     report: dict[str, Any],
     raw_evidence: dict[str, Any] | None = None,
+    ranking_preview: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    if ranking_preview and (ranking_preview.get("production_write") is not False or ranking_preview.get("rankings_changed") is not False):
+        raise ValueError("Ranking preview did not confirm production immutability.")
+    ranking_by_symbol = {
+        str(row.get("symbol", "")).upper(): row
+        for row in (ranking_preview or {}).get("rankings", [])
+        if row.get("symbol")
+    }
     raw_by_symbol = {
         str(company.get("symbol")): company
         for company in (raw_evidence or {}).get("companies", [])
@@ -1128,6 +1136,18 @@ def build_queue(
     }
     for resolution in report.get("resolutions", []):
         item = classify(resolution)
+        shadow = ranking_by_symbol.get(item["symbol"].upper())
+        item["mfi_shadow_ranking"] = ({
+            "rank": shadow.get("magic_formula_rank"),
+            "combined_score": shadow.get("magic_formula_score"),
+            "earnings_yield": shadow.get("earnings_yield"),
+            "return_on_capital": shadow.get("return_on_capital"),
+            "eligibility_status": shadow.get("eligibility_status"),
+            "preview_eligible": shadow.get("ranking_eligible") is True,
+            "ranked": shadow.get("magic_formula_rank") is not None,
+            "production_approved": shadow.get("production_approved") is True,
+            "methodology_version": (ranking_preview or {}).get("methodology_version"),
+        } if shadow else None)
         raw_company = raw_by_symbol.get(item["symbol"])
         raw_accession = (
             (raw_company or {}).get("filing", {}).get("accession_number")
@@ -1256,12 +1276,17 @@ def build_queue(
     return {
         "source": "Magic Screen EdgarTools deterministic resolver preview",
         "resolver": report.get("resolver"),
+        "ranking_methodology_version": (ranking_preview or {}).get("methodology_version"),
+        "ranking_preview_as_of": (ranking_preview or {}).get("as_of"),
         "generated_from_preview": report.get("generated_at"),
         "production_fundamentals_changed": report.get("production_fundamentals_changed"),
         "rankings_changed": report.get("rankings_changed"),
         "production_write": False,
         "summary": {
             "total": len(rows),
+            "shadow_preview_eligible": sum(1 for row in rows if (row.get("mfi_shadow_ranking") or {}).get("preview_eligible")),
+            "shadow_ranked_review_items": sum(1 for row in rows if (row.get("mfi_shadow_ranking") or {}).get("ranked")),
+            "shadow_production_approved": sum(1 for row in rows if (row.get("mfi_shadow_ranking") or {}).get("production_approved")),
             "priority_1": counts.get("P1", 0),
             "priority_2": counts.get("P2", 0),
             "priority_3": counts.get("P3", 0),
@@ -1343,6 +1368,7 @@ def main() -> int:
     parser.add_argument("--raw-evidence", default="edgartools-bakeoff.json")
     parser.add_argument("--json-output", default="accounting-review-queue.json")
     parser.add_argument("--csv-output", default="accounting-review-queue.csv")
+    parser.add_argument("--ranking-preview", default="edgartools-mfi-ranking-preview.json")
     args = parser.parse_args()
 
     report = json.loads(Path(args.input).read_text(encoding="utf-8"))
@@ -1355,10 +1381,14 @@ def main() -> int:
     if report.get("production_fundamentals_changed") is not False or report.get("rankings_changed") is not False:
         raise SystemExit("Refusing to build queue: preview did not confirm production/ranking immutability.")
 
-    queue = build_queue(report, raw_evidence)
+    ranking_preview = None
+    ranking_path = Path(args.ranking_preview)
+    if ranking_path.exists():
+        ranking_preview = json.loads(ranking_path.read_text(encoding="utf-8"))
+    queue = build_queue(report, raw_evidence, ranking_preview)
     Path(args.json_output).write_text(json.dumps(queue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     fields = [
-        "symbol", "priority", "provider_status", "ebit_status", "invested_capital_status",
+        "symbol", "priority", "mfi_shadow_ranking", "provider_status", "ebit_status", "invested_capital_status",
         "debt_status", "debt_resolution_gap", "debt_candidate_evidence_review", "debt_candidate_evidence_review_source", "cash_scope_resolution", "unrestricted_cash_candidate", "candidate_roc", "reporting_currency",
         "issue_count", "issues", "balance_sheet_exceptions", "debt_instrument_evidence",
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
@@ -1390,6 +1420,7 @@ def main() -> int:
             row["filing_specific_ebit_review"] = json.dumps(
                 item.get("filing_specific_ebit_review"), separators=(",", ":")
             )
+            row["mfi_shadow_ranking"] = json.dumps(item.get("mfi_shadow_ranking"), separators=(",", ":"))
             row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))
             writer.writerow(row)
     print("Accounting review queue:", json.dumps(queue["summary"], sort_keys=True))

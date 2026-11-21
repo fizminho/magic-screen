@@ -107,3 +107,7 @@ This is a verified pipeline milestone, not production approval. Next work is to 
 ## Next accounting-review work
 
 The next review batch should prioritize the five shadow-ranked issuers and any P1 items that can materially change EY or ROC. In particular, OTEX's working capital offsets 96.79% of net PP&E, leaving a small positive invested-capital candidate; UPWK's separately reported $378.425m fixed-income portfolio has mixed maturities and undisclosed instrument-level amounts. Neither a net-PP&E-only denominator nor treating the full UPWK portfolio as cash-like is approved. A generated sensitivity report compares those alternatives solely to quantify ranking impact before any policy decision.
+
+## Accounting queue now carries shadow-rank context
+
+The review queue now attaches each issuer's current shadow rank, combined score, EY, ROC and eligibility status when the ranking preview is available. This makes the accounting queue actionable by showing which unresolved issuers currently influence the candidate ranking. It does not change accounting priority, resolver outcomes or production approval. The queue summary separately counts preview-eligible, shadow-ranked and production-approved rows; production approval remains zero until policy review is complete.

@@ -174,6 +174,40 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertTrue(all(item["production_write"] is False for item in queue["items"]))
 
 
+    def test_queue_attaches_shadow_rank_context_without_changing_accounting_priority(self):
+        report = {
+            "resolver": "deterministic-preview-v1",
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [
+                {"symbol": "ABC", "provider_status": "supported", "ebit_status": "review_required", "invested_capital_status": "review_required"},
+                {"symbol": "XYZ", "provider_status": "unsupported_provider", "overall_status": "unsupported_provider"},
+            ],
+        }
+        ranking = {
+            "as_of": "2026-11-21T08:18:44Z",
+            "methodology_version": "classic_mfi_ordinal_rank_sum_v1",
+            "production_write": False, "rankings_changed": False,
+            "rankings": [
+                {"symbol": "ABC", "magic_formula_rank": 1, "magic_formula_score": 3, "earnings_yield": 0.12, "return_on_capital": 0.4, "eligibility_status": "eligible", "ranking_eligible": True, "production_approved": False},
+                {"symbol": "XYZ", "magic_formula_rank": None, "magic_formula_score": None, "earnings_yield": None, "return_on_capital": None, "eligibility_status": "excluded_provider_unsupported", "ranking_eligible": False, "production_approved": False},
+            ],
+        }
+        queue = build_queue(report, ranking_preview=ranking)
+        by_symbol = {item["symbol"]: item for item in queue["items"]}
+        self.assertEqual(by_symbol["ABC"]["priority"], "P1")
+        self.assertEqual(by_symbol["ABC"]["mfi_shadow_ranking"]["rank"], 1)
+        self.assertFalse(by_symbol["ABC"]["mfi_shadow_ranking"]["production_approved"])
+        self.assertIsNone(by_symbol["XYZ"]["mfi_shadow_ranking"]["rank"])
+        self.assertEqual(queue["summary"]["shadow_ranked_review_items"], 1)
+        self.assertEqual(queue["summary"]["shadow_production_approved"], 0)
+        self.assertFalse(queue["production_write"])
+
+    def test_queue_rejects_mutable_ranking_preview(self):
+        report = {"production_fundamentals_changed": False, "rankings_changed": False, "resolutions": [{"symbol": "ABC", "provider_status": "supported"}]}
+        ranking = {"production_write": True, "rankings_changed": False, "rankings": []}
+        with self.assertRaisesRegex(ValueError, "production immutability"):
+            build_queue(report, ranking_preview=ranking)
     def test_unique_classification_does_not_mean_policy_approval(self):
         item = classify({
             "symbol": "LEASE",
