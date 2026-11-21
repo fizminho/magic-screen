@@ -646,7 +646,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertEqual(result["category_counts"]["unrestricted_cash"], 1)
         self.assertEqual(result["category_counts"]["restricted_cash"], 1)
         self.assertEqual(result["category_counts"]["lease_liabilities"], 1)
-        self.assertEqual(result["category_counts"]["conventional_debt"], 1)
+        self.assertEqual(result["category_counts"]["conventional_debt"], 2)
         self.assertEqual(result["category_counts"]["noncontrolling_interests"], 1)
         self.assertEqual(result["category_counts"]["customer_escrow_assets_and_payables"], 2)
         self.assertEqual(result["category_counts"]["marketable_equity_securities"], 1)
