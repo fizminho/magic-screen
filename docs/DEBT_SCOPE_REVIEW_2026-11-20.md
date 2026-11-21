@@ -217,3 +217,23 @@ Additional review coverage: 17 accession-bound issuer debt-note reviews, three f
 - **SNDK:** $1.777bn of marketable equity securities and $678m of Flash Ventures notes/investments remain separate from cash and cash equivalents.
 
 The latest queue confirms `production_fundamentals_changed=false`, `rankings_changed=false` and `production_write=false`. The evidence inventory does not aggregate or net these rows.
+## Issuer-level cash and investment note reviews (21 Nov 2026)
+
+Eight exact-accession annual-filing reviews are now attached separately from the debt-note review layer. These records explain portfolio composition, maturity, liquidity and restrictions; they do not approve any cash deduction or promote any balance into the resolver.
+
+| Issuer | Reporting date | Investment evidence | Review implication |
+|---|---|---|---|
+| FHTX | 31 Dec 2025 | $78.018m available-for-sale: $1.500m U.S. government agencies, $35.287m commercial paper, $41.231m corporate notes/bonds. | Available for current operations, but some maturities may exceed one year; keep separate from cash equivalents. [10-K](https://www.sec.gov/Archives/edgar/data/1822462/000162828026016814/fhtx-20251231.htm) |
+| NRIX | 30 Nov 2025 | $345.981m U.S. Treasury securities, separately from $241.364m money-market cash equivalents. | Debt securities with current classification; do not automatically merge with cash equivalents. [10-K](https://www.sec.gov/Archives/edgar/data/1549595/000154959526000016/nrix-20251130.htm) |
+| PXED | 31 Aug 2026 | $167.852m marketable debt securities: $137.094m current, $30.758m noncurrent. Includes U.S. Treasury/agency, commercial paper and investment-grade corporate debt. | Maturity extends up to three years; liquidity deployability is constrained by Department of Education composite-score requirements. [10-K](https://www.sec.gov/Archives/edgar/data/1600222/000119312526445323/pxed-20260831.htm) |
+| STRA | 31 Dec 2025 | $12.297m held-to-maturity investments: $7.297m due within one year and $5.000m due within one to five years. | Includes term deposits, U.S. Treasuries and corporate debt; held-to-maturity intent argues against automatic cash-equivalent treatment. [10-K](https://www.sec.gov/Archives/edgar/data/1013934/000101393426000006/stra-20251231.htm) |
+| ALEC | 31 Dec 2025 | $190.222m marketable securities, available-for-sale; money market funds, Treasuries, corporate bonds, CDs and commercial paper. | Available for current operations; combined cash-equivalent and marketable-security maturities include $214.4m within one year and $41.0m in one to two years. [10-K](https://www.sec.gov/Archives/edgar/data/1653087/000119312526071593/alec-20251231.htm) |
+| PLTK | 31 Dec 2025 | $136.0m short-term investments: $71.8m term deposits and $64.2m commercial paper. | Explicitly more than three months and less than one year, outside the issuer's cash-equivalent definition. [10-K](https://www.sec.gov/Archives/edgar/data/1828016/000182801626000010/playtika-20251231.htm) |
+| ZVRA | 31 Dec 2025 | $176.484m available-for-sale debt securities: $128.605m due within one year and $47.879m due in one to three years. | U.S. Treasuries and corporate bonds invested to fund future operations; apply a common maturity cutoff. [10-K](https://www.sec.gov/Archives/edgar/data/1434647/000143464726000011/zvra-20251231.htm) |
+| UPWK | 31 Dec 2025 | $378.425m marketable securities: money-market funds, commercial paper, Treasury bills, corporate bonds and other fixed income. | Available for current operations, but face row does not identify the exact maturity mix. Keep separate until instrument-level eligibility is established. [10-K](https://www.sec.gov/Archives/edgar/data/1627475/000162747526000012/upwk-20251231.htm) |
+
+### Cross-issuer conclusion
+
+The issuers use materially different labels and classifications: cash equivalents, available-for-sale securities, held-to-maturity securities, current marketable securities and noncurrent marketable securities. Several portfolios are explicitly available for current operations, but this is not equivalent to the issuer's cash-equivalent definition. The future policy should define a consistent maturity ceiling, eligible instrument types, credit-quality standard, market-liquidity test, encumbrance test and operational-availability test. No issuer-specific exception should be used to improve a particular ranking.
+
+All eight reviews are exact-accession-bound and carry `status=review_only`, `production_approved=false`, `resolver_input=false` and `cash_candidate_promoted=false`. They are surfaced separately from conventional-debt note reviews.
