@@ -4,8 +4,12 @@ function valueAt(row, period) {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 export function buildLeaseRouCoverage(extraction, universe = null) {
-  const universeSymbols = Array.isArray(universe?.symbols) ? new Set(universe.symbols) : null;
-  const issuers = (extraction?.companies ?? []).filter(c => c && typeof c.symbol === "string" && (!universeSymbols || universeSymbols.has(c.symbol))).map(c => {
+  const activeSymbols = Array.isArray(universe?.symbols) ? new Set(universe.symbols.map(s => String(s).toUpperCase())) : null;
+  const extractedCompanies = (extraction?.companies ?? []).filter(c => c && typeof c.symbol === "string");
+  const outOfUniverseSymbols = activeSymbols
+    ? extractedCompanies.filter(c => !activeSymbols.has(String(c.symbol).toUpperCase())).map(c => c.symbol).sort()
+    : [];
+  const issuers = extractedCompanies.filter(c => !activeSymbols || activeSymbols.has(String(c.symbol).toUpperCase())).map(c => {
     const period = c.filing?.period_of_report ?? c.filing?.report_date ?? null;
     const currency = c.reporting_currency_review?.currency ?? c.reporting_currency ?? "unknown";
     const rou = [], leases = [], embedded = [], unclassified = [];
@@ -36,8 +40,9 @@ export function buildLeaseRouCoverage(extraction, universe = null) {
   const supported = issuers.filter(x=>x.provider_status==="supported");
   const rou = supported.flatMap(x=>x.rou_assets), leases=supported.flatMap(x=>x.lease_liabilities), embedded=supported.flatMap(x=>x.embedded_rou_in_net_ppe);
   return { generated_at:new Date().toISOString(), primary_provider:extraction?.primary_provider ?? null,
-    summary:{ active_universe_issuers:issuers.length, supported_active_issuers:supported.length,
-      unsupported_active_issuers:issuers.filter(x=>x.provider_status==="unsupported_provider").length,
+    summary:{ active_universe_issuers:activeSymbols ? activeSymbols.size : issuers.length,
+      extracted_supported_issuers:supported.length,
+      out_of_universe_extraction_issuers:outOfUniverseSymbols.length,
       issuers_with_separately_reported_rou_assets:supported.filter(x=>x.rou_assets.length).length,
       issuers_with_lease_liability_rows:supported.filter(x=>x.lease_liabilities.length).length,
       issuers_with_rou_embedded_in_net_ppe:supported.filter(x=>x.embedded_rou_in_net_ppe.length).length,
@@ -45,7 +50,7 @@ export function buildLeaseRouCoverage(extraction, universe = null) {
       missing_rou_amount_rows:rou.filter(x=>x.value===null).length,
       missing_lease_liability_amount_rows:leases.filter(x=>x.value===null).length,
       unclassified_lease_liability_rows:supported.reduce((n,x)=>n+x.unclassified_lease_liabilities.length,0) },
-    issuers, production_write:false, production_approved:false, production_fundamentals_changed:false, rankings_changed:false,
+    issuers, out_of_universe_extraction_symbols:outOfUniverseSymbols, production_write:false, production_approved:false, production_fundamentals_changed:false, rankings_changed:false,
     guardrail:"Filing-period-bound evidence coverage only. Missing values remain unknown. ROU assets embedded in combined PP&E concepts are not counted separately. No lease/ROU formula, EV, ROC or ranking is approved or changed." };
 }
 export function renderLeaseRouCoverageMarkdown(report) {
@@ -72,10 +77,11 @@ export function renderLeaseRouCoverageMarkdown(report) {
   return lines.join("\n");
 }
 if (process.argv[1] && import.meta.url === new URL("file://"+process.argv[1]).href) {
-  const input=process.argv[2]??"edgartools-bakeoff.json", jsonOut=process.argv[3]??"lease-rou-coverage.json", mdOut=process.argv[4]??"lease-rou-coverage.md", universePath=process.argv[5];
+  const input=process.argv[2]??"edgartools-bakeoff.json", jsonOut=process.argv[3]??"lease-rou-coverage.json", mdOut=process.argv[4]??"lease-rou-coverage.md";
+  const universePath=process.argv[5]??(fs.existsSync("edgartools-universe.json")?"edgartools-universe.json":null);
   const universe=universePath && fs.existsSync(universePath) ? JSON.parse(fs.readFileSync(universePath,"utf8")) : null;
-  const report=buildLeaseRouCoverage(JSON.parse(fs.readFileSync(input,"utf8")), universe);
+  const report=buildLeaseRouCoverage(JSON.parse(fs.readFileSync(input,"utf8")),universe);
   fs.writeFileSync(jsonOut,JSON.stringify(report,null,2)+"\n");
   fs.writeFileSync(mdOut,renderLeaseRouCoverageMarkdown(report)+"\n");
-  console.log("Built lease/ROU evidence coverage for "+report.summary.supported_active_issuers+" supported issuers; production unchanged.");
+  console.log("Built lease/ROU evidence coverage for "+report.summary.active_universe_issuers+" active issuers ("+report.summary.extracted_supported_issuers+" supported); excluded "+report.summary.out_of_universe_extraction_issuers+" extraction controls; production unchanged.");
 }

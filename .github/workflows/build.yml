@@ -17,6 +17,8 @@ jobs:
       - run: npm run build
       - name: Run Gemini accounting review contract and deduplication tests
         run: node --test worker/gemini-accounting-review*.test.mjs
+      - name: Run lease and ROU coverage regression tests
+        run: node --test scripts/test_build_lease_rou_coverage_report.mjs
       - name: Validate EdgarTools test script syntax
         run: python3 -m py_compile scripts/edgartools_bakeoff.py
       # INTENTIONAL: validate Wrangler bundling and asset configuration without deploying.
