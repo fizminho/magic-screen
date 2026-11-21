@@ -802,6 +802,20 @@ def filing_ev_scope_note_review(symbol: str, accession: str | None) -> dict[str,
     }
 
 
+
+FILING_DEBT_REVIEW_CLASSIFICATIONS: dict[str, str] = {
+    "MNTN": "named_instrument_zero_or_undrawn_facility",
+    "SPRO": "issuer_explicit_no_conventional_debt_statement",
+    "BCRX": "separate_royalty_financing_obligation",
+    "PRDO": "separate_sale_leaseback_financing_obligation",
+    "VXRT": "separate_future_royalty_financing_obligation",
+    "SBC": "conventional_borrowing_maturity_reconciliation",
+    "SGHC": "conventional_borrowing_with_current_bucket_unresolved",
+    "ZVRA": "conventional_term_loan_maturity_schedule",
+    "PXED": "named_instrument_zero_or_undrawn_facility",
+    "STRA": "named_instrument_zero_or_undrawn_facility",
+}
+
 # Curated filing-note checks. These are attached only to the exact accession
 # below; they are review evidence, never resolver inputs or approved debt values.
 FILING_DEBT_NOTE_REVIEWS: dict[str, dict[str, Any]] = {
@@ -1081,6 +1095,7 @@ def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any
     return {
         **review,
         **FILING_DEBT_REVIEW_ACTIONS[symbol],
+        "review_classification": FILING_DEBT_REVIEW_CLASSIFICATIONS.get(symbol, "unclassified_manual_review"),
         "status": "review_only",
         "source": "curated_primary_annual_filing_note_review",
         "production_approved": False,
@@ -1249,6 +1264,10 @@ def build_queue(
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
+            "filing_debt_note_review_classifications": dict(Counter(
+                (row.get("filing_debt_note_review") or {}).get("review_classification", "unclassified")
+                for row in rows if row.get("filing_debt_note_review")
+            )),
             "debt_candidate_evidence_dispositions": dict(Counter(
                 f"{bucket}:{(row.get('debt_candidate_evidence_review') or {}).get('buckets', {}).get(bucket, {}).get('disposition', 'not_available')}"
                 for row in rows for bucket in ("current", "noncurrent")

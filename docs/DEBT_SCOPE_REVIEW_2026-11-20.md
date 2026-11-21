@@ -105,6 +105,23 @@ FHTX's FY2025 balance sheet reports operating lease liabilities and other operat
 Both records are accession-bound and review-only. They do not promote debt candidates, change EV, or alter production rankings.
 
 
+## Structured debt-note review classifications
+
+The queue now exposes a controlled `review_classification` for each accession-matched curated debt-note review, and a summary count by classification. This is a navigation aid for policy work, not a new accounting conclusion.
+
+| Classification | Issuers | Meaning |
+|---|---|---|
+| `conventional_borrowing_maturity_reconciliation` | SBC | Filing note reconciles face-statement current and noncurrent borrowing buckets. |
+| `conventional_borrowing_with_current_bucket_unresolved` | SGHC | Noncurrent borrowing has facility support, but a separate on-demand loan leaves current debt unresolved. |
+| `conventional_term_loan_maturity_schedule` | ZVRA | Term-loan maturity schedule supports noncurrent classification; current bucket is not automatically zero. |
+| `named_instrument_zero_or_undrawn_facility` | MNTN, PXED, STRA | Negative evidence applies only to the named instruments or facilities, not all possible debt. |
+| `issuer_explicit_no_conventional_debt_statement` | SPRO | Filing states no debt; separately reported leases and other liabilities retain their own scope. |
+| `separate_royalty_financing_obligation` | BCRX | Royalty financing remains distinct from ordinary bank borrowing. |
+| `separate_sale_leaseback_financing_obligation` | PRDO | Failed sale-leaseback construction financing remains a separate financing category. |
+| `separate_future_royalty_financing_obligation` | VXRT | Future-royalty financing remains separate from bank borrowing and leases. |
+
+The classification is attached only when the extracted filing accession exactly matches the resolver preview. Every record remains `review_only`, with `production_approved=false`, `resolver_input=false`, and `debt_candidate_promoted=false`. The classification does not fill missing maturity buckets, aggregate distinct instruments, or change EV.
+
 ## Top-five shadow-ranking issuer note checks (21 Nov 2026)
 
 The five current shadow-ranked companies were checked against the exact annual filing accessions used by the resolver preview. The observations below are filing evidence, not approvals or changes to the EV formula.

@@ -758,6 +758,26 @@ class AccountingReviewQueueTests(unittest.TestCase):
                 self.assertFalse(review["debt_candidate_promoted"])
                 self.assertIsNone(filing_debt_note_review(symbol, "0000000000-00-000000"))
 
+    def test_curated_debt_review_classifications_separate_conventional_and_debt_like_evidence(self):
+        from build_accounting_review_queue import (
+            FILING_DEBT_REVIEW_CLASSIFICATIONS, FILING_DEBT_NOTE_REVIEWS,
+            filing_debt_note_review,
+        )
+
+        self.assertEqual(set(FILING_DEBT_REVIEW_CLASSIFICATIONS), set(FILING_DEBT_NOTE_REVIEWS))
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["BCRX"], "separate_royalty_financing_obligation")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["PRDO"], "separate_sale_leaseback_financing_obligation")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["VXRT"], "separate_future_royalty_financing_obligation")
+        self.assertEqual(FILING_DEBT_REVIEW_CLASSIFICATIONS["SBC"], "conventional_borrowing_maturity_reconciliation")
+        for symbol, source in FILING_DEBT_NOTE_REVIEWS.items():
+            with self.subTest(symbol=symbol):
+                review = filing_debt_note_review(symbol, source["accession"])
+                self.assertEqual(review["review_classification"], FILING_DEBT_REVIEW_CLASSIFICATIONS[symbol])
+                self.assertFalse(review["production_approved"])
+                self.assertFalse(review["resolver_input"])
+                self.assertFalse(review["debt_candidate_promoted"])
+                self.assertIsNone(filing_debt_note_review(symbol, "different-accession"))
+
     def test_every_curated_debt_note_review_is_scoped_and_non_promoting(self):
         from build_accounting_review_queue import FILING_DEBT_NOTE_REVIEWS, filing_debt_note_review
 
