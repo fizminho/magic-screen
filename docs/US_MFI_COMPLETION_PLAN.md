@@ -176,3 +176,14 @@ The accounting review queue now also carries accession-bound operating-income qu
 ## P1 entity-perimeter exception: VSNT
 
 A further P1 comparability blocker has been identified for VSNT. Its FY2025 10-K contains combined historical statements for operations previously run within Comcast, and explicitly warns that those statements may not represent a standalone company. VSNT began regular-way trading on 5 January 2026, after the 2 January separation. The FY2025 balance sheet includes $983m long-term debt and $1,034m restricted cash from senior-note proceeds held in escrow; the major term loans funded on the separation date. The accounting queue now raises an accession-bound P1 entity-perimeter warning and keeps VSNT out of ranked output until comparable standalone annual statements or an approved pro forma bridge exist. No production or ranking inputs are changed.
+
+
+## P2 debt and EV review batch (21 November 2026)
+
+The next review queue contains ten P2 issuers after the newly identified VSNT perimeter mismatch was raised to P1. The accession-bound debt and EV evidence already available, plus the remaining reviewer actions, are summarized in [the P2 debt-scope review plan](US_MFI_P2_DEBT_SCOPE_REVIEW_2026-11-21.md).
+
+- **Financing obligations needing policy:** BCRX royalty financing ($465.688m), PRDO sale-leaseback financing ($56.992m), and VXRT future-royalty sale liabilities ($4.060m). Keep these separate from conventional borrowings pending a debt-like EV policy.
+- **Debt candidates with maturity evidence:** SBC bank borrowings ($42.833484m total across current/noncurrent buckets) and ZVRA long-term debt ($61.928m carrying value). Resolver must not auto-sum ambiguous rows or infer current debt zero.
+- **Named facility zero/undrawn evidence:** MNTN's named notes/revolver and PXED/STRA revolvers have filing-specific zero-drawn evidence, but this does not prove every debt category is zero.
+- **No face debt row / incomplete note review:** FHTX and NRIX remain unknown, not debt-free. Their marketable securities portfolios also remain separate from cash equivalents.
+- **Full-universe verification is triggered by this commit.** The expected triage shift is VSNT P1 and ten remaining P2 cases; accept only the generated artifact's actual counts.
