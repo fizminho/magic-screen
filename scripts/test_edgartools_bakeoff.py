@@ -5,7 +5,7 @@ from io import BytesIO
 from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
 
-from edgartools_bakeoff import DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, balance_sheet_reconciliation_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, invested_capital_review, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
+from edgartools_bakeoff import filing_note_review, DIRECT_OPERATING_INCOME_LABEL_PATTERN, direct_operating_income_fact, balance_sheet_fact_review, balance_sheet_reconciliation_review, currency_normalization_review, enterprise_value_scope_review, filing_specific_currency_override, filing_specific_review, FRANKFURTER_RATE_CACHE, fetch_frankfurter_rate, mfi_market_cap_usd_millions, invested_capital_review, manual_enterprise_value_scenario_review, non_sec_issuer_review_case, reporting_currency_unit_review, roc_review, statement_fact_amount, extract_company
 
 
 PERIOD = "2025-12-31"
@@ -1429,3 +1429,46 @@ class BalanceSheetFactReviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FilingNoteReviewTests(unittest.TestCase):
+    def test_extracts_bounded_topic_matched_note_evidence(self):
+        class Notes:
+            def __init__(self):
+                self.focus = None
+
+            def to_markdown(self, focus=None):
+                self.focus = focus
+                return """# Note 8 - Debt
+The company maintains a revolving credit facility.
+Borrowings outstanding were $125 million at year end.
+Unused capacity was $75 million.
+
+# Note 12 - Equity
+The consolidated subsidiaries include a noncontrolling interest.
+The carrying amount of noncontrolling interest was $8 million.
+"""
+
+        notes = Notes()
+        result = filing_note_review(type("FilingObject", (), {"notes": notes})())
+        self.assertEqual(notes.focus, ["Debt", "Cash", "Lease", "Equity", "Financing", "Commitments", "Contingencies", "Related Party"])
+        self.assertEqual(result["status"], "candidates_found")
+        self.assertEqual(result["candidate_count"], 2)
+        by_title = {item["title"]: item for item in result["candidates"]}
+        self.assertIn("debt_scope", by_title["Note 8 - Debt"]["topics"])
+        self.assertIn("nci_scope", by_title["Note 12 - Equity"]["topics"])
+        self.assertLessEqual(len(by_title["Note 8 - Debt"]["excerpt"]), 1200)
+
+    def test_missing_structured_notes_is_transparent(self):
+        result = filing_note_review(object())
+        self.assertEqual(result["status"], "not_available")
+        self.assertEqual(result["candidate_count"], 0)
+
+    def test_note_parser_failure_does_not_fallback_to_full_filing(self):
+        class BrokenNotes:
+            def to_markdown(self, focus=None):
+                raise RuntimeError("notes parser unavailable")
+
+        result = filing_note_review(type("FilingObject", (), {"notes": BrokenNotes()})())
+        self.assertEqual(result["status"], "extraction_error")
+        self.assertEqual(result["candidates"], [])
