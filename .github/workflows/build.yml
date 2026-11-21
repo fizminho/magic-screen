@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm install --no-audit --no-fund
       - run: npm run build
       - name: Run Gemini accounting review contract and deduplication tests
         run: node --test worker/gemini-accounting-review*.test.mjs
