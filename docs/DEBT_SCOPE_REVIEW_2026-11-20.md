@@ -148,6 +148,18 @@ Additional isolated scope checks:
 - OTEX's near-zero invested-capital denominator remains the largest ROC sensitivity. The existing denominator diagnostics and P1 escalation remain in force.
 
 These figures are scenario arithmetic only. They do not change the five-stock shadow ranking, accounting approval state, or production data.
+## Debt candidate instrument-level evidence (review-only)
+
+The queue now carries an accession-matched, fiscal-period-matched instrument ledger for current and noncurrent debt candidates. Each line preserves its XBRL concept, label, amount, fiscal period and source row index.
+
+The ledger distinguishes one nonzero candidate plus separately reported zero-valued instrument lines, multiple nonzero or unknown-valued instruments requiring manual review, all reported instrument lines explicitly valued at zero, and no candidate (unknown, not zero).
+
+Examples from the latest FY2025 extraction:
+- MNTN has two current-debt concepts, both explicitly reported at zero. Its noncurrent bucket has no candidate and remains unknown.
+- SBC has one nonzero bank-borrowing candidate and one separately reported related-party notes-payable line at zero in both current and noncurrent buckets. Positive borrowing lines are preserved without automatic aggregation.
+
+These are evidence-quality dispositions only. The resolver's ambiguity status, EV candidate, ranking eligibility and production data remain unchanged. Zero is asserted only for the exact reported line and fiscal period.
+
 ## Structured issuer portfolio composition evidence (review-only)
 
 The cash-policy review now carries a structured `portfolio_composition` object for the nine issuer-note reviews. Amounts are in USD millions and are attached only to the exact reviewed annual-filing accession.

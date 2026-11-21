@@ -1012,6 +1012,67 @@ FILING_DEBT_REVIEW_ACTIONS: dict[str, dict[str, Any]] = {
     "QTTB": {"evidence_scope": "reconciled_venture_debt_and_collateral_restricted_cash", "manual_review_questions": ["Confirm the 9.708m debt carrying value and its 6.235m/3.473m maturity split.", "Keep 0.647m collateral restricted cash outside unrestricted cash.", "Decide whether the 4.943m noncurrent operating lease liability is excluded under the chosen EV policy."], "prohibited_inferences": ["Do not add restricted cash to unrestricted cash.", "Do not merge lease liabilities into conventional borrowings automatically."]},
     "UPWK": {"evidence_scope": "reconciled_convertible_note_debt_with_customer_escrow_restricted_cash_and_marketable_securities", "manual_review_questions": ["Confirm 359.770m debt carrying value and August 15, 2026 maturity at the annual reporting date.", "Keep 3.8m restricted cash and 180.752m customer escrow funds outside unrestricted cash.", "Decide whether the 378.425m marketable securities qualify as cash-like assets under a consistent EV policy.", "Determine whether subsequent debt repayment data should affect a current-market-cap ranking that otherwise uses annual filing fundamentals."], "prohibited_inferences": ["Do not count customer escrow assets as company cash when matched by escrow liabilities.", "Do not treat restricted cash as unrestricted.", "Do not automatically add marketable securities to cash equivalents or ignore debt maturity timing."]},
 }
+def debt_candidate_evidence_review(raw_company: dict[str, Any]) -> dict[str, Any]:
+    """Describe debt candidates without summing instruments or converting missing rows to zero."""
+    fact_review = raw_company.get("balance_sheet_fact_review") or {}
+    categories = fact_review.get("categories") or {}
+    fiscal_period = fact_review.get("fiscal_period")
+    result: dict[str, Any] = {
+        "fiscal_period": fiscal_period,
+        "currency": raw_company.get("reporting_currency_review", {}).get("currency"),
+        "buckets": {},
+        "production_approved": False,
+        "resolver_input": False,
+        "debt_candidate_promoted": False,
+    }
+    for bucket, category_name in (
+        ("current", "current_debt_candidates"),
+        ("noncurrent", "noncurrent_debt_candidates"),
+    ):
+        category = categories.get(category_name) or {}
+        candidates = [
+            candidate for candidate in category.get("candidates", [])
+            if candidate.get("fiscal_period") == fiscal_period
+        ]
+        nonzero = [candidate for candidate in candidates if candidate.get("value") not in (None, 0, 0.0)]
+        explicit_zero = [candidate for candidate in candidates if candidate.get("value") in (0, 0.0)]
+        unknown = [candidate for candidate in candidates if candidate.get("value") is None]
+        if not candidates:
+            disposition = "unknown_not_zero"
+        elif len(nonzero) > 1 or unknown:
+            disposition = "multiple_or_unknown_instrument_values_manual_review"
+        elif len(nonzero) == 1 and explicit_zero:
+            disposition = "one_nonzero_plus_explicit_zero_instruments_review_only"
+        elif len(nonzero) == 1:
+            disposition = "unique_nonzero_candidate_review_only"
+        elif explicit_zero and len(explicit_zero) == len(candidates):
+            disposition = "all_reported_instrument_lines_explicit_zero_review_only"
+        else:
+            disposition = "ambiguous_manual_review"
+        result["buckets"][bucket] = {
+            "source_category_status": category.get("status", "not_found"),
+            "source_candidate_count": category.get("candidate_count", len(candidates)),
+            "fiscal_period_candidate_count": len(candidates),
+            "nonzero_candidate_count": len(nonzero),
+            "explicit_zero_candidate_count": len(explicit_zero),
+            "unknown_value_candidate_count": len(unknown),
+            "disposition": disposition,
+            "candidates": [
+                {
+                    "concept": candidate.get("concept"),
+                    "label": candidate.get("label"),
+                    "value": candidate.get("value"),
+                    "fiscal_period": candidate.get("fiscal_period"),
+                    "row_index": candidate.get("row_index"),
+                }
+                for candidate in candidates
+            ],
+            "automatic_aggregation": False,
+            "production_approved": False,
+        }
+    return result
+
+
 def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
     """Attach exact-accession evidence to the read-only review queue only; never approve or promote resolver candidates."""
     review = FILING_DEBT_NOTE_REVIEWS.get(symbol)
@@ -1065,6 +1126,8 @@ def build_queue(
                 for name, raw_name in raw_category_names.items()
             }
             item["debt_instrument_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            item["debt_candidate_evidence_review"] = debt_candidate_evidence_review(raw_company)
+            item["debt_candidate_evidence_review_source"] = "fresh_extraction_artifact_same_accession"
             item["debt_scope_evidence"] = extract_debt_scope_evidence(raw_company)
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["ev_scope_evidence"] = extract_ev_scope_evidence(raw_company)
@@ -1162,6 +1225,10 @@ def build_queue(
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
+            "debt_candidate_evidence_dispositions": dict(Counter(
+                f"{bucket}:{(row.get('debt_candidate_evidence_review') or {}).get('buckets', {}).get(bucket, {}).get('disposition', 'not_available')}"
+                for row in rows for bucket in ("current", "noncurrent")
+            )),
             "debt_bucket_gap_dispositions": dict(Counter(
                 f"{bucket}:{(row.get('debt_resolution_gap') or {}).get(bucket, {}).get('disposition', 'not_available')}"
                 for row in rows for bucket in ("current", "noncurrent")

@@ -476,6 +476,84 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertNotIn("filing_specific_ebit_candidate_available_manual_review", item["issues"])
 
 
+    def test_debt_candidate_evidence_review_distinguishes_zero_lines_from_unknown(self):
+        from build_accounting_review_queue import debt_candidate_evidence_review
+
+        company = {
+            "reporting_currency_review": {"currency": "USD"},
+            "balance_sheet_fact_review": {
+                "fiscal_period": "2025-12-31",
+                "categories": {
+                    "current_debt_candidates": {
+                        "status": "ambiguous_candidates", "candidate_count": 2,
+                        "candidates": [
+                            {"concept": "us-gaap_NotesPayableCurrent", "label": "Short-term note payable",
+                             "value": 0.0, "fiscal_period": "2025-12-31", "row_index": 19},
+                            {"concept": "us-gaap_ConvertibleDebtCurrent", "label": "Convertible debt",
+                             "value": 0.0, "fiscal_period": "2025-12-31", "row_index": 20},
+                        ],
+                    },
+                    "noncurrent_debt_candidates": {"status": "not_found", "candidate_count": 0, "candidates": []},
+                },
+            },
+        }
+        review = debt_candidate_evidence_review(company)
+        self.assertEqual(review["buckets"]["current"]["disposition"],
+                         "all_reported_instrument_lines_explicit_zero_review_only")
+        self.assertEqual(review["buckets"]["current"]["explicit_zero_candidate_count"], 2)
+        self.assertEqual(review["buckets"]["noncurrent"]["disposition"], "unknown_not_zero")
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+
+    def test_debt_candidate_evidence_review_one_nonzero_plus_explicit_zero_is_not_aggregated(self):
+        from build_accounting_review_queue import debt_candidate_evidence_review
+
+        company = {
+            "balance_sheet_fact_review": {
+                "fiscal_period": "2025-12-31",
+                "categories": {
+                    "current_debt_candidates": {
+                        "status": "ambiguous_candidates", "candidate_count": 2,
+                        "candidates": [
+                            {"concept": "us-gaap_LoansPayableCurrent", "label": "Bank and other borrowings, current",
+                             "value": 9099046.0, "fiscal_period": "2025-12-31", "row_index": 87},
+                            {"concept": "us-gaap_NotesPayableCurrent", "label": "Notes payables, current - related parties",
+                             "value": 0.0, "fiscal_period": "2025-12-31", "row_index": 88},
+                        ],
+                    },
+                    "noncurrent_debt_candidates": {"status": "not_found", "candidate_count": 0, "candidates": []},
+                },
+            },
+        }
+        current = debt_candidate_evidence_review(company)["buckets"]["current"]
+        self.assertEqual(current["disposition"], "one_nonzero_plus_explicit_zero_instruments_review_only")
+        self.assertEqual(current["nonzero_candidate_count"], 1)
+        self.assertEqual(current["explicit_zero_candidate_count"], 1)
+        self.assertEqual(len(current["candidates"]), 2)
+        self.assertFalse(current["automatic_aggregation"])
+
+    def test_debt_candidate_evidence_review_does_not_mix_fiscal_periods(self):
+        from build_accounting_review_queue import debt_candidate_evidence_review
+
+        company = {
+            "balance_sheet_fact_review": {
+                "fiscal_period": "2025-12-31",
+                "categories": {
+                    "current_debt_candidates": {
+                        "status": "unique_candidate", "candidate_count": 1,
+                        "candidates": [
+                            {"concept": "us-gaap_NotesPayableCurrent", "label": "Note payable",
+                             "value": 123.0, "fiscal_period": "2024-12-31", "row_index": 4},
+                        ],
+                    },
+                    "noncurrent_debt_candidates": {"status": "not_found", "candidate_count": 0, "candidates": []},
+                },
+            },
+        }
+        current = debt_candidate_evidence_review(company)["buckets"]["current"]
+        self.assertEqual(current["disposition"], "unknown_not_zero")
+        self.assertEqual(current["fiscal_period_candidate_count"], 0)
+
     def test_debt_scope_evidence_distinguishes_leases_financing_and_explicit_zero(self):
         from build_accounting_review_queue import extract_debt_scope_evidence
 
