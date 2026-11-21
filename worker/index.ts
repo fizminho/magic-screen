@@ -1,9 +1,15 @@
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { MEMBERSHIP_DDL, SOURCE_MFI, SOURCE_FRONTEND, backfillMfiMemberships, applyMfiSelection, addFrontendStock, removeFrontendStock, invalidateUsRanks, normaliseUsSymbol } from "./universe-membership.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { runBatchPage, BATCH_STATUS } from "./gemini-batch.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { assignCombinedRanks, MINIMUM_ELIGIBLE_COHORT } from "./mfi-ranking.mjs";
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
 import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { classifyDebtReconciliation } from "./debt-reconciliation.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
-import { runGeminiAccountingReview, listGeminiAccountingEscalations } from "./gemini-accounting-review.mjs";
+import { runGeminiAccountingReview, listGeminiAccountingEscalations, getGeminiModelCandidates } from "./gemini-accounting-review.mjs";
 
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; GEMINI_MODEL?: string; GEMINI_MIN_REQUEST_INTERVAL_MS?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
@@ -41,6 +47,14 @@ const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";curren
   ]
 };
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"}});
+const US_ACTIVE_UNIVERSE_SQL="EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)";
+let membershipReady=false;
+async function ensureMembershipSchema(env: Env) {
+  if (membershipReady) return;
+  await env.DB.batch(MEMBERSHIP_DDL.map((sql:string)=>env.DB.prepare(sql)));
+  await backfillMfiMemberships(env.DB);
+  membershipReady=true;
+}
 async function ensureSchema(env: Env) {
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS stock_snapshot (
@@ -56,6 +70,7 @@ async function ensureSchema(env: Env) {
   ]);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS stock_master (symbol TEXT NOT NULL, market TEXT NOT NULL, company_name TEXT NOT NULL, currency TEXT NOT NULL, exchange TEXT, sector TEXT, listing_status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL, source_updated_at TEXT NOT NULL, PRIMARY KEY(symbol,market))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market,company_name)").run();
+  await ensureMembershipSchema(env);
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS sec_company_map (symbol TEXT PRIMARY KEY, cik TEXT NOT NULL, updated_at TEXT NOT NULL)"),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS stock_fundamentals (
@@ -311,20 +326,6 @@ type MfiPreviewRow = {
   ebit_candidate:number|null; invested_capital_candidate:number|null; ebit_status:string;
   invested_capital_status:string; enterprise_value_candidate_review:any; balance_sheet_candidate_review:any; review_flags:string[];
 };
-function ordinalRanks(rows:any[], key:"earnings_yield"|"return_on_capital") {
-  // Classic Greenblatt ordering: highest EY/ROC receives rank 1.
-  // Exact ties share the average occupied ordinal positions.
-  const sorted=[...rows].sort((a:any,b:any)=>b[key]-a[key] || a.symbol.localeCompare(b.symbol));
-  const result=new Map<string,number>();
-  for(let i=0;i<sorted.length;) {
-    let end=i+1;
-    while(end<sorted.length && sorted[end][key]===sorted[i][key]) end++;
-    const averageRank=((i+1)+end)/2;
-    for(let j=i;j<end;j++) result.set(sorted[j].symbol,averageRank);
-    i=end;
-  }
-  return result;
-}
 function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
   const evaluated=rows.map(row=>{
     const ev=row.market_cap!==null && row.market_cap>0
@@ -375,25 +376,8 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
       ranking_eligible:eligible,eligibility_status:eligibilityStatus,exclusion_reasons:exclusionReasons};
   });
   const eligible=evaluated.filter(row=>row.ranking_eligible);
-  const minimumCohort=5;
-  if(eligible.length>=minimumCohort) {
-    const ey=ordinalRanks(eligible as any,"earnings_yield");
-    const roc=ordinalRanks(eligible as any,"return_on_capital");
-    for(const row of eligible as any[]) {
-      row.earnings_yield_rank=ey.get(row.symbol)??null;
-      row.return_on_capital_rank=roc.get(row.symbol)??null;
-      // Classic MFI combines ordinal ranks; lower score is better.
-      row.magic_formula_score=row.earnings_yield_rank+row.return_on_capital_rank;
-    }
-    eligible.sort((a:any,b:any)=>a.magic_formula_score-b.magic_formula_score || a.symbol.localeCompare(b.symbol));
-    let previousScore:number|null=null;
-    let previousRank=0;
-    eligible.forEach((row:any,index:number)=>{
-      if(previousScore===null || row.magic_formula_score!==previousScore) previousRank=index+1;
-      row.magic_formula_rank=previousRank;
-      previousScore=row.magic_formula_score;
-    });
-  }
+  const minimumCohort=MINIMUM_ELIGIBLE_COHORT;
+  assignCombinedRanks(eligible as any[],minimumCohort);
   const ranked=new Set(eligible.length>=minimumCohort?eligible.map(row=>row.symbol):[]);
   for(const row of evaluated as any[]) {
     if(!ranked.has(row.symbol)) {
@@ -423,8 +407,8 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
 
 async function syncUsFundamentals(env:Env, limit=10) {
   await ensureSchema(env);
-  const mapAge=await env.DB.prepare("SELECT MIN(cm.updated_at) AS updated_at,COUNT(cm.symbol) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
-  const missingMap=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND cm.symbol IS NULL").first<any>();
+  const mapAge=await env.DB.prepare("SELECT MIN(cm.updated_at) AS updated_at,COUNT(cm.symbol) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").first<any>();
+  const missingMap=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1) AND cm.symbol IS NULL").first<any>();
   const mapStale=!mapAge?.count || !mapAge.updated_at || Date.now()-Date.parse(mapAge.updated_at)>7*86400000 || (missingMap?.count??0)>0;
   if (mapStale) {
     const response=await fetch("https://www.sec.gov/files/company_tickers_exchange.json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept-Encoding":"gzip, deflate"}});
@@ -434,7 +418,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
     const ix={cik:fields.indexOf("cik"),ticker:fields.indexOf("ticker")};
     if (ix.cik<0 || ix.ticker<0) throw new Error("Unexpected SEC ticker map format");
     const now=new Date().toISOString();
-    const active=await env.DB.prepare("SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing'").all<any>();
+    const active=await env.DB.prepare("SELECT m.symbol FROM stock_master m WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").all<any>();
     const symbolsToMap=[...new Set(active.results.map((x:any)=>String(x.symbol).toUpperCase()))];
     const normaliseTicker=(value:string)=>value.toUpperCase().replace(/[^A-Z0-9]/g,"");
     const cikByTicker=new Map<string,string>();
@@ -456,7 +440,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
   const maxAnnualPeriodEnd=new Date(Date.now()-maxAnnualPeriodAgeDays*86400000).toISOString().slice(0,10);
   // INTENTIONAL: wait for the MFI market-cap snapshot before attempting SEC calculations.
   // This avoids recording a false incomplete result during the gap between MFI import and quote sync.
-  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR f.market_cap IS NOT q.market_cap OR (f.status='calculated' AND (f.updated_at<? OR f.fiscal_period<?)) OR (f.status!='calculated' AND f.updated_at<?)) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 WHEN f.status!='calculated' THEN 1 ELSE 2 END,f.updated_at,m.symbol LIMIT ?").bind(staleCalculatedBefore,maxAnnualPeriodEnd,staleRetryBefore,Math.max(1,Math.min(10,limit))).all<any>();
+  const candidates=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap,cm.cik FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1) AND q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND (f.updated_at IS NULL OR f.market_cap IS NOT q.market_cap OR (f.status='calculated' AND (f.updated_at<? OR f.fiscal_period<?)) OR (f.status!='calculated' AND f.updated_at<?)) ORDER BY CASE WHEN f.updated_at IS NULL THEN 0 WHEN f.status!='calculated' THEN 1 ELSE 2 END,f.updated_at,m.symbol LIMIT ?").bind(staleCalculatedBefore,maxAnnualPeriodEnd,staleRetryBefore,Math.max(1,Math.min(10,limit))).all<any>();
   let processed=0,calculated=0,stale=0,failed=0;
   for(const item of candidates.results) {
     const now=new Date().toISOString();
@@ -539,18 +523,18 @@ async function syncUsFundamentals(env:Env, limit=10) {
       processed++;
     }
   }
-  const totals=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END) AS valid FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+  const totals=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END) AS valid FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").first<any>();
   let ranked=0;
   // INTENTIONAL: never publish a partial-universe Magic Formula rank. Every active MFI
   // candidate must have complete, usable inputs or all ranks remain blank.
   if(totals?.total>0 && totals.valid===totals.total) {
-    const unranked=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' AND q.magic_formula_rank IS NULL").first<any>();
+    const unranked=await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1) AND q.magic_formula_rank IS NULL").first<any>();
     // INTENTIONAL: recompute only when at least one active candidate is unranked. This
     // handles a changed MFI universe even on a run that processes no new SEC facts.
     if((unranked?.count??0)>0) {
       // INTENTIONAL: equal EY or ROC values share the same component rank. RANK() avoids
       // arbitrary row-number differences between financially tied candidates.
-      const rankedRows=await env.DB.prepare("SELECT f.symbol,RANK() OVER(ORDER BY f.earnings_yield DESC)+RANK() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND m.source='Magic Formula Investing'").all<any>();
+      const rankedRows=await env.DB.prepare("SELECT f.symbol,RANK() OVER(ORDER BY f.earnings_yield DESC)+RANK() OVER(ORDER BY f.return_on_capital DESC) AS combined_rank FROM stock_fundamentals f INNER JOIN stock_master m ON m.symbol=f.symbol AND m.market=f.market WHERE f.market='US' AND f.status='calculated' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").all<any>();
       // INTENTIONAL: only write rank rows when the calculated rank actually changes.
       // The SEC cron runs every thirty minutes; unchanged ranks do not consume D1 writes.
       for(const row of rankedRows.results) await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=? WHERE symbol=? AND market='US' AND magic_formula_rank IS NOT ?").bind(row.combined_rank,row.symbol,row.combined_rank).run();
@@ -559,7 +543,7 @@ async function syncUsFundamentals(env:Env, limit=10) {
   } else if(processed>0 && totals?.total>0) {
     // INTENTIONAL: if any active candidate becomes incomplete, clear every rank so the
     // UI never displays a stale partial ranking as if the full universe were ranked.
-    await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=NULL WHERE market='US' AND magic_formula_rank IS NOT NULL AND symbol IN (SELECT symbol FROM stock_master WHERE market='US' AND listing_status='active' AND source='Magic Formula Investing')").run();
+    await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=NULL WHERE market='US' AND magic_formula_rank IS NOT NULL AND symbol IN (SELECT m.symbol FROM stock_master m WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1))").run();
   }
   const remaining=Math.max(0,(totals?.total??0)-(totals?.valid??0));
   return {source:"SEC EDGAR Company Facts",processed,calculated,stale,failed,remaining,ranked,total:totals?.total??0,note:"Ranks are published only when every active MFI candidate has usable required facts."};
@@ -577,7 +561,7 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
     const cached = await env.DB.prepare("SELECT minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date FROM mfi_screening_meta WHERE id=1").first<any>();
     const cacheAge = cached?.source_updated_at ? Date.now() - Date.parse(cached.source_updated_at) : Infinity;
     if (cached && cached.minimum_market_cap === minimumMarketCap && cached.selected_count === (select30 ? 30 : 50) && cacheAge >= 0 && cacheAge < 6 * 60 * 60 * 1000) {
-      const result = await env.DB.prepare("SELECT m.symbol,m.company_name AS name,COALESCE(q.market_cap,0)/1000000.0 AS marketCapMillions FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.company_name").all<any>();
+      const result = await env.DB.prepare("SELECT m.symbol,m.company_name AS name,COALESCE(q.market_cap,0)/1000000.0 AS marketCapMillions FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.source='Magic Formula Investing' AND um.active=1) ORDER BY m.company_name").all<any>();
       if (result.results.length === cached.result_count) {
         return {imported:result.results.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:cached.source_updated_at,priceDate:cached.price_date,quarterDate:cached.quarter_date,cached:true,stocks:result.results};
       }
@@ -619,27 +603,22 @@ async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=
   }).filter((row): row is {symbol:string;name:string;marketCapMillions:number;priceDate:string;quarterDate:string} => !!row && !!row.name);
   if (!rows.length) throw new Error("Magic Formula returned no parseable stock rows.");
   const now = new Date().toISOString();
-  const previousUniverse = await env.DB.prepare("SELECT m.symbol,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.symbol").all<any>();
+  const previousUniverse = await env.DB.prepare("SELECT m.symbol,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1) ORDER BY m.symbol").all<any>();
   const previousCaps = new Map<string,number|null>(previousUniverse.results.map((row:any)=>[String(row.symbol),row.market_cap==null?null:Number(row.market_cap)]));
   const previousSymbols = previousUniverse.results.map((row:any)=>String(row.symbol)).sort();
   const nextSymbols = rows.map(row=>row.symbol).sort();
   const universeChanged = previousSymbols.length!==nextSymbols.length || previousSymbols.some((symbol:string,index:number)=>symbol!==nextSymbols[index]);
   const marketCapChanged = rows.some(row=>previousCaps.has(row.symbol) && previousCaps.get(row.symbol)!==row.marketCapMillions*1000000);
-  for (let i=0;i<rows.length;i+=40) {
-    await env.DB.batch(rows.slice(i,i+40).flatMap(row=>[
-      env.DB.prepare("INSERT INTO stock_master (symbol,market,company_name,currency,exchange,listing_status,source,source_updated_at) VALUES (?,'US',?,'USD','Magic Formula Investing','active','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,exchange=excluded.exchange,listing_status='active',source=excluded.source,source_updated_at=excluded.source_updated_at WHERE stock_master.company_name IS NOT excluded.company_name OR stock_master.exchange IS NOT excluded.exchange OR stock_master.listing_status IS NOT 'active' OR stock_master.source IS NOT 'Magic Formula Investing'").bind(row.symbol,row.name,now),
-      env.DB.prepare("INSERT INTO stock_snapshot (symbol,market,company_name,currency,market_cap,shariah_status,data_status,provider,updated_at) VALUES (?,'US',?,'USD',?,'unverified','mfi_screened','Magic Formula Investing',?) ON CONFLICT(symbol,market) DO UPDATE SET company_name=excluded.company_name,market_cap=excluded.market_cap,updated_at=excluded.updated_at WHERE stock_snapshot.company_name IS NOT excluded.company_name OR stock_snapshot.market_cap IS NOT excluded.market_cap").bind(row.symbol,row.name,row.marketCapMillions*1000000,now)
-    ]));
-  }
-  const activeSymbols = rows.map(row=>row.symbol);
-  await env.DB.prepare("UPDATE stock_master SET listing_status='inactive' WHERE market='US' AND listing_status!='inactive' AND symbol NOT IN ("+activeSymbols.map(()=>"?").join(",")+")").bind(...activeSymbols).run();
-  if(universeChanged || marketCapChanged) {
+  // INTENTIONAL: MFI.com is one source of US universe membership. A refresh may only change the
+  // MFI membership; frontend memberships are never deactivated here (see worker/universe-membership.mjs).
+  const applied=await applyMfiSelection(env.DB,rows,now);
+  if(universeChanged || marketCapChanged || applied.unionChanged) {
     // INTENTIONAL: candidate membership or market-cap changes invalidate the previous
     // combined ranking. SEC ingestion republishes ranks only after all inputs are current.
-    await env.DB.prepare("UPDATE stock_snapshot SET magic_formula_rank=NULL WHERE market='US' AND magic_formula_rank IS NOT NULL").run();
+    await invalidateUsRanks(env.DB);
   }
   await env.DB.prepare("INSERT INTO mfi_screening_meta (id,minimum_market_cap,selected_count,result_count,source_updated_at,price_date,quarter_date) VALUES (1,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET minimum_market_cap=excluded.minimum_market_cap,selected_count=excluded.selected_count,result_count=excluded.result_count,source_updated_at=excluded.source_updated_at,price_date=excluded.price_date,quarter_date=excluded.quarter_date").bind(minimumMarketCap,select30?30:50,rows.length,now,rows[0]?.priceDate ?? null,rows[0]?.quarterDate ?? null).run();
-  return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,cached:false,stocks:rows};
+  return {imported:rows.length,minimumMarketCap,selectedCount:select30?30:50,source:"Magic Formula Investing",asOf:now,priceDate:rows[0]?.priceDate ?? null,quarterDate:rows[0]?.quarterDate ?? null,cached:false,stocks:rows,membership:{mfiAdded:applied.mfiAdded,mfiDeactivated:applied.mfiDeactivated,stillActiveViaOtherSource:applied.stillActiveViaOtherSource,activeUniverseSize:applied.activeUniverseSize}};
 }
 
 async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
@@ -959,14 +938,14 @@ export default {
         const quotes=await env.DB.prepare("SELECT MAX(updated_at) AS last_updated FROM stock_snapshot WHERE market=?").bind(market).first<any>();
         if (market==="MY") return json({market,last_quote_sync:quotes?.last_updated??null});
         const mfi=await env.DB.prepare("SELECT source_updated_at,price_date,quarter_date,result_count,minimum_market_cap,selected_count FROM mfi_screening_meta WHERE id=1").first<any>();
-        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='stale_fiscal_period' THEN 1 ELSE 0 END),0) AS stale_fiscal_period,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='stale_fiscal_period' THEN 1 ELSE 0 END),0) AS stale_fiscal_period,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").first<any>();
         return json({market,last_quote_sync:quotes?.last_updated??null,mfi_last_sync:mfi?.source_updated_at??null,mfi_price_date:mfi?.price_date??null,mfi_quarter_date:mfi?.quarter_date??null,mfi_count:mfi?.result_count??0,mfi_minimum_market_cap:mfi?.minimum_market_cap??null,mfi_selected_count:mfi?.selected_count??null,sec});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
     if (url.pathname==="/api/fundamentals/status" && request.method==="GET") {
       try {
         await ensureSchema(env);
-        const status=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'").first<any>();
+        const status=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").first<any>();
         return json({source:"SEC EDGAR Company Facts",...status});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
     }
@@ -987,7 +966,7 @@ export default {
         // requiring someone to open the screener first. Existing universe-change
         // invalidation rules remain owned by syncMagicFormulaUniverse.
         const universeSync=await syncMagicFormulaUniverse(env,50,true,false);
-        const rows=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing' ORDER BY m.symbol").all<any>();
+        const rows=await env.DB.prepare("SELECT m.symbol,m.company_name,q.market_cap FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1) ORDER BY m.symbol").all<any>();
         return json({primary_provider:"EdgarTools",market:"US",source:"active Magic Formula Investing stock_master",count:rows.results.length,symbols:rows.results.map((row:any)=>row.symbol),stocks:rows.results,selection:{minimum_market_cap_millions:universeSync.minimumMarketCap,selected_count:universeSync.selectedCount},universe_refresh:{cached:universeSync.cached??false,imported:universeSync.imported,priceDate:universeSync.priceDate??null,quarterDate:universeSync.quarterDate??null,asOf:universeSync.asOf??null},note:"Active US MFI universe refreshed using the existing six-hour MFI cache. Selection settings and market-cap dates are recorded for audit; market caps are informational and are not accounting approval."});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools universe discovery"},503); }
     }
@@ -1049,7 +1028,7 @@ export default {
             WHERE e2.symbol=m.symbol AND e2.market='US'
             ORDER BY e2.ingested_at DESC,e2.accession_key DESC LIMIT 1
           )
-          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'
+          WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)
           ORDER BY m.symbol`).all<any>();
         const resolutions=rows.results.map((row:any)=>{
           let company:any=null;
@@ -1092,11 +1071,11 @@ export default {
             WHERE e2.symbol=m.symbol AND e2.market='US'
             ORDER BY e2.ingested_at DESC,e2.accession_key DESC LIMIT 1
           )
-          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'
+          WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)
           ORDER BY m.symbol`).all<any>();
         const caps=await env.DB.prepare(`SELECT m.symbol,q.market_cap FROM stock_master m
           LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US'
-          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'`).all<any>();
+          WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)`).all<any>();
         const capBySymbol=new Map(caps.results.map((x:any)=>[x.symbol,x.market_cap==null?null:Number(x.market_cap)]));
         const rows=evidence.results.map((row:any)=>{
           let company:any=null;
@@ -1139,7 +1118,7 @@ export default {
             WHERE e2.symbol=m.symbol AND e2.market='US'
             ORDER BY e2.ingested_at DESC,e2.accession_key DESC LIMIT 1
           )
-          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'
+          WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)
           ORDER BY m.symbol`).all<any>();
         const reconciliationRows=rows.results.map((row:any)=>{
           let company:any=null;
@@ -1178,6 +1157,62 @@ export default {
         if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
         return json(await diagnoseSecExtensionFacts(env,symbol));
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC filing XBRL extension diagnostic"},503); }
+    }
+    if (url.pathname==="/api/fundamentals/edgartools/ai-review/batch" && (request.method==="GET" || request.method==="POST")) {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        await ensureSchema(env);
+        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (
+          symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,
+          fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,
+          provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,
+          ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))`).run();
+        const active=await env.DB.prepare("SELECT m.symbol FROM stock_master m WHERE m.market='US' AND m.listing_status='active' AND "+US_ACTIVE_UNIVERSE_SQL+" ORDER BY m.symbol").all<any>();
+        const symbolsActive=active.results.map((row:any)=>String(row.symbol));
+        const loadIssuer=async(symbol:string)=>{
+          const row=await env.DB.prepare(`SELECT e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json
+            FROM edgartools_filing_evidence e WHERE e.symbol=? AND e.market='US'
+            ORDER BY e.ingested_at DESC,e.accession_key DESC LIMIT 1`).bind(symbol).first<any>();
+          if(!row) return {state:"awaiting_evidence"};
+          if(row.provider_status!=="supported"||!row.payload_json) return {state:"unsupported"};
+          const company=JSON.parse(row.payload_json);
+          // Deterministic resolver first: only escalations it leaves unresolved are eligible for Gemini.
+          const resolver=resolveEdgarToolsEvidence(symbol,row.provider_status,row.accession,row.fiscal_period,company);
+          return {state:"supported",accession:row.accession,fiscalPeriod:row.fiscal_period,company,resolver,escalations:listGeminiAccountingEscalations(symbol,company,resolver)};
+        };
+        if (request.method==="GET") {
+          // Read-only coverage and queue status. Never exposes the API key.
+          const tasks=await env.DB.prepare("SELECT task,status,COUNT(*) AS n FROM gemini_accounting_review_cache GROUP BY task,status").all<any>().catch(()=>({results:[]} as any));
+          const plan=await runBatchPage({symbols:symbolsActive,cursor:null,loadIssuer,runReview:async()=>({}),maxNewCalls:0,maxTasks:0,dryRun:true,includeFullScope:url.searchParams.get("include_full_scope")==="1"});
+          let modelCheck:any=null;
+          if(url.searchParams.get("check_models")==="1" && env.GEMINI_API_KEY) {
+            try {
+              const res=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",{headers:{"x-goog-api-key":env.GEMINI_API_KEY}});
+              if(res.ok){
+                const body:any=await res.json();
+                const available=new Set((body.models??[]).map((m:any)=>String(m.name).replace(/^models\//,"")));
+                const configured=getGeminiModelCandidates(env.GEMINI_MODEL,(env as any).GEMINI_MODEL_FALLBACKS);
+                modelCheck={configured:configured.map((model:string)=>({model,available:available.has(model)}))};
+              } else modelCheck={error:"Model list HTTP "+res.status};
+            } catch(e){ modelCheck={error:"Model list request failed"}; }
+          }
+          return json({active_universe:symbolsActive.length,gemini_api_key_configured:!!env.GEMINI_API_KEY,gemini_model_configured:env.GEMINI_MODEL??null,model_check:modelCheck,
+            unsupported:plan.counts.UNSUPPORTED,awaiting_evidence:plan.counts.AWAITING_EVIDENCE,deterministic_only:plan.counts.SKIPPED_DETERMINISTIC,
+            issuers_with_pending_tasks:plan.issuers.filter((i:any)=>i.tasks.length>0).length,pending_tasks_planned:plan.counts.PENDING,
+            cached_reviews_by_task_status:tasks.results,coverage_note:"Unsupported and awaiting-evidence issuers remain visible and are not dropped. Quota exhaustion is never cached as a completed review.",
+            production_write:false,production_fundamentals_changed:false,rankings_changed:false});
+        }
+        const body=JSON.parse((await request.text())||"{}");
+        const dryRun=body.dry_run===true;
+        if(!dryRun && !env.GEMINI_API_KEY) return json({error:"GEMINI_API_KEY is not configured as a Worker secret"},503);
+        const page=await runBatchPage({symbols:symbolsActive,cursor:typeof body.cursor==="string"?body.cursor:null,loadIssuer,
+          runReview:(input:any)=>runGeminiAccountingReview(env,{...input,model:env.GEMINI_MODEL}),
+          maxNewCalls:Math.min(5,Math.max(1,Math.floor(Number(body.max_new_calls??2)))),
+          maxTasks:Math.min(25,Math.max(1,Math.floor(Number(body.max_tasks??12)))),
+          includeFullScope:body.include_full_scope===true,dryRun});
+        return json({...page,active_universe:symbolsActive.length,ai_review_only:true,production_write:false,production_fundamentals_changed:false,rankings_changed:false});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini batch accounting review"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/ai-review" && (request.method==="GET" || request.method==="POST")) {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
@@ -1247,7 +1282,7 @@ export default {
               SELECT 1 FROM stock_snapshot q WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
             ) THEN 1 ELSE 0 END),0) AS deletion_candidates
             FROM stock_master m
-            WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json'`).first<any>();
+            WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json' AND NOT EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)`).first<any>();
           return json({action:"preview",...counts,delete_filter:"US stock_master rows with SEC source, excluding rows whose stock_snapshot provider is Magic Formula Investing",note:"No rows changed. MFI-marked rows are protected."});
         }
         if(action==="delete") {
@@ -1256,6 +1291,7 @@ export default {
             WHERE rowid IN (
               SELECT m.rowid FROM stock_master m
               WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json'
+                AND NOT EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)
                 AND NOT EXISTS (
                   SELECT 1 FROM stock_snapshot q
                   WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
@@ -1264,6 +1300,7 @@ export default {
             )`).bind(batchSize).run();
           const remaining=await env.DB.prepare(`SELECT COUNT(*) AS count FROM stock_master m
             WHERE m.market='US' AND m.source='SEC company_tickers_exchange.json'
+              AND NOT EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)
               AND NOT EXISTS (
                 SELECT 1 FROM stock_snapshot q
                 WHERE q.symbol=m.symbol AND q.market='US' AND q.provider='Magic Formula Investing'
@@ -1272,6 +1309,39 @@ export default {
         }
         return json({error:"action must be preview or delete"},400);
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC universe cleanup"},503); }
+    }
+    if (url.pathname==="/api/universe/us/stocks" && (request.method==="POST" || request.method==="DELETE")) {
+      // Frontend-managed US universe membership. Protected by the same bearer token as other universe writes.
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        await ensureSchema(env);
+        const now=new Date().toISOString();
+        if (request.method==="DELETE") {
+          const symbol=normaliseUsSymbol(url.searchParams.get("symbol"));
+          if(!symbol) return json({error:"Invalid US ticker symbol"},400);
+          const result=await removeFrontendStock(env.DB,symbol,now);
+          return json({...result,note:result.status==="removed"?"Only the frontend membership was removed. The stock stays active if another source still includes it. Published ranks are cleared if the active universe changed.":"No active frontend membership for this symbol; MFI.com memberships cannot be removed here."},result.status==="not_found"?404:200);
+        }
+        const payload:any=await request.json();
+        const symbol=normaliseUsSymbol(payload.symbol);
+        if(!symbol) return json({error:"Invalid US ticker symbol. Use the plain US ticker, for example AAPL or BRK-B."},400);
+        // Best-effort name/CIK check against SEC's directory. It is a validation aid only: the directory is
+        // never imported as a universe, and unmapped tickers stay visible as unsupported in coverage.
+        let secMatch:{name:string|null;cik:string}|null=null;
+        try {
+          const res=await fetch("https://www.sec.gov/files/company_tickers.json",{headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept-Encoding":"gzip, deflate"},signal:AbortSignal.timeout(6000)});
+          if(res.ok){
+            const dir:any=await res.json();
+            const norm=(v:string)=>v.toUpperCase().replace(/[^A-Z0-9]/g,"");
+            const hit:any=Object.values(dir).find((row:any)=>norm(String(row.ticker))===norm(symbol));
+            if(hit) secMatch={name:hit.title?String(hit.title):null,cik:String(hit.cik_str).padStart(10,"0")};
+          }
+        } catch { /* validation aid only */ }
+        const capMillions=payload.market_cap_millions==null?null:Number(payload.market_cap_millions);
+        const result=await addFrontendStock(env.DB,{symbol,companyName:payload.company_name||secMatch?.name||symbol,marketCapMillions:capMillions,metadata:{sec_directory_match:!!secMatch}},now);
+        return json({...result,sec_directory_match:!!secMatch,awaiting_market_cap:capMillions==null,note:"Added to the US universe. It enters the normal quote, SEC extraction, review and ranking gates. Published ranks are cleared while the new candidate lacks current complete fundamentals."});
+      } catch (e) { return json({error:e instanceof Error?e.message:String(e)},400); }
     }
     if (url.pathname==="/api/universe/import-my" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
@@ -1319,7 +1389,7 @@ export default {
           }
         }
         // INTENTIONAL: SEC fundamentals are authoritative for US calculations. The snapshot is a quote/cache projection and can lag the fundamentals table; prefer same-market-cap SEC ratios and derive the displayed status from the SEC record.
-        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.earnings_yield WHEN f.status='calculated' THEN NULL ELSE q.earnings_yield END AS earnings_yield,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.return_on_capital WHEN f.status='calculated' THEN NULL ELSE q.return_on_capital END AS return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,f.ebit AS fundamentals_ebit,f.current_assets AS fundamentals_current_assets,f.current_liabilities AS fundamentals_current_liabilities,f.net_ppe AS fundamentals_net_ppe,f.total_debt AS fundamentals_total_debt,f.cash AS fundamentals_cash,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 'fundamentals_calculated' WHEN f.status='calculated' THEN 'fundamentals_stale_market_cap' WHEN f.status='stale_fiscal_period' THEN 'fundamentals_stale' WHEN f.status='missing_required_facts' THEN 'fundamentals_incomplete' WHEN f.status='negative_invested_capital' THEN 'fundamentals_negative_invested_capital' WHEN f.status='zero_invested_capital' THEN 'fundamentals_zero_invested_capital' ELSE COALESCE(q.data_status,'awaiting_quote') END AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
+        const result = await env.DB.prepare("SELECT m.symbol,m.market,m.company_name,m.currency,q.price,q.change_percent,q.market_cap,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.earnings_yield WHEN f.status='calculated' THEN NULL ELSE q.earnings_yield END AS earnings_yield,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN f.return_on_capital WHEN f.status='calculated' THEN NULL ELSE q.return_on_capital END AS return_on_capital,q.magic_formula_rank,f.fiscal_period,f.filed_at,f.status AS fundamentals_status,f.source AS fundamentals_source,f.ebit AS fundamentals_ebit,f.current_assets AS fundamentals_current_assets,f.current_liabilities AS fundamentals_current_liabilities,f.net_ppe AS fundamentals_net_ppe,f.total_debt AS fundamentals_total_debt,f.cash AS fundamentals_cash,(SELECT GROUP_CONCAT(um2.source,'|') FROM stock_universe_membership um2 WHERE um2.market=m.market AND um2.symbol=m.symbol AND um2.active=1) AS universe_sources_raw,COALESCE(q.shariah_status,'unverified') AS shariah_status,q.shariah_source,q.shariah_as_of,CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 'fundamentals_calculated' WHEN f.status='calculated' THEN 'fundamentals_stale_market_cap' WHEN f.status='stale_fiscal_period' THEN 'fundamentals_stale' WHEN f.status='missing_required_facts' THEN 'fundamentals_incomplete' WHEN f.status='negative_invested_capital' THEN 'fundamentals_negative_invested_capital' WHEN f.status='zero_invested_capital' THEN 'fundamentals_zero_invested_capital' ELSE COALESCE(q.data_status,'awaiting_quote') END AS data_status,q.provider,q.updated_at FROM stock_master m LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market=m.market LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market=m.market WHERE m.market=? AND m.listing_status='active' AND (m.market!='US' OR EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)) ORDER BY COALESCE(q.magic_formula_rank,999),m.company_name").bind(market).all();
         const latest = await env.DB.prepare("SELECT MAX(updated_at) AS updated_at FROM stock_snapshot WHERE market=?").bind(market).first<{updated_at:string|null}>();
         // INTENTIONAL: preserve the distinction between an explicit numeric zero and an absent SEC fact.
         // Company Facts omits custom-tagged and dimension-specific observations, so missing fields
@@ -1332,8 +1402,9 @@ export default {
             if(row[key]==null) missing.push(label);
             else if(row[key]===0) zero.push(label);
           }
-          const {fundamentals_ebit,fundamentals_current_assets,fundamentals_current_liabilities,fundamentals_net_ppe,fundamentals_total_debt,fundamentals_cash,...stock}=row;
-          return {...stock,fundamentals_missing_fields:row.fundamentals_status==="missing_required_facts"?missing:[],fundamentals_zero_fields:zero};
+          const {fundamentals_ebit,fundamentals_current_assets,fundamentals_current_liabilities,fundamentals_net_ppe,fundamentals_total_debt,fundamentals_cash,universe_sources_raw,...stock}=row;
+          const universe_sources=universe_sources_raw?String(universe_sources_raw).split("|").sort():[];
+          return {...stock,universe_sources,fundamentals_missing_fields:row.fundamentals_status==="missing_required_facts"?missing:[],fundamentals_zero_fields:zero};
         });
         return json({market,stocks,updatedAt:latest?.updated_at ?? null,sourceStatus:stocks.some((row:any)=>row.price!=null)?"Quote cache connected":"Waiting for scheduled quote sync",refresh});
       } catch (error) {

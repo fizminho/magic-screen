@@ -1,0 +1,49 @@
+name: Gemini accounting review batch
+
+# Resumable, deduplicated batch review of unresolved accounting tasks for the active US universe.
+# Review-only: never writes production fundamentals, ratios, eligibility or rankings.
+on:
+  workflow_dispatch:
+    inputs:
+      start_cursor:
+        description: "Resume after this ticker (blank = from the start)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Plan only; do not call Gemini"
+        type: boolean
+        default: true
+      include_full_scope:
+        description: "Also run the combined full_scope task"
+        type: boolean
+        default: false
+      max_new_calls:
+        description: "Non-cached Gemini calls per Worker request (1-5)"
+        default: "2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gemini-accounting-review-batch
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run batch review
+        env:
+          WORKER_BASE_URL: ${{ vars.WORKER_BASE_URL || 'https://magic-screen.96muhdhafiz.workers.dev' }}
+          UNIVERSE_SYNC_TOKEN: ${{ secrets.UNIVERSE_SYNC_TOKEN }}
+          START_CURSOR: ${{ inputs.start_cursor }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          INCLUDE_FULL_SCOPE: ${{ inputs.include_full_scope }}
+          MAX_NEW_CALLS: ${{ inputs.max_new_calls }}
+          MAX_RUNTIME_MINUTES: "45"
+        run: node scripts/run_gemini_review_batch.mjs
