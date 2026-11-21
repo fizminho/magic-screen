@@ -699,6 +699,7 @@ class AccountingReviewQueueTests(unittest.TestCase):
         from build_accounting_review_queue import FILING_EV_SCOPE_NOTE_REVIEWS, filing_ev_scope_note_review
 
         expected = {
+            "SGHC": "0001628280-26-025609",
             "FHTX": "0001628280-26-016814",
             "NRIX": "0001549595-26-000016",
             "PXED": "0001193125-26-445323",
@@ -742,6 +743,46 @@ class AccountingReviewQueueTests(unittest.TestCase):
         item = build_queue(preview, raw)["items"][0]
         self.assertIsNone(item["filing_ev_scope_note_review"])
         self.assertEqual(item["filing_ev_scope_note_review_source"], "stored_resolver_preview")
+
+
+    def test_sghc_cash_review_keeps_user_funds_and_restrictions_separate(self):
+        from build_accounting_review_queue import filing_ev_scope_note_review
+
+        review = filing_ev_scope_note_review("SGHC", "0001628280-26-025609")
+        self.assertIsNotNone(review)
+        self.assertIn("129m", " ".join(review["observations"]))
+        self.assertIn("6m", " ".join(review["observations"]))
+        self.assertIn("19m", " ".join(review["observations"]))
+        self.assertIn("12m", " ".join(review["observations"]))
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertFalse(review["cash_candidate_promoted"])
+        self.assertIsNone(filing_ev_scope_note_review("SGHC", "different-accession"))
+
+    def test_sghc_on_demand_loan_remains_unresolved(self):
+        from build_accounting_review_queue import filing_debt_note_review
+
+        review = filing_debt_note_review("SGHC", "0001628280-26-025609")
+        self.assertIsNotNone(review)
+        self.assertIn("NGN", " ".join(review["observations"]))
+        self.assertIn("unspecified", " ".join(review["observations"]))
+        self.assertTrue(any("zero" in x for x in review["limitations"]))
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertFalse(review["debt_candidate_promoted"])
+
+    def test_zvra_subsequent_debt_repayment_does_not_rewrite_annual_snapshot(self):
+        from build_accounting_review_queue import filing_debt_note_review
+
+        review = filing_debt_note_review("ZVRA", "0001434647-26-000011")
+        self.assertIsNotNone(review)
+        self.assertIn("March 12, 2026", " ".join(review["observations"]))
+        self.assertIn("63.1m", " ".join(review["observations"]))
+        self.assertIn("subsequent", review["interpretation"].lower())
+        self.assertTrue(any("rewrite FY2025" in x for x in review["limitations"]))
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertFalse(review["debt_candidate_promoted"])
 
 if __name__ == "__main__":
     unittest.main()
