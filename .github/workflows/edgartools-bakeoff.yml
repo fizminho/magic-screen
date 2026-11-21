@@ -311,7 +311,7 @@ jobs:
           python scripts/assess_us_mfi_policy_cohort.py
       - name: Build top-cohort ranking sensitivity report
         if: always() && hashFiles('edgartools-mfi-ranking-preview.json') != '' && hashFiles('accounting-review-queue.json') != ''
-        run: python scripts/build_mfi_sensitivity_report.py
+        run: python scripts/build_mfi_sensitivity_report.py --leases lease-rou-coverage.json
       - name: Validate issuer debt-note review guardrails
         if: always() && hashFiles('accounting-review-queue.json') != ''
         run: |
