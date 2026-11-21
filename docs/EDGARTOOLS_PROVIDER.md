@@ -231,7 +231,7 @@ Gemini is an optional interpretation assistant, not a fundamentals provider or c
 - The request contains compact, grouped candidate evidence and the resolver's existing validation outcomes, not the full filing, complete Company Facts dataset, or the full EdgarTools payload.
 - The default model is `gemini-2.5-flash-lite`; only Flash-Lite model IDs may be configured. No automatic escalation to paid-tier models is performed.
 - A D1 cache key includes the evidence hash, task, prompt version, proposed policy version and model. Unchanged task evidence reuses the cached response.
-- The application enforces a maximum of 10 uncached calls per UTC day. This is an application guardrail, not a guarantee of Google's free quota.
+- There is no application-level daily request cap. A D1-backed in-flight lock prevents simultaneous identical requests from calling Gemini twice; successful responses are cached by evidence hash, task, prompt version, proposed policy version and model. A failed request releases its lock so it can be retried.
 - Model output must pass a strict JSON contract and every finding must cite an evidence ID from the submitted package. Unknown evidence IDs, classifications or malformed responses are rejected.
 - Filing-derived labels and descriptions are untrusted input. Gemini has no tools, browsing or execution permissions.
 - AI output remains `*_REVIEW_REQUIRED` / candidate interpretation only. It never changes resolver results, production fundamentals, eligibility or ranking. Human review and existing deterministic validations remain mandatory.
