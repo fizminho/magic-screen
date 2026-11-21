@@ -47,3 +47,15 @@ test("markdown includes guardrails and issuer-level detail",()=>{
  const md=renderLeaseRouCoverageMarkdown(r); assert.match(md,/Missing rows or amounts are unknown/i);
  assert.match(md,/TEST/); assert.match(md,/production_write=false/);
 });
+
+test("restricts coverage totals to the active MFI universe when a snapshot is supplied",()=>{
+ const companies=["PRDO","ADBE","AFMJF"].map(symbol=>({symbol,provider_status:symbol==="AFMJF"?"unsupported_provider":"supported",
+  filing:{period_of_report:"2025-12-31"},statements:{balance_sheet:{rows:[
+   row("us-gaap_OperatingLeaseRightOfUseAsset","Operating lease right-of-use asset",100,1)
+  ]}}}));
+ const r=buildLeaseRouCoverage({companies},{symbols:["PRDO","AFMJF"]});
+ assert.deepEqual(r.issuers.map(x=>x.symbol),["AFMJF","PRDO"]);
+ assert.equal(r.summary.active_universe_issuers,2);
+ assert.equal(r.summary.supported_active_issuers,1);
+ assert.equal(r.summary.unsupported_active_issuers,1);
+});

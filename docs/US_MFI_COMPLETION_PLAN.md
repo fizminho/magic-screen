@@ -399,3 +399,10 @@ The first full-universe attempt after the initial Markdown fix (run 44924509279)
 
 
 The ROU classifier now matches the singular XBRL `RightOfUseAsset` concept directly, including labels that abbreviate the phrase. The missing-selected-period regression test was the source of the prior run failure; the fix is merged in PR #25 and the main Build passed (run 44925046268). A fresh full-universe run is required to produce the final cohort coverage artifact and validate the report on actual annual filings.
+
+
+## First lease/ROU coverage artifact review (22 November 2026)
+
+Full-universe run **44925190864** completed successfully, including the lease/ROU coverage builder. The first artifact inventory found 3 issuers whose net PP&E XBRL concept embeds finance-lease ROU, and SGHC's IFRS lease rows remain untyped rather than guessed. The report also surfaced a scope issue: the extractor includes ADBE as a regression control, so its initial 29 supported extraction rows do not represent the active 30-name MFI cohort (the resolver correctly reports 28 supported and 2 unsupported). PRDO also has an unvalued issuer-specific aggregate ROU concept alongside separately valued operating and finance ROU rows; the aggregate remains unknown, not zero.
+
+The audit is being tightened to consume the active-universe snapshot and report active-cohort counts separately from regression controls. It will retain accession/period-bound detail and unknown values. No invested-capital formula, lease EV treatment, EBIT, production fundamentals or rankings were changed.
