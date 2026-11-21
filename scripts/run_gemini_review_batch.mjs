@@ -1,7 +1,7 @@
 // GitHub Actions orchestrator for the resumable Gemini accounting-review batch.
 // Calls the authenticated Worker one bounded page at a time, honours quota waits, and reports per issuer/task.
 // Required env: WORKER_BASE_URL, UNIVERSE_SYNC_TOKEN. Optional: START_CURSOR, DRY_RUN, INCLUDE_FULL_SCOPE,
-// MAX_NEW_CALLS, MAX_RUNTIME_MINUTES. The token is never printed.
+// MAX_NEW_CALLS, MAX_RUNTIME_MINUTES, SYMBOLS (optional comma-separated active tickers). The token is never printed.
 import { appendFileSync } from "node:fs";
 import { orchestrate } from "../worker/gemini-batch.mjs";
 
@@ -9,6 +9,7 @@ export async function runFromEnv(env = process.env, fetchImpl = fetch, sleep = m
   const base = String(env.WORKER_BASE_URL ?? "").replace(/\/$/, "");
   const token = env.UNIVERSE_SYNC_TOKEN;
   if (!base || !token) throw new Error("WORKER_BASE_URL and UNIVERSE_SYNC_TOKEN are required");
+  const symbols = String(env.SYMBOLS ?? "").split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
   const startedAt = Date.now();
   const deadlineMs = startedAt + Number(env.MAX_RUNTIME_MINUTES ?? 40) * 60_000;
   const lines = [];
@@ -18,7 +19,8 @@ export async function runFromEnv(env = process.env, fetchImpl = fetch, sleep = m
         method: "POST",
         headers: { "content-type": "application/json", authorization: "Bearer " + token },
         body: JSON.stringify({ cursor: cursor ?? env.START_CURSOR ?? null, dry_run: env.DRY_RUN === "true",
-          include_full_scope: env.INCLUDE_FULL_SCOPE === "true", max_new_calls: Number(env.MAX_NEW_CALLS ?? 2) })
+          include_full_scope: env.INCLUDE_FULL_SCOPE === "true", max_new_calls: Number(env.MAX_NEW_CALLS ?? 2),
+          ...(symbols.length ? { symbols } : {}) })
       });
       if (response.status === 401 || response.status === 503 && attempt === 3) throw new Error("Worker returned HTTP " + response.status);
       if (response.ok) return response.json();

@@ -1217,7 +1217,17 @@ export default {
         const body=JSON.parse((await request.text())||"{}");
         const dryRun=body.dry_run===true;
         if(!dryRun && !env.GEMINI_API_KEY) return json({error:"GEMINI_API_KEY is not configured as a Worker secret"},503);
-        const page=await runBatchPage({symbols:symbolsActive,cursor:typeof body.cursor==="string"?body.cursor:null,loadIssuer,
+        let selectedSymbols=symbolsActive;
+        if(body.symbols!==undefined) {
+          if(!Array.isArray(body.symbols)||body.symbols.length<1||body.symbols.length>30||
+            body.symbols.some((value:any)=>typeof value!=="string"||!/^[A-Z0-9.-]{1,15}$/.test(value.trim().toUpperCase())))
+            return json({error:"symbols must be an array of 1-30 valid ticker strings"},400);
+          const requested=[...new Set(body.symbols.map((value:string)=>value.trim().toUpperCase()))];
+          const inactive=requested.filter((symbol:string)=>!symbolsActive.includes(symbol));
+          if(inactive.length) return json({error:"Requested symbols are not in the active US universe",symbols:inactive},400);
+          selectedSymbols=symbolsActive.filter((symbol:string)=>requested.includes(symbol));
+        }
+        const page=await runBatchPage({symbols:selectedSymbols,cursor:typeof body.cursor==="string"?body.cursor:null,loadIssuer,
           runReview:(input:any)=>runGeminiAccountingReview(env,{...input,model:env.GEMINI_MODEL}),
           maxNewCalls:Math.min(5,Math.max(1,Math.floor(Number(body.max_new_calls??2)))),
           maxTasks:Math.min(25,Math.max(1,Math.floor(Number(body.max_tasks??12)))),
