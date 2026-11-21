@@ -158,3 +158,32 @@ The queue now also carries an accession-bound FY2025 operating-income-quality re
 | VXRT | Current/noncurrent liability and royalty-stream limitation identified | Separate limited-recourse royalty-financing bucket; policy decision | No |
 
 No resolver inputs, production fundamentals, EY/ROC, eligibility or rankings were changed. The remaining P2 batch should next reconcile explicit conventional debt instruments (SBC and ZVRA), then complete the named-facility and debt-note coverage reviews for MNTN, PXED, STRA, FHTX and NRIX.
+
+
+## PRDO full-scope reconciliation update (22 November 2026)
+
+The refreshed Gemini `full_scope` review (prompt `gemini-accounting-review-v10`, accession `0001193125-26-059331`) now confirms that the failed sale-leaseback financing is separately presented from ordinary operating and finance lease liabilities. The deterministic six-signal filing-note matcher returned `financing_treatment_supported`; the same-filing balance-sheet face rows are distinct:
+
+| Balance-sheet item | FY2025 carrying value (USD millions) | Face row |
+|---|---:|---:|
+| Operating lease liability, current | 6.032 | 39 |
+| Finance lease liability, current | 5.458 | 40 |
+| Operating lease liability, noncurrent | 43.752 | 50 |
+| Finance lease liability, noncurrent | 6.097 | 51 |
+| Failed sale-leaseback financing, noncurrent | 56.992 | 52 |
+
+Ordinary operating lease liabilities total **49.784m** and finance lease liabilities total **11.555m**. The separately presented failed sale-leaseback financing liability is **56.992m**. The note matcher also confirmed all six required signals: failed sale-leaseback identification, financing-liability recognition, no rent expense, payment allocation to interest and liability reduction, ordinary lease schedule limited to balance-sheet lease liabilities, and a separate failed sale-leaseback payment schedule.
+
+**Reconciliation conclusion:** `relationship=separate_obligations_supported_by_filing` and `requires_manual_reconciliation=false`. The $56.992m balance must not be treated as a duplicate of the $61.339m ordinary lease-liability total. Use the reported carrying value, not the $154.067m undiscounted future payment schedule, if a future approved policy includes this financing obligation.
+
+This resolves the presentation/overlap question only. It does **not** approve EV inclusion or invested-capital treatment. The current proposed EV policy keeps failed sale-leaseback financing in a separate pending-owner-policy bucket. The asset remains on the balance sheet and is depreciated, so the relationship between that retained asset, depreciation in EBIT and invested capital still requires a consistent accounting-owner decision.
+
+The same full-scope review identified:
+- Unrestricted cash: **$110.970m**.
+- Restricted cash: **$21.310m**, separately identified and excluded from unrestricted cash under the proposed policy.
+- Current available-for-sale debt securities: **$511.211m**, kept separate from cash equivalents pending a uniform cash-like test.
+- Operating ROU asset: **$43.290m**; finance ROU asset: **$10.259m**.
+- Consolidated GAAP operating income: **$196.000m**.
+- No conventional debt identified in the supplied evidence.
+
+The review remains `REVIEW_REQUIRED`, `production_approved=false`, and `production_write=false`. The issuer remains shadow-only. No EV adjustment, invested-capital formula, EBIT value, production fundamental or ranking was changed.
