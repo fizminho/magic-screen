@@ -109,3 +109,42 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("returns structured quota exhaustion without caching or retaining the request lock", async () => {
+  const DB = new FakeD1();
+  const { env, input } = reviewInput(DB);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: {
+    code: 429, message: "You exceeded your current quota, please check your plan and billing details."
+  } }), { status: 429, headers: { "content-type": "application/json" } });
+  try {
+    const result = await runGeminiAccountingReview(env, input);
+    assert.equal(result.status, "QUOTA_EXHAUSTED");
+    assert.equal(result.review_state, "PENDING_RETRY");
+    assert.equal(result.retryable, false);
+    assert.equal(result.production_write, false);
+    assert.equal(DB.cache.size, 0);
+    assert.equal(DB.locks.size, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("returns a retryable rate-limit status for non-quota HTTP 429 responses", async () => {
+  const DB = new FakeD1();
+  const { env, input } = reviewInput(DB);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: {
+    code: 429, message: "Too many requests. Please retry in 30 seconds."
+  } }), { status: 429, headers: { "content-type": "application/json" } });
+  try {
+    const result = await runGeminiAccountingReview(env, input);
+    assert.equal(result.status, "RATE_LIMITED");
+    assert.equal(result.retryable, true);
+    assert.equal(DB.cache.size, 0);
+    assert.equal(DB.locks.size, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
