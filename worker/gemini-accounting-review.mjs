@@ -584,7 +584,8 @@ export async function runGeminiAccountingReview(env, input) {
     const providerMessage = String(parsedError?.error?.message ?? responseBody);
     const quotaExhausted = isGeminiQuotaExhaustion(candidateResponse.status, providerMessage, parsedError);
     modelFailures.push({ model: candidateModel, provider_http_status: candidateResponse.status,
-      quota_exhausted: quotaExhausted, message: providerMessage.slice(0, 240) });
+      quota_exhausted: quotaExhausted, message: providerMessage.slice(0, 240),
+      retry_after_ms: parseGeminiRetryAfterMs(candidateResponse.headers?.get?.("retry-after") ?? null, responseBody) || null });
     const shouldFailOver = quotaExhausted || candidateResponse.status === 404
       || candidateResponse.status === 408 || candidateResponse.status === 429 || candidateResponse.status >= 500;
     if (shouldFailOver) continue;
@@ -600,6 +601,7 @@ export async function runGeminiAccountingReview(env, input) {
       symbol: input.symbol, accession: input.accession, task: input.task,
       status: allQuotaExhausted ? "QUOTA_EXHAUSTED" : "MODEL_FALLBACK_EXHAUSTED",
       review_state: "PENDING_RETRY", cached: false, ai_review_only: true, retryable,
+      retry_after_ms: Math.max(0, ...modelFailures.map(item => Number(item.retry_after_ms) || 0)) || null,
       provider_http_status: modelFailures.at(-1)?.provider_http_status ?? null,
       attempts: modelFailures.length, model_failures: modelFailures,
       note: allQuotaExhausted

@@ -12,11 +12,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm install
       - run: npm run build
       - name: Run Gemini accounting review contract and deduplication tests
         run: node --test worker/gemini-accounting-review*.test.mjs
+      - name: Run US universe source-membership tests
+        run: node --test worker/universe-membership.test.mjs
+      - name: Run Gemini batch orchestration and ranking tests
+        run: node --test worker/gemini-batch.test.mjs worker/mfi-ranking.test.mjs
       - name: Run debt reconciliation regression tests
         run: node --test worker/debt-reconciliation.test.mjs
       - name: Run lease and ROU coverage regression tests

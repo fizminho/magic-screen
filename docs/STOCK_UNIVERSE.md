@@ -2,13 +2,21 @@
 
 ## United States
 
-Magic Screen's US candidate universe comes exclusively from the authenticated Magic Formula Investing (MFI) screening endpoint:
+The US candidate universe is the union of active source memberships stored in `stock_universe_membership`:
 
-- Source: https://www.magicformulainvesting.com/Screening/StockScreening
-- Refresh endpoint: `GET /api/mfi/screen`
-- Displayed US stocks are read from `GET /api/stocks?market=US`.
-- SEC's `company_tickers_exchange.json` directory is used only inside the fundamentals pipeline to map MFI tickers to CIKs. It must not be imported as the US candidate universe.
-- `GET /api/universe?market=US` remains a read-only legacy/master-data query for compatibility and diagnostics. It is not called by the frontend and does not trigger SEC universe synchronisation. The former `sync=1` behaviour has been retired.
+| Source | How it enters | What can remove it |
+|---|---|---|
+| `Magic Formula Investing` | Authenticated MFI screen, `GET /api/mfi/screen` (https://www.magicformulainvesting.com/Screening/StockScreening) | Only an MFI refresh that no longer returns the symbol |
+| `Frontend` | `POST /api/universe/us/stocks` (the "Add US stock" dialog), bearer `UNIVERSE_SYNC_TOKEN` | Only `DELETE /api/universe/us/stocks?symbol=...` |
+
+Rules:
+
+- One canonical `stock_master` row per `(market, symbol)`. A stock is active while any source membership is active, and `listing_status` is reconciled from that.
+- Additions and imports are idempotent. Existing MFI rows are backfilled into MFI memberships automatically. Legacy SEC-directory or starter rows are not backfilled and stay out of the universe.
+- Displayed US stocks come from `GET /api/stocks?market=US`, which includes `universe_sources` per stock. MFI.com's screen order is not a Magic Formula ranking.
+- SEC's `company_tickers_exchange.json` / `company_tickers.json` are used only to map tickers to CIKs and to sanity-check frontend additions. They must never be imported as the universe. Tickers with no SEC match stay visible as unsupported in coverage.
+- Any change to the active universe, or to MFI market caps, clears published US ranks until every active candidate has current complete fundamentals. A frontend addition with no market cap keeps ranks withheld until a cap is available (optionally supply `market_cap_millions`; it never overrides an MFI cap).
+- `GET /api/universe?market=US` remains a read-only legacy/master-data query and is not called by the frontend.
 
 ## Bursa Malaysia
 
