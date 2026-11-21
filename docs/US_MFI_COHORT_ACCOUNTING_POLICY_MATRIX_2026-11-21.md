@@ -120,3 +120,10 @@ Recommended starting point: only issuer-defined cash equivalents with original m
 ## Legacy reconciliation output
 
 The authenticated read-only reconciliation preview compares legacy and EdgarTools metrics using the same current market-cap snapshot. It emits input and EY/ROC deltas only when fiscal periods match and both sides have complete inputs. Legacy accession is not stored in the old table and is disclosed as unavailable. This report is required before any cutover decision and does not change production values.
+
+
+## Legacy reconciliation evidence and cutover blocker
+
+The first full reconciliation (run 44889267826) includes all 30 issuers and confirms 28 EdgarTools-supported names. Only one supported issuer has a fully calculated legacy fundamentals record, and 27/28 supported issuers have no legacy total-debt value. Legacy field coverage is EBIT 25/28, invested capital 23/28, debt 1/28 and cash 24/28. The only full EY/ROC comparison is BMBL, which is not in the ranked cohort. None of the five current shadow-ranked names can be fully compared with legacy.
+
+This is a material legacy completeness gap. The new preview now reports partial same-period input deltas separately from full metric deltas; full EV/EY/ROC comparisons remain blocked when debt or another required input is missing. Cutover must not be approved merely because the new path has better coverage; every difference must be explained or explicitly accepted by the accounting/product owner.

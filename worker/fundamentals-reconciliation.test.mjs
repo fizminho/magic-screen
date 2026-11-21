@@ -13,6 +13,23 @@ function row(overrides={}){return {
     enterprise_value_candidate_review:{conventional_debt_status:"identified_from_unique_current_and_noncurrent_components",conventional_gross_debt_candidate:10000000,unrestricted_cash_candidate:5000000}},
   ...overrides};}
 testCase("reconciles identical same-period inputs using a common current market cap",()=>{const r=buildFundamentalsReconciliationPreview([row()]);const x=r.rows[0];assert.equal(x.status,"comparable");assert.equal(x.legacy.metrics.enterprise_value,105000000);assert.equal(x.edgartools.metrics.enterprise_value,105000000);assert.equal(x.metric_deltas.earnings_yield_percentage_points,0);assert.equal(r.production_write,false);});
+testCase("reports partial same-period inputs when legacy debt is missing",()=>{
+  const input=row({legacy_status:"missing_required_facts",legacy_ebit:9000000,legacy_total_debt:null});
+  const result=buildFundamentalsReconciliationPreview([input]);
+  const item=result.rows[0];
+  assert.equal(item.metrics_comparable,false);
+  assert.equal(item.metric_deltas,null);
+  assert.equal(item.status,"legacy_not_calculated");
+  assert.equal(item.partial_input_deltas.ebit.delta,1000000);
+  assert.equal(item.partial_input_deltas.invested_capital.delta,0);
+  assert.equal(item.partial_input_deltas.gross_debt,null);
+  assert.equal(item.partial_input_deltas.unrestricted_cash.delta,0);
+  assert.equal(item.has_partial_input_differences,true);
+  assert.equal(result.summary.partial_input_comparison_rows,1);
+  assert.equal(result.summary.rows_with_partial_input_differences,1);
+  assert.equal(result.summary.legacy_debt_missing_supported,1);
+});
+
 testCase("does not compare different fiscal periods",()=>{const x=buildFundamentalsReconciliationPreview([row({legacy_fiscal_period:"2024-12-31"})]).rows[0];assert.equal(x.status,"period_mismatch");assert.equal(x.metrics_comparable,false);assert.equal(x.metric_deltas,null);assert.ok(x.mismatch_reasons.includes("fiscal_period_mismatch"));});
 testCase("does not compare uncalculated legacy fundamentals",()=>{const x=buildFundamentalsReconciliationPreview([row({legacy_status:"missing_required_facts"})]).rows[0];assert.equal(x.status,"legacy_not_calculated");assert.equal(x.legacy.metrics,null);});
 testCase("keeps unsupported providers visible but non-comparable",()=>{const r=row();r.edgar.provider_status="unsupported_provider";const x=buildFundamentalsReconciliationPreview([r]).rows[0];assert.equal(x.status,"edgartools_unsupported_or_missing");assert.equal(x.edgartools.metrics,null);});

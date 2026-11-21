@@ -322,3 +322,15 @@ Full-universe workflow run **44889130534** completed successfully on commit 91b6
 - Production-approved rows **0**. Resolver and ranking artifacts confirm production writes, production fundamentals changes and ranking changes are all **false**.
 
 The full-universe run passed extraction, raw evidence ingestion, resolver preview, ranking preview, coverage validation, queue generation, sensitivity report and debt-note guardrails. This verifies the current review flags and 30-name coverage; it does not approve accounting policies or production cutover.
+
+
+## Legacy-versus-EdgarTools reconciliation findings (run 44889267826)
+
+The first full 30-name read-only reconciliation artifact is available from successful bakeoff run 44889267826 (artifact 14700518715). Results:
+- 30 active issuers included; 28 EdgarTools-supported and 2 unsupported.
+- 27 of 28 supported issuers have matching annual fiscal periods between legacy and EdgarTools.
+- Only 1 of 28 supported issuers has a fully calculated legacy fundamentals record (BMBL); it is not in the current ranked cohort.
+- 27 of 28 supported issuers have no legacy total-debt value. Legacy field coverage is EBIT 25/28, invested capital 23/28, debt 1/28 and cash 24/28.
+- Only one full EY/ROC comparison is possible. None of the five current shadow-ranked issuers has a complete legacy comparison.
+
+This is a legacy data-completeness blocker, not evidence of an EdgarTools metric error. The comparison endpoint has been extended to show partial same-period input deltas even when the legacy debt input is missing, while keeping full EV/EY/ROC deltas blocked. The next bakeoff will validate those partial comparisons and report field coverage. Production cutover remains blocked until legacy-vs-new differences are explainable or the owner explicitly approves a controlled replacement of the legacy path.

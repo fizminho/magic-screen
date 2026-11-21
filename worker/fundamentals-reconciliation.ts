@@ -20,6 +20,9 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
     const periodMatch=Boolean(legacyPeriod&&edgarPeriod&&legacyPeriod===edgarPeriod);
     const currentMarketCap=finiteNumber(row.current_market_cap);
     const legacyMarketCap=finiteNumber(row.legacy_market_cap);
+    const legacyEbit=finiteNumber(row.legacy_ebit);
+    const legacyGrossDebt=finiteNumber(row.legacy_total_debt);
+    const legacyCash=finiteNumber(row.legacy_cash);
     const legacyInvestedCapital=finiteNumber(row.legacy_current_assets)!==null&&finiteNumber(row.legacy_current_liabilities)!==null&&finiteNumber(row.legacy_net_ppe)!==null
       ?Number(row.legacy_current_assets)-Number(row.legacy_current_liabilities)+Number(row.legacy_net_ppe):null;
     const legacyMetrics=legacyStatus==="calculated"?calculateMetrics(row.legacy_ebit,legacyInvestedCapital,row.legacy_total_debt,row.legacy_cash,currentMarketCap):null;
@@ -29,6 +32,18 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
       &&edgar.invested_capital_status==="positive_denominator_candidate_review_only"
       &&evReview.conventional_debt_status==="identified_from_unique_current_and_noncurrent_components";
     const edgarMetrics=edgarInputsComplete?calculateMetrics(edgar.ebit_candidate,edgar.invested_capital_candidate,evReview.conventional_gross_debt_candidate,evReview.unrestricted_cash_candidate,currentMarketCap):null;
+    const edgarEbit=finiteNumber(edgar.ebit_candidate);
+    const edgarInvestedCapital=finiteNumber(edgar.invested_capital_candidate);
+    const edgarGrossDebt=finiteNumber(evReview.conventional_gross_debt_candidate);
+    const edgarCash=finiteNumber(evReview.unrestricted_cash_candidate);
+    const partialInputDeltas=periodMatch?{
+      ebit:legacyEbit!==null&&edgarEbit!==null?inputDelta(legacyEbit,edgarEbit):null,
+      invested_capital:legacyInvestedCapital!==null&&edgarInvestedCapital!==null?inputDelta(legacyInvestedCapital,edgarInvestedCapital):null,
+      gross_debt:legacyGrossDebt!==null&&edgarGrossDebt!==null?inputDelta(legacyGrossDebt,edgarGrossDebt):null,
+      unrestricted_cash:legacyCash!==null&&edgarCash!==null?inputDelta(legacyCash,edgarCash):null,
+    }:null;
+    const partialDeltaValues=partialInputDeltas?[partialInputDeltas.ebit,partialInputDeltas.invested_capital,partialInputDeltas.gross_debt,partialInputDeltas.unrestricted_cash].filter((value:any)=>value!==null):[];
+    const hasPartialInputDifferences=materiallyDifferent(partialDeltaValues);
     const mismatchReasons:string[]=[];
     if(legacyStatus!=="calculated") mismatchReasons.push("legacy_fundamentals_not_calculated");
     if(!legacyPeriod) mismatchReasons.push("legacy_fiscal_period_missing");
@@ -65,18 +80,22 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
     return {
       symbol:String(row.symbol??"UNKNOWN"),company_name:row.company_name??null,status,metrics_comparable:metricsComparable,period_match:periodMatch,
       legacy:{status:legacyStatus,source:row.legacy_source??null,fiscal_period:legacyPeriod,filed_at:row.legacy_filed_at??null,accession_available:false,
-        ebit:finiteNumber(row.legacy_ebit),invested_capital:legacyInvestedCapital,gross_debt:finiteNumber(row.legacy_total_debt),cash:finiteNumber(row.legacy_cash),
+        ebit:legacyEbit,invested_capital:legacyInvestedCapital,gross_debt:legacyGrossDebt,cash:legacyCash,
         market_cap_at_calculation:legacyMarketCap,stored_earnings_yield:finiteNumber(row.legacy_stored_earnings_yield),
         stored_return_on_capital:finiteNumber(row.legacy_stored_return_on_capital),metrics:legacyMetrics},
       edgartools:{provider_status:edgar.provider_status??null,accession:edgar.accession??null,fiscal_period:edgarPeriod,form:edgar.filing_form??null,
         reporting_currency:edgar.reporting_currency??null,ebit_status:edgar.ebit_status??null,invested_capital_status:edgar.invested_capital_status??null,
+        ebit_candidate:edgarEbit,invested_capital_candidate:edgarInvestedCapital,gross_debt_candidate:edgarGrossDebt,unrestricted_cash_candidate:edgarCash,
         review_flags:reviewFlags,metrics:edgarMetrics},
       current_market_cap:currentMarketCap,market_cap_updated_at:row.market_cap_updated_at??null,mismatch_reasons:mismatchReasons,
-      input_deltas:inputDeltas,metric_deltas:metricDeltas,has_input_differences:materiallyDifferent(inputDeltaValues),
+      input_deltas:inputDeltas,metric_deltas:metricDeltas,partial_input_deltas:partialInputDeltas,
+      has_input_differences:materiallyDifferent(inputDeltaValues),has_partial_input_differences:hasPartialInputDifferences,
       production_approved:false,production_write:false,
     };
   });
   const count=(status:string)=>reconciliations.filter((row:any)=>row.status===status).length;
+  const supportedRows=reconciliations.filter((row:any)=>row.edgartools.provider_status==="supported");
+  const fieldCoverage=(rows:any[],field:string)=>rows.filter((row:any)=>row[field]!==null&&row[field]!==undefined).length;
   return {source:"legacy_stock_fundamentals_vs_edgartools_shadow",as_of:asOf,summary:{
     universe:reconciliations.length,legacy_calculated:reconciliations.filter((row:any)=>row.legacy.status==="calculated").length,
     edgartools_supported:reconciliations.filter((row:any)=>row.edgartools.provider_status==="supported").length,
@@ -84,6 +103,21 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
     period_mismatched:reconciliations.filter((row:any)=>row.mismatch_reasons.includes("fiscal_period_mismatch")).length,
     metrics_comparable:reconciliations.filter((row:any)=>row.metrics_comparable).length,
     rows_with_input_differences:reconciliations.filter((row:any)=>row.has_input_differences).length,
+    partial_input_comparison_rows:reconciliations.filter((row:any)=>row.partial_input_deltas&&Object.values(row.partial_input_deltas).some((value:any)=>value!==null)).length,
+    rows_with_partial_input_differences:reconciliations.filter((row:any)=>row.has_partial_input_differences).length,
+    legacy_debt_missing_supported:supportedRows.filter((row:any)=>row.legacy.gross_debt===null).length,
+    legacy_field_coverage:{
+      ebit:fieldCoverage(supportedRows.map((row:any)=>row.legacy),"ebit"),
+      invested_capital:fieldCoverage(supportedRows.map((row:any)=>row.legacy),"invested_capital"),
+      gross_debt:fieldCoverage(supportedRows.map((row:any)=>row.legacy),"gross_debt"),
+      cash:fieldCoverage(supportedRows.map((row:any)=>row.legacy),"cash"),
+    },
+    edgartools_field_coverage:{
+      ebit:fieldCoverage(supportedRows.map((row:any)=>row.edgartools),"ebit_candidate"),
+      invested_capital:fieldCoverage(supportedRows.map((row:any)=>row.edgartools),"invested_capital_candidate"),
+      gross_debt:fieldCoverage(supportedRows.map((row:any)=>row.edgartools),"gross_debt_candidate"),
+      cash:fieldCoverage(supportedRows.map((row:any)=>row.edgartools),"unrestricted_cash_candidate"),
+    },
     legacy_not_calculated:count("legacy_not_calculated"),legacy_inputs_incomplete:count("legacy_inputs_incomplete"),
     edgartools_unsupported_or_missing:count("edgartools_unsupported_or_missing"),edgartools_inputs_incomplete:count("edgartools_inputs_incomplete"),
   },rows:reconciliations,production_fundamentals_changed:false,rankings_changed:false,production_write:false,
