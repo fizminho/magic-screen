@@ -1165,5 +1165,63 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(review["resolver_input"])
         self.assertFalse(review["debt_candidate_promoted"])
 
+
+    def test_qttb_operating_income_quality_review_is_accession_bound_and_non_promoting(self):
+        from build_accounting_review_queue import (
+            FILING_OPERATING_INCOME_QUALITY_REVIEWS,
+            filing_operating_income_quality_review,
+        )
+
+        source = FILING_OPERATING_INCOME_QUALITY_REVIEWS["QTTB"]
+        review = filing_operating_income_quality_review("QTTB", "0001193125-26-099339")
+        self.assertIsNotNone(review)
+        self.assertEqual(review["reported_operating_income_millions"], 16.902)
+        self.assertEqual(review["identified_nonrecurring_operating_revenue_millions"], 53.737)
+        self.assertIn("customer refund liability", " ".join(review["observations"]))
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertFalse(review["ranking_input_changed"])
+        self.assertIsNone(filing_operating_income_quality_review("QTTB", "different-accession"))
+
+    def test_queue_attaches_qttb_operating_income_quality_review_without_changing_rank(self):
+        preview = {
+            "production_fundamentals_changed": False,
+            "rankings_changed": False,
+            "resolutions": [{
+                "symbol": "QTTB",
+                "accession": "0001193125-26-099339",
+                "provider_status": "supported",
+                "ebit_status": "direct_reported_candidate_review_only",
+                "invested_capital_status": "positive_denominator_candidate_review_only",
+                "enterprise_value_candidate_review": {
+                    "conventional_debt_status": "identified_from_unique_current_and_noncurrent_components",
+                    "unrestricted_cash_candidate": 48_297_000,
+                },
+            }],
+        }
+        ranking = {
+            "production_write": False,
+            "rankings_changed": False,
+            "rankings": [{
+                "symbol": "QTTB", "magic_formula_rank": 4, "magic_formula_score": 8,
+                "earnings_yield": 0.10388, "return_on_capital": 0.37826,
+                "eligibility_status": "eligible", "ranking_eligible": True,
+                "production_approved": False,
+            }],
+        }
+        raw = {"companies": [{
+            "symbol": "QTTB",
+            "filing": {"accession_number": "0001193125-26-099339"},
+            "balance_sheet_fact_review": {"fiscal_period": "2025-12-31", "categories": {}},
+            "statements": {"balance_sheet": {"rows": []}},
+        }]}
+        item = build_queue(preview, raw, ranking)["items"][0]
+        self.assertEqual(item["filing_operating_income_quality_review"]["reported_operating_income_millions"], 16.902)
+        self.assertEqual(item["mfi_shadow_ranking"]["rank"], 4)
+        self.assertIn("filing_operating_income_quality_review_available_manual_review", item["issues"])
+        self.assertTrue(any("nonrecurring" in action for action in item["next_review_actions"]))
+        self.assertFalse(item["filing_operating_income_quality_review"]["production_approved"])
+        self.assertFalse(item["production_write"])
+
 if __name__ == "__main__":
     unittest.main()

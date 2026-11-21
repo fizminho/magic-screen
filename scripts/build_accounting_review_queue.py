@@ -1126,6 +1126,45 @@ def debt_candidate_evidence_review(raw_company: dict[str, Any]) -> dict[str, Any
     return result
 
 
+FILING_OPERATING_INCOME_QUALITY_REVIEWS: dict[str, dict[str, Any]] = {
+    "QTTB": {
+        "accession": "0001193125-26-099339",
+        "fiscal_period": "2025-12-31",
+        "review_classification": "material_nonrecurring_operating_revenue_in_reported_EBIT",
+        "reported_operating_income_millions": 16.902,
+        "identified_nonrecurring_operating_revenue_millions": 53.737,
+        "observations": [
+            "FY2025 reported operating income is 16.902m, calculated as 53.737m collaboration-arrangement revenue less 36.835m operating expenses.",
+            "The filing explains that the 53.737m collaboration-arrangement revenue arose from settlement of a customer refund liability following the Amgen amendment.",
+            "The issuer states that it has not commercialized product candidates and does not expect product sales for several years, if at all."
+        ],
+        "interpretation": "The reported GAAP operating-income subtotal is arithmetically valid, but a one-time settlement is the entire revenue line and materially affects the positive EBIT candidate. The shadow rank is a mechanical reported-GAAP result, not a recurring-earnings quality signal.",
+        "manual_review_questions": [
+            "Should the Magic Formula EBIT numerator use reported GAAP operating income without adjustment, or is a documented cohort-wide exceptional-item policy required?",
+            "If any adjustment policy is adopted, define it consistently and retain the reported GAAP amount alongside every adjusted candidate."
+        ],
+        "prohibited_inferences": [
+            "Do not silently remove the settlement revenue or replace reported EBIT.",
+            "Do not mark the issuer production-approved based on the positive reported operating-income subtotal."
+        ],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1661998/000119312526099339/qttb-20251231.htm",
+        "source": "curated_primary_annual_filing_operating_income_quality_review",
+        "status": "review_only",
+        "production_approved": False,
+        "resolver_input": False,
+        "ranking_input_changed": False
+    }
+}
+
+
+def filing_operating_income_quality_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
+    """Attach accession-bound operating-income quality observations without adjusting EBIT."""
+    review = FILING_OPERATING_INCOME_QUALITY_REVIEWS.get(symbol)
+    if not review or not accession or review["accession"] != accession:
+        return None
+    return dict(review)
+
+
 def filing_debt_note_review(symbol: str, accession: str | None) -> dict[str, Any] | None:
     """Attach exact-accession evidence to the read-only review queue only; never approve or promote resolver candidates."""
     review = FILING_DEBT_NOTE_REVIEWS.get(symbol)
@@ -1230,6 +1269,17 @@ def build_queue(
             item["debt_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
             item["ev_scope_evidence"] = extract_ev_scope_evidence(raw_company)
             item["ev_scope_evidence_source"] = "fresh_extraction_artifact_same_accession"
+            item["filing_operating_income_quality_review"] = filing_operating_income_quality_review(item["symbol"], raw_accession)
+            item["filing_operating_income_quality_review_source"] = (
+                "curated_primary_annual_filing_operating_income_quality_review_same_accession"
+                if item["filing_operating_income_quality_review"] else "not_available"
+            )
+            if item["filing_operating_income_quality_review"]:
+                item["issues"].append("filing_operating_income_quality_review_available_manual_review")
+                item["next_review_actions"].append(
+                    "Review material nonrecurring items in the reported operating-income subtotal; do not silently adjust EBIT or change the ranking formula."
+                )
+                item["issue_count"] = len(item["issues"])
             item["filing_debt_note_review"] = filing_debt_note_review(item["symbol"], raw_accession)
             item["filing_debt_note_review_source"] = (
                 "curated_primary_annual_filing_note_review_same_accession"
@@ -1291,6 +1341,8 @@ def build_queue(
             item["debt_scope_evidence_source"] = "stored_resolver_preview"
             item["ev_scope_evidence"] = None
             item["ev_scope_evidence_source"] = "stored_resolver_preview"
+            item["filing_operating_income_quality_review"] = None
+            item["filing_operating_income_quality_review_source"] = "stored_resolver_preview"
             item["filing_debt_note_review"] = None
             item["filing_debt_note_review_source"] = "stored_resolver_preview"
             item["filing_ev_scope_note_review"] = None
@@ -1328,6 +1380,7 @@ def build_queue(
             )),
             "debt_scope_evidence_companies": sum(1 for row in rows if row.get("debt_scope_evidence") and row["debt_scope_evidence"].get("row_count", 0)),
             "filing_debt_note_manual_reviews_available": sum(1 for row in rows if row.get("filing_debt_note_review")),
+            "filing_operating_income_quality_manual_reviews_available": sum(1 for row in rows if row.get("filing_operating_income_quality_review")),
             "filing_debt_note_review_classifications": dict(Counter(
                 (row.get("filing_debt_note_review") or {}).get("review_classification", "unclassified")
                 for row in rows if row.get("filing_debt_note_review")
@@ -1426,7 +1479,7 @@ def main() -> int:
         "debt_instrument_evidence_source", "debt_scope_evidence", "debt_scope_evidence_source", "ev_scope_evidence", "ev_scope_evidence_source", "filing_debt_note_review", "filing_debt_note_review_source", "filing_ev_scope_note_review", "filing_ev_scope_note_review_source", "balance_sheet_reconciliation_review",
         "balance_sheet_reconciliation_evidence_source", "invested_capital_denominator_diagnostics",
         "invested_capital_denominator_diagnostics_source", "filing_specific_ebit_review",
-        "filing_specific_ebit_review_source", "candidate_vs_policy_assessment", "next_review_actions", "production_write",
+        "filing_specific_ebit_review_source", "filing_operating_income_quality_review", "filing_operating_income_quality_review_source", "candidate_vs_policy_assessment", "next_review_actions", "production_write",
     ]
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -1452,6 +1505,9 @@ def main() -> int:
             )
             row["filing_specific_ebit_review"] = json.dumps(
                 item.get("filing_specific_ebit_review"), separators=(",", ":")
+            )
+            row["filing_operating_income_quality_review"] = json.dumps(
+                item.get("filing_operating_income_quality_review"), separators=(",", ":")
             )
             row["mfi_shadow_ranking"] = json.dumps(item.get("mfi_shadow_ranking"), separators=(",", ":"))
             row["candidate_vs_policy_assessment"] = json.dumps(item["candidate_vs_policy_assessment"], separators=(",", ":"))

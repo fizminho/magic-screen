@@ -168,3 +168,6 @@ The remaining three current shadow-ranked issuers now have accession-matched fil
 - **IRWD:** FY2025 operating income is $98.502m. Current notes carrying value of $199.680m and $385m drawn revolver are separate borrowing instruments. The notes matured and were repaid in June 2026, but later repayment must not overwrite the FY2025 annual snapshot.
 - **QTTB:** FY2025 reported operating income is $16.902m, but it includes $53.737m collaboration-arrangement revenue arising from settlement of a customer refund liability under the Amgen amendment. This makes its positive EBIT and tied shadow rank unusually sensitive to a nonrecurring operating item. The $9.708m venture-debt carrying value reconciles to $6.235m current and $3.473m noncurrent; $0.647m restricted cash is collateral.
 - All three remain review-only and production-unapproved. No production fundamentals, ratios, eligibility or rankings were changed.
+
+
+The accounting review queue now also carries accession-bound operating-income quality notes for material nonrecurring items. QTTB's FY2025 reported EBIT of $16.902m includes $53.737m of collaboration-arrangement settlement revenue. The queue surfaces this as manual review context only; it does not adjust EBIT, eligibility or rank.
