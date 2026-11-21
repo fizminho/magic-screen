@@ -1153,6 +1153,35 @@ FILING_OPERATING_INCOME_QUALITY_REVIEWS: dict[str, dict[str, Any]] = {
         "production_approved": False,
         "resolver_input": False,
         "ranking_input_changed": False
+    },
+    "VXRT": {
+        "accession": "0001437749-26-008023",
+        "fiscal_period": "2025-12-31",
+        "review_classification": "noncash_royalty_revenue_related_to_sold_royalties",
+        "reported_operating_income_millions": 18.074,
+        "identified_nonrecurring_operating_revenue_millions": 1.929,
+        "observations": [
+            "FY2025 GAAP operating income is 18.074m.",
+            "The filing separately reports 1.929m non-cash royalty revenue related to the sale of future royalties from Daiichi Sankyo; royalties received are required to be paid to HCRP.",
+            "The liability from sale of future royalties is 4.060m at year-end, comprising 1.381m current and 2.679m noncurrent.",
+            "The liability roll-forward reports 4.521m non-cash royalty revenue paid to HCRP and 2.823m non-cash imputed interest expense during FY2025; these are roll-forward mechanics and should not be conflated with the 1.929m revenue line in the MD&A."
+        ],
+        "interpretation": "The issuer's sold-royalty financing produces a noncash revenue line and a separately accreting financing liability. This creates an operating-income quality and EV-scope question: the EBIT candidate may include revenue from a stream already sold, while the related financing obligation remains outstanding.",
+        "manual_review_questions": [
+            "Should noncash royalty revenue related to sold future royalties remain in the MFI EBIT numerator, or should a documented cohort-wide policy adjust such financing-linked operating revenue?",
+            "Should the 4.060m future-royalty sale liability be treated as debt-like for EV, separately from conventional borrowings and leases?",
+            "Reconcile the 1.929m reported noncash royalty revenue with the 4.521m liability roll-forward payment line; do not assume they are the same measure."
+        ],
+        "prohibited_inferences": [
+            "Do not silently remove noncash royalty revenue or adjust EBIT without an approved cohort-wide rule.",
+            "Do not automatically classify the royalty liability as conventional debt or ordinary lease liability."
+        ],
+        "source_url": "https://www.sec.gov/Archives/edgar/data/72444/000143774926008023/vxrt20251231_10k.htm",
+        "source": "curated_primary_annual_filing_operating_income_quality_review",
+        "status": "review_only",
+        "production_approved": False,
+        "resolver_input": False,
+        "ranking_input_changed": False
     }
 }
 

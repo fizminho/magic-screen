@@ -1304,5 +1304,18 @@ class AccountingReviewQueueTests(unittest.TestCase):
         self.assertFalse(item["filing_company_perimeter_review"]["production_approved"])
         self.assertFalse(item["production_write"])
 
+
+    def test_vxrt_sold_royalty_revenue_quality_review_is_accession_bound(self):
+        from build_accounting_review_queue import filing_operating_income_quality_review
+
+        review = filing_operating_income_quality_review("VXRT", "0001437749-26-008023")
+        self.assertIsNotNone(review)
+        self.assertEqual(review["reported_operating_income_millions"], 18.074)
+        self.assertEqual(review["identified_nonrecurring_operating_revenue_millions"], 1.929)
+        self.assertIn("4.521m", " ".join(review["observations"]))
+        self.assertFalse(review["production_approved"])
+        self.assertFalse(review["resolver_input"])
+        self.assertIsNone(filing_operating_income_quality_review("VXRT", "wrong-accession"))
+
 if __name__ == "__main__":
     unittest.main()
