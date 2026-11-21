@@ -4,6 +4,29 @@ from build_accounting_review_queue import build_queue, classify
 
 
 class AccountingReviewQueueTests(unittest.TestCase):
+    def test_next_review_actions_are_actionable_and_preserve_unknowns(self):
+        item = classify({
+            "symbol": "UPWK",
+            "provider_status": "supported",
+            "ebit_status": "direct_reported_candidate_review_only",
+            "invested_capital_status": "positive_denominator_candidate_review_only",
+            "review_flags": ["negative_working_capital_offset_high_risk_manual_review", "nondebt_financing_obligation_requires_enterprise_value_scope_review"],
+            "enterprise_value_candidate_review": {
+                "conventional_debt_status": "identified_from_unique_current_and_noncurrent_components",
+                "unrestricted_cash_candidate": 294356000,
+            },
+        })
+        actions = item["next_review_actions"]
+        self.assertTrue(any("negative-working-capital offset" in action for action in actions))
+        self.assertTrue(any("unrestricted" in action.lower() for action in actions))
+        self.assertTrue(any("financing obligations" in action.lower() for action in actions))
+        self.assertFalse(item["production_write"])
+
+    def test_unsupported_provider_action_does_not_suggest_fallback(self):
+        item = classify({"symbol": "AFMJF", "provider_status": "unsupported_provider", "overall_status": "unsupported_provider"})
+        self.assertEqual(len(item["next_review_actions"]), 1)
+        self.assertIn("unapproved fallback", item["next_review_actions"][0])
+
     def test_unsupported_provider_is_deferred(self):
         item = classify({"symbol": "AFMJF", "provider_status": "unsupported_provider",
                          "overall_status": "unsupported_provider"})

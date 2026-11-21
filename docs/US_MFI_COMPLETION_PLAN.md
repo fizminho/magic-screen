@@ -115,3 +115,11 @@ The next review batch should prioritize the five shadow-ranked issuers and any P
 ## Accounting queue now carries shadow-rank context
 
 The review queue now attaches each issuer's current shadow rank, combined score, EY, ROC and eligibility status when the ranking preview is available. This makes the accounting queue actionable by showing which unresolved issuers currently influence the candidate ranking. It does not change accounting priority, resolver outcomes or production approval. The queue summary separately counts preview-eligible, shadow-ranked and production-approved rows; production approval remains zero until policy review is complete.
+
+## Current execution focus (21 November 2026)
+
+- The full-universe pipeline and classic MFI shadow ranking are implemented and validated; do not spend further effort on another provider or ranking-engine rewrite.
+- The accounting review queue now emits deterministic next actions per issuer. These are review instructions only; they do not approve EBIT, invested capital, debt or cash candidates.
+- The frontend exposes an all-cohort legacy-versus-shadow reconciliation table for all 30 active MFI candidates. It includes missing legacy rows and unranked shadow rows instead of limiting comparison to the five ranked names.
+- The next review pass should close evidence questions issuer by issuer, starting with P1 names and the five shadow-ranked issuers. Policy sign-off remains a human accounting decision.
+- Production cutover remains blocked until accounting review, reconciliation and explicit release approval are complete.

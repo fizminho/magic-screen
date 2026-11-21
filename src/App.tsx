@@ -28,6 +28,7 @@ export default function App() {
   const [mfiPreview,setMfiPreview]=useState<MfiPreview|null>(null);
   const [mfiPreviewError,setMfiPreviewError]=useState("");
   const [showMfiExcluded,setShowMfiExcluded]=useState(false);
+  const [showMfiReconciliation,setShowMfiReconciliation]=useState(false);
 
   const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
   const [loading, setLoading] = useState(false);
@@ -253,6 +254,16 @@ export default function App() {
                 return <tr key={row.symbol}><td className="formula-score">#{row.magic_formula_rank}</td><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td><b>{ratioPct(row.earnings_yield)}</b><small className="preview-legacy-value" title={legacy?.fundamentals_status ? `Company Facts status: ${legacy.fundamentals_status}` : "No production Company Facts row"}>Legacy: {ratioPct(legacyEy)} · Δ {percentagePointDelta(row.earnings_yield,legacyEy)}</small></td><td><span title={row.return_on_capital!==null && row.return_on_capital>5?"Candidate ROC exceeds 500%. Review working capital, lease classification and net PP&E scope before relying on this value.": "Candidate ROC, not accounting-approved."}>{ratioPct(row.return_on_capital)}</span><small className="preview-legacy-value" title={legacy?.fundamentals_status ? `Company Facts status: ${legacy.fundamentals_status}` : "No production Company Facts row"}>Legacy: {ratioPct(legacyRoc)} · Δ {percentagePointDelta(row.return_on_capital,legacyRoc)}</small>{row.return_on_capital!==null && row.return_on_capital>5 && <small className="preview-warning">Outlier · verify denominator</small>}</td><td>{row.earnings_yield_rank?.toFixed(1)??"—"}</td><td>{row.return_on_capital_rank?.toFixed(1)??"—"}</td><td><span className="preview-warning" title={row.review_flags.join(", ") || "No review flags"}>{row.review_flags.length} flags · hover for details</span></td></tr>;
               })}
             </tbody></table></div>
+            <button className="import-btn mfi-excluded-toggle" onClick={()=>setShowMfiReconciliation(value=>!value)}>{showMfiReconciliation?"Hide":"Show"} full legacy comparison ({mfiPreview.summary.universe})</button>
+            {showMfiReconciliation && <div className="mfi-reconciliation">
+              <p className="preview-cohort-note">Every active MFI candidate is shown, not just ranked names. Legacy values come from the current Company Facts production lane; shadow values come from the accession-matched EdgarTools annual filing lane. Missing values are shown as unavailable, never treated as zero.</p>
+              <div className="table-wrap mfi-excluded-wrap"><table className="preview-table"><thead><tr><th>SYMBOL / STATUS</th><th>SHADOW EY</th><th>LEGACY EY</th><th>EY Δ</th><th>SHADOW ROC</th><th>LEGACY ROC</th><th>ROC Δ</th></tr></thead><tbody>
+                {mfiPreview.rankings.map(row=>{
+                  const legacy=stocks.find(stock=>stock.market==="US" && stock.symbol===row.symbol);
+                  return <tr key={row.symbol}><td><b>{row.symbol}</b><small className="preview-symbol">{row.magic_formula_rank!==null?`Rank #${row.magic_formula_rank}`:row.eligibility_status||"Not ranked"} · {legacy?.fundamentals_status||"No legacy row"}</small></td><td>{ratioPct(row.earnings_yield)}</td><td>{ratioPct(legacy?.earnings_yield??null)}</td><td>{percentagePointDelta(row.earnings_yield,legacy?.earnings_yield??null)}</td><td>{ratioPct(row.return_on_capital)}</td><td>{ratioPct(legacy?.return_on_capital??null)}</td><td>{percentagePointDelta(row.return_on_capital,legacy?.return_on_capital??null)}</td></tr>;
+                })}
+              </tbody></table></div>
+            </div>}
             <button className="import-btn mfi-excluded-toggle" onClick={()=>setShowMfiExcluded(value=>!value)}>{showMfiExcluded?"Hide":"Show"} excluded companies ({mfiPreview.summary.excluded})</button>
             {showMfiExcluded && <div className="table-wrap mfi-excluded-wrap"><table className="preview-table"><thead><tr><th>COMPANY</th><th>WHY IT IS EXCLUDED</th></tr></thead><tbody>
               {mfiPreview.rankings.filter(row=>row.magic_formula_rank===null).map(row=><tr key={row.symbol}><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td><small className="mfi-exclusion-reasons">{row.ranking_eligible ? `Eligible, but ranks are withheld because the minimum cohort of ${mfiPreview.minimum_eligible_cohort} has not been met.` : row.exclusion_reasons.join(" · ") || "No reason returned"}</small></td></tr>)}

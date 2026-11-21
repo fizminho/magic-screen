@@ -33,6 +33,37 @@ BALANCE_POLICY_STATUS = {
 }
 
 
+def next_review_actions(
+    provider: str, ebit: str, invested: str, debt: str, cash: Any, flags: list[str],
+) -> list[str]:
+    """Return deterministic reviewer actions without promoting any accounting candidate."""
+    if provider == "unsupported_provider":
+        return ["Keep visible in coverage; do not infer missing filing values or invoke an unapproved fallback."]
+    actions: list[str] = []
+    if ebit != "direct_reported_candidate_review_only":
+        actions.append("Locate the operating-income subtotal in the accession-matched annual filing; document any reconstruction bridge and cross-check it to pretax income.")
+    else:
+        actions.append("Confirm the selected operating-income concept is consolidated, non-dimensional, annual and consistent with the issuer statement presentation.")
+    if invested != "positive_denominator_candidate_review_only":
+        actions.append("Resolve current assets, current liabilities and net PP&E from the same fiscal period; keep non-positive or unresolved denominators unranked.")
+    else:
+        actions.append("Review working-capital composition, ROU/rental-equipment scope and denominator sensitivity before accepting invested capital.")
+    if "negative_working_capital_offset_high_risk_manual_review" in flags:
+        actions.append("Manually inspect the negative-working-capital offset; do not rely on an extreme ROC produced by a near-zero positive denominator.")
+    if debt != "identified_from_unique_current_and_noncurrent_components":
+        actions.append("Reconcile each borrowing instrument to current/noncurrent maturity buckets; distinguish explicit zero from unknown and avoid double-counting aggregate debt.")
+    else:
+        actions.append("Tie current and noncurrent borrowing candidates to filing-note carrying values and confirm no aggregate/component double count.")
+    if cash is None:
+        actions.append("Identify unrestricted cash and cash equivalents from the same annual filing; leave missing cash unknown, not zero.")
+    else:
+        actions.append("Confirm cash is unrestricted; keep restricted cash, customer escrow and marketable securities separate pending a uniform policy.")
+    if any("noncontrolling_interest" in flag for flag in flags):
+        actions.append("Quantify NCI and document whether the EV numerator/denominator treatment is consistent across the cohort.")
+    if any("nondebt_financing_obligation" in flag for flag in flags):
+        actions.append("Classify royalty, sale-leaseback or other financing obligations separately; do not silently fold them into conventional debt.")
+    return list(dict.fromkeys(actions))
+
 def classify(row: dict[str, Any]) -> dict[str, Any]:
     symbol = str(row.get("symbol") or "UNKNOWN")
     flags = [str(x) for x in row.get("review_flags", [])]
@@ -195,6 +226,7 @@ def classify(row: dict[str, Any]) -> dict[str, Any]:
         "unrestricted_cash_candidate": cash,
         "candidate_roc": row.get("candidate_roc"),
         "reporting_currency": row.get("reporting_currency"),
+        "next_review_actions": next_review_actions(provider, ebit, invested, debt, cash, flags),
         "issue_count": len(issues),
         "issues": issues,
         "balance_sheet_exceptions": category_summary,
