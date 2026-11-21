@@ -124,3 +124,12 @@ The five remaining supported P3 names have negative reported operating income in
 | PLTK | FY2025 | -$5.1m | $2,389.1m | $684.2m | $136.0m short-term investments, $734.0m acquisition contingent consideration and $142.9m lease liabilities |
 
 No issuer-specific impairment or exceptional-item add-back is approved. BMBL's impairment adjustment must not be used to make it eligible without an explicit policy applied consistently to all issuers. PLTK contingent consideration remains a separate financing/EV-scope item, not conventional borrowing by default.
+
+
+## Cohort-wide policy matrix: approval status
+
+The detailed matrix is in [US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md](US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md). It consolidates the evidence gathered across all P1/P2/P3 issuers into explicit proposed defaults and unresolved approval decisions.
+
+**Current state:** recommended defaults are documented, but none is accounting-owner approved. In particular, no production decision has been made on (1) exceptional/nonrecurring EBIT items, (2) operating/finance lease treatment and ROU asset symmetry, (3) NCI in EV, (4) marketable securities as cash-like, (5) royalty/failed-sale-leaseback/contingent consideration debt-like treatment, or (6) invested-capital handling for negative/near-zero denominators.
+
+The current shadow ranking is a diagnostic, not a final investable ranking. The current five-name cohort is exactly at the minimum eligibility count; any issuer removed at approval must be replaced by another fully evidenced eligible name or the ranking must be withheld until five approved names are available.

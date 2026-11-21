@@ -269,3 +269,12 @@ The five supported P3 names that are not currently ranked now have a consolidate
 - **PLTK:** EBIT -$5.1m; debt $2,389.1m; cash $684.2m; restricted cash $1.5m; short-term investments $136.0m. Acquisition contingent consideration is $734.0m and must remain a separate EV-scope question; operating lease liabilities total $142.9m.
 
 **P3 evidence milestone:** all eight supported P3 issuers now have filing review worksheets (three ranked plus five unranked). AFMJF and EGHSF remain unsupported-provider exclusions, visible in coverage with no fallback. Next, consolidate the complete 30-name cohort into a single accounting policy matrix and close policy approval gates before resolver implementation or cutover.
+
+
+## Cohort-wide accounting policy matrix prepared for owner approval (21 November 2026)
+
+All 30 issuer review lanes are now documented: 10 P1, 10 P2 and 10 P3. The P3 set includes eight supported issuers with accession-bound reviews and two unsupported-provider exclusions. The next deliverable is the [cohort-wide accounting policy matrix](US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md), which consolidates the proposed defaults, evidence examples, unresolved choices and required approval gates.
+
+The matrix preserves the current candidate rules: annual consolidated operating income; invested capital = current assets - current liabilities + net PP&E; gross conventional debt at carrying value; unrestricted cash equivalents only; marketable securities, restricted cash, leases, NCI and other financing obligations kept separately visible. Exceptional items, lease/ROU treatment, NCI, marketable-securities cash-like treatment and debt-like financing inclusion require explicit cohort-wide decisions.
+
+No policy is marked approved. The matrix is a decision aid, not a production instruction. Implementation should begin only after the accounting owner signs off the policy and the full-universe shadow results are re-run against it.
