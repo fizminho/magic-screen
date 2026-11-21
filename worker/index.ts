@@ -534,6 +534,9 @@ function resolveEdgarToolsEvidence(symbol:string, providerStatus:string|null, ac
     flags.push("multiple_direct_operating_income_rows");
   }
   const invested=company.invested_capital_review??{};
+  if (invested.denominator_diagnostics?.negative_working_capital_offsets_at_least_90pct_of_net_ppe===true) {
+    flags.push("invested_capital_negative_working_capital_offset_high_risk_manual_review");
+  }
   const investedCapital=typeof invested.value==="number" && Number.isFinite(invested.value) ? invested.value : null;
   let investedStatus="review_required";
   if (invested.status==="calculated_review_only" && investedCapital!==null && investedCapital>0
@@ -644,8 +647,9 @@ function buildMfiRankingPreview(rows:MfiPreviewRow[]) {
         ?"EdgarTools provider unsupported for this issuer"
         :"Annual filing evidence unavailable");
     } else {
-      if(!["direct_reported_candidate_review_only","filing_specific_reconstruction_review_only"].includes(row.ebit_status)) exclusionReasons.push("Direct or accession-matched filing-specific EBIT candidate unavailable or ambiguous");
+      if(row.ebit_status!=="direct_reported_candidate_review_only") exclusionReasons.push("Direct reported consolidated EBIT required; filing-specific reconstructions remain manual-review-only");
       if(row.invested_capital_status!=="positive_denominator_candidate_review_only") exclusionReasons.push("Invested-capital denominator unresolved or non-positive");
+      if(row.review_flags.includes("invested_capital_negative_working_capital_offset_high_risk_manual_review")) exclusionReasons.push("Near-zero / negative-working-capital offset risk requires manual review; ROC and ranking withheld");
       if(row.reporting_currency!=="USD") exclusionReasons.push("Reporting currency not confirmed as USD");
       if(row.enterprise_value_candidate_review?.conventional_debt_status!=="identified_from_unique_current_and_noncurrent_components") exclusionReasons.push("Conventional debt inputs incomplete or ambiguous");
       if(ev===null || ev<=0) exclusionReasons.push("Enterprise-value candidate unavailable or non-positive");

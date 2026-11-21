@@ -47,6 +47,8 @@ def assess(queue, ranking, policy):
             blockers.append("debt instrument and maturity tie-out remains review-only")
         # Generic XBRL candidate buckets are evidence hints, not automatic blockers.
         issue_set = set(item.get("issues", []))
+        if "invested_capital_negative_working_capital_offset_high_risk_manual_review" in issue_set:
+            blockers.append("near-zero / negative-working-capital offset risk requires manual review; ROC and ranking withheld")
         if any(x in issue_set for x in (
             "flag:restricted_or_combined_cash_present_review_enterprise_value_cash_input",
             "flag:unrestricted_cash_not_uniquely_identified",

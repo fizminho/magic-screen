@@ -68,6 +68,13 @@ class CohortAssessmentTests(unittest.TestCase):
         row = next(x for x in result["issuer_assessments"] if x["symbol"] == "AAA")
         self.assertTrue(any("cash classification" in x for x in row["blockers"]))
 
+    def test_high_risk_invested_capital_offset_is_a_blocker(self):
+        q, r, p = fixtures()
+        q["items"][0]["issues"].append("invested_capital_negative_working_capital_offset_high_risk_manual_review")
+        result = assess(q, r, p)
+        row = next(x for x in result["issuer_assessments"] if x["symbol"] == "AAA")
+        self.assertTrue(any("ROC and ranking withheld" in x for x in row["blockers"]))
+
     def test_report_keeps_candidate_as_review_only(self):
         q, r, p = fixtures()
         report = render_markdown(assess(q, r, p))

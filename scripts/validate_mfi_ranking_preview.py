@@ -36,6 +36,12 @@ def validate(report: dict[str, Any]) -> list[str]:
     if summary.get("universe") != len(rows):
         errors.append("summary universe does not match preview rows")
     eligible = [row for row in rows if row.get("ranking_eligible") is True]
+    for row in eligible:
+        symbol = str(row.get("symbol", "")).upper()
+        if row.get("ebit_status") != "direct_reported_candidate_review_only":
+            errors.append(f"{symbol}: filing-specific EBIT reconstruction must remain manual-review-only and unranked")
+        if "invested_capital_negative_working_capital_offset_high_risk_manual_review" in (row.get("review_flags") or []):
+            errors.append(f"{symbol}: high-risk near-zero invested-capital denominator must withhold ROC and ranking")
     if summary.get("eligible") != len(eligible):
         errors.append("eligible summary does not reconcile")
     unsupported = [row for row in rows if row.get("provider_status") == "unsupported_provider"]

@@ -6,7 +6,8 @@ def row(symbol, provider="supported", eligible=False, rank=None, ey=None, roc=No
     return {"symbol": symbol, "provider_status": provider, "ranking_eligible": eligible,
             "eligibility_status": "excluded_provider_unsupported" if provider == "unsupported_provider" else ("eligible" if eligible else "excluded_accounting_or_valuation_review"),
             "magic_formula_rank": rank, "earnings_yield_rank": ey, "return_on_capital_rank": roc,
-            "magic_formula_score": score, "earnings_yield": ey_value, "return_on_capital": roc_value}
+            "magic_formula_score": score, "earnings_yield": ey_value, "return_on_capital": roc_value,
+            "ebit_status": "direct_reported_candidate_review_only", "review_flags": []}
 
 
 class RankingPreviewTests(unittest.TestCase):
@@ -75,6 +76,18 @@ class RankingPreviewTests(unittest.TestCase):
         ]
         report = self.report(rows, 2, 2, minimum=2)
         self.assertEqual(validate(report), [])
+
+    def test_filing_specific_ebit_reconstruction_cannot_be_ranked(self):
+        item = row("HRB", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.2, roc_value=0.3)
+        item["ebit_status"] = "filing_specific_reconstruction_review_only"
+        errors = validate(self.report([item], 1, 1, minimum=1))
+        self.assertTrue(any("filing-specific EBIT reconstruction" in error for error in errors))
+
+    def test_high_risk_invested_capital_denominator_cannot_be_ranked(self):
+        item = row("OTEX", eligible=True, rank=1, ey=1, roc=1, score=2, ey_value=0.2, roc_value=0.3)
+        item["review_flags"] = ["invested_capital_negative_working_capital_offset_high_risk_manual_review"]
+        errors = validate(self.report([item], 1, 1, minimum=1))
+        self.assertTrue(any("high-risk near-zero" in error for error in errors))
 
     def test_production_write_must_remain_false(self):
         report = self.report([], 0, 0)
