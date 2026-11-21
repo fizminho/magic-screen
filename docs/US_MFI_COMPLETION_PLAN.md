@@ -128,3 +128,12 @@ The review queue now attaches each issuer's current shadow rank, combined score,
 - Production cutover remains blocked until accounting review, reconciliation and explicit release approval are complete.
 
 The latest review-triage update adds deterministic issuer-specific next actions to both the JSON and CSV accounting queues, and the frontend now provides a full 30-name legacy-versus-shadow reconciliation view. The accounting regression tests, queue generation, shadow ranking validator and build passed on the updated code. A fresh full-universe run is being triggered to revalidate dynamic universe refresh and raw ingestion with these changes.
+
+
+## Filing-level review pass: HRB and OTEX (21 November 2026)
+
+The first two shadow-ranked issuers have now had their selected FY2026 annual filings checked against key face-statement and note-level amounts. The accession-bound calculations and unresolved decisions are recorded in [the HRB and OTEX review worksheet](US_MFI_HRB_OTEX_REVIEW_2026-11-21.md). This is a stronger evidence tie-out, not accounting approval.
+
+- **HRB:** FY2026 current assets less current liabilities plus net PP&E reconciles to **$273.588m**. Unrestricted cash, restricted cash, conventional debt and operating-lease balances are separately identified. The $907.686m EBIT reconstruction remains subject to accounting-owner approval.
+- **OTEX:** FY2026 debt carrying value reconciles exactly to the maturity buckets. The **$16.745m** invested-capital candidate is the principal blocker: negative working capital offsets **96.79%** of net PP&E. Lease liabilities and NCI are quantified but remain separate policy questions.
+- No resolver, production fundamentals, EY/ROC, eligibility or ranking values were changed. Both issuers remain review-only and production_approved=false.
