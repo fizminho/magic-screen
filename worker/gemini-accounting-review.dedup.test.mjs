@@ -51,7 +51,7 @@ class FakeD1 {
 
 function reviewInput(DB) {
   return {
-    env: { DB, GEMINI_API_KEY: "test-key", GEMINI_MIN_REQUEST_INTERVAL_MS: "1000" },
+    env: { DB, GEMINI_API_KEY: "test-key", GEMINI_MIN_REQUEST_INTERVAL_MS: "1000", GEMINI_MODEL_FALLBACKS: "gemini-3.5-flash-lite" },
     input: {
       task: "debt_scope",
       symbol: "ABC",
@@ -118,46 +118,85 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
 });
 
 
-test("returns structured quota exhaustion without caching or retaining the request lock", async () => {
+test("fails over to another model on quota exhaustion and returns quota exhausted only when the pool is exhausted", async () => {
   const DB = new FakeD1();
   const { env, input } = reviewInput(DB);
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ error: {
-    code: 429, message: "You exceeded your current quota, please check your plan and billing details."
-  } }), { status: 429, headers: { "content-type": "application/json" } });
+  const requestedModels = [];
+  globalThis.fetch = async url => {
+    requestedModels.push(String(url).split("/models/")[1].split(":")[0]);
+    return new Response(JSON.stringify({ error: { code: 429, message: "You exceeded your current quota, please check your plan and billing details." } }),
+      { status: 429, headers: { "content-type": "application/json" } });
+  };
   try {
     const result = await runGeminiAccountingReview(env, input);
     assert.equal(result.status, "QUOTA_EXHAUSTED");
     assert.equal(result.review_state, "PENDING_RETRY");
     assert.equal(result.retryable, false);
     assert.equal(result.production_write, false);
+    assert.equal(result.attempts, 2);
+    assert.deepEqual(requestedModels, ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
     assert.equal(DB.cache.size, 0);
     assert.equal(DB.locks.size, 0);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  } finally { globalThis.fetch = originalFetch; }
 });
 
-test("returns a retryable rate-limit status for non-quota HTTP 429 responses", async () => {
+test("moves to the next model after a transient rate limit instead of retrying the same model", async () => {
   const DB = new FakeD1();
   const { env, input } = reviewInput(DB);
   const originalFetch = globalThis.fetch;
-  let apiCalls = 0;
-  globalThis.fetch = async () => {
-    apiCalls += 1;
-    return new Response(JSON.stringify({ error: {
-      code: 429, message: "Too many requests. Please retry in 30 seconds."
-    } }), { status: 429, headers: { "content-type": "application/json" } });
+  const requestedModels = [];
+  globalThis.fetch = async url => {
+    requestedModels.push(String(url).split("/models/")[1].split(":")[0]);
+    return new Response(JSON.stringify({ error: { code: 429, message: "Too many requests. Please retry in 30 seconds." } }),
+      { status: 429, headers: { "content-type": "application/json" } });
   };
   try {
     const result = await runGeminiAccountingReview(env, input);
-    assert.equal(result.status, "RATE_LIMITED");
+    assert.equal(result.status, "MODEL_FALLBACK_EXHAUSTED");
     assert.equal(result.retryable, true);
-    assert.equal(result.attempts, 3);
-    assert.equal(apiCalls, 3);
+    assert.equal(result.attempts, 2);
+    assert.deepEqual(requestedModels, ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
     assert.equal(DB.cache.size, 0);
     assert.equal(DB.locks.size, 0);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("uses the next model successfully after the preferred model quota is exhausted", async () => {
+  const DB = new FakeD1();
+  const { env, input } = reviewInput(DB);
+  const originalFetch = globalThis.fetch;
+  const requestedModels = [];
+  globalThis.fetch = async url => {
+    const model = String(url).split("/models/")[1].split(":")[0];
+    requestedModels.push(model);
+    if (model === "gemini-3.1-flash-lite") {
+      return new Response(JSON.stringify({ error: { code: 429, message: "Daily quota exceeded." } }), { status: 429 });
+    }
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+      task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Second model completed the review.",
+      findings: [{ evidence_id: "current_debt:0", classification: "conventional_debt",
+        rationale: "The filing identifies a debt instrument.", confidence: "medium" }], unresolved_questions: []
+    }) }] } }] }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const result = await runGeminiAccountingReview(env, input);
+    assert.equal(result.status, "REVIEW_REQUIRED");
+    assert.equal(result.model, "gemini-3.5-flash-lite");
+    assert.equal(result.attempts, 2);
+    assert.deepEqual(requestedModels, ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
+    assert.equal(DB.cache.size, 1);
+    assert.equal(DB.locks.size, 0);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test("model pool includes supported text models and excludes unsupported model families", async () => {
+  const { getGeminiModelCandidates } = await import("./gemini-accounting-review.mjs");
+  assert.deepEqual(getGeminiModelCandidates("gemini-2.5-flash-lite", "gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.8-flash-tts"),
+    ["gemini-2.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]);
+  assert.deepEqual(getGeminiModelCandidates(null, null), [
+    "gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash-lite",
+    "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-3.8-flash", "gemini-4-hydrogen"
+  ]);
 });
