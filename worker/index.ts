@@ -1,4 +1,5 @@
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
+import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation";
 
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
@@ -1403,6 +1404,54 @@ export default {
         }
         return json(response);
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"MFI shadow ranking preview"},503); }
+    }
+    if (url.pathname==="/api/fundamentals/edgartools/reconciliation-preview" && request.method==="GET") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        // INTENTIONAL: compare legacy production fundamentals with accession-bound EdgarTools candidates without writing either side.
+        const rows=await env.DB.prepare(`SELECT m.symbol,m.company_name,
+          q.market_cap AS current_market_cap,q.updated_at AS market_cap_updated_at,
+          f.status AS legacy_status,f.source AS legacy_source,f.fiscal_period AS legacy_fiscal_period,f.filed_at AS legacy_filed_at,
+          f.ebit AS legacy_ebit,f.current_assets AS legacy_current_assets,f.current_liabilities AS legacy_current_liabilities,
+          f.net_ppe AS legacy_net_ppe,f.total_debt AS legacy_total_debt,f.cash AS legacy_cash,
+          f.market_cap AS legacy_market_cap,f.earnings_yield AS legacy_stored_earnings_yield,
+          f.return_on_capital AS legacy_stored_return_on_capital,
+          e.provider_status,e.accession,e.fiscal_period AS edgar_fiscal_period,e.form,e.payload_json
+          FROM stock_master m
+          LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US'
+          LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US'
+          LEFT JOIN edgartools_filing_evidence e ON e.symbol=m.symbol AND e.accession_key=(
+            SELECT e2.accession_key FROM edgartools_filing_evidence e2
+            WHERE e2.symbol=m.symbol AND e2.market='US'
+            ORDER BY e2.ingested_at DESC,e2.accession_key DESC LIMIT 1
+          )
+          WHERE m.market='US' AND m.listing_status='active' AND m.source='Magic Formula Investing'
+          ORDER BY m.symbol`).all<any>();
+        const reconciliationRows=rows.results.map((row:any)=>{
+          let company:any=null;
+          if(row.payload_json) { try { company=JSON.parse(row.payload_json); } catch { company=null; } }
+          const resolved=resolveEdgarToolsEvidence(row.symbol,row.provider_status??null,row.accession??null,row.edgar_fiscal_period??null,company);
+          return {
+            symbol:row.symbol,company_name:row.company_name,
+            current_market_cap:row.current_market_cap==null?null:Number(row.current_market_cap),
+            market_cap_updated_at:row.market_cap_updated_at??null,
+            legacy_status:row.legacy_status??null,legacy_source:row.legacy_source??null,
+            legacy_fiscal_period:row.legacy_fiscal_period??null,legacy_filed_at:row.legacy_filed_at??null,
+            legacy_ebit:row.legacy_ebit==null?null:Number(row.legacy_ebit),
+            legacy_current_assets:row.legacy_current_assets==null?null:Number(row.legacy_current_assets),
+            legacy_current_liabilities:row.legacy_current_liabilities==null?null:Number(row.legacy_current_liabilities),
+            legacy_net_ppe:row.legacy_net_ppe==null?null:Number(row.legacy_net_ppe),
+            legacy_total_debt:row.legacy_total_debt==null?null:Number(row.legacy_total_debt),
+            legacy_cash:row.legacy_cash==null?null:Number(row.legacy_cash),
+            legacy_market_cap:row.legacy_market_cap==null?null:Number(row.legacy_market_cap),
+            legacy_stored_earnings_yield:row.legacy_stored_earnings_yield==null?null:Number(row.legacy_stored_earnings_yield),
+            legacy_stored_return_on_capital:row.legacy_stored_return_on_capital==null?null:Number(row.legacy_stored_return_on_capital),
+            edgar:{...resolved,filing_form:row.form??null}
+          };
+        });
+        return json(buildFundamentalsReconciliationPreview(reconciliationRows,new Date().toISOString()));
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Legacy vs EdgarTools reconciliation preview"},503); }
     }
     if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);

@@ -143,6 +143,12 @@ A consistent MFI EV policy should distinguish the following buckets rather than 
 
 This rule is a proposed policy for human review only. It must be tested against the whole active cohort, approved once, and applied consistently. It must not be selectively applied because it changes an issuer's EY or rank.
 
+
+
+## VXRT EBIT-quality review addition
+
+The queue now also carries an accession-bound FY2025 operating-income-quality review for VXRT (accession 0001437749-26-008023). The filing reports GAAP operating income of $18.074m and separately reports $1.929m non-cash royalty revenue related to the sold Daiichi Sankyo royalty stream. This is distinct from the $4.521m non-cash royalty revenue remitted to HCRP in the royalty-liability roll-forward and the $2.823m imputed interest expense. The $1.929m amount is a manual exceptional-revenue review item only; it is not removed from EBIT or passed into resolver inputs. Keep the $4.060m royalty financing liability separately classified.
+
 ## Batch conclusion
 
 | Issuer | Evidence status | Candidate EV disposition | Production approved |

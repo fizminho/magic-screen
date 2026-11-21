@@ -113,3 +113,8 @@ Recommended starting point: only issuer-defined cash equivalents with original m
 | Production cutover and rollback | Not approved |
 
 **Conclusion:** the research and evidence-triage phase is substantially complete across the 30-name cohort. The project is not production-ready until accounting policy choices are approved, encoded, regression-tested and reconciled against the legacy path. No production fundamentals, ratios, eligibility or rankings have been changed.
+
+
+## Legacy reconciliation output
+
+The authenticated read-only reconciliation preview compares legacy and EdgarTools metrics using the same current market-cap snapshot. It emits input and EY/ROC deltas only when fiscal periods match and both sides have complete inputs. Legacy accession is not stored in the old table and is disclosed as unavailable. This report is required before any cutover decision and does not change production values.

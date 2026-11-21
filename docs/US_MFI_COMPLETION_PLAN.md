@@ -300,3 +300,10 @@ The latest verified full-universe run before the VXRT EBIT-quality flag was adde
 2. Close the all-30 legacy-versus-EdgarTools reconciliation and document material differences, period mismatches and rollback criteria.
 3. Re-run full-universe extraction, ingestion, resolver and ranking after every approved policy implementation.
 4. Obtain explicit production cutover approval. Until then, keep production writes disabled and the legacy Company Facts path intact.
+
+
+## Legacy-versus-EdgarTools reconciliation preview
+
+An authenticated, read-only endpoint is being added at GET /api/fundamentals/edgartools/reconciliation-preview. It compares the legacy stock_fundamentals record against the accession-bound EdgarTools resolver candidate for every active US MFI issuer, using one current market-cap snapshot for both calculations. It exposes source periods, legacy filed date, EdgarTools accession, input deltas and EY/ROC percentage-point deltas only when fiscal periods match. The legacy table does not store accession numbers, so the report marks that limitation explicitly.
+
+The endpoint and workflow validator never write production fundamentals, ratios, eligibility or rankings. Period-mismatched rows are retained for triage but are not marked comparable. The next bakeoff must verify the full 30-row output and identify how many issuers have period-aligned, fully comparable legacy and EdgarTools metrics.

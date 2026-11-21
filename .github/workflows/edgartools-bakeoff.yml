@@ -20,6 +20,10 @@ on:
       - "README.md"
       - "worker/index.ts"
       - "worker/filing-specific-ebit.ts"
+      - "worker/fundamentals-reconciliation.ts"
+      - "worker/fundamentals-reconciliation.test.mjs"
+      - "scripts/validate_fundamentals_reconciliation.py"
+      - "scripts/test_validate_fundamentals_reconciliation.py"
       - "worker/filing-specific-ebit.test.mjs"
       - "src/App.tsx"
       - "src/styles.css"
@@ -68,6 +72,8 @@ jobs:
           python -m unittest discover -s scripts -p "test_edgartools_bakeoff.py" -v
           python -m unittest discover -s scripts -p "test_accounting_review_queue.py" -v
           node --experimental-strip-types --test worker/filing-specific-ebit.test.mjs
+          node --experimental-strip-types --test worker/fundamentals-reconciliation.test.mjs
+          python -m unittest discover -s scripts -p "test_validate_fundamentals_reconciliation.py" -v
           python -m unittest discover -s scripts -p "test_validate_mfi_universe_coverage.py" -v
           python -m unittest discover -s scripts -p "test_build_mfi_sensitivity_report.py" -v
       - name: Resolve active MFI universe
@@ -250,6 +256,20 @@ jobs:
               raise SystemExit("Ranking preview did not confirm production immutability.")
           print("Preview-only ranking rows:", len(report.get("rankings", [])))
           PY
+      - name: Run read-only legacy versus EdgarTools reconciliation preview
+        if: hashFiles('edgartools-resolver-preview.json') != '' && vars.EDGARTOOLS_INGEST_URL != ''
+        env:
+          EDGARTOOLS_INGEST_URL: "${{ vars.EDGARTOOLS_INGEST_URL }}"
+          UNIVERSE_SYNC_TOKEN: "${{ secrets.UNIVERSE_SYNC_TOKEN }}"
+        run: |
+          if [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
+            echo "::warning::UNIVERSE_SYNC_TOKEN is not configured; reconciliation preview skipped."
+            exit 0
+          fi
+          BASE_URL="${EDGARTOOLS_INGEST_URL%/api/fundamentals/edgartools/ingest}"
+          set +x
+          curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 5 --retry-max-time 300 --max-time 120 -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" "$BASE_URL/api/fundamentals/edgartools/reconciliation-preview" > edgartools-reconciliation-preview.json
+          python scripts/validate_fundamentals_reconciliation.py edgartools-reconciliation-preview.json
       - name: Validate US MFI ranking policy and coverage
         if: always() && hashFiles('edgartools-mfi-ranking-preview.json') != ''
         run: |
@@ -319,6 +339,7 @@ jobs:
             accounting-review-queue.json
             accounting-review-queue.csv
             edgartools-mfi-ranking-preview.json
+            edgartools-reconciliation-preview.json
             mfi-ranking-sensitivity.json
             mfi-ranking-sensitivity.md
           if-no-files-found: warn
