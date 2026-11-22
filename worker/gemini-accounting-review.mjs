@@ -1,3 +1,4 @@
+import { ensureLedgerSchema, persistCompletedReview } from "./gemini-review-ledger.mjs";
 const PROMPT_VERSION = "gemini-accounting-review-v10";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
@@ -510,6 +511,7 @@ export async function runGeminiAccountingReview(env, input) {
     prompt_version TEXT NOT NULL, policy_version TEXT NOT NULL, model TEXT NOT NULL, status TEXT NOT NULL,
     response_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
   )`).run();
+  await ensureLedgerSchema(env);
   const cacheTable = "gemini_accounting_review_cache";
   const cached = await env.DB.prepare("SELECT response_json,model,created_at FROM " + cacheTable + " WHERE cache_key=?").bind(cacheKey).first();
   if (cached?.response_json) return { ...JSON.parse(cached.response_json), symbol: input.symbol, accession: input.accession,
@@ -647,10 +649,11 @@ export async function runGeminiAccountingReview(env, input) {
       model, attempts: modelFailures.length + 1, ...(modelFailures.length ? { model_fallbacks: modelFailures } : {}),
       cached: false, input_hash: inputHash, prompt_version: PROMPT_VERSION, policy_version: POLICY_VERSION,
       ai_review_only: true };
-    await env.DB.prepare(`INSERT INTO gemini_accounting_review_cache
+    await persistCompletedReview(env, `INSERT INTO gemini_accounting_review_cache
       (cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(cacheKey,input.symbol,input.accession,input.task,inputHash,PROMPT_VERSION,
-        POLICY_VERSION,model,normalized.status,JSON.stringify(normalized),now,now).run();
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`, { cacheKey, symbol: input.symbol, accession: input.accession, task: input.task,
+        inputHash, promptVersion: PROMPT_VERSION, policyVersion: POLICY_VERSION, model, status: normalized.status,
+        responseJson: JSON.stringify(normalized), createdAt: now });
     return result;
   } finally {
     await env.DB.prepare("DELETE FROM gemini_accounting_review_locks WHERE cache_key=?").bind(cacheKey).run();

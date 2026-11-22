@@ -16,7 +16,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - name: Run Gemini accounting review contract and deduplication tests
-        run: node --test worker/gemini-accounting-review*.test.mjs
+        run: node --test worker/gemini-accounting-review*.test.mjs worker/gemini-review-ledger.test.mjs
       - name: Run US universe source-membership tests
         run: node --test worker/universe-membership.test.mjs
       - name: Run Gemini batch orchestration and ranking tests

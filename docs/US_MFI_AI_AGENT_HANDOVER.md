@@ -314,3 +314,16 @@ US MFI is ready for production consideration only when:
 - A separate production cutover is reviewed and approved.
 
 **Final instruction:** Do not rebuild the universe, extraction provider, Gemini batch or ranking engine. Continue from the working implementation. Finish the audit ledger, diagnose the remaining task failure, close accounting review and reconciliation blockers, and keep production writes disabled until explicit approval.
+
+
+## Status update: workstream A (audit ledger) implemented offline, 22 Nov 2026
+
+Implemented against the uploaded `main` snapshot (which did not contain PR #47). NOT yet committed, pushed, merged or deployed; no CI run exists for it.
+
+- `worker/gemini-review-ledger.mjs`: idempotent DDL, append-only history and decisions (DB triggers block UPDATE/DELETE), cache+history written in one `DB.batch`, decision validation against the exact cached review (cache_key, symbol, task, input_hash, optional accession), bounded pagination (default 25, max 100).
+- `worker/gemini-accounting-review.mjs`: cache insert replaced by `persistCompletedReview`; cache hits and in-flight duplicates never append history.
+- `worker/index.ts`: `GET .../ai-review/history`, `GET|POST .../ai-review/decisions`; bearer-authenticated; responses carry `production_write=false`, `rankings_changed=false`, `reviewer_identity_verified=false`.
+- Tests: `worker/gemini-review-ledger.test.mjs` (real SQLite), plus history assertions in the dedup test. Full `node --test worker/*.test.mjs`: 84 pass, 0 fail.
+- Not run: `npm run build` (tsc) and `wrangler deploy --dry-run` (no network/node_modules in this session). Run both before merging.
+- Known gap: reviews cached before this change have no history row. A one-off, explicit backfill from the cache table is possible but was not added.
+- Items B-G untouched (need live logs, endpoints and filing evidence).

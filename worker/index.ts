@@ -9,6 +9,8 @@ import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconcili
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { classifyDebtReconciliation } from "./debt-reconciliation.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { parsePageParams, recordReviewDecision, listReviewHistory, listReviewDecisions, MAX_DECISION_BODY_BYTES, REVIEW_TASKS } from "./gemini-review-ledger.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { runGeminiAccountingReview, listGeminiAccountingEscalations, getGeminiModelCandidates } from "./gemini-accounting-review.mjs";
 
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; GEMINI_MODEL?: string; GEMINI_MIN_REQUEST_INTERVAL_MS?: string; }
@@ -1272,6 +1274,37 @@ export default {
         return json(await runGeminiAccountingReview(env,{symbol,accession:row.accession,fiscalPeriod:row.fiscal_period,
           company,resolver,task,model:env.GEMINI_MODEL}));
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools + Gemini accounting review"},503); }
+    }
+    if ((url.pathname==="/api/fundamentals/edgartools/ai-review/history" && request.method==="GET")
+      || (url.pathname==="/api/fundamentals/edgartools/ai-review/decisions" && (request.method==="GET" || request.method==="POST"))) {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      // Audit ledger only: touches gemini_accounting_review_* tables, never production fundamentals or rankings.
+      const audit={production_write:false,production_fundamentals_changed:false,rankings_changed:false};
+      try {
+        const isDecisions=url.pathname.endsWith("/decisions");
+        if (request.method==="POST") {
+          const body=await request.text();
+          if(new TextEncoder().encode(body).byteLength>MAX_DECISION_BODY_BYTES) return json({error:"Decision request exceeds 8 KiB limit"},413);
+          let payload:any; try { payload=JSON.parse(body||"{}"); } catch { return json({error:"Invalid JSON body"},400); }
+          const result:any=await recordReviewDecision(env,payload);
+          return result.ok ? json({...result.decision,...audit},201) : json({error:result.error},result.status);
+        }
+        const page:any=parsePageParams(url.searchParams);
+        if(!page.ok) return json({error:page.error},400);
+        const symbolParam=url.searchParams.get("symbol");
+        const symbol=symbolParam?symbolParam.trim().toUpperCase():null;
+        if(symbol && !/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
+        const task=url.searchParams.get("task");
+        if(task && !REVIEW_TASKS.has(task)) return json({error:"Unsupported accounting review task"},400);
+        const cacheKey=url.searchParams.get("cache_key");
+        if(cacheKey && !/^[0-9a-f]{64}$/.test(cacheKey)) return json({error:"cache_key must be a 64-character hex key"},400);
+        const rows=isDecisions
+          ? await listReviewDecisions(env,{symbol,task,cacheKey,limit:page.limit,offset:page.offset})
+          : await listReviewHistory(env,{symbol,task,limit:page.limit,offset:page.offset});
+        return json({[isDecisions?"decisions":"history"]:rows,limit:page.limit,offset:page.offset,
+          reviewer_identity_verified:false,...audit});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini accounting review audit ledger"},503); }
     }
     if (url.pathname==="/api/ai/fundamentals/extract" && request.method==="POST") {
       return json({error:"This legacy Company Facts tag-discovery endpoint is retired. Use /api/fundamentals/edgartools/ai-review for cached, ambiguity-only review."},410);
