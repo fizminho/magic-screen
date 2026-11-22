@@ -15,6 +15,7 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #55 merged: SEC Company Facts debt shadow discovery now scans issuer-specific taxonomies and distinguishes royalty financing, other financing, leases and convertible debt. It remains read-only and does not change production fundamentals or rankings.
 - PR #55 deployment succeeded in [run #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869).
 - PR #53 merged: a manually triggered, read-only export of persistent Gemini review history and human decisions is available. It makes no Gemini calls and performs no application writes.
+- PR #57 merged: the read-only legacy-versus-EdgarTools reconciliation now exposes legacy row presence, stored CIK, updated_at and filed date, plus an explicit unavailable accession state. Its CI also runs the complete Node regression suite.
 - PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test are already present on main. Do not reapply it.
 - The latest documented accepted full-universe snapshot remains 30 active issuers, 28 EdgarTools-supported, 2 unsupported, 26 in accounting/valuation review, 2 shadow eligible, 0 shadow ranked and 0 production-approved.
 - The latest main push bakeoff was regression-only: dynamic universe discovery, ingestion and full-universe validation were skipped. A fresh full-universe run remains a priority.
@@ -37,7 +38,7 @@ Follow the unchecked items in the masterplan in order:
 
 1. Run the full dynamic EdgarTools bakeoff with blank ticker override and verify ingestion plus all full-universe validators.
 2. Manually run the Gemini review ledger export workflow and build one issuer-level, deduplicated human review queue.
-3. Add legacy row provenance and explain the BMBL historical debt discrepancy.
+3. Use the new reconciliation provenance to explain the BMBL historical debt discrepancy; add further history instrumentation only if these fields are insufficient.
 4. Validate BCRX custom royalty financing, IRWD convertible debt, OTEX carrying-value reconciliation and UPWK issuance-cost treatment.
 5. Obtain explicit owner approval for the cohort-wide EBIT, debt, lease, cash, invested-capital, NCI and ranking policies.
 6. Complete legacy-versus-EdgarTools reconciliation, staging and rollback before requesting production cutover.
