@@ -20,8 +20,8 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #61 merged and deployed: legacy debt shadow now exposes legacy row presence, status, source, updated_at, fiscal period/filed date and CIK mapping update time.
 - PR #62 merged: README documents the controlled `[full-universe]` trigger. Full dynamic run [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage; artifact contains 30 active issuers, 28 supported, 2 unsupported, 2 shadow eligible, 0 ranked and 0 production approved.
 - PR #63 merged: README and workflow document/support controlled `[ledger-export]` runs. Export [#44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) passed and was inspected: 139 history rows, 26 issuers, zero decisions, no duplicate cache keys/input hashes.
-- PR #64 is open: add evidence IDs to review history metadata without exposing raw Gemini response JSON. Wait for CI before merge.
-- Main commit `a0e52ba194a8b3b0a69f57027a3150222da16d1d` passed [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110), including full Node regression, Python policy tests, TypeScript build and Wrangler dry-run.
+- PR #64 merged: review history now returns deduplicated evidence-ID metadata while continuing to omit raw Gemini response JSON. [CI #44990410412](https://github.com/fizminho/magic-screen/actions/runs/44990410412) passed; wait for deployment and rerun the ledger export.
+- Main commit `33fa04740b5c70e7e296cf4708f081b618393165` is passing through deployment and [Build #44990629361](https://github.com/fizminho/magic-screen/actions/runs/44990629361), including full Node regression, Python policy tests, TypeScript build and Wrangler dry-run.
 - PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test were already present on main. Do not reapply.
 - Production migration is not approved.
 
@@ -40,7 +40,7 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 
 Follow the unchecked items in the masterplan in order:
 
-1. Merge/deploy PR #64 only after CI passes, rerun the ledger export, and reconcile evidence IDs to issuer/task/accession records.
+1. Verify PR #64 deployment, rerun the ledger export, and reconcile evidence IDs to issuer/task/accession records.
 2. Begin human review in this order: OTEX (extreme 64.65x ROC candidate from USD 16.745m invested capital), GTM (non-positive IC and USD 2.7319bn tax receivable agreement), SGHC (IFRS EBIT and debt/on-demand borrowing), PBI (filing-specific EBIT bridge), HPQ (large debt, cash and IC scope), SSTK (IC and contributor royalties), XPOF (IC/cash/NCI), HRMY (IC), HRB (reconstructed EBIT and lease/IC scope).
 3. Record human decisions with evidence references and rationale; the current ledger has zero decisions. Do not treat ACCEPTED_CANDIDATE as approval.
 4. Resolve the remaining P2/P3 issuer evidence and unsupported-provider handling. Reconcile IRWD convertible-note classification between legacy Company Facts shadow discovery and filing-based debt-note review.
