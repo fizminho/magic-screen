@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Current main:** 98f9dc7c12d5691f1fbbe088fef9597a47855d56  
+**Main code baseline for this status snapshot:** 98f9dc7c12d5691f1fbbe088fef9597a47855d56  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
