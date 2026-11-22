@@ -1124,15 +1124,20 @@ export default {
         if (!selected.length || selected.length>10) return json({error:"Provide between 1 and 10 valid US ticker symbols"},400);
         const results=[];
         for(const symbol of selected) {
-          const row=await env.DB.prepare(`SELECT m.symbol,m.company_name,cm.cik,f.fiscal_period AS legacy_fiscal_period,
-            f.filed_at AS legacy_filed_at,f.total_debt AS legacy_total_debt
+          const row=await env.DB.prepare(`SELECT m.symbol,m.company_name,cm.cik,cm.updated_at AS cik_mapping_updated_at,
+            f.symbol AS legacy_record_symbol,f.status AS legacy_status,f.source AS legacy_source,f.updated_at AS legacy_updated_at,
+            f.fiscal_period AS legacy_fiscal_period,f.filed_at AS legacy_filed_at,f.total_debt AS legacy_total_debt
             FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol
             LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US'
             WHERE m.market='US' AND m.symbol=? AND m.listing_status='active'
             AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)`).bind(symbol).first<any>();
           if(!row) { results.push({symbol,state:"not_in_active_us_universe"}); continue; }
           const base={symbol,company_name:row.company_name,cik:row.cik??null,
-            legacy_total_debt:row.legacy_total_debt==null?null:Number(row.legacy_total_debt)};
+            cik_mapping_updated_at:row.cik_mapping_updated_at??null,
+            legacy:{record_present:row.legacy_record_symbol!=null,status:row.legacy_status??null,
+              source:row.legacy_source??null,updated_at:row.legacy_updated_at??null,
+              fiscal_period:row.legacy_fiscal_period??null,filed_at:row.legacy_filed_at??null,
+              total_debt:row.legacy_total_debt==null?null:Number(row.legacy_total_debt)}};
           if(!row.cik || row.cik==="UNMAPPED") { results.push({...base,state:"sec_cik_unmapped"}); continue; }
           try {
             const response=await fetch("https://data.sec.gov/api/xbrl/companyfacts/CIK"+String(row.cik).padStart(10,"0")+".json",
