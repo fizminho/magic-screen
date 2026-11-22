@@ -1258,6 +1258,22 @@ export default {
         return json({...page,active_universe:symbolsActive.length,ai_review_only:true,production_write:false,production_fundamentals_changed:false,rankings_changed:false});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini batch accounting review"},503); }
     }
+    if (url.pathname==="/api/fundamentals/edgartools/ai-review/history" && request.method==="GET") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        await ensureSchema(env);
+        const symbol=String(url.searchParams.get("symbol")??"").trim().toUpperCase();
+        if (symbol && !/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
+        const requestedLimit=Number(url.searchParams.get("limit")??50);
+        const limit=Number.isFinite(requestedLimit)?Math.min(100,Math.max(1,Math.floor(requestedLimit))):50;
+        const rows=await env.DB.prepare(`SELECT id,cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,reviewed_at
+          FROM gemini_accounting_review_history ${symbol?"WHERE symbol=?":""}
+          ORDER BY reviewed_at DESC,id DESC LIMIT ?`).bind(...(symbol?[symbol,limit]:[limit])).all<any>();
+        return json({reviews:rows.results.map((row:any)=>({...row,response:JSON.parse(row.response_json),response_json:undefined})),
+          count:rows.results.length,ai_review_only:true,production_write:false});
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini accounting review history"},503); }
+    }
     if (url.pathname==="/api/fundamentals/edgartools/ai-review/decisions" && (request.method==="GET" || request.method==="POST")) {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
       if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
@@ -1266,7 +1282,8 @@ export default {
         if (request.method==="GET") {
           const symbol=String(url.searchParams.get("symbol")??"").trim().toUpperCase();
           if (symbol && !/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
-          const limit=Math.min(100,Math.max(1,Math.floor(Number(url.searchParams.get("limit")??50))));
+          const requestedLimit=Number(url.searchParams.get("limit")??50);
+          const limit=Number.isFinite(requestedLimit)?Math.min(100,Math.max(1,Math.floor(requestedLimit))):50;
           const rows=await env.DB.prepare(`SELECT id,symbol,accession,task,cache_key,input_hash,decision,classification,rationale,reviewer,created_at
             FROM gemini_accounting_review_decisions ${symbol?"WHERE symbol=?":""}
             ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...(symbol?[symbol,limit]:[limit])).all<any>();
