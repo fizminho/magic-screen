@@ -99,6 +99,20 @@ test("payload validation: enums, OVERRIDE classification, lengths", () => {
   assert.equal(validateDecisionPayload(null).ok, false);
 });
 
+test("history exposes deduplicated evidence IDs without raw Gemini response content", async () => {
+  const env = await setup();
+  const response = {
+    findings: [{ evidence_ids: ["debt_scope:0", "debt_scope:1"], rationale: "private rationale" }],
+    supporting_evidence: [{ evidence_id: "debt_scope:0" }],
+    nested: { evidence_ids: ["cash_scope:2"] }
+  };
+  await persistCompletedReview(env, CACHE_SQL, row({ responseJson: JSON.stringify(response) }));
+  const [item] = await listReviewHistory(env, { limit: 10, offset: 0 });
+  assert.deepEqual(item.evidence_ids, ["cash_scope:2", "debt_scope:0", "debt_scope:1"]);
+  assert.equal("response_json" in item, false);
+  assert.equal("rationale" in item, false);
+});
+
 test("reads are bounded, filtered and omit raw response payloads", async () => {
   const env = await setup();
   for (let i = 0; i < 3; i++) await persistCompletedReview(env, CACHE_SQL, row({ cacheKey: String(i).repeat(64), symbol: i === 2 ? "XYZ" : "ABC" }));
