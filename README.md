@@ -27,6 +27,14 @@ A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
 
 The screener is a research aid, not investment advice. Verify current filings, company disclosures and Shariah status before making an investment decision.
 
+## Gemini review ledger export
+
+The persistent review history and human-decision export is read-only. It makes no Gemini calls and does not change application data or rankings.
+
+- Manual run: Actions → Export Gemini review audit ledger → Run workflow.
+- Controlled main push: a push affecting this workflow, its export script or README whose commit message contains `[ledger-export]` also runs the export.
+- The workflow uploads JSON and Markdown artifacts with 14-day retention. Treat the JSON as sensitive operational data and do not commit it to the repository.
+
 ## Full-universe validation operations
 
 The EdgarTools fundamentals bakeoff supports three execution modes:
