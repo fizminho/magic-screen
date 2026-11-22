@@ -4,12 +4,6 @@ name: Gemini accounting review batch
 # Review-only: never writes production fundamentals, ratios, eligibility or rankings.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/gemini-accounting-review-batch.yml"
-      - "scripts/run_gemini_review_batch.mjs"
-      - "README.md"
     inputs:
       start_cursor:
         description: "Resume after this ticker (blank = from the start)"
@@ -30,6 +24,12 @@ on:
       max_new_calls:
         description: "Non-cached Gemini calls per Worker request (1-5)"
         default: "2"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/gemini-accounting-review-batch.yml"
+      - "scripts/run_gemini_review_batch.mjs"
+      - "README.md"
 
 permissions:
   contents: read
@@ -54,7 +54,7 @@ jobs:
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          if [[ "$COMMIT_MESSAGE" =~ \\[gemini-review:([A-Z0-9,.-]+)\\] ]]; then
+          if [[ "$COMMIT_MESSAGE" =~ \[gemini-review:([A-Z0-9,.-]+)\] ]]; then
             SYMBOLS="${BASH_REMATCH[1]}"
           else
             echo "::error::Push-triggered Gemini review requires [gemini-review:TICKER1,TICKER2] in the commit message."
