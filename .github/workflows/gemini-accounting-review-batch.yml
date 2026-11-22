@@ -4,6 +4,12 @@ name: Gemini accounting review batch
 # Review-only: never writes production fundamentals, ratios, eligibility or rankings.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/gemini-accounting-review-batch.yml"
+      - "scripts/run_gemini_review_batch.mjs"
+      - "README.md"
     inputs:
       start_cursor:
         description: "Resume after this ticker (blank = from the start)"
@@ -34,6 +40,7 @@ concurrency:
 
 jobs:
   review:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[gemini-review:')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -41,14 +48,38 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Resolve guarded push symbols
+        id: push_inputs
+        if: github.event_name == 'push'
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          if [[ "$COMMIT_MESSAGE" =~ \\[gemini-review:([A-Z0-9,.-]+)\\] ]]; then
+            SYMBOLS="${BASH_REMATCH[1]}"
+          else
+            echo "::error::Push-triggered Gemini review requires [gemini-review:TICKER1,TICKER2] in the commit message."
+            exit 1
+          fi
+          IFS=',' read -ra ITEMS <<< "$SYMBOLS"
+          if (( ${#ITEMS[@]} < 1 || ${#ITEMS[@]} > 2 )); then
+            echo "::error::Push-triggered Gemini review is limited to one or two tickers."
+            exit 1
+          fi
+          for SYMBOL in "${ITEMS[@]}"; do
+            if [[ ! "$SYMBOL" =~ ^[A-Z0-9.-]{1,15}$ ]]; then
+              echo "::error::Invalid ticker in Gemini review trigger."
+              exit 1
+            fi
+          done
+          echo "symbols=$SYMBOLS" >> "$GITHUB_OUTPUT"
       - name: Run batch review
         env:
           WORKER_BASE_URL: ${{ vars.WORKER_BASE_URL || 'https://magic-screen.96muhdhafiz.workers.dev' }}
           UNIVERSE_SYNC_TOKEN: ${{ secrets.UNIVERSE_SYNC_TOKEN }}
-          START_CURSOR: ${{ inputs.start_cursor }}
-          SYMBOLS: ${{ inputs.symbols }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          INCLUDE_FULL_SCOPE: ${{ inputs.include_full_scope }}
-          MAX_NEW_CALLS: ${{ inputs.max_new_calls }}
-          MAX_RUNTIME_MINUTES: "45"
+          START_CURSOR: ${{ github.event_name == 'workflow_dispatch' && inputs.start_cursor || '' }}
+          SYMBOLS: ${{ github.event_name == 'workflow_dispatch' && inputs.symbols || steps.push_inputs.outputs.symbols || '' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+          INCLUDE_FULL_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.include_full_scope || false }}
+          MAX_NEW_CALLS: ${{ github.event_name == 'workflow_dispatch' && inputs.max_new_calls || '2' }}
+          MAX_RUNTIME_MINUTES: ${{ github.event_name == 'workflow_dispatch' && '45' || '15' }}
         run: node scripts/run_gemini_review_batch.mjs
