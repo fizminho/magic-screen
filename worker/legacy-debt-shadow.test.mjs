@@ -142,7 +142,9 @@ testCase("endpoint is authenticated, shadow-only and never writes", () => {
   assert.match(block, /Unauthorized[\s\S]*401|401/);
   assert.match(block, /production_write:false/);
   assert.match(block, /rankings_changed:false/);
-  assert.doesNotMatch(block, /INSERT|UPDATE|DELETE|REPLACE|\.run\(|\.batch\(/i);
+  assert.doesNotMatch(block, /\b(?:INSERT|UPDATE|DELETE|REPLACE)\b|\.run\(|\.batch\(/i);
+  for (const field of ["legacy_record_symbol", "legacy_status", "legacy_source", "legacy_updated_at", "legacy_fiscal_period", "legacy_filed_at", "cik_mapping_updated_at"]) assert.ok(block.includes(field), `missing legacy provenance field: ${field}`);
+  assert.match(block, /record_present:row\.legacy_record_symbol!=null/);
   assert.doesNotMatch(block, /stock_fundamentals\s*\(|ranking_snapshot/i);
 });
 testCase("issuer-specific taxonomy royalty facts are discovered and remain outside conventional debt", () => {

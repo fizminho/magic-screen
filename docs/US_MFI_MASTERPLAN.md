@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #57 progress refresh)  
+**Last updated:** 22 November 2026 (post-PR #60)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -26,12 +26,12 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after provenance and housekeeping releases | 5400ab319cca5095901b42bf81036727860d37bd | PR #59 merge commit |
-| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381) |
+| Main code baseline after debt discovery test and housekeeping releases | 40f84a13687bca94d860184488d9eec83094155a | PR #60 merge commit |
+| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381), [PR #60 Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
-| CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381) |
+| CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test; PR #60 adds debt discovery category, filing alignment, dimensional rejection and cap tests | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Latest documented full cohort | 30 active; 28 supported; 2 unsupported; 26 review-required; 2 shadow eligible; 0 shadow ranked; 0 production approved | [Implementation status snapshot](US_MFI_IMPLEMENTATION_STATUS_2026-11-22.md), [live validation](US_MFI_LIVE_VALIDATION_2026-11-22.md) |
 | Latest main push bakeoff | Regression-only stages passed; dynamic universe, ingestion and full-universe stages skipped | [Bakeoff #44987320672](https://github.com/fizminho/magic-screen/actions/runs/44987320672) |
@@ -50,7 +50,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [x] Verify lease/ROU audit active-universe filtering and regression test already exist on main.
 - [x] Close stale PR #28 unmerged because its intended change is already present on main.
 - [x] Create this masterplan as the authoritative execution checklist.
-- [ ] Run the ledger export workflow manually and inspect the generated artifact; no workflow-dispatch connector action is available in this session, so an owner/manual GitHub Actions dispatch is required.
+- [ ] Run the ledger export workflow manually and inspect the generated artifact; GitHub workflow-dispatch is not exposed by the connected GitHub actions in this session, so an owner/manual GitHub Actions dispatch is required.
 - [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
 
 ### P1. Refresh evidence for the current active cohort
@@ -73,10 +73,11 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 
 ### P1. Close deterministic accounting and issuer evidence gaps
 
-- [ ] Validate PR #55 live discovery against BCRX custom royalty financing and IRWD convertible debt; confirm both stay outside conventional debt candidates unless policy explicitly says otherwise.
+- [x] Add automated regression coverage for issuer-specific royalty, other financing, lease and convertible categories, accession/period/dimension rejection, and deterministic 120-concept cap; [PR #60](https://github.com/fizminho/magic-screen/pull/60), [CI #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191).
+- [ ] Validate live discovery against BCRX custom royalty financing and IRWD convertible debt; confirm both stay outside conventional debt candidates unless policy explicitly says otherwise.
 - [ ] Inspect filing evidence for OTEX gross/net debt carrying-value and issuance-cost reconciliation.
 - [ ] Explain UPWK gross debt versus net carrying value and preserve issuance costs separately.
-- [ ] Resolve BMBL legacy debt discrepancy: earlier note says USD 588.465m while latest live D1 row showed total_debt=null. Add legacy row provenance (CIK, accession/period, filed date, updated_at, status and source) before drawing conclusions.
+- [ ] Resolve BMBL legacy debt discrepancy: earlier note says USD 588.465m while latest live D1 row showed total_debt=null. PR #57 added provenance to the general reconciliation preview; the debt shadow endpoint is being updated to expose the same legacy row metadata (CIK, period, filed date, updated_at, status and source). Compare the stored row to the SEC anchor before concluding why total_debt is null.
 - [ ] Review remaining issuer-specific debt, financing, lease, NCI, cash and EBIT exceptions using the prioritised queue.
 - [ ] Keep royalty financing, convertibles, sale-leaseback, securitisation, customer financing, tax receivable agreements and contingent consideration separately classified pending policy.
 - [ ] Keep unsupported issuers visible; do not silently drop or replace them.
