@@ -34,9 +34,11 @@ function factsFor(facts, tags, accession, periodEnd) {
   return found;
 }
 
-function uniqueValue(items) {
-  const eligible = items.filter(item => item.eligible_usd_instant);
-  return eligible.length === 1 ? eligible[0].value : null;
+function selectedValue(items) {
+  // Match secFactValue(): taxonomy and tag priority are preserved, then latest filed fact wins.
+  const eligible = items.filter(item => item.eligible_usd_instant)
+    .sort((a, b) => String(b.filed ?? "").localeCompare(String(a.filed ?? "")));
+  return eligible.length ? eligible[0].value : null;
 }
 
 export function diagnoseLegacyDebtFacts(facts, periodEnd, accession) {
