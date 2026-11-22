@@ -130,7 +130,7 @@ Owner approval required before implementation can change shadow assumptions or p
 
 1. Run the full dynamic EdgarTools workflow and review its artifacts.
 2. Export and consolidate the Gemini audit ledger; build the prioritised issuer queue.
-3. Add legacy row provenance and resolve the BMBL discrepancy.
+3. Use the new legacy row provenance to explain the BMBL discrepancy; if the existing fields cannot explain it, add targeted history/audit evidence.
 4. Complete deterministic debt/financing classification validation for BCRX, IRWD, OTEX and UPWK.
 5. Work through shared policy decisions, then apply the approved policy cohort-wide.
 6. Reconcile legacy and EdgarTools, complete staging/rollback, and only then request cutover approval.
