@@ -1,3 +1,5 @@
+> **Current architecture note (22 November 2026):** This document describes the legacy SEC Company Facts Worker lane, not the target EdgarTools provider workflow. The legacy lane still runs every 30 minutes and writes the existing production fundamentals path during migration. EdgarTools extraction, raw evidence ingestion, deterministic resolution and shadow ranking are documented in [EDGARTOOLS_PROVIDER.md](EDGARTOOLS_PROVIDER.md) and remain read-only with respect to production fundamentals and rankings. The migration checklist is [US_MFI_MASTERPLAN.md](US_MFI_MASTERPLAN.md). Do not interpret this legacy implementation description as approval to use Company Facts as the target provider or to cut over production.
+
 # US financial fundamentals: SEC EDGAR
 
 The US screener uses SEC EDGAR Company Facts as its primary financial-statement source. The SEC's data.sec.gov XBRL APIs are public and do not require an API key. Requests include a declared User-Agent.
