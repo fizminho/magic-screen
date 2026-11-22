@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Main code baseline for this status snapshot:** bf7df3ad91467fc494b1ab01b3eb1057706d7363  
+**Main code baseline for this status snapshot:** `fbf2351bb3e7d84d576000264d55b933150ca5c3` (PR #69)  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -65,16 +65,16 @@ Latest read-only export [#44993168923](https://github.com/fizminho/magic-screen/
 
 ## Latest workflow distinction
 
-- Full dynamic-universe bakeoff [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage. A post-documentation push bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was also triggered and is pending inspection; do not treat it as accepted full-universe validation until its mode and artifact are checked.
+- Last accepted full dynamic-universe bakeoff: [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114), all stages passed. The later push bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) passed in **regression-only mode**; its log explicitly skipped dynamic-universe coverage assertions. It is not a fresh cohort refresh.
 - Read-only ledger export [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) passed and artifact was inspected.
-- PR #68 documentation build [#44993118191](https://github.com/fizminho/magic-screen/actions/runs/44993118191) passed all Node, Python, TypeScript and Wrangler dry-run checks. Main post-merge build [#44993168886](https://github.com/fizminho/magic-screen/actions/runs/44993168886) is pending inspection. No production cutover occurred.
+- PR #68 and PR #69 documentation changes are merged. PR #69 main build [#44993454361](https://github.com/fizminho/magic-screen/actions/runs/44993454361) passed all Node, Python, TypeScript and Wrangler dry-run checks. A fresh full-universe run is the next operational step. No production cutover occurred.
 
 ## Open critical gates
 
-1. Merge/deploy PR #64, rerun the ledger export with evidence IDs, and reconcile every review item to exact evidence.
-2. Human review of the P1 issuer queue in the order recorded in the masterplan; no decisions have yet been recorded.
-3. Resolve P2/P3 filing exceptions and unsupported-provider handling without silently dropping active issuers.
-4. Obtain cohort-wide owner approval for EBIT, debt, lease, cash, invested capital, NCI and ranking methodology.
+1. Run a fresh dynamic full-universe bakeoff; #44993168825 was regression-only and does not refresh the cohort.
+2. Obtain owner decisions on shared EBIT, debt, lease/ROU, cash, invested-capital, NCI and ranking policies; all remain pending.
+3. Complete evidence-linked P1 issuer sign-off in the masterplan order; the ledger currently has zero human decisions.
+4. Resolve P2/P3 filing exceptions and unsupported-provider handling without silently dropping active issuers.
 5. Complete legacy-versus-EdgarTools reconciliation, staging write rehearsal and rollback.
 6. Explicit owner approval before production cutover.
 
