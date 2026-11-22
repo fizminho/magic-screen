@@ -1,6 +1,6 @@
 # US MFI agent handover
 
-**Last refreshed:** 22 November 2026 (full-universe and ledger audit)  
+**Last refreshed:** 22 November 2026 (ALEC/BCRX targeted review and refreshed ledger)  
 **Repository:** fizminho/magic-screen  
 **Authoritative execution plan:** [US MFI masterplan](US_MFI_MASTERPLAN.md)
 
@@ -20,8 +20,8 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #61 merged and deployed: legacy debt shadow now exposes legacy row presence, status, source, updated_at, fiscal period/filed date and CIK mapping update time.
 - PR #62 merged: README documents the controlled `[full-universe]` trigger. Full dynamic run [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage; artifact contains 30 active issuers, 28 supported, 2 unsupported, 2 shadow eligible, 0 ranked and 0 production approved.
 - PR #63 merged: README and workflow document/support controlled `[ledger-export]` runs. Export [#44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) passed and was inspected: 139 history rows, 26 issuers, zero decisions, no duplicate cache keys/input hashes.
-- PR #64 merged and deployed: review history returns deduplicated evidence-ID metadata while omitting raw Gemini response JSON. Fresh export [#44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574) was inspected: 133/139 rows have evidence IDs, all accessions match current extracted filings, zero decisions.
-- Main commit `33fa04740b5c70e7e296cf4708f081b618393165` is passing through deployment and [Build #44990629361](https://github.com/fizminho/magic-screen/actions/runs/44990629361), including full Node regression, Python policy tests, TypeScript build and Wrangler dry-run.
+- PR #64 merged and deployed: review history returns deduplicated evidence-ID metadata while omitting raw Gemini response JSON. Targeted batch [#44991281916](https://github.com/fizminho/magic-screen/actions/runs/44991281916) completed ALEC/BCRX; refreshed ledger [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) has 149 rows across 28 issuers, 143 rows with evidence IDs, and zero human decisions.
+- PR #68 merged documentation-only refresh; its PR build [#44993118191](https://github.com/fizminho/magic-screen/actions/runs/44993118191) passed. Main post-merge build [#44993168886](https://github.com/fizminho/magic-screen/actions/runs/44993168886) is pending verification.
 - PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test were already present on main. Do not reapply.
 - Production migration is not approved.
 
