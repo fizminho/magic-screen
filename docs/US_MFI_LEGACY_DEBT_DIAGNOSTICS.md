@@ -53,3 +53,6 @@ curl -X POST "https://magic-screen.96muhdhafiz.workers.dev/api/fundamentals/lega
 ```
 
 Do not paste the bearer token into chat or commit it. Run the endpoint after the Worker deployment completes. Results are limited to public SEC filing facts and the user's own stored reconciliation metadata.
+
+
+See `US_MFI_LEGACY_DEBT_SHADOW_CANDIDATE.md` for the separate shadow candidate endpoint (shadow only; no production writes or ranking changes).
