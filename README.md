@@ -27,6 +27,19 @@ A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
 
 The screener is a research aid, not investment advice. Verify current filings, company disclosures and Shariah status before making an investment decision.
 
+## Targeted Gemini review batch
+
+The accounting-review batch supports manual dispatch for normal resumable runs. For a narrowly scoped gap, a controlled main push can trigger one or two explicitly named active US tickers by including `[gemini-review:TICKER1,TICKER2]` in the commit message while changing this README, the batch workflow or its runner script.
+
+The guarded push mode:
+- accepts at most two tickers;
+- disables `full_scope` re-review;
+- caps each Worker page at two new Gemini calls;
+- stops after 15 minutes;
+- reuses existing cache entries and locks, so unchanged evidence is not resent.
+
+Use this only for a verified coverage gap. The run is AI review only, not human approval, and never writes production fundamentals or rankings.
+
 ## Gemini review ledger export
 
 The persistent review history and human-decision export is read-only. It makes no Gemini calls and does not change application data or rankings.
