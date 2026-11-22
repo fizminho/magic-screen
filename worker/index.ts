@@ -10,6 +10,7 @@ import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconcili
 import { classifyDebtReconciliation } from "./debt-reconciliation.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { parsePageParams, recordReviewDecision, listReviewHistory, listReviewDecisions, MAX_DECISION_BODY_BYTES, REVIEW_TASKS } from "./gemini-review-ledger.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { runGeminiAccountingReview, listGeminiAccountingEscalations, getGeminiModelCandidates } from "./gemini-accounting-review.mjs";
 
 interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; GEMINI_MODEL?: string; GEMINI_MIN_REQUEST_INTERVAL_MS?: string; }
