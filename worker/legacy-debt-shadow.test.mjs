@@ -167,3 +167,58 @@ testCase("convertible debt is surfaced as a separate scope-review category", () 
     x.concept === "us-gaap:ConvertibleDebtCurrent" && x.category === "convertible_debt"));
   assert.ok(r.review_flags.includes("scope_review_required_convertible_debt"));
 });
+
+
+testCase("discovery classifies every debt-related category across issuer taxonomies", () => {
+  const facts = build({ LongTermDebtCurrent: 0, LongTermDebtNoncurrent: 0 });
+  facts.facts["issuer-custom"] = {
+    RoyaltyFinancingLiability: { units: { USD: [fact(10)] } },
+    FailedSaleLeasebackObligation: { units: { USD: [fact(20)] } },
+    OperatingLeaseLiability: { units: { USD: [fact(30)] } },
+    ConvertibleDebtCurrent: { units: { USD: [fact(40)] } },
+    CreditFacilityOutstanding: { units: { USD: [fact(50)] } }
+  };
+  const r = resolveLegacyDebtShadow(facts, END, ACC);
+  const categories = new Map(r.other_concepts_discovered.map(x => [x.concept.split(":")[1], x.category]));
+  assert.equal(categories.get("RoyaltyFinancingLiability"), "royalty_financing");
+  assert.equal(categories.get("FailedSaleLeasebackObligation"), "other_financing");
+  assert.equal(categories.get("OperatingLeaseLiability"), "lease");
+  assert.equal(categories.get("ConvertibleDebtCurrent"), "convertible_debt");
+  assert.equal(categories.get("CreditFacilityOutstanding"), "other_debt_related");
+  assert.ok(r.review_flags.includes("scope_review_required_royalty_financing"));
+  assert.ok(r.review_flags.includes("scope_review_required_other_financing"));
+  assert.ok(r.review_flags.includes("separate_lease_evidence_not_included"));
+  assert.ok(r.review_flags.includes("scope_review_required_convertible_debt"));
+  assert.ok(r.other_concepts_discovered.every(x => x.included_in_candidate === false));
+});
+
+testCase("discovery rejects mismatched accession, period and dimensional facts", () => {
+  const facts = build({ LongTermDebtCurrent: 0, LongTermDebtNoncurrent: 0 });
+  facts.facts["issuer-custom"] = {
+    RoyaltyFinancingLiability: { units: { USD: [
+      fact(10),
+      fact(11, { accn: "different-accession" }),
+      fact(12, { end: "2024-12-31" }),
+      fact(13, { segment: { member: "Domestic" } })
+    ] } }
+  };
+  const r = resolveLegacyDebtShadow(facts, END, ACC);
+  assert.equal(r.other_concepts_discovered.length, 1);
+  assert.equal(r.other_concepts_discovered[0].value, 10);
+  assert.equal(r.other_concepts_discovered[0].concept, "issuer-custom:RoyaltyFinancingLiability");
+});
+
+testCase("discovery cap is deterministic and bounded", () => {
+  const facts = build({ LongTermDebtCurrent: 0, LongTermDebtNoncurrent: 0 });
+  const custom = {};
+  for (let i = 0; i < 125; i++) {
+    const tag = `CustomDebtObligation${String(i).padStart(3, "0")}`;
+    custom[tag] = { units: { USD: [fact(i + 1)] } };
+  }
+  facts.facts["issuer-custom"] = custom;
+  const r = resolveLegacyDebtShadow(facts, END, ACC);
+  assert.equal(r.other_concepts_discovered.length, 120);
+  assert.equal(r.other_concepts_discovered[0].concept, "issuer-custom:CustomDebtObligation000");
+  assert.equal(r.other_concepts_discovered.at(-1).concept, "issuer-custom:CustomDebtObligation119");
+  assert.ok(!r.other_concepts_discovered.some(x => x.concept.endsWith("CustomDebtObligation120")));
+});
