@@ -3,6 +3,7 @@ import testCase from "node:test";
 import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconciliation.ts";
 function row(overrides={}){return {
   symbol:"TEST",company_name:"Test Inc",current_market_cap:100000000,market_cap_updated_at:"2026-11-20T10:00:00.000Z",
+  legacy_record_present:true,legacy_cik:"0000000001",legacy_updated_at:"2026-03-01T00:00:00.000Z",
   legacy_status:"calculated",legacy_source:"SEC EDGAR Company Facts",legacy_fiscal_period:"2025-12-31",legacy_filed_at:"2026-02-20",
   legacy_ebit:10000000,legacy_current_assets:50000000,legacy_current_liabilities:20000000,legacy_net_ppe:20000000,
   legacy_total_debt:10000000,legacy_cash:5000000,legacy_market_cap:100000000,
@@ -12,7 +13,7 @@ function row(overrides={}){return {
     invested_capital_status:"positive_denominator_candidate_review_only",review_flags:[],
     enterprise_value_candidate_review:{conventional_debt_status:"identified_from_unique_current_and_noncurrent_components",conventional_gross_debt_candidate:10000000,unrestricted_cash_candidate:5000000}},
   ...overrides};}
-testCase("reconciles identical same-period inputs using a common current market cap",()=>{const r=buildFundamentalsReconciliationPreview([row()]);const x=r.rows[0];assert.equal(x.status,"comparable");assert.equal(x.legacy.metrics.enterprise_value,105000000);assert.equal(x.edgartools.metrics.enterprise_value,105000000);assert.equal(x.metric_deltas.earnings_yield_percentage_points,0);assert.equal(r.production_write,false);});
+testCase("reconciles identical same-period inputs using a common current market cap",()=>{const r=buildFundamentalsReconciliationPreview([row()]);const x=r.rows[0];assert.equal(x.status,"comparable");assert.equal(x.legacy.record_present,true);assert.equal(x.legacy.cik,"0000000001");assert.equal(x.legacy.updated_at,"2026-03-01T00:00:00.000Z");assert.equal(x.legacy.accession,null);assert.equal(r.summary.legacy_rows_present,1);assert.equal(x.legacy.metrics.enterprise_value,105000000);assert.equal(x.edgartools.metrics.enterprise_value,105000000);assert.equal(x.metric_deltas.earnings_yield_percentage_points,0);assert.equal(r.production_write,false);});
 testCase("reports partial same-period inputs when legacy debt is missing",()=>{
   const input=row({legacy_status:"missing_required_facts",legacy_ebit:9000000,legacy_total_debt:null});
   const result=buildFundamentalsReconciliationPreview([input]);
@@ -30,6 +31,7 @@ testCase("reports partial same-period inputs when legacy debt is missing",()=>{
   assert.equal(result.summary.legacy_debt_missing_supported,1);
 });
 
+testCase("reports a missing legacy row separately from a present but incomplete row",()=>{const r=buildFundamentalsReconciliationPreview([row({legacy_record_present:false,legacy_status:null,legacy_cik:null,legacy_updated_at:null,legacy_filed_at:null})]);const x=r.rows[0];assert.equal(x.legacy.record_present,false);assert.equal(x.legacy.cik,null);assert.equal(x.legacy.updated_at,null);assert.ok(x.mismatch_reasons.includes("legacy_fundamentals_row_missing"));assert.equal(r.summary.legacy_rows_missing,1);});
 testCase("does not compare different fiscal periods",()=>{const x=buildFundamentalsReconciliationPreview([row({legacy_fiscal_period:"2024-12-31"})]).rows[0];assert.equal(x.status,"period_mismatch");assert.equal(x.metrics_comparable,false);assert.equal(x.metric_deltas,null);assert.ok(x.mismatch_reasons.includes("fiscal_period_mismatch"));});
 testCase("does not compare uncalculated legacy fundamentals",()=>{const x=buildFundamentalsReconciliationPreview([row({legacy_status:"missing_required_facts"})]).rows[0];assert.equal(x.status,"legacy_not_calculated");assert.equal(x.legacy.metrics,null);});
 testCase("keeps unsupported providers visible but non-comparable",()=>{const r=row();r.edgar.provider_status="unsupported_provider";const x=buildFundamentalsReconciliationPreview([r]).rows[0];assert.equal(x.status,"edgartools_unsupported_or_missing");assert.equal(x.edgartools.metrics,null);});

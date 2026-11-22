@@ -16,6 +16,7 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
   const reconciliations=rows.map((row:any)=>{
     const edgar=row.edgar??{};
     const legacyStatus=String(row.legacy_status??"missing");
+    const legacyRecordPresent=row.legacy_record_present===true||(row.legacy_record_present==null&&row.legacy_status!=null);
     const legacyPeriod=typeof row.legacy_fiscal_period==="string"?row.legacy_fiscal_period:null;
     const edgarPeriod=typeof edgar.fiscal_period==="string"?edgar.fiscal_period:null;
     const periodMatch=Boolean(legacyPeriod&&edgarPeriod&&legacyPeriod===edgarPeriod);
@@ -46,6 +47,7 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
     const partialDeltaValues=partialInputDeltas?[partialInputDeltas.ebit,partialInputDeltas.invested_capital,partialInputDeltas.gross_debt,partialInputDeltas.unrestricted_cash].filter((value:any)=>value!==null):[];
     const hasPartialInputDifferences=materiallyDifferent(partialDeltaValues);
     const mismatchReasons:string[]=[];
+    if(!legacyRecordPresent) mismatchReasons.push("legacy_fundamentals_row_missing");
     if(legacyStatus!=="calculated") mismatchReasons.push("legacy_fundamentals_not_calculated");
     if(!legacyPeriod) mismatchReasons.push("legacy_fiscal_period_missing");
     if(!edgarPeriod) mismatchReasons.push("edgartools_fiscal_period_missing");
@@ -80,7 +82,9 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
     if(legacyMarketCap!==null&&currentMarketCap!==null&&Math.abs(legacyMarketCap-currentMarketCap)>0.01) reviewFlags.push("legacy_market_cap_differs_from_current_snapshot");
     return {
       symbol:String(row.symbol??"UNKNOWN"),company_name:row.company_name??null,status,metrics_comparable:metricsComparable,period_match:periodMatch,
-      legacy:{status:legacyStatus,source:row.legacy_source??null,fiscal_period:legacyPeriod,filed_at:row.legacy_filed_at??null,accession_available:false,
+      legacy:{record_present:legacyRecordPresent,cik:typeof row.legacy_cik==="string"?row.legacy_cik:null,
+        status:legacyStatus,source:row.legacy_source??null,fiscal_period:legacyPeriod,filed_at:row.legacy_filed_at??null,
+        updated_at:row.legacy_updated_at??null,accession:null,accession_available:false,
         ebit:legacyEbit,invested_capital:legacyInvestedCapital,gross_debt:legacyGrossDebt,cash:legacyCash,
         market_cap_at_calculation:legacyMarketCap,stored_earnings_yield:finiteNumber(row.legacy_stored_earnings_yield),
         stored_return_on_capital:finiteNumber(row.legacy_stored_return_on_capital),metrics:legacyMetrics},
@@ -106,6 +110,11 @@ export function buildFundamentalsReconciliationPreview(rows:any[],asOf:string|nu
     rows_with_input_differences:reconciliations.filter((row:any)=>row.has_input_differences).length,
     partial_input_comparison_rows:reconciliations.filter((row:any)=>row.partial_input_deltas&&Object.values(row.partial_input_deltas).some((value:any)=>value!==null)).length,
     rows_with_partial_input_differences:reconciliations.filter((row:any)=>row.has_partial_input_differences).length,
+    legacy_rows_present:reconciliations.filter((row:any)=>row.legacy.record_present).length,
+    legacy_rows_missing:reconciliations.filter((row:any)=>!row.legacy.record_present).length,
+    legacy_rows_with_cik:reconciliations.filter((row:any)=>row.legacy.cik!==null).length,
+    legacy_rows_with_filed_at:reconciliations.filter((row:any)=>row.legacy.filed_at!==null).length,
+    legacy_rows_with_updated_at:reconciliations.filter((row:any)=>row.legacy.updated_at!==null).length,
     legacy_debt_missing_supported:supportedRows.filter((row:any)=>row.legacy.gross_debt===null).length,
     legacy_field_coverage:{
       ebit:fieldCoverage(supportedRows.map((row:any)=>row.legacy),"ebit"),
