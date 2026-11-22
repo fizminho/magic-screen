@@ -82,6 +82,11 @@ async function ensureSchema(env: Env) {
     )`)
   ]);
   await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS gemini_accounting_review_cache (
+      cache_key TEXT PRIMARY KEY, symbol TEXT NOT NULL, accession TEXT, task TEXT NOT NULL, input_hash TEXT NOT NULL,
+      prompt_version TEXT NOT NULL, policy_version TEXT NOT NULL, model TEXT NOT NULL, status TEXT NOT NULL,
+      response_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    )`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS gemini_accounting_review_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT, cache_key TEXT NOT NULL UNIQUE, symbol TEXT NOT NULL,
       accession TEXT, task TEXT NOT NULL, input_hash TEXT NOT NULL, prompt_version TEXT NOT NULL,
