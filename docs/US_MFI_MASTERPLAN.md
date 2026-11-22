@@ -107,12 +107,12 @@ Owner approval required before implementation can change shadow assumptions or p
 ### P2. Engineering quality and documentation
 
 - [x] Add a complete Node test sweep to CI (all worker *.test.mjs files plus the lease/ROU audit test); [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
-- [ ] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI.
+- [x] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI; verified in [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
 - [ ] Add tests for all debt taxonomy discovery categories, dimension rejection, filing alignment and discovery-cap behaviour.
 - [ ] Ensure workflow outputs distinguish regression-only, targeted and full-universe modes.
 - [x] Consolidate agent handovers and implementation status around this masterplan.
-- [ ] Correct README cron cadence and clearly distinguish the legacy Company Facts runtime from the EdgarTools evidence lane.
-- [ ] Remove stale branch-specific instructions and duplicate/contradictory policy statements.
+- [x] Correct README cron cadence and clearly distinguish the legacy Company Facts runtime from the EdgarTools evidence lane; [PR #56](https://github.com/fizminho/magic-screen/pull/56).
+- [x] Remove stale branch-specific agent instructions and point handovers to this plan. The ranking tie-method difference remains explicitly documented as an unresolved owner decision, not silently changed.
 - [ ] Keep dated issuer research notes as evidence records; do not duplicate their full content into this plan.
 
 ### P3. Controlled release
