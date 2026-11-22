@@ -24,7 +24,7 @@ function factsFor(facts, tags, accession, periodEnd) {
             end: entry?.end ?? null, start: entry?.start ?? null, filed: entry?.filed ?? null,
             form: entry?.form ?? null, same_period: samePeriod,
             eligible_usd_instant: unit === "USD" && samePeriod &&
-              typeof entry?.val === "number" && Number.isFinite(entry.val) &&
+              typeof entry?.val === "number" && Number.isFinite(entry.val) && Boolean(entry?.filed) &&
               ["10-K", "20-F", "40-F", "10-Q"].includes(entry?.form)
           });
         }
