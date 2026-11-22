@@ -30,15 +30,25 @@ export async function runFromEnv(env = process.env, fetchImpl = fetch, sleep = m
     throw new Error("Worker page failed after retries");
   };
   const result = await orchestrate({ callPage, sleep, deadlineMs,
-    log: issuer => lines.push("| " + issuer.symbol + " | " + issuer.status + " | " + issuer.tasks.map(t => t.task + ":" + t.status + (t.cached ? "(cached)" : "")).join(", ") + " |") });
-  const summary = ["## Gemini accounting review batch", "", "Finished: **" + result.finished + "** (" + (result.reason ?? "all issuers processed") + "). Resume cursor: `" + (result.cursor ?? "") + "`",
+    log: issuer => lines.push("| " + issuer.symbol + " | " + issuer.status + " | " + issuer.tasks.map(t => t.task + ":" + t.status + (t.cached ? "(cached)" : "") + (t.review_status ? " [review=" + t.review_status + "]" : "") + (t.error ? " [error=" + t.error + "]" : "")).join(", ") + " |") });
+  const dryRun = env.DRY_RUN === "true";
+  const summary = ["## Gemini accounting review batch", "", "Mode: **" + (dryRun ? "DRY RUN (no Gemini calls)" : "LIVE REVIEW") + "**",
+    "Finished: **" + result.finished + "** (" + (result.reason ?? "all issuers processed") + "). Resume cursor: `" + (result.cursor ?? "") + "`",
     "", "Status totals: `" + JSON.stringify(result.totals) + "`", "", "| Issuer | Status | Tasks |", "|---|---|---|", ...lines].join("\n");
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, summary + "\n");
   console.log(summary);
-  return result;
+  return { ...result, dryRun };
+}
+
+// Exit policy: orchestration incomplete/failed = 1; completed batch with task-level failures = 2;
+// completed batch with review-required/unsupported outcomes only = 0.
+export function getBatchExitCode(result) {
+  if (!result?.finished) return 1;
+  if (Number(result?.totals?.FAILED ?? 0) > 0) return 2;
+  return 0;
 }
 
 if (import.meta.url === "file://" + process.argv[1]) {
-  runFromEnv().then(result => { if (!result.finished) process.exitCode = 2; if (result.totals.FAILED > 0) process.exitCode = 1; })
+  runFromEnv().then(result => { process.exitCode = getBatchExitCode(result); })
     .catch(error => { console.error("::error::" + error.message); process.exit(1); });
 }

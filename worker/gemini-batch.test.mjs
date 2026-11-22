@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import testCase from "node:test";
 import { BATCH_STATUS as S, classifyReviewOutcome, selectBatchTasks, runBatchPage, orchestrate } from "./gemini-batch.mjs";
+import { getBatchExitCode } from "../scripts/run_gemini_review_batch.mjs";
 
 const supported = (tasks, accession = "acc") => ({ state: "supported", accession, fiscalPeriod: "2025", company: {}, resolver: {}, escalations: tasks.map(task => ({ task })) });
 const loader = map => async symbol => map[symbol] ?? { state: "awaiting_evidence" };
@@ -101,4 +102,19 @@ testCase("orchestrator aborts on repeated no-progress and respects its deadline"
   let t = 0;
   const timed = await orchestrate({ callPage: async () => ({ ...stuck, cursor: String(t) }), sleep: async () => {}, now: () => (t += 10), deadlineMs: 25 });
   assert.equal(timed.finished, false);
+});
+
+
+testCase("batch exit code distinguishes orchestration failure, task failure and review backlog", () => {
+  assert.equal(getBatchExitCode({ finished: false, totals: { FAILED: 0 } }), 1);
+  assert.equal(getBatchExitCode({ finished: true, totals: { FAILED: 1, REVIEW_REQUIRED: 4, UNSUPPORTED: 1 } }), 2);
+  assert.equal(getBatchExitCode({ finished: true, totals: { FAILED: 0, REVIEW_REQUIRED: 4, UNSUPPORTED: 1 } }), 0);
+  assert.equal(getBatchExitCode({ finished: true, totals: {} }), 0);
+});
+
+testCase("unclassified provider outcomes are surfaced as task errors", async () => {
+  const page = await runBatchPage({ symbols: ["A"], loadIssuer: loader({ A: supported(["debt_scope"]) }),
+    runReview: async () => ({ status: "UNEXPECTED_PROVIDER_STATE", message: "provider returned malformed payload" }) });
+  assert.equal(page.counts.FAILED, 1);
+  assert.equal(page.issuers[0].tasks[0].error, "provider returned malformed payload");
 });
