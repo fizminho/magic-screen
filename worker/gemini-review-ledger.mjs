@@ -71,8 +71,10 @@ export async function persistCompletedReview(env, cacheInsertSql, row) {
     row.promptVersion, row.policyVersion, row.model, row.status, row.responseJson, row.createdAt, row.createdAt);
   const historyStmt = env.DB.prepare(HISTORY_INSERT_SQL).bind(row.cacheKey, row.symbol, row.accession, row.task,
     row.inputHash, row.promptVersion, row.policyVersion, row.model, row.status, row.responseJson, row.createdAt);
-  if (typeof env.DB.batch === "function") await env.DB.batch([cacheStmt, historyStmt]);
-  else { await cacheStmt.run(); await historyStmt.run(); }
+  if (typeof env.DB.batch !== "function") {
+    throw new Error("D1 batch support is required for atomic cache/history persistence");
+  }
+  await env.DB.batch([cacheStmt, historyStmt]);
 }
 
 function fail(message, status = 400) { return { ok: false, status, error: message }; }
