@@ -43,6 +43,10 @@ All stages passed: dynamic universe discovery (30 unique symbols), matching mark
 - Reconciliation: 27/28 supported issuers have period-matched partial comparisons, zero period mismatches and zero field-level differences in the available comparisons. No full EV/EY/ROC comparison is possible because legacy total debt is missing for all 28 supported issuers.
 - The nine P1 filing accessions match the current extracted annual filings. The fresh run preserves the same accession set for OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB.
 
+## P1 targeted AI cache check
+
+The guarded [OTEX/GTM batch #44994448916](https://github.com/fizminho/magic-screen/actions/runs/44994448916) passed after the fresh cohort refresh. It processed exactly two tickers, reused cached evidence for every task and made zero new Gemini calls: 10 cached task completions, 5 review-required outcomes, 4 deterministic skips, 0 failures and 0 pending. OTEX EBIT/NCI remain REVIEW_REQUIRED; GTM EBIT remains REVIEW_REQUIRED and invested capital remains CONFLICTING_EVIDENCE. No new review-history rows were added, so the ledger export remains [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923). This is an AI cache/status check, not human sign-off.
+
 ## Current pipeline architecture
 
 - EdgarTools is the designated primary extraction provider for the target US fundamentals workflow.
