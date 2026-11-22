@@ -1,3 +1,5 @@
+> **Execution control:** The live priority order and checked/unchecked completion state are maintained in [US_MFI_MASTERPLAN.md](US_MFI_MASTERPLAN.md). This document preserves the detailed architecture, methodology and release-gate design; where status wording differs, the masterplan is authoritative.
+
 # US Magic Formula Investing: completion and release plan
 
 **Scope:** US equities only. Bursa work is deferred until US MFI is production-ready.

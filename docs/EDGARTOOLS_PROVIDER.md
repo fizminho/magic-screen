@@ -1,3 +1,5 @@
+> **Status update (22 November 2026):** EdgarTools remains the designated target extraction provider, but it is not yet the production fundamentals writer. The legacy Company Facts Worker sync still runs on a 30-minute cron. The latest documented accepted cohort is 30 active issuers (28 supported, 2 unsupported), with 26 accounting/valuation reviews, 2 shadow-eligible, 0 shadow-ranked and 0 production-approved. The latest main push bakeoff was regression-only and skipped dynamic discovery/ingestion. See the [US MFI masterplan](US_MFI_MASTERPLAN.md) for current execution status and gates; dated cohort figures here must be refreshed by a full dynamic run before use.
+
 # EdgarTools primary fundamentals provider
 
 ## Decision
