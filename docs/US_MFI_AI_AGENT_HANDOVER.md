@@ -1,6 +1,6 @@
 # US MFI agent handover
 
-**Last refreshed:** 22 November 2026 (fresh full-universe bakeoff #44993883641)  
+**Last refreshed:** 22 November 2026 (fresh cohort and OTEX/GTM targeted AI cache check)  
 **Repository:** fizminho/magic-screen  
 **Authoritative execution plan:** [US MFI masterplan](US_MFI_MASTERPLAN.md)
 
@@ -23,6 +23,7 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #64 merged and deployed: review history returns deduplicated evidence-ID metadata while omitting raw Gemini response JSON. Targeted batch [#44991281916](https://github.com/fizminho/magic-screen/actions/runs/44991281916) completed ALEC/BCRX; refreshed ledger [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) has 149 rows across 28 issuers, 143 rows with evidence IDs, and zero human decisions.
 - PR #68 merged and refreshed the ledger after ALEC/BCRX; [export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) has 149 rows across 28 issuers, 143 with evidence IDs and zero human decisions.
 - PR #69 and PR #70 merged the masterplan/status/handover refreshes. PR #70 CI [#44993832392](https://github.com/fizminho/magic-screen/actions/runs/44993832392) and main build [#44993883526](https://github.com/fizminho/magic-screen/actions/runs/44993883526) passed.
+- Targeted OTEX/GTM batch [#44994448916](https://github.com/fizminho/magic-screen/actions/runs/44994448916) passed but reused all cached task outputs; it made zero new Gemini calls and did not create new history rows. OTEX EBIT/NCI and GTM EBIT/IC remain unresolved; this is not human sign-off.
 - Fresh dynamic bakeoff [#44993883641](https://github.com/fizminho/magic-screen/actions/runs/44993883641) passed all stages: 30 active, 28 supported, 2 unsupported, 2 shadow eligible, 0 ranked and 0 production approved. Artifact [14742851802](https://github.com/fizminho/magic-screen/actions/runs/44993883641/artifacts/14742851802) was inspected. The prior #44993168825 run was regression-only.
 - PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test were already present on main. Do not reapply.
 - Production migration is not approved.
