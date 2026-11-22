@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { listGeminiAccountingEscalations } from "./gemini-accounting-review.mjs";
+import { listGeminiAccountingEscalations, validateGeminiAccountingResponse } from "./gemini-accounting-review.mjs";
 
 test("does not escalate deterministic categories with no unresolved signals", () => {
   const company = { balance_sheet_fact_review: { categories: {
@@ -437,4 +437,30 @@ test("full scope does not escalate solely because deterministic invested-capital
     ebit_status: "direct_reported_candidate_review_only", invested_capital_status: "positive_denominator_candidate_review_only",
     enterprise_value_candidate_review: { conventional_debt_status: "identified_from_unique_current_and_noncurrent_components" } };
   assert.deepEqual(listGeminiAccountingEscalations("ABC", company, resolver), []);
+});
+
+test("normalizes valid rationale evidence citations into evidence_ids", () => {
+  const evidence = { categories: { current_debt: { candidates: [
+    { evidence_id: "current_debt:0", source_kind: "filing_fact_candidate" },
+    { evidence_id: "current_debt:1", source_kind: "filing_fact_candidate" }
+  ] } }, filing_note_candidates: [] };
+  const parsed = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Two debt facts need review.",
+    findings: [{ evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"],
+      classification: "conventional_debt",
+      rationale: "The balance is supported by current_debt:0 and cross-checked against current_debt:1.",
+      confidence: "medium" }], unresolved_questions: [] };
+  const result = validateGeminiAccountingResponse(parsed, "debt_scope", evidence);
+  assert.deepEqual(result.findings[0].evidence_ids, ["current_debt:0", "current_debt:1"]);
+});
+
+test("rejects rationale citations outside the supplied filing evidence allowlist", () => {
+  const evidence = { categories: { current_debt: { candidates: [
+    { evidence_id: "current_debt:0", source_kind: "filing_fact_candidate" }
+  ] } }, filing_note_candidates: [] };
+  const parsed = { task: "debt_scope", status: "REVIEW_REQUIRED", summary: "Evidence needs review.",
+    findings: [{ evidence_id: "current_debt:0", evidence_ids: ["current_debt:0"],
+      classification: "conventional_debt", rationale: "See invented_fact:99 for support.",
+      confidence: "medium" }], unresolved_questions: [] };
+  assert.throws(() => validateGeminiAccountingResponse(parsed, "debt_scope", evidence),
+    /rationale cites a filing evidence ID outside the supplied evidence allowlist/);
 });
