@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #63 and full-universe evidence refresh)  
+**Last updated:** 22 November 2026 (post-PR #64 evidence-ID metadata)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -26,8 +26,8 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after debt discovery, provenance, full-universe operations and ledger export trigger | a0e52ba194a8b3b0a69f57027a3150222da16d1d | PR #63 merge commit |
-| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110), [PR #63 Build #44990076048](https://github.com/fizminho/magic-screen/actions/runs/44990076048) |
+| Main code baseline after ledger evidence-ID metadata release | 33fa04740b5c70e7e296cf4708f081b618393165 | PR #64 merge commit |
+| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44990629361](https://github.com/fizminho/magic-screen/actions/runs/44990629361), [PR #63 Build #44990076048](https://github.com/fizminho/magic-screen/actions/runs/44990076048) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
@@ -104,8 +104,8 @@ The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are pr
 ### P1 ledger evidence gap
 
 - [x] Export and inspect the ledger: 139 history rows, 26 issuers, 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE and 2 NOT_APPLICABLE; zero human decisions are recorded.
-- [ ] Include evidence IDs in history API/export. Current export omits them; [PR #64](https://github.com/fizminho/magic-screen/pull/64) is open with a read-only metadata-only fix and regression tests.
-- [ ] After PR #64 deploys, rerun the ledger export and reconcile evidence IDs to the review queue. No human decision should be inferred from an AI status.
+- [x] Include evidence IDs in review history API metadata without exposing raw response JSON; [PR #64](https://github.com/fizminho/magic-screen/pull/64), [CI #44990410412](https://github.com/fizminho/magic-screen/actions/runs/44990410412).
+- [ ] After PR #64 deployment, rerun the ledger export and reconcile evidence IDs to the review queue. The prior inspected artifact predates this enhancement; no human decision should be inferred from an AI status.
 
 ### P1. Approve a single cohort-wide accounting policy
 
