@@ -5,7 +5,10 @@ import { runGeminiAccountingReview } from "./gemini-accounting-review.mjs";
 class FakeD1 {
   cache = new Map();
   locks = new Map();
+  history = new Map();
   gateNextAllowedAt = null;
+
+  async batch(statements) { const out = []; for (const s of statements) out.push(await s.run()); return out; }
 
   prepare(sql) {
     const db = this;
@@ -40,7 +43,7 @@ class FakeD1 {
         return { results: [] };
       },
       async run() {
-        if (sql.includes("CREATE TABLE")) return { success: true };
+        if (sql.includes("CREATE ")) return { success: true };
         if (sql.includes("DELETE FROM gemini_accounting_review_locks")) {
           db.locks.delete(values[0]);
           return { success: true };
@@ -48,6 +51,11 @@ class FakeD1 {
         if (sql.includes("INSERT INTO gemini_accounting_review_cache")) {
           const [cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at,updated_at] = values;
           db.cache.set(cache_key, { response_json, model, created_at, status, symbol, accession, task, input_hash, prompt_version, policy_version, updated_at });
+          return { success: true };
+        }
+        if (sql.includes("INSERT OR IGNORE INTO gemini_accounting_review_history")) {
+          const [cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at] = values;
+          if (!db.history.has(cache_key)) db.history.set(cache_key, { cache_key,symbol,accession,task,input_hash,model,status,created_at });
           return { success: true };
         }
         throw new Error("Unexpected D1 run query: " + sql);
@@ -118,6 +126,9 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
     assert.equal(cached.status, "REVIEW_REQUIRED");
     assert.equal(cached.cached, true);
     assert.equal(apiCalls, 1);
+    // Ledger: exactly one history row for the one completed review; cache hits and in-flight duplicates add none.
+    assert.equal(DB.history.size, 1);
+    assert.equal([...DB.history.values()][0].status, "REVIEW_REQUIRED");
   } finally {
     releaseFetch();
     globalThis.fetch = originalFetch;
