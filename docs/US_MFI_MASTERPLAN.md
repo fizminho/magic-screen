@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #64 evidence-ID metadata)  
+**Last updated:** 22 November 2026 (post-PR #65 evidence-linked ledger reconciliation)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -26,8 +26,8 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after ledger evidence-ID metadata release | 33fa04740b5c70e7e296cf4708f081b618393165 | PR #64 merge commit |
-| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44990629361](https://github.com/fizminho/magic-screen/actions/runs/44990629361), [PR #63 Build #44990076048](https://github.com/fizminho/magic-screen/actions/runs/44990076048) |
+| Main code baseline after evidence-linked ledger documentation | 181d26360125e57d4a9a72f621438bb8e65e6c2e | PR #65 merge commit |
+| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44990799577](https://github.com/fizminho/magic-screen/actions/runs/44990799577), [PR #63 Build #44990076048](https://github.com/fizminho/magic-screen/actions/runs/44990076048) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
@@ -50,7 +50,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [x] Verify lease/ROU audit active-universe filtering and regression test already exist on main.
 - [x] Close stale PR #28 unmerged because its intended change is already present on main.
 - [x] Create this masterplan as the authoritative execution checklist.
-- [x] Run the read-only ledger export and inspect the artifact: 139 history rows, 26 issuers, zero decisions; [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990205149/artifacts/14741890230).
+- [x] Run the read-only ledger export and inspect the evidence-linked artifact: 139 history rows, 26 issuers, 133 rows with evidence IDs, 6 without IDs, zero decisions; [Export #44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990799574/artifacts/14741538700).
 - [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
 
 ### P1. Refresh evidence for the current active cohort
@@ -65,7 +65,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 ### P1. Build one issuer-level human review queue
 
 - [x] Run the read-only Gemini review ledger export using the controlled `[ledger-export]` main-push trigger and inspect its artifact; [PR #63](https://github.com/fizminho/magic-screen/pull/63), [run #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149).
-- [x] Reconcile exported history by issuer, task, accession, cache key and input hash. The current export has 139 unique history IDs/cache keys/input hashes, 26 issuers and no duplicate keys.
+- [x] Reconcile exported history by issuer, task, accession, evidence IDs, cache key and input hash. All 139 accessions match the current extracted filing for that issuer; 139 unique history IDs/cache keys/input hashes; no duplicate keys.
 - [x] Deduplicate completed/cached reviews; the export contains no duplicate cache keys or input hashes. Do not resend unchanged evidence.
 - [x] Separate deterministic missing facts, conflicting evidence, policy decisions and unsupported-provider cases in the full-universe accounting exception queue; 9 P1, 10 P2, 11 P3.
 - [x] Rank the first human-review tranche by impact on denominator distortion, debt/EV scope, EBIT reconstruction and cash/NCI/lease policy; see the current P1 order below.
@@ -105,8 +105,30 @@ The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are pr
 
 - [x] Export and inspect the ledger: 139 history rows, 26 issuers, 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE and 2 NOT_APPLICABLE; zero human decisions are recorded.
 - [x] Include evidence IDs in review history API metadata without exposing raw response JSON; [PR #64](https://github.com/fizminho/magic-screen/pull/64), [CI #44990410412](https://github.com/fizminho/magic-screen/actions/runs/44990410412).
-- [ ] After PR #64 deployment, rerun the ledger export and reconcile evidence IDs to the review queue. The prior inspected artifact predates this enhancement; no human decision should be inferred from an AI status.
+- [x] After PR #64 deployment, rerun the ledger export and reconcile evidence IDs to the review queue; [PR #64](https://github.com/fizminho/magic-screen/pull/64), [export #44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574). 133/139 rows contain one or more evidence IDs (347 ID occurrences); six rows have none (3 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE, 1 ACCEPTED_CANDIDATE).
 
+### Evidence-linked review coverage gaps
+
+- [x] All 139 exported history rows carry a filing accession that matches the current EdgarTools extraction for that issuer.
+- [x] Evidence IDs are exposed for 133 rows (347 ID occurrences); six rows have no IDs: STRA debt_scope, SBC financing_scope, QTTB nci_scope, IRWD financing_scope, HRMY financing_scope and GTM financing_scope. The latter three are ACCEPTED_CANDIDATE/NOT_APPLICABLE records with no supporting evidence IDs in the normalized response; do not infer approval from the status.
+- [ ] Determine whether the two supported active issuers absent from the ledger (ALEC and BCRX) require additional task reviews. ADBE is the regression control; AFMJF and EGHSF are provider-unsupported. Do not send duplicate/cached reviews.
+- [ ] Record human decisions only after an analyst reviews the cited filing evidence; the current ledger still has zero decisions.
+
+### P1 Gemini task-status overlay (AI status is not approval)
+
+| Issuer | Tasks still flagged by Gemini |
+|---|---|
+| SGHC | debt, EBIT, invested capital, lease |
+| GTM | EBIT review; invested capital conflicting evidence |
+| OTEX | EBIT, NCI |
+| HPQ | cash, lease |
+| HRB | EBIT, financing |
+| XPOF | cash, EBIT |
+| PBI | No Gemini task flagged, but filing-specific EBIT and invested-capital policy review remain open |
+| SSTK | No Gemini task flagged, but negative/near-zero invested-capital and contributor-royalty scope remain open |
+| HRMY | No Gemini task flagged, but invested-capital denominator remains unresolved |
+
+Gemini ACCEPTED_CANDIDATE only means the task's evidence was accepted as a candidate. It is not human approval, policy approval or production eligibility.
 ### P1. Approve a single cohort-wide accounting policy
 
 Owner approval required before implementation can change shadow assumptions or production values.
