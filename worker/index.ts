@@ -1156,7 +1156,11 @@ export default {
               .filter((x:any)=>x.val!=null&&x.start&&x.end&&["10-K","20-F","40-F"].includes(x.form)
                 &&(Date.parse(x.end)-Date.parse(x.start))/86400000>=330&&(Date.parse(x.end)-Date.parse(x.start))/86400000<=400)
               .sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
-            const anchor=annual[0];
+            // Reproduce the stored legacy record's period/filed anchor where available.
+            const anchor=annual.find((x:any)=>
+              (!legacy.legacy_fiscal_period||x.end===legacy.legacy_fiscal_period)
+              &&(!legacy.legacy_filed_at||x.filed===legacy.legacy_filed_at)
+            )??annual.find((x:any)=>!legacy.legacy_fiscal_period||x.end===legacy.legacy_fiscal_period)??annual[0];
             if(!anchor?.accn) { results.push({...base,state:"no_annual_usd_anchor_found"}); continue; }
             results.push({...base,state:"diagnosed",sec_company_name:facts?.entityName??null,
               sec_cik:facts?.cik??null,diagnostic:diagnoseLegacyDebtFacts(facts,anchor.end,anchor.accn)});
