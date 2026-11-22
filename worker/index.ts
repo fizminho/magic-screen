@@ -1159,7 +1159,7 @@ export default {
             const anchor=annual[0];
             if(!anchor?.accn) { results.push({...base,state:"no_annual_usd_anchor_found"}); continue; }
             results.push({...base,state:"diagnosed",sec_company_name:facts?.entityName??null,
-              sec_cik:facts?. cik??null,diagnostic:diagnoseLegacyDebtFacts(facts,anchor.end,anchor.accn)});
+              sec_cik:facts?.cik??null,diagnostic:diagnoseLegacyDebtFacts(facts,anchor.end,anchor.accn)});
           } catch(error) {
             results.push({...base,state:"sec_fetch_error",error:error instanceof Error?error.message:String(error)});
           }
