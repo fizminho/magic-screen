@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (fresh full-universe bakeoff #44993883641)  
+**Last updated:** 22 November 2026 (fresh cohort and OTEX/GTM targeted AI cache check)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -129,6 +129,8 @@ The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are pr
 | HRMY | No Gemini task flagged, but invested-capital denominator remains unresolved |
 
 Gemini ACCEPTED_CANDIDATE only means the task's evidence was accepted as a candidate. It is not human approval, policy approval or production eligibility.
+
+Targeted post-refresh check [#44994448916](https://github.com/fizminho/magic-screen/actions/runs/44994448916) processed exactly OTEX and GTM and completed successfully: 10 cached task completions, 5 review-required statuses, 4 deterministic skips, 0 failures and 0 pending. Every task was served from existing cache; no new Gemini calls or history rows were created. OTEX still has EBIT and NCI REVIEW_REQUIRED. GTM still has EBIT REVIEW_REQUIRED and invested-capital CONFLICTING_EVIDENCE. This confirms the blockers are unchanged and must not be represented as new sign-off.
 ### P1. Approve a single cohort-wide accounting policy
 
 Owner approval required before implementation can change shadow assumptions or production values.
