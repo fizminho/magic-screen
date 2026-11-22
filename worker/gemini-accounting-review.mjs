@@ -651,6 +651,16 @@ export async function runGeminiAccountingReview(env, input) {
       (cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at,updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).bind(cacheKey,input.symbol,input.accession,input.task,inputHash,PROMPT_VERSION,
         POLICY_VERSION,model,normalized.status,JSON.stringify(normalized),now,now).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS gemini_accounting_review_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, cache_key TEXT NOT NULL UNIQUE, symbol TEXT NOT NULL,
+      accession TEXT, task TEXT NOT NULL, input_hash TEXT NOT NULL, prompt_version TEXT NOT NULL,
+      policy_version TEXT NOT NULL, model TEXT NOT NULL, status TEXT NOT NULL,
+      response_json TEXT NOT NULL, reviewed_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare(`INSERT OR IGNORE INTO gemini_accounting_review_history
+      (cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,reviewed_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(cacheKey,input.symbol,input.accession,input.task,inputHash,PROMPT_VERSION,
+        POLICY_VERSION,model,normalized.status,JSON.stringify(normalized),now).run();
     return result;
   } finally {
     await env.DB.prepare("DELETE FROM gemini_accounting_review_locks WHERE cache_key=?").bind(cacheKey).run();
