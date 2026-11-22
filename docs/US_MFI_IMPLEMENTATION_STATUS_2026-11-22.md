@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Main code baseline for this status snapshot:** 181d26360125e57d4a9a72f621438bb8e65e6c2e  
+**Main code baseline for this status snapshot:** bf7df3ad91467fc494b1ab01b3eb1057706d7363  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -11,7 +11,7 @@ This document is a concise status snapshot. The masterplan is authoritative for 
 | Item | Result | Evidence |
 |---|---|---|
 | Issuer-specific debt discovery | Merged and deployed; scans all SEC Company Facts taxonomies and separates royalty financing, other financing, leases and convertible debt | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
-| Gemini audit-ledger export | Merged; manual and controlled [ledger-export] trigger; inspected 139 history rows and zero decisions. PR #64 adds evidence-ID metadata without raw response JSON; fresh export #44990799574 was inspected | [PR #53](https://github.com/fizminho/magic-screen/pull/53), [PR #63](https://github.com/fizminho/magic-screen/pull/63), [PR #64](https://github.com/fizminho/magic-screen/pull/64), [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) |
+| Gemini audit-ledger export | Latest read-only export after ALEC/BCRX targeted review: 149 rows, 28 issuers, 143 rows with evidence IDs, zero human decisions; [Export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) | [PR #64](https://github.com/fizminho/magic-screen/pull/64), [PR #68](https://github.com/fizminho/magic-screen/pull/68), [Artifact](https://github.com/fizminho/magic-screen/actions/runs/44993168923/artifacts/14741769525) |
 | Lease/ROU active-universe audit | Active-universe filtering and ADBE control exclusion test are already on main; duplicate stale PR closed unmerged | [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Main build and regression | Full Node suite, Python policy tests, TypeScript build and Wrangler dry-run passed | [Build #44990799577](https://github.com/fizminho/magic-screen/actions/runs/44990799577) |
 | Legacy reconciliation provenance | Merged; read-only response now includes legacy row presence, stored CIK, updated_at and filed date, and states accession is unavailable rather than inventing one | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
@@ -45,14 +45,15 @@ All stages passed: dynamic universe discovery, matching market-cap snapshot (pri
 
 ## Review ledger snapshot
 
-Read-only export [#44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990205149/artifacts/14741890230):
+Latest read-only export [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44993168923/artifacts/14741769525), exported 22 November 2026 at 06:19:15Z:
 
-- 139 history rows across 26 issuers; 139 unique cache keys and input hashes, no duplicate rows by those keys.
-- Statuses: 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE.
-- Tasks: cash 26, debt 24, EBIT 20, financing 11, invested capital 26, lease 25, NCI 7.
-- Zero human decisions recorded.
-- Fresh export [#44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990799574/artifacts/14741538700): 133/139 history rows contain evidence IDs (347 occurrences); six rows have no IDs. All 139 accessions match the current extraction. No duplicate cache/input hashes; zero human decisions.
-- Five active-universe symbols have no ledger history: ADBE (regression control), AFMJF and EGHSF (unsupported), plus supported ALEC and BCRX. Determine whether ALEC/BCRX need targeted reviews without resending cached evidence.
+- 149 history rows across 28 issuers; 149 unique history IDs, cache keys and input hashes, with no duplicate keys.
+- Statuses: 98 ACCEPTED_CANDIDATE, 34 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 5 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE.
+- Tasks: cash 28, debt 26, EBIT 21, financing 12, invested capital 28, lease 27, NCI 7.
+- 143/149 rows contain evidence IDs (379 occurrences); six rows have none: STRA debt_scope, SBC financing_scope, QTTB nci_scope, IRWD financing_scope, HRMY financing_scope and GTM financing_scope.
+- ALEC and BCRX now each have five task-history rows under their current filing accession. ALEC: four ACCEPTED_CANDIDATE and EBIT REVIEW_REQUIRED. BCRX: cash/lease ACCEPTED_CANDIDATE, debt INSUFFICIENT_EVIDENCE, financing/invested capital REVIEW_REQUIRED.
+- Zero human decisions recorded. Production writes, fundamentals changes and ranking changes are all false.
+- ADBE remains a regression control, not an active issuer; AFMJF and EGHSF remain provider-unsupported.
 
 ## Resolved issuer evidence from the fresh run
 
@@ -64,9 +65,9 @@ Read-only export [#44990205149](https://github.com/fizminho/magic-screen/actions
 
 ## Latest workflow distinction
 
-- Full dynamic-universe bakeoff [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage. Do not confuse the earlier regression-only run [#44989800356](https://github.com/fizminho/magic-screen/actions/runs/44989800356) with full-universe validation.
-- Read-only ledger export [#44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) passed and artifact was inspected.
-- Main Build [#44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110) passed. No production cutover occurred.
+- Full dynamic-universe bakeoff [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage. A post-documentation push bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was also triggered and is pending inspection; do not treat it as accepted full-universe validation until its mode and artifact are checked.
+- Read-only ledger export [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) passed and artifact was inspected.
+- PR #68 documentation build [#44993118191](https://github.com/fizminho/magic-screen/actions/runs/44993118191) passed all Node, Python, TypeScript and Wrangler dry-run checks. Main post-merge build [#44993168886](https://github.com/fizminho/magic-screen/actions/runs/44993168886) is pending inspection. No production cutover occurred.
 
 ## Open critical gates
 
