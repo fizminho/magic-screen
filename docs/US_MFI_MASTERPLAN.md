@@ -111,7 +111,7 @@ The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are pr
 
 - [x] All 139 exported history rows carry a filing accession that matches the current EdgarTools extraction for that issuer.
 - [x] Evidence IDs are exposed for 133 rows (347 ID occurrences); six rows have no IDs: STRA debt_scope, SBC financing_scope, QTTB nci_scope, IRWD financing_scope, HRMY financing_scope and GTM financing_scope. The latter three are ACCEPTED_CANDIDATE/NOT_APPLICABLE records with no supporting evidence IDs in the normalized response; do not infer approval from the status.
-- [ ] Determine whether the two supported active issuers absent from the ledger (ALEC and BCRX) require additional task reviews. ADBE is the regression control; AFMJF and EGHSF are provider-unsupported. Do not send duplicate/cached reviews.
+- [ ] Run a targeted review batch for the two supported active issuers absent from the ledger (ALEC and BCRX) after [PR #67](https://github.com/fizminho/magic-screen/pull/67) passes CI and merges. The guarded trigger allows at most two symbols, excludes full_scope, caps each Worker page at two new calls and stops after 15 minutes; cached evidence is reused. ADBE is only the regression control; AFMJF and EGHSF are provider-unsupported.
 - [ ] Record human decisions only after an analyst reviews the cited filing evidence; the current ledger still has zero decisions.
 
 ### P1 Gemini task-status overlay (AI status is not approval)
