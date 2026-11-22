@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #60)  
+**Last updated:** 22 November 2026 (post-PR #61)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -26,7 +26,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after debt discovery test and housekeeping releases | 40f84a13687bca94d860184488d9eec83094155a | PR #60 merge commit |
+| Main code baseline after debt discovery test and legacy provenance release | 20cacaa33d24e1b865984d604d1d26c57ce4275d | PR #61 merge commit |
 | Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381), [PR #60 Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
@@ -55,7 +55,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 
 ### P1. Refresh evidence for the current active cohort
 
-- [ ] Manually dispatch EdgarTools fundamentals bakeoff with blank ticker override so it resolves the live active US MFI universe.
+- [ ] Run EdgarTools fundamentals bakeoff with blank ticker override so it resolves the live active US MFI universe. Use Actions → Run workflow, the daily schedule, or a controlled main push whose commit message contains `[full-universe]` and touches a configured bakeoff path. The controlled push trigger is documented in README.
 - [ ] Confirm the workflow discovers the active universe, uses the matching market-cap snapshot and quote date, extracts annual filings, and ingests raw evidence.
 - [ ] Confirm the full-universe validators, lease/ROU coverage audit, accounting exception queue, policy cohort assessment and ranking sensitivity report all complete.
 - [ ] Confirm the run explicitly reports no production fundamentals or ranking changes.
@@ -77,7 +77,8 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [ ] Validate live discovery against BCRX custom royalty financing and IRWD convertible debt; confirm both stay outside conventional debt candidates unless policy explicitly says otherwise.
 - [ ] Inspect filing evidence for OTEX gross/net debt carrying-value and issuance-cost reconciliation.
 - [ ] Explain UPWK gross debt versus net carrying value and preserve issuance costs separately.
-- [ ] Resolve BMBL legacy debt discrepancy: earlier note says USD 588.465m while latest live D1 row showed total_debt=null. PR #57 added provenance to the general reconciliation preview; the debt shadow endpoint is being updated to expose the same legacy row metadata (CIK, period, filed date, updated_at, status and source). Compare the stored row to the SEC anchor before concluding why total_debt is null.
+- [x] Extend the debt shadow endpoint with legacy row presence, status, source, updated_at, fiscal period, filed date and CIK mapping update time; [PR #61](https://github.com/fizminho/magic-screen/pull/61).
+- [ ] Resolve BMBL legacy debt discrepancy: earlier note says USD 588.465m while latest live D1 row showed total_debt=null. Compare the newly exposed stored-row provenance to the SEC anchor before concluding why total_debt is null.
 - [ ] Review remaining issuer-specific debt, financing, lease, NCI, cash and EBIT exceptions using the prioritised queue.
 - [ ] Keep royalty financing, convertibles, sale-leaseback, securitisation, customer financing, tax receivable agreements and contingent consideration separately classified pending policy.
 - [ ] Keep unsupported issuers visible; do not silently drop or replace them.
