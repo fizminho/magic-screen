@@ -81,6 +81,23 @@ async function ensureSchema(env: Env) {
       PRIMARY KEY(symbol,market)
     )`)
   ]);
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS gemini_accounting_review_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, cache_key TEXT NOT NULL UNIQUE, symbol TEXT NOT NULL,
+      accession TEXT, task TEXT NOT NULL, input_hash TEXT NOT NULL, prompt_version TEXT NOT NULL,
+      policy_version TEXT NOT NULL, model TEXT NOT NULL, status TEXT NOT NULL,
+      response_json TEXT NOT NULL, reviewed_at TEXT NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_gemini_review_history_symbol ON gemini_accounting_review_history(symbol,reviewed_at DESC)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS gemini_accounting_review_decisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, symbol TEXT NOT NULL, accession TEXT, task TEXT NOT NULL,
+      cache_key TEXT NOT NULL, input_hash TEXT NOT NULL, decision TEXT NOT NULL
+        CHECK (decision IN ('ACCEPT','REJECT','OVERRIDE')),
+      classification TEXT, rationale TEXT NOT NULL, reviewer TEXT NOT NULL, created_at TEXT NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_gemini_review_decisions_symbol ON gemini_accounting_review_decisions(symbol,created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_gemini_review_decisions_cache ON gemini_accounting_review_decisions(cache_key,created_at DESC)")
+  ]);
   const now = new Date().toISOString();
   for (const market of ["MY","US"] as const) {
     const existing = await env.DB.prepare("SELECT COUNT(*) AS count FROM stock_master WHERE market=?").bind(market).first<{count:number}>();
@@ -1235,6 +1252,46 @@ export default {
           includeFullScope:body.include_full_scope===true,dryRun});
         return json({...page,active_universe:symbolsActive.length,ai_review_only:true,production_write:false,production_fundamentals_changed:false,rankings_changed:false});
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini batch accounting review"},503); }
+    }
+    if (url.pathname==="/api/fundamentals/edgartools/ai-review/decisions" && (request.method==="GET" || request.method==="POST")) {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        await ensureSchema(env);
+        if (request.method==="GET") {
+          const symbol=String(url.searchParams.get("symbol")??"").trim().toUpperCase();
+          if (symbol && !/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
+          const limit=Math.min(100,Math.max(1,Math.floor(Number(url.searchParams.get("limit")??50))));
+          const rows=await env.DB.prepare(`SELECT id,symbol,accession,task,cache_key,input_hash,decision,classification,rationale,reviewer,created_at
+            FROM gemini_accounting_review_decisions ${symbol?"WHERE symbol=?":""}
+            ORDER BY created_at DESC,id DESC LIMIT ?`).bind(...(symbol?[symbol,limit]:[limit])).all<any>();
+          return json({decisions:rows.results, count:rows.results.length, ai_review_only:true, production_write:false});
+        }
+        const body:any=await request.json();
+        const symbol=String(body.symbol??"").trim().toUpperCase();
+        const task=String(body.task??"").trim();
+        const cacheKey=String(body.cache_key??"").trim();
+        const inputHash=String(body.input_hash??"").trim();
+        const decision=String(body.decision??"").trim().toUpperCase();
+        const classification=body.classification==null?null:String(body.classification).trim();
+        const rationale=String(body.rationale??"").trim();
+        const reviewer=String(body.reviewer??"").trim();
+        if(!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
+        if(!["debt_scope","cash_scope","lease_scope","nci_scope","financing_scope","ebit_scope","invested_capital_scope","full_scope"].includes(task)) return json({error:"Unsupported accounting review task"},400);
+        if(!/^[a-f0-9]{64}$/i.test(cacheKey)||!/^[a-f0-9]{64}$/i.test(inputHash)) return json({error:"Valid cache_key and input_hash are required"},400);
+        if(!["ACCEPT","REJECT","OVERRIDE"].includes(decision)) return json({error:"decision must be ACCEPT, REJECT or OVERRIDE"},400);
+        if(decision==="OVERRIDE" && (!classification||classification.length>100)) return json({error:"OVERRIDE requires a classification of at most 100 characters"},400);
+        if(rationale.length<5||rationale.length>4000) return json({error:"rationale must be between 5 and 4000 characters"},400);
+        if(reviewer.length<2||reviewer.length>100) return json({error:"reviewer must be between 2 and 100 characters"},400);
+        const cached=await env.DB.prepare("SELECT symbol,accession,task,input_hash FROM gemini_accounting_review_cache WHERE cache_key=?").bind(cacheKey).first<any>();
+        if(!cached||cached.symbol!==symbol||cached.task!==task||cached.input_hash!==inputHash) return json({error:"The referenced cached review was not found or does not match the supplied issuer, task and evidence hash"},409);
+        const createdAt=new Date().toISOString();
+        const result=await env.DB.prepare(`INSERT INTO gemini_accounting_review_decisions
+          (symbol,accession,task,cache_key,input_hash,decision,classification,rationale,reviewer,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?)`).bind(symbol,cached.accession,task,cacheKey,inputHash,decision,classification,rationale,reviewer,createdAt).run();
+        return json({saved:true,id:result.meta.last_row_id,symbol,accession:cached.accession,task,decision,classification,
+          created_at:createdAt,reviewer_label_is_self_reported:true,ai_review_only:true,production_write:false},201);
+      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini accounting decision ledger"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/ai-review" && (request.method==="GET" || request.method==="POST")) {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
