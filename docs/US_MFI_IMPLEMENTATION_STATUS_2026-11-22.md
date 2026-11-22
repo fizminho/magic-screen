@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Current main at audit start:** e1754654d8ff98b0222e5bc2c60016a6f4023cad  
+**Main code baseline for this status snapshot:** 98f9dc7c12d5691f1fbbe088fef9597a47855d56  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -14,6 +14,8 @@ This document is a concise status snapshot. The masterplan is authoritative for 
 | Gemini audit-ledger export | Merged; manual workflow exports read-only history and decisions without invoking Gemini or writing application data | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Lease/ROU active-universe audit | Active-universe filtering and ADBE control exclusion test are already on main; duplicate stale PR closed unmerged | [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Main build | Passed after PR #53 merge | [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008) |
+| Legacy reconciliation provenance | Merged; read-only response now includes legacy row presence, stored CIK, updated_at and filed date, and states accession is unavailable rather than inventing one | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
+| Complete Node regression suite | Build workflow now runs every worker *.test.mjs file plus the lease/ROU audit test; Python tests, TypeScript build and Wrangler dry-run remain | [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482) |
 
 ## Latest documented cohort baseline
 
@@ -41,7 +43,7 @@ These figures are a historical accepted snapshot, not proof of a fresh full-univ
 
 ## Latest workflow distinction
 
-- [Main push bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44985667878) passed its regression stages.
+- [Main push bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44987320672) passed its regression stages.
 - That run skipped dynamic universe discovery, raw evidence ingestion and full-universe validation. It must not be reported as a fresh full-universe acceptance.
 - The main Build and deployment after PR #55 succeeded in [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869); the subsequent PR #53 documentation/workflow merge passed [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008).
 
