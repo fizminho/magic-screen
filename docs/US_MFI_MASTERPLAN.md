@@ -48,7 +48,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [x] Close stale PR #28 unmerged because its intended change is already present on main.
 - [x] Create this masterplan as the authoritative execution checklist.
 - [ ] Run the ledger export workflow manually and inspect the generated artifact; no workflow-dispatch connector action is available in this session, so an owner/manual GitHub Actions dispatch is required.
-- [ ] Reconcile stale or conflicting docs against this plan and the current code.
+- [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
 
 ### P1. Refresh evidence for the current active cohort
 
@@ -107,7 +107,7 @@ Owner approval required before implementation can change shadow assumptions or p
 - [ ] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI.
 - [ ] Add tests for all debt taxonomy discovery categories, dimension rejection, filing alignment and discovery-cap behaviour.
 - [ ] Ensure workflow outputs distinguish regression-only, targeted and full-universe modes.
-- [ ] Consolidate agent handovers and implementation status around this masterplan.
+- [x] Consolidate agent handovers and implementation status around this masterplan.
 - [ ] Correct README cron cadence and clearly distinguish the legacy Company Facts runtime from the EdgarTools evidence lane.
 - [ ] Remove stale branch-specific instructions and duplicate/contradictory policy statements.
 - [ ] Keep dated issuer research notes as evidence records; do not duplicate their full content into this plan.
