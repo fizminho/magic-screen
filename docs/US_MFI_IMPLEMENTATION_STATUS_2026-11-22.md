@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Main code baseline for this status snapshot:** 98f9dc7c12d5691f1fbbe088fef9597a47855d56  
+**Main code baseline for this status snapshot:** 5400ab319cca5095901b42bf81036727860d37bd  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -15,7 +15,7 @@ This document is a concise status snapshot. The masterplan is authoritative for 
 | Lease/ROU active-universe audit | Active-universe filtering and ADBE control exclusion test are already on main; duplicate stale PR closed unmerged | [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Main build | Passed after PR #53 merge | [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008) |
 | Legacy reconciliation provenance | Merged; read-only response now includes legacy row presence, stored CIK, updated_at and filed date, and states accession is unavailable rather than inventing one | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
-| Complete Node regression suite | Build workflow now runs every worker *.test.mjs file plus the lease/ROU audit test; Python tests, TypeScript build and Wrangler dry-run remain | [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482) |
+| Complete Node regression suite | All worker *.test.mjs files and lease/ROU audit test passed; Python policy tests, TypeScript build and Wrangler dry-run also passed | [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381) |
 
 ## Latest documented cohort baseline
 
