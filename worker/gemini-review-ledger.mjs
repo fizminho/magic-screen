@@ -148,16 +148,35 @@ export async function recordReviewDecision(env, payload, now = new Date().toISOS
   } };
 }
 
+function collectEvidenceIds(value, ids = new Set()) {
+  if (!value || typeof value !== "object") return ids;
+  if (Array.isArray(value)) {
+    for (const item of value) collectEvidenceIds(item, ids);
+    return ids;
+  }
+  if (typeof value.evidence_id === "string" && value.evidence_id.trim()) ids.add(value.evidence_id.trim());
+  if (Array.isArray(value.evidence_ids)) {
+    for (const id of value.evidence_ids) if (typeof id === "string" && id.trim()) ids.add(id.trim());
+  }
+  for (const child of Object.values(value)) collectEvidenceIds(child, ids);
+  return ids;
+}
+
 export async function listReviewHistory(env, { symbol = null, task = null, limit, offset }) {
   await ensureLedgerSchema(env);
   const where = []; const args = [];
   if (symbol) { where.push("symbol=?"); args.push(symbol); }
   if (task) { where.push("task=?"); args.push(task); }
-  const sql = "SELECT history_id,cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,created_at "
+  const sql = "SELECT history_id,cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at "
     + "FROM gemini_accounting_review_history" + (where.length ? " WHERE " + where.join(" AND ") : "")
     + " ORDER BY history_id DESC LIMIT ? OFFSET ?";
   const rows = await env.DB.prepare(sql).bind(...args, limit, offset).all();
-  return rows?.results ?? [];
+  return (rows?.results ?? []).map(row => {
+    let response = null;
+    try { response = JSON.parse(row.response_json); } catch { response = null; }
+    const { response_json, ...metadata } = row;
+    return { ...metadata, evidence_ids: [...collectEvidenceIds(response)].sort() };
+  });
 }
 
 export async function listReviewDecisions(env, { symbol = null, task = null, cacheKey = null, limit, offset }) {
