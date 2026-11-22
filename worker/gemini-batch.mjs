@@ -99,7 +99,8 @@ export async function runBatchPage({ symbols, cursor = null, loadIssuer, runRevi
       const status = classifyReviewOutcome(result);
       if (!result.cached && status !== BATCH_STATUS.SKIPPED_DETERMINISTIC && status !== BATCH_STATUS.PROCESSING) newCalls++;
       counts[status]++;
-      taskResults.push({ task, status, cached: !!result.cached, model: result.model ?? null, review_status: result.status ?? null });
+      taskResults.push({ task, status, cached: !!result.cached, model: result.model ?? null, review_status: result.status ?? null,
+        ...(status === BATCH_STATUS.FAILED ? { error: String(result.error ?? result.message ?? ("Unclassified review status: " + (result.status ?? "missing status"))).slice(0, 300) } : {}) });
       if (status === BATCH_STATUS.QUOTA_EXHAUSTED) {
         // Do not hammer the provider: stop the page and tell the orchestrator how long to wait.
         retryAfterMs = Math.max(retryAfterMs, Number(result.retry_after_ms ?? 0) || 60_000);
