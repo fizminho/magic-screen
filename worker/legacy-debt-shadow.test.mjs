@@ -49,9 +49,9 @@ testCase("BCRX control: royalty financing and finance leases stay separate", () 
   });
   assert.equal(r.candidate_conventional_debt, 0);
   assert.equal(r.status, "candidate_scope_review_required");
-  assert.ok(r.review_flags.includes("scope_review_required_royalty_or_other_financing"));
+  assert.ok(r.review_flags.includes("scope_review_required_royalty_financing"));
   assert.ok(r.review_flags.includes("separate_lease_evidence_not_included"));
-  const royalty = r.other_concepts_discovered.filter(d => d.category === "royalty_or_other_financing");
+  const royalty = r.other_concepts_discovered.filter(d => d.category === "royalty_financing");
   assert.equal(royalty.reduce((s, d) => s + d.value, 0), 465.688 * M);
   assert.ok(r.other_concepts_discovered.every(d => d.included_in_candidate === false));
 });
