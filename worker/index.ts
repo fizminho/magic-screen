@@ -9,6 +9,8 @@ import { buildFundamentalsReconciliationPreview } from "./fundamentals-reconcili
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { classifyDebtReconciliation } from "./debt-reconciliation.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { diagnoseLegacyDebtFacts } from "./legacy-debt-diagnostic.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { parsePageParams, recordReviewDecision, listReviewHistory, listReviewDecisions, MAX_DECISION_BODY_BYTES, REVIEW_TASKS } from "./gemini-review-ledger.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { runGeminiAccountingReview, listGeminiAccountingEscalations, getGeminiModelCandidates } from "./gemini-accounting-review.mjs";
@@ -1108,6 +1110,67 @@ export default {
         }
         return json(response);
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"MFI shadow ranking preview"},503); }
+    }
+    if (url.pathname==="/api/fundamentals/legacy-debt-diagnostic" && request.method==="POST") {
+      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
+      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      try {
+        await ensureSchema(env);
+        const payload:any=await request.json();
+        const requested=Array.isArray(payload.symbols)?payload.symbols:[payload.symbol];
+        const selected=[...new Set(requested.map((value:any)=>String(value??"").trim().toUpperCase()).filter((value:string)=>/^[A-Z0-9.-]{1,15}$/.test(value)))];
+        if (!selected.length || selected.length>10) return json({error:"Provide between 1 and 10 valid US ticker symbols"},400);
+        const results=[];
+        for(const symbol of selected) {
+          const legacy=await env.DB.prepare(`SELECT m.symbol,m.company_name,cm.cik,cm.updated_at AS cik_mapping_updated_at,
+            f.status AS legacy_status,f.source AS legacy_source,f.updated_at AS legacy_updated_at,
+            f.fiscal_period AS legacy_fiscal_period,f.filed_at AS legacy_filed_at,
+            f.ebit AS legacy_ebit,f.total_debt AS legacy_total_debt,f.cash AS legacy_cash,
+            f.current_assets AS legacy_current_assets,f.current_liabilities AS legacy_current_liabilities,
+            f.net_ppe AS legacy_net_ppe
+            FROM stock_master m LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol
+            LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US'
+            WHERE m.market='US' AND m.symbol=? AND m.listing_status='active'
+            AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)`).bind(symbol).first<any>();
+          if(!legacy) { results.push({symbol,state:"not_in_active_us_universe"}); continue; }
+          const base={symbol,company_name:legacy.company_name,cik:legacy.cik??null,
+            cik_mapping_updated_at:legacy.cik_mapping_updated_at??null,legacy:{status:legacy.legacy_status??null,
+              source:legacy.legacy_source??null,updated_at:legacy.legacy_updated_at??null,
+              fiscal_period:legacy.legacy_fiscal_period??null,filed_at:legacy.legacy_filed_at??null,
+              ebit:legacy.legacy_ebit==null?null:Number(legacy.legacy_ebit),
+              total_debt:legacy.legacy_total_debt==null?null:Number(legacy.legacy_total_debt),
+              cash:legacy.legacy_cash==null?null:Number(legacy.legacy_cash),
+              current_assets:legacy.legacy_current_assets==null?null:Number(legacy.legacy_current_assets),
+              current_liabilities:legacy.legacy_current_liabilities==null?null:Number(legacy.legacy_current_liabilities),
+              net_ppe:legacy.legacy_net_ppe==null?null:Number(legacy.legacy_net_ppe)}};
+          if(!legacy.cik || legacy.cik==="UNMAPPED") { results.push({...base,state:"sec_cik_unmapped"}); continue; }
+          try {
+            const response=await fetch("https://data.sec.gov/api/xbrl/companyfacts/CIK"+String(legacy.cik).padStart(10,"0")+".json",
+              {headers:{"User-Agent":"Magic Screen/1.0 support@binalah.co","Accept":"application/json"}});
+            if(!response.ok) { results.push({...base,state:"sec_companyfacts_error",http_status:response.status}); continue; }
+            const facts:any=await response.json();
+            const anchorTags=["OperatingIncomeLoss","OperatingProfitLoss","ProfitLossFromOperatingActivities","Revenues","Revenue",
+              "RevenueFromContractWithCustomerExcludingAssessedTax","RevenueFromContractWithCustomerIncludingAssessedTax",
+              "SalesRevenueNet","SalesRevenueGoodsNet","SalesRevenueServicesNet"];
+            const annual=["us-gaap","ifrs-full"].flatMap(t=>anchorTags.flatMap(tag=>facts?.facts?.[t]?.[tag]?.units?.USD??[]))
+              .filter((x:any)=>x.val!=null&&x.start&&x.end&&["10-K","20-F","40-F"].includes(x.form)
+                &&(Date.parse(x.end)-Date.parse(x.start))/86400000>=330&&(Date.parse(x.end)-Date.parse(x.start))/86400000<=400)
+              .sort((a:any,b:any)=>b.end.localeCompare(a.end)||b.filed.localeCompare(a.filed));
+            // Reproduce the stored legacy record's period/filed anchor where available.
+            const anchor=annual.find((x:any)=>
+              (!legacy.legacy_fiscal_period||x.end===legacy.legacy_fiscal_period)
+              &&(!legacy.legacy_filed_at||x.filed===legacy.legacy_filed_at)
+            )??annual.find((x:any)=>!legacy.legacy_fiscal_period||x.end===legacy.legacy_fiscal_period)??annual[0];
+            if(!anchor?.accn) { results.push({...base,state:"no_annual_usd_anchor_found"}); continue; }
+            results.push({...base,state:"diagnosed",sec_company_name:facts?.entityName??null,
+              sec_cik:facts?.cik??null,diagnostic:diagnoseLegacyDebtFacts(facts,anchor.end,anchor.accn)});
+          } catch(error) {
+            results.push({...base,state:"sec_fetch_error",error:error instanceof Error?error.message:String(error)});
+          }
+        }
+        return json({source:"SEC EDGAR Company Facts",mode:"read_only",results,
+          production_fundamentals_changed:false,rankings_changed:false,production_write:false});
+      } catch(error) { return json({error:error instanceof Error?error.message:String(error),source:"Legacy SEC debt diagnostic"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/reconciliation-preview" && request.method==="GET") {
       if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);

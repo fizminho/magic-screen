@@ -23,6 +23,8 @@ jobs:
         run: node --test worker/gemini-batch.test.mjs worker/mfi-ranking.test.mjs
       - name: Run debt reconciliation regression tests
         run: node --test worker/debt-reconciliation.test.mjs
+      - name: Run legacy SEC debt diagnostic tests
+        run: node --test worker/legacy-debt-diagnostic.test.mjs
       - name: Run lease and ROU coverage regression tests
         run: node --test scripts/test_build_lease_rou_coverage_report.mjs
       - name: Run US MFI policy sensitivity regression tests
