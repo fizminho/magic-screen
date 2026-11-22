@@ -1,5 +1,5 @@
 import { ensureLedgerSchema, persistCompletedReview } from "./gemini-review-ledger.mjs";
-const PROMPT_VERSION = "gemini-accounting-review-v10";
+const PROMPT_VERSION = "gemini-accounting-review-v11";
 const POLICY_VERSION = "us-mfi-accounting-policy-v1-proposed";
 const DEFAULT_MODEL = "gemini-3.1-flash-lite";
 const SUPPORTED_TEXT_MODELS = new Set([
@@ -352,16 +352,22 @@ export function validateGeminiAccountingResponse(parsed, task, evidence) {
     if (!Array.isArray(item.evidence_ids)) {
       throw new Error(prefix + "evidence_ids must explicitly list every filing evidence ID supporting this finding");
     }
-    const evidenceIds = [...new Set(item.evidence_ids)];
-    if (!evidenceIds.includes(item.evidence_id) || evidenceIds.some(id => typeof id !== "string" || !ids.has(id))) {
-      throw new Error(prefix + "evidence_ids must contain the primary evidence_id and only supplied filing evidence IDs");
+    const suppliedEvidenceIds = [...new Set(item.evidence_ids)];
+    if (suppliedEvidenceIds.some(id => typeof id !== "string" || !ids.has(id))) {
+      throw new Error(prefix + "evidence_ids may contain only supplied filing evidence IDs");
     }
     if (typeof item.rationale !== "string" || item.rationale.trim().length === 0 || item.rationale.length > 1000) {
       throw new Error(prefix + "rationale must be a non-empty string of at most 1000 characters");
     }
     const rationaleIds = [...new Set(item.rationale.match(/\b[a-z][a-z0-9_]*:\d+\b/gi) ?? [])];
-    if (rationaleIds.some(id => !ids.has(id) || !evidenceIds.includes(id))) {
-      throw new Error(prefix + "every filing evidence ID cited in rationale must be included in evidence_ids and the supplied evidence allowlist");
+    if (rationaleIds.some(id => !ids.has(id))) {
+      throw new Error(prefix + "rationale cites a filing evidence ID outside the supplied evidence allowlist");
+    }
+    // Normalize valid rationale citations into the structured evidence list.
+    // Unknown IDs remain a hard contract error; no evidence is invented.
+    const evidenceIds = [...new Set([...suppliedEvidenceIds, ...rationaleIds])];
+    if (!evidenceIds.includes(item.evidence_id)) {
+      throw new Error(prefix + "evidence_ids must contain the primary evidence_id");
     }
     if (!CLASSIFICATIONS.has(item.classification)) {
       throw new Error(prefix + "classification is missing or not in the allowed classification list");
@@ -551,7 +557,7 @@ export async function runGeminiAccountingReview(env, input) {
     "Findings may cite ONLY evidence objects marked source_kind=filing_fact_candidate or source_kind=filing_note_candidate. Resolver summaries are context only and MUST NOT be cited as filing evidence or treated as independent reported facts. Cite each finding with an exact evidence_id from the explicit filing-evidence allowlist below. Never invent, shorten, rename, or reconstruct an evidence ID. If no filing-fact evidence supports a finding, return no finding for it and explain the gap in unresolved_questions.",
     "This is a review proposal only. Never approve production values, alter MFI formulas, or recommend a stock.",
     "Return strict JSON only with exactly these top-level fields: task, status, summary, findings, unresolved_questions.",
-    "Each finding must contain exactly: evidence_id (primary string), evidence_ids (array containing every filing evidence ID used, including IDs mentioned in rationale), classification (one allowed value), rationale (non-empty string), confidence (low, medium, or high). If the rationale refers to a filing note or fact by ID, that exact ID MUST appear in evidence_ids. Do not cite evidence that is not listed there.",
+    "Each finding must contain exactly: evidence_id (primary string), evidence_ids (array of filing evidence IDs), classification (one allowed value), rationale (non-empty string), confidence (low, medium, or high). If rationale mentions a filing evidence ID, it must be an exact ID from the allowlist. The system will normalize valid rationale citations into evidence_ids, so include them there when possible; never invent or cite an ID outside the allowlist.",
     "Allowed status: ACCEPTED_CANDIDATE, REVIEW_REQUIRED, CONFLICTING_EVIDENCE, INSUFFICIENT_EVIDENCE, NOT_APPLICABLE.",
     "Allowed classification: conventional_debt, lease_liability, finance_lease_liability, operating_lease_liability, failed_sale_leaseback_financing, supplier_finance, vendor_financing, factoring, receivables_financing, royalty_financing, tax_receivable_agreement, restricted_cash, unrestricted_cash, customer_funds, escrow, short_term_investment, noncontrolling_interest, operating_liability, other_financing_or_liability, pension_liability, asset_retirement_obligation, contingent_consideration, preferred_equity, redeemable_noncontrolling_interest, operating_income_presentation, non_operating_item, discontinued_operation, exceptional_item_review, right_of_use_asset, rental_equipment, property_plant_equipment, working_capital_component, other_ev_adjustment_review, unknown.",
     "Valid filing-evidence evidence_id allowlist: " + JSON.stringify([...new Set([...serializedEvidence.matchAll(/\{"evidence_id":"([^"]+)","source_kind":"(?:filing_fact_candidate|filing_note_candidate)"/g)].map(match => match[1]))].sort()),
