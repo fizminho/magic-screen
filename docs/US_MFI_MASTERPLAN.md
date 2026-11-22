@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #61)  
+**Last updated:** 22 November 2026 (post-PR #62)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -50,7 +50,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [x] Verify lease/ROU audit active-universe filtering and regression test already exist on main.
 - [x] Close stale PR #28 unmerged because its intended change is already present on main.
 - [x] Create this masterplan as the authoritative execution checklist.
-- [ ] Run the ledger export workflow manually and inspect the generated artifact; GitHub workflow-dispatch is not exposed by the connected GitHub actions in this session, so an owner/manual GitHub Actions dispatch is required.
+- [ ] Run the ledger export workflow and inspect the generated artifact. It supports manual dispatch or a controlled main push affecting the workflow, export script or README with `[ledger-export]` in the commit message; README documents both paths.
 - [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
 
 ### P1. Refresh evidence for the current active cohort
