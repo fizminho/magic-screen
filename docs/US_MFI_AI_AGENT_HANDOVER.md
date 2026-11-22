@@ -1,6 +1,6 @@
 # US MFI agent handover
 
-**Last refreshed:** 22 November 2026 (ALEC/BCRX targeted review and refreshed ledger)  
+**Last refreshed:** 22 November 2026 (PR #69 merged; next run is a fresh full-universe refresh)  
 **Repository:** fizminho/magic-screen  
 **Authoritative execution plan:** [US MFI masterplan](US_MFI_MASTERPLAN.md)
 
@@ -21,7 +21,8 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #62 merged: README documents the controlled `[full-universe]` trigger. Full dynamic run [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage; artifact contains 30 active issuers, 28 supported, 2 unsupported, 2 shadow eligible, 0 ranked and 0 production approved.
 - PR #63 merged: README and workflow document/support controlled `[ledger-export]` runs. Export [#44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) passed and was inspected: 139 history rows, 26 issuers, zero decisions, no duplicate cache keys/input hashes.
 - PR #64 merged and deployed: review history returns deduplicated evidence-ID metadata while omitting raw Gemini response JSON. Targeted batch [#44991281916](https://github.com/fizminho/magic-screen/actions/runs/44991281916) completed ALEC/BCRX; refreshed ledger [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) has 149 rows across 28 issuers, 143 rows with evidence IDs, and zero human decisions.
-- PR #68 merged documentation-only refresh; its PR build [#44993118191](https://github.com/fizminho/magic-screen/actions/runs/44993118191) passed. Main post-merge build [#44993168886](https://github.com/fizminho/magic-screen/actions/runs/44993168886) is pending verification.
+- PR #68 merged and refreshed the ledger after ALEC/BCRX; [export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) has 149 rows across 28 issuers, 143 with evidence IDs and zero human decisions.
+- PR #69 merged the masterplan/status/handover refresh; main build [#44993454361](https://github.com/fizminho/magic-screen/actions/runs/44993454361) passed. The later bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was regression-only, not a fresh dynamic universe run.
 - PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test were already present on main. Do not reapply.
 - Production migration is not approved.
 
@@ -38,14 +39,13 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 
 ## Immediate next steps
 
-Follow the unchecked items in the masterplan in order:
+Follow the masterplan in order:
 
-1. Resolve missing ledger coverage for supported ALEC and BCRX if their tasks are required; ADBE is a regression control and AFMJF/EGHSF are unsupported. Avoid duplicate/cached Gemini calls.
-2. Begin human review in this order: OTEX (extreme 64.65x ROC candidate from USD 16.745m invested capital), GTM (non-positive IC and USD 2.7319bn tax receivable agreement), SGHC (IFRS EBIT and debt/on-demand borrowing), PBI (filing-specific EBIT bridge), HPQ (large debt, cash and IC scope), SSTK (IC and contributor royalties), XPOF (IC/cash/NCI), HRMY (IC), HRB (reconstructed EBIT and lease/IC scope).
-3. Record human decisions with evidence references and rationale; the current ledger has zero decisions. Do not treat ACCEPTED_CANDIDATE as approval.
-4. Resolve the remaining P2/P3 issuer evidence and unsupported-provider handling. Reconcile IRWD convertible-note classification between legacy Company Facts shadow discovery and filing-based debt-note review.
-5. Obtain explicit owner approval for cohort-wide EBIT, debt, lease, cash, invested-capital, NCI and ranking policies.
-6. Complete legacy-versus-EdgarTools reconciliation, staging and rollback before requesting production cutover.
+1. Run and inspect a fresh dynamic full-universe bakeoff. The later push run [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was regression-only; it did not refresh active symbols or filings.
+2. Obtain explicit owner decisions on shared EBIT/exceptional-item, invested-capital/negative-denominator, debt/other-financing, lease/ROU, cash/securities, NCI, ranking and quote-staleness policies. The cohort policy matrix and lease/cash recommendation contain evidence-backed proposals, not approvals.
+3. Complete issuer-level sign-off in this order: OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB. Use accession-bound evidence and record each decision against the exact cache key/input hash; the current ledger has zero human decisions.
+4. Complete deterministic debt/financing validation for BCRX, IRWD, OTEX and UPWK; keep missing values unknown and distinct financing buckets separate.
+5. Reconcile legacy and EdgarTools, then complete staging/rollback. Do not alter production until explicit owner approval.
 
 ## Rules for future agents
 

@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-ALEC/BCRX targeted review and ledger export)  
+**Last updated:** 22 November 2026 (post-PR #69; refreshing full-universe baseline)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -25,19 +25,20 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 
 | Area | Verified state | Evidence |
 |---|---|---|
-| Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after evidence-linked ledger documentation | 181d26360125e57d4a9a72f621438bb8e65e6c2e | PR #65 merge commit |
-| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44990799577](https://github.com/fizminho/magic-screen/actions/runs/44990799577), [PR #63 Build #44990076048](https://github.com/fizminho/magic-screen/actions/runs/44990076048) |
+| Current main baseline | `fbf2351bb3e7d84d576000264d55b933150ca5c3` | PR #69 merged; [main build #44993454361](https://github.com/fizminho/magic-screen/actions/runs/44993454361) passed |
+
+| Build | Passing on current main after PR #69; complete Node suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44993454361](https://github.com/fizminho/magic-screen/actions/runs/44993454361) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
 | CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test; PR #60 adds debt discovery category, filing alignment, dimensional rejection and cap tests | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Latest full-universe cohort | 30 active; 28 supported; 2 unsupported (AFMJF, EGHSF); 26 accounting/valuation review; 2 shadow eligible (IRWD, SNDK); 0 ranked (minimum eligible cohort is 5); 0 production approved | [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44989926114/artifacts/14741293084) |
-| Latest main push bakeoff | Full dynamic-universe refresh, ingestion, resolver, reconciliation, lease/ROU, exception queue, policy cohort and sensitivity stages all passed; production unchanged | [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) |
+| Latest accepted full-universe bakeoff | 30 active issuers, 28 supported, 2 unsupported; all dynamic ingestion, resolver, reconciliation, lease/ROU, exception queue, policy cohort and sensitivity stages passed; production unchanged | [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) |
+| Later push bakeoff | [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) passed in regression-only mode; it did not refresh the live universe or replace the accepted cohort snapshot | Workflow log explicitly reports `Regression-only run: skipping dynamic-universe coverage assertions` |
 | Production migration | Not approved; legacy Company Facts sync still runs on the 30-minute cron | worker/index.ts, wrangler.toml |
 
-**Important:** The 30-issuer coverage figures above are the latest documented accepted full-universe snapshot, not proof that the current cohort has just been refreshed. A fresh dynamic run is still required.
+**Important:** The 30-issuer figures are the last accepted full-universe snapshot from #44989926114. Run #44993168825 was regression-only. This PR uses the documented `[full-universe]` marker to request a fresh live refresh; do not update the cohort snapshot until its artifact and all production-unchanged flags are inspected.
 
 ## Priority plan
 
@@ -176,11 +177,11 @@ Owner approval required before implementation can change shadow assumptions or p
 
 ## Next implementation sequence
 
-1. Inspect the fresh post-review ledger [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) and finish the post-merge full-universe bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825); confirm production remains unchanged.
-2. Start the P1 human-review tranche in the recorded order: OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB. Record explicit evidence-linked human decisions, not AI candidates.
-3. Complete deterministic debt/financing classification validation for BCRX, IRWD, OTEX and UPWK, including BCRX's unknown conventional debt and separate royalty financing.
-4. Work through shared policy decisions, then apply the approved policy cohort-wide.
-5. Reconcile legacy and EdgarTools, complete staging/rollback, and only then request cutover approval.
+1. Run and inspect a fresh live full-universe bakeoff using the `[full-universe]` marker. The prior post-documentation run [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was regression-only and must not be described as a live refresh. Verify the active universe, filing/price alignment, all pipeline stages and `production_write=false`, `production_fundamentals_changed=false`, `rankings_changed=false` before replacing the cohort snapshot.
+2. Obtain explicit owner decisions on the shared policy gates before encoding them: EBIT/exceptional items, invested capital and negative-denominator handling, conventional debt and other financing obligations, lease/ROU symmetry, unrestricted cash and marketable securities, NCI, ranking ties/minimum cohort and quote staleness. The evidence-backed starting points are in [cohort policy matrix](US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md) and [lease/cash recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md). These are proposals, not approvals.
+3. Continue issuer-level sign-off in the recorded priority order: OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB. Preserve the existing worksheets; record decisions only against exact accession, task, evidence hash and evidence IDs.
+4. Complete deterministic debt/financing classification validation for BCRX, IRWD, OTEX and UPWK, including BCRX's unknown conventional debt and separate royalty financing.
+5. Reconcile legacy and EdgarTools across the refreshed cohort, then complete staging/rollback. Production cutover remains blocked until explicit owner approval.
 
 ## Change-control rules for future agents
 

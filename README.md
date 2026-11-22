@@ -56,6 +56,7 @@ The EdgarTools fundamentals bakeoff supports three execution modes:
 - Scheduled run: the daily schedule resolves the current active US MFI universe.
 - Manual run: use Actions → EdgarTools fundamentals bakeoff → Run workflow. Leave `symbols`, `mfi_price_date` and `market_caps_json` blank to use the current active universe and its matching market-cap snapshot.
 - Controlled main-branch run: a push affecting a configured bakeoff path whose commit message contains `[full-universe]` also resolves the live active universe. A normal push-triggered run without this marker is regression-only and uses the pinned fixture cohort.
+- Verification rule: a green regression-only push is not a fresh cohort refresh. Confirm the workflow log includes active-universe discovery, raw ingestion and full-universe coverage validation before updating the current cohort snapshot. The last accepted full-universe baseline is [run #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114); [run #44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was regression-only.
 
 Do not supply a ticker override or custom market-cap map for a cohort refresh. Confirm the run's universe-resolution, extraction, evidence-ingestion, lease/ROU, exception-queue, policy-cohort and ranking-sensitivity stages before treating it as a full validation. All bakeoff modes are shadow-only and must report production data unchanged.
 
