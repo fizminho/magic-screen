@@ -34,7 +34,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | CI Node regression coverage | Build workflow now runs all worker *.test.mjs files and lease/ROU audit test | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Latest documented full cohort | 30 active; 28 supported; 2 unsupported; 26 review-required; 2 shadow eligible; 0 shadow ranked; 0 production approved | [Implementation status snapshot](US_MFI_IMPLEMENTATION_STATUS_2026-11-22.md), [live validation](US_MFI_LIVE_VALIDATION_2026-11-22.md) |
-| Latest main push bakeoff | Regression-only stages passed; dynamic universe, ingestion and full-universe stages skipped | [Bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44985667878) |
+| Latest main push bakeoff | Regression-only stages passed; dynamic universe, ingestion and full-universe stages skipped | [Bakeoff #44987320672](https://github.com/fizminho/magic-screen/actions/runs/44987320672) |
 | Production migration | Not approved; legacy Company Facts sync still runs on the 30-minute cron | worker/index.ts, wrangler.toml |
 
 **Important:** The 30-issuer coverage figures above are the latest documented accepted full-universe snapshot, not proof that the current cohort has just been refreshed. A fresh dynamic run is still required.
