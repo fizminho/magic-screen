@@ -27,6 +27,16 @@ A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
 
 The screener is a research aid, not investment advice. Verify current filings, company disclosures and Shariah status before making an investment decision.
 
+## Full-universe validation operations
+
+The EdgarTools fundamentals bakeoff supports three execution modes:
+
+- Scheduled run: the daily schedule resolves the current active US MFI universe.
+- Manual run: use Actions → EdgarTools fundamentals bakeoff → Run workflow. Leave `symbols`, `mfi_price_date` and `market_caps_json` blank to use the current active universe and its matching market-cap snapshot.
+- Controlled main-branch run: a push affecting a configured bakeoff path whose commit message contains `[full-universe]` also resolves the live active universe. A normal push-triggered run without this marker is regression-only and uses the pinned fixture cohort.
+
+Do not supply a ticker override or custom market-cap map for a cohort refresh. Confirm the run's universe-resolution, extraction, evidence-ingestion, lease/ROU, exception-queue, policy-cohort and ranking-sensitivity stages before treating it as a full validation. All bakeoff modes are shadow-only and must report production data unchanged.
+
 ## US MFI implementation control
 
 The execution order and current completion checklist live in [US MFI masterplan](docs/US_MFI_MASTERPLAN.md). Read it before implementing US accounting, provider migration, ranking or production-release changes.
