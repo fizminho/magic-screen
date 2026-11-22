@@ -25,10 +25,13 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 
 | Area | Verified state | Evidence |
 |---|---|---|
-| Main branch | e1754654d8ff98b0222e5bc2c60016a6f4023cad at start of this plan branch | GitHub main ref |
+| Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
+| Current main after housekeeping and provenance work | 98f9dc7c12d5691f1fbbe088fef9597a47855d56 | PR #57 merge commit |
 | Build | Passing | [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
+| Legacy reconciliation provenance | Merged; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482) |
+| CI Node regression coverage | Build workflow now runs all worker *.test.mjs files and lease/ROU audit test | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Latest documented full cohort | 30 active; 28 supported; 2 unsupported; 26 review-required; 2 shadow eligible; 0 shadow ranked; 0 production approved | [Implementation status snapshot](US_MFI_IMPLEMENTATION_STATUS_2026-11-22.md), [live validation](US_MFI_LIVE_VALIDATION_2026-11-22.md) |
 | Latest main push bakeoff | Regression-only stages passed; dynamic universe, ingestion and full-universe stages skipped | [Bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44985667878) |
@@ -95,7 +98,7 @@ Owner approval required before implementation can change shadow assumptions or p
 ### P1. Reconcile legacy Company Facts against EdgarTools
 
 - [ ] Confirm current legacy sync behaviour, cron cadence, production write fields and retry semantics.
-- [ ] Add read-only legacy row provenance to reconciliation diagnostics.
+- [x] Add read-only legacy row provenance to reconciliation diagnostics. The preview now exposes row presence, stored CIK, updated_at, filed date and explicitly unavailable accession; [PR #57](https://github.com/fizminho/magic-screen/pull/57).
 - [ ] Reconcile each overlapping issuer/input on same period, currency, scope and unit.
 - [ ] Explain mismatches and non-comparable rows; do not equate missing legacy debt with zero.
 - [ ] Define an approved shadow-to-production mapping and migration compatibility contract.
@@ -103,7 +106,7 @@ Owner approval required before implementation can change shadow assumptions or p
 
 ### P2. Engineering quality and documentation
 
-- [ ] Add a complete Node test sweep to CI (including all worker and script .test.mjs suites) or document intentional exclusions.
+- [x] Add a complete Node test sweep to CI (all worker *.test.mjs files plus the lease/ROU audit test); [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
 - [ ] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI.
 - [ ] Add tests for all debt taxonomy discovery categories, dimension rejection, filing alignment and discovery-cap behaviour.
 - [ ] Ensure workflow outputs distinguish regression-only, targeted and full-universe modes.
