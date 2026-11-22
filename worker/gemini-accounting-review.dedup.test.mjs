@@ -4,8 +4,15 @@ import { runGeminiAccountingReview } from "./gemini-accounting-review.mjs";
 
 class FakeD1 {
   cache = new Map();
+  history = new Map();
   locks = new Map();
   gateNextAllowedAt = null;
+
+  async batch(statements) {
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    return results;
+  }
 
   prepare(sql) {
     const db = this;
@@ -48,6 +55,11 @@ class FakeD1 {
         if (sql.includes("INSERT INTO gemini_accounting_review_cache")) {
           const [cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,created_at,updated_at] = values;
           db.cache.set(cache_key, { response_json, model, created_at, status, symbol, accession, task, input_hash, prompt_version, policy_version, updated_at });
+          return { success: true };
+        }
+        if (sql.includes("INSERT INTO gemini_accounting_review_history")) {
+          const [cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,reviewed_at] = values;
+          db.history.set(cache_key, { cache_key,symbol,accession,task,input_hash,prompt_version,policy_version,model,status,response_json,reviewed_at });
           return { success: true };
         }
         throw new Error("Unexpected D1 run query: " + sql);
@@ -113,10 +125,12 @@ test("identical concurrent Gemini reviews make one API call and later reuse the 
     const first = await firstPromise;
     assert.equal(first.status, "REVIEW_REQUIRED");
     assert.equal(first.cached, false);
+    assert.equal(DB.history.size, 1);
 
     const cached = await runGeminiAccountingReview(env, input);
     assert.equal(cached.status, "REVIEW_REQUIRED");
     assert.equal(cached.cached, true);
+    assert.equal(DB.history.size, 1, "cache hits must not create duplicate history rows");
     assert.equal(apiCalls, 1);
   } finally {
     releaseFetch();
