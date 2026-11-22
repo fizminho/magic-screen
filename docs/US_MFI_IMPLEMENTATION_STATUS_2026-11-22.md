@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Main code baseline for this status snapshot:** a0e52ba194a8b3b0a69f57027a3150222da16d1d  
+**Main code baseline for this status snapshot:** 33fa04740b5c70e7e296cf4708f081b618393165  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -11,9 +11,9 @@ This document is a concise status snapshot. The masterplan is authoritative for 
 | Item | Result | Evidence |
 |---|---|---|
 | Issuer-specific debt discovery | Merged and deployed; scans all SEC Company Facts taxonomies and separates royalty financing, other financing, leases and convertible debt | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
-| Gemini audit-ledger export | Merged; manual and controlled [ledger-export] trigger; inspected 139 history rows and zero decisions | [PR #53](https://github.com/fizminho/magic-screen/pull/53), [PR #63](https://github.com/fizminho/magic-screen/pull/63), [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) |
+| Gemini audit-ledger export | Merged; manual and controlled [ledger-export] trigger; inspected 139 history rows and zero decisions. PR #64 adds evidence-ID metadata without raw response JSON; fresh export pending deployment | [PR #53](https://github.com/fizminho/magic-screen/pull/53), [PR #63](https://github.com/fizminho/magic-screen/pull/63), [PR #64](https://github.com/fizminho/magic-screen/pull/64), [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) |
 | Lease/ROU active-universe audit | Active-universe filtering and ADBE control exclusion test are already on main; duplicate stale PR closed unmerged | [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
-| Main build and regression | Full Node suite, Python policy tests, TypeScript build and Wrangler dry-run passed | [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110) |
+| Main build and regression | Full Node suite, Python policy tests, TypeScript build and Wrangler dry-run passed | [Build #44990629361](https://github.com/fizminho/magic-screen/actions/runs/44990629361) |
 | Legacy reconciliation provenance | Merged; read-only response now includes legacy row presence, stored CIK, updated_at and filed date, and states accession is unavailable rather than inventing one | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
 | Complete Node regression suite | All worker *.test.mjs files and lease/ROU audit test passed; debt-discovery category, accession/period/dimension and discovery-cap tests included | [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 
@@ -51,7 +51,7 @@ Read-only export [#44990205149](https://github.com/fizminho/magic-screen/actions
 - Statuses: 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE.
 - Tasks: cash 26, debt 24, EBIT 20, financing 11, invested capital 26, lease 25, NCI 7.
 - Zero human decisions recorded.
-- Current export omits evidence IDs. [PR #64](https://github.com/fizminho/magic-screen/pull/64) adds evidence-ID-only metadata to history without exposing raw response JSON; rerun the export after it is merged/deployed.
+- The inspected export predates evidence-ID metadata. [PR #64](https://github.com/fizminho/magic-screen/pull/64) is merged and adds deduplicated evidence-ID metadata without exposing raw response JSON; rerun the export after deployment.
 
 ## Resolved issuer evidence from the fresh run
 
