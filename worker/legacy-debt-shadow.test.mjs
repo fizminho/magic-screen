@@ -145,3 +145,25 @@ testCase("endpoint is authenticated, shadow-only and never writes", () => {
   assert.doesNotMatch(block, /INSERT|UPDATE|DELETE|REPLACE|\.run\(|\.batch\(/i);
   assert.doesNotMatch(block, /stock_fundamentals\s*\(|ranking_snapshot/i);
 });
+testCase("issuer-specific taxonomy royalty facts are discovered and remain outside conventional debt", () => {
+  const facts = build({ LongTermDebtCurrent: 0, LongTermDebtNoncurrent: 0 });
+  facts.facts["bcrx-custom"] = {
+    RoyaltyFinancingLiabilityCurrent: { units: { USD: [fact(38.455 * M)] } },
+    RoyaltyFinancingLiabilityNoncurrent: { units: { USD: [fact(427.233 * M)] } }
+  };
+  const r = resolveLegacyDebtShadow(facts, END, ACC);
+  const royalty = r.other_concepts_discovered.filter(x => x.category === "royalty_financing");
+  assert.equal(royalty.length, 2);
+  assert.equal(royalty.reduce((sum, x) => sum + x.value, 0), 465.688 * M);
+  assert.ok(r.review_flags.includes("scope_review_required_royalty_financing"));
+  assert.ok(royalty.every(x => x.included_in_candidate === false));
+});
+
+testCase("convertible debt is surfaced as a separate scope-review category", () => {
+  const r = run({ ConvertibleDebtCurrent: 199.680 * M });
+  assert.equal(r.candidate_conventional_debt, null);
+  assert.equal(r.status, "unresolved_insufficient_inputs");
+  assert.ok(r.other_concepts_discovered.some(x =>
+    x.concept === "us-gaap:ConvertibleDebtCurrent" && x.category === "convertible_debt"));
+  assert.ok(r.review_flags.includes("scope_review_required_convertible_debt"));
+});
