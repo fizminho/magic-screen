@@ -1230,6 +1230,7 @@ export default {
         // INTENTIONAL: compare legacy production fundamentals with accession-bound EdgarTools candidates without writing either side.
         const rows=await env.DB.prepare(`SELECT m.symbol,m.company_name,
           q.market_cap AS current_market_cap,q.updated_at AS market_cap_updated_at,
+          f.symbol AS legacy_record_symbol,f.cik AS legacy_cik,f.updated_at AS legacy_updated_at,
           f.status AS legacy_status,f.source AS legacy_source,f.fiscal_period AS legacy_fiscal_period,f.filed_at AS legacy_filed_at,
           f.ebit AS legacy_ebit,f.current_assets AS legacy_current_assets,f.current_liabilities AS legacy_current_liabilities,
           f.net_ppe AS legacy_net_ppe,f.total_debt AS legacy_total_debt,f.cash AS legacy_cash,
@@ -1254,7 +1255,8 @@ export default {
             symbol:row.symbol,company_name:row.company_name,
             current_market_cap:row.current_market_cap==null?null:Number(row.current_market_cap),
             market_cap_updated_at:row.market_cap_updated_at??null,
-            legacy_status:row.legacy_status??null,legacy_source:row.legacy_source??null,
+            legacy_record_present:row.legacy_record_symbol!=null,legacy_cik:row.legacy_cik??null,
+            legacy_updated_at:row.legacy_updated_at??null,legacy_status:row.legacy_status??null,legacy_source:row.legacy_source??null,
             legacy_fiscal_period:row.legacy_fiscal_period??null,legacy_filed_at:row.legacy_filed_at??null,
             legacy_ebit:row.legacy_ebit==null?null:Number(row.legacy_ebit),
             legacy_current_assets:row.legacy_current_assets==null?null:Number(row.legacy_current_assets),
