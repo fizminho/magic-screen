@@ -1,6 +1,6 @@
 # US MFI agent handover
 
-**Last refreshed:** 22 November 2026  
+**Last refreshed:** 22 November 2026 (full-universe and ledger audit)  
 **Repository:** fizminho/magic-screen  
 **Authoritative execution plan:** [US MFI masterplan](US_MFI_MASTERPLAN.md)
 
@@ -16,11 +16,13 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #55 deployment succeeded in [run #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869).
 - PR #53 merged: a manually triggered, read-only export of persistent Gemini review history and human decisions is available. It makes no Gemini calls and performs no application writes.
 - PR #57 merged: the read-only legacy-versus-EdgarTools reconciliation now exposes legacy row presence, stored CIK, updated_at and filed date, plus an explicit unavailable accession state. Its CI also runs the complete Node regression suite.
-- PR #59 merged: the masterplan now records verified housekeeping completion and keeps unresolved accounting and owner decisions unchecked.
-- Main commit `5400ab319cca5095901b42bf81036727860d37bd` passed [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381), including full Node regression, Python policy tests, TypeScript build and Wrangler dry-run.
-- PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test are already present on main. Do not reapply it.
-- The latest documented accepted full-universe snapshot remains 30 active issuers, 28 EdgarTools-supported, 2 unsupported, 26 in accounting/valuation review, 2 shadow eligible, 0 shadow ranked and 0 production-approved.
-- The latest main push bakeoff was regression-only: dynamic universe discovery, ingestion and full-universe validation were skipped. A fresh full-universe run remains a priority.
+- PR #60 merged: issuer-taxonomy debt discovery now has regression coverage for all categories, accession/period/dimension filtering and the deterministic 120-concept cap.
+- PR #61 merged and deployed: legacy debt shadow now exposes legacy row presence, status, source, updated_at, fiscal period/filed date and CIK mapping update time.
+- PR #62 merged: README documents the controlled `[full-universe]` trigger. Full dynamic run [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) passed every stage; artifact contains 30 active issuers, 28 supported, 2 unsupported, 2 shadow eligible, 0 ranked and 0 production approved.
+- PR #63 merged: README and workflow document/support controlled `[ledger-export]` runs. Export [#44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) passed and was inspected: 139 history rows, 26 issuers, zero decisions, no duplicate cache keys/input hashes.
+- PR #64 is open: add evidence IDs to review history metadata without exposing raw Gemini response JSON. Wait for CI before merge.
+- Main commit `a0e52ba194a8b3b0a69f57027a3150222da16d1d` passed [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110), including full Node regression, Python policy tests, TypeScript build and Wrangler dry-run.
+- PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test were already present on main. Do not reapply.
 - Production migration is not approved.
 
 ## Architecture and safety boundaries
@@ -38,11 +40,11 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 
 Follow the unchecked items in the masterplan in order:
 
-1. Run the full dynamic EdgarTools bakeoff with blank ticker override and verify ingestion plus all full-universe validators.
-2. Manually run the Gemini review ledger export workflow and build one issuer-level, deduplicated human review queue.
-3. Use the new reconciliation provenance to explain the BMBL historical debt discrepancy; add further history instrumentation only if these fields are insufficient.
-4. Validate BCRX custom royalty financing, IRWD convertible debt, OTEX carrying-value reconciliation and UPWK issuance-cost treatment.
-5. Obtain explicit owner approval for the cohort-wide EBIT, debt, lease, cash, invested-capital, NCI and ranking policies.
+1. Merge/deploy PR #64 only after CI passes, rerun the ledger export, and reconcile evidence IDs to issuer/task/accession records.
+2. Begin human review in this order: OTEX (extreme 64.65x ROC candidate from USD 16.745m invested capital), GTM (non-positive IC and USD 2.7319bn tax receivable agreement), SGHC (IFRS EBIT and debt/on-demand borrowing), PBI (filing-specific EBIT bridge), HPQ (large debt, cash and IC scope), SSTK (IC and contributor royalties), XPOF (IC/cash/NCI), HRMY (IC), HRB (reconstructed EBIT and lease/IC scope).
+3. Record human decisions with evidence references and rationale; the current ledger has zero decisions. Do not treat ACCEPTED_CANDIDATE as approval.
+4. Resolve the remaining P2/P3 issuer evidence and unsupported-provider handling. Reconcile IRWD convertible-note classification between legacy Company Facts shadow discovery and filing-based debt-note review.
+5. Obtain explicit owner approval for cohort-wide EBIT, debt, lease, cash, invested-capital, NCI and ranking policies.
 6. Complete legacy-versus-EdgarTools reconciliation, staging and rollback before requesting production cutover.
 
 ## Rules for future agents
