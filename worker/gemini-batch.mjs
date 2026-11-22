@@ -90,7 +90,7 @@ export async function runBatchPage({ symbols, cursor = null, loadIssuer, runRevi
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         // Transient provider/network problems are retryable; contract/validation errors are FAILED and surfaced.
-        const transient = /HTTP (408|425|429|5[0-9][0-9])|timeout|fetch failed|network|ECONNRESET|ETIMEDOUT|socket hang up/i.test(message);
+        const transient = /HTTP (429|5\\d\\d)|timeout|fetch failed|network/i.test(message);
         const status = transient ? BATCH_STATUS.PENDING_RETRY : BATCH_STATUS.FAILED;
         counts[status]++;
         taskResults.push({ task, status, error: message.slice(0, 300) });
