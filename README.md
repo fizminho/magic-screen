@@ -47,6 +47,7 @@ The persistent review history and human-decision export is read-only. It makes n
 - Manual run: Actions → Export Gemini review audit ledger → Run workflow.
 - Controlled main push: a push affecting this workflow, its export script or README whose commit message contains `[ledger-export]` also runs the export.
 - The workflow uploads JSON and Markdown artifacts with 14-day retention. History rows include evidence-ID metadata; raw Gemini response JSON is not exposed by the history endpoint. Treat the JSON as sensitive operational data and do not commit it to the repository.
+- After any targeted issuer review, refresh this export so the audit ledger captures the new task history; a successful batch run is not a human accounting approval.
 
 ## Full-universe validation operations
 
