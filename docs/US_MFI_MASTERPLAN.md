@@ -26,7 +26,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Current main after housekeeping and provenance work | 98f9dc7c12d5691f1fbbe088fef9597a47855d56 | PR #57 merge commit |
+| Main code baseline after housekeeping and provenance release (before this doc-only progress refresh) | 98f9dc7c12d5691f1fbbe088fef9597a47855d56 | PR #57 merge commit |
 | Build | Passing | [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
