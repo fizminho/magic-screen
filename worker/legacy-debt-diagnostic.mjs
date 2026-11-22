@@ -46,7 +46,7 @@ export function diagnoseLegacyDebtFacts(facts, periodEnd, accession) {
   for (const [name, tags] of Object.entries(TAGS)) {
     groups[name] = factsFor(facts, tags, accession, periodEnd);
   }
-  const value = name => uniqueValue(groups[name]);
+  const value = name => selectedValue(groups[name]);
   const debtCurrentAggregate = value("debt_current_aggregate");
   const borrowingsCurrentAggregate = value("borrowings_current_aggregate");
   const debtCurrent = value("debt_current");
