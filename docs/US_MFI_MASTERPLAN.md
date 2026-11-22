@@ -26,12 +26,12 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after housekeeping and provenance release (before this doc-only progress refresh) | 98f9dc7c12d5691f1fbbe088fef9597a47855d56 | PR #57 merge commit |
-| Build | Passing | [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008) |
+| Main code baseline after provenance and housekeeping releases | 5400ab319cca5095901b42bf81036727860d37bd | PR #59 merge commit |
+| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
-| CI Node regression coverage | Build workflow now runs all worker *.test.mjs files and lease/ROU audit test | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482) |
+| CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Latest documented full cohort | 30 active; 28 supported; 2 unsupported; 26 review-required; 2 shadow eligible; 0 shadow ranked; 0 production approved | [Implementation status snapshot](US_MFI_IMPLEMENTATION_STATUS_2026-11-22.md), [live validation](US_MFI_LIVE_VALIDATION_2026-11-22.md) |
 | Latest main push bakeoff | Regression-only stages passed; dynamic universe, ingestion and full-universe stages skipped | [Bakeoff #44987320672](https://github.com/fizminho/magic-screen/actions/runs/44987320672) |
@@ -108,7 +108,7 @@ Owner approval required before implementation can change shadow assumptions or p
 
 - [x] Add a complete Node test sweep to CI (all worker *.test.mjs files plus the lease/ROU audit test); [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
 - [x] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI; verified in [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
-- [ ] Add tests for all debt taxonomy discovery categories, dimension rejection, filing alignment and discovery-cap behaviour.
+- [ ] Add tests for all debt taxonomy discovery categories, dimension rejection, filing alignment and discovery-cap behaviour (implementation in progress on branch test/debt-discovery-regression-coverage; do not tick until CI passes and PR merges).
 - [ ] Ensure workflow outputs distinguish regression-only, targeted and full-universe modes.
 - [x] Consolidate agent handovers and implementation status around this masterplan.
 - [x] Correct README cron cadence and clearly distinguish the legacy Company Facts runtime from the EdgarTools evidence lane; [PR #56](https://github.com/fizminho/magic-screen/pull/56).
