@@ -43,7 +43,7 @@ These figures are a historical accepted snapshot, not proof of a fresh full-univ
 
 ## Latest workflow distinction
 
-- [Main push bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44985667878) passed its regression stages.
+- [Main push bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44987320672) passed its regression stages.
 - That run skipped dynamic universe discovery, raw evidence ingestion and full-universe validation. It must not be reported as a fresh full-universe acceptance.
 - The main Build and deployment after PR #55 succeeded in [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869); the subsequent PR #53 documentation/workflow merge passed [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008).
 
