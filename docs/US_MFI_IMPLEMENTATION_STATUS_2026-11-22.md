@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Main code baseline for this status snapshot:** `fbf2351bb3e7d84d576000264d55b933150ca5c3` (PR #69)  
+**Main code baseline for this status snapshot:** `191564f18324ffed0c803e157a9809143c06b7f2` (PR #70)  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -19,7 +19,7 @@ This document is a concise status snapshot. The masterplan is authoritative for 
 
 ## Latest full-universe evidence snapshot
 
-Fresh dynamic active-universe run [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) completed successfully on 22 November 2026. [Downloadable run artifact](https://github.com/fizminho/magic-screen/actions/runs/44989926114/artifacts/14741293084).
+Fresh dynamic active-universe run [#44993883641](https://github.com/fizminho/magic-screen/actions/runs/44993883641) completed successfully on 22 November 2026. [Downloadable run artifact](https://github.com/fizminho/magic-screen/actions/runs/44993883641/artifacts/14742851802).
 
 | Measure | Result |
 |---|---:|
@@ -33,7 +33,15 @@ Fresh dynamic active-universe run [#44989926114](https://github.com/fizminho/mag
 | Shadow ranked | 0 (minimum cohort is 5) |
 | Production approved | 0 |
 
-All stages passed: dynamic universe discovery, matching market-cap snapshot (price date 2026-11-20), annual extraction, raw ingestion, resolver/reconciliation previews, lease/ROU coverage, exception queue, policy cohort and ranking sensitivity. The run explicitly reports production fundamentals, rankings and production writes unchanged.
+All stages passed: dynamic universe discovery (30 unique symbols), matching market-cap snapshot (price date 2026-11-20), annual extraction (29 company records: 27 supported plus 2 provider-unsupported), raw evidence ingestion (31 records including ADBE regression control), resolver/reconciliation previews, lease/ROU coverage, exception queue, policy cohort and ranking sensitivity. The run explicitly reports production fundamentals, rankings and production writes unchanged.
+
+## Fresh run diagnostics (run #44993883641)
+
+- Resolver: 30 active, 28 supported, 2 unsupported, 0 awaiting evidence; 25 direct EBIT candidates, 17 conventional debt candidates, 15 net-debt candidates, 11 ambiguous debt inputs and 28 review-required.
+- Ranking: 2 shadow eligible (IRWD, SNDK), 0 ranked, 30 excluded; minimum eligible cohort remains five; 26 are accounting/valuation review and 2 are provider-unsupported.
+- Policy queue: P1/P2/P3 remains 9/10/11; all 30 are blocked or review-required; production-approved remains zero.
+- Reconciliation: 27/28 supported issuers have period-matched partial comparisons, zero period mismatches and zero field-level differences in the available comparisons. No full EV/EY/ROC comparison is possible because legacy total debt is missing for all 28 supported issuers.
+- The nine P1 filing accessions match the current extracted annual filings. The fresh run preserves the same accession set for OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB.
 
 ## Current pipeline architecture
 
@@ -65,15 +73,16 @@ Latest read-only export [#44993168923](https://github.com/fizminho/magic-screen/
 
 ## Latest workflow distinction
 
-- Last accepted full dynamic-universe bakeoff: [#44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114), all stages passed. The later push bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) passed in **regression-only mode**; its log explicitly skipped dynamic-universe coverage assertions. It is not a fresh cohort refresh.
-- Read-only ledger export [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) passed and artifact was inspected.
-- PR #68 and PR #69 documentation changes are merged. PR #69 main build [#44993454361](https://github.com/fizminho/magic-screen/actions/runs/44993454361) passed all Node, Python, TypeScript and Wrangler dry-run checks. A fresh full-universe run is the next operational step. No production cutover occurred.
+- Fresh full dynamic-universe bakeoff [#44993883641](https://github.com/fizminho/magic-screen/actions/runs/44993883641) passed all 20 workflow steps; artifact [14742851802](https://github.com/fizminho/magic-screen/actions/runs/44993883641/artifacts/14742851802) was inspected. This is the current cohort snapshot.
+- The earlier [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825) was regression-only and is superseded by #44993883641.
+- Latest ledger [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) remains the current history export; no new Gemini reviews or human decisions were added by the bakeoff.
+- PR #70 documentation CI [#44993832392](https://github.com/fizminho/magic-screen/actions/runs/44993832392) and main build [#44993883526](https://github.com/fizminho/magic-screen/actions/runs/44993883526) passed all Node, Python, TypeScript and Wrangler dry-run checks. No production cutover occurred.
 
 ## Open critical gates
 
-1. Run a fresh dynamic full-universe bakeoff; #44993168825 was regression-only and does not refresh the cohort.
-2. Obtain owner decisions on shared EBIT, debt, lease/ROU, cash, invested-capital, NCI and ranking policies; all remain pending.
-3. Complete evidence-linked P1 issuer sign-off in the masterplan order; the ledger currently has zero human decisions.
+1. Obtain owner decisions on shared EBIT, debt, lease/ROU, cash, invested-capital, NCI, ranking and quote-staleness policies; all remain pending.
+2. Complete evidence-linked P1 issuer sign-off in the masterplan order; the ledger currently has zero human decisions.
+3. Resolve the legacy reconciliation gap: all 28 supported issuers currently lack a legacy total-debt value, so no full EV/EY/ROC comparison is available.
 4. Resolve P2/P3 filing exceptions and unsupported-provider handling without silently dropping active issuers.
 5. Complete legacy-versus-EdgarTools reconciliation, staging write rehearsal and rollback.
 6. Explicit owner approval before production cutover.
