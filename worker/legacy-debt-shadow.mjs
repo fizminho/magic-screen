@@ -14,7 +14,7 @@ const CROSS_CHECK_TAGS = ["LongTermDebt"];
 const SELECTED = new Set([...CURRENT_TAGS, ...NONCURRENT_TAGS, ...SHORT_TERM_TAGS,
   ...CURRENT_AGGREGATE_TAGS, ...LEASE_AGGREGATE_TAGS, ...CROSS_CHECK_TAGS]);
 const DISCOVERY = /Debt|Borrowing|Loan|Lease|Royalty|Financing|NotesPayable|Convertible|CreditFacility|Securiti[sz]|SaleLeaseback|Obligation/i;
-const MAX_DISCOVERED = 60;
+const MAX_DISCOVERED = 120;
 
 function hasDimension(entry) {
   return Boolean(entry?.segment || entry?.dimensions || entry?.members || entry?.dimension || entry?.axis);
@@ -64,14 +64,18 @@ function describe(c) {
 }
 
 function categorize(tag) {
-  if (/Royalty|SaleLeaseback|Securiti[sz]|CustomerFinancing|FinancingObligation|FailedSale/i.test(tag)) return "royalty_or_other_financing";
+  if (/Royalty/i.test(tag)) return "royalty_financing";
+  if (/SaleLeaseback|Securiti[sz]|CustomerFinancing|FinancingObligation|FailedSale/i.test(tag)) return "other_financing";
   if (/Lease/i.test(tag)) return "lease";
+  if (/Convertible/i.test(tag)) return "convertible_debt";
   return "other_debt_related";
 }
 
 function discover(facts, accession, periodEnd) {
   const out = [];
-  for (const taxonomy of TAXONOMIES) for (const [tag, node] of Object.entries(facts?.facts?.[taxonomy] ?? {})) {
+  // Company Facts includes issuer-specific taxonomies. Scan them as evidence too;
+  // restricting discovery to us-gaap/ifrs-full silently misses custom royalty financing.
+  for (const [taxonomy, taxonomyFacts] of Object.entries(facts?.facts ?? {})) for (const [tag, node] of Object.entries(taxonomyFacts ?? {})) {
     if (SELECTED.has(tag) || !DISCOVERY.test(tag)) continue;
     for (const [unit, entries] of Object.entries(node?.units ?? {})) for (const entry of Array.isArray(entries) ? entries : []) {
       if (entry?.accn !== accession || entry?.start || entry?.end !== periodEnd || hasDimension(entry)) continue;
@@ -118,9 +122,13 @@ export function resolveLegacyDebtShadow(facts, periodEnd, accession) {
     if (a.fact.value !== expected && a.fact.value !== cur.fact.value) note(reasons, "current_aggregate_conflicts_with_components");
   }
   if (leaseAgg.status === "present") note(flags, "debt_and_lease_aggregate_present_not_used");
-  const royalty = discovered.filter(d => d.category === "royalty_or_other_financing");
+  const royalty = discovered.filter(d => d.category === "royalty_financing");
+  const otherFinancing = discovered.filter(d => d.category === "other_financing");
+  const convertible = discovered.filter(d => d.category === "convertible_debt");
   const leases = discovered.filter(d => d.category === "lease");
-  if (royalty.length) note(flags, "scope_review_required_royalty_or_other_financing");
+  if (royalty.length) note(flags, "scope_review_required_royalty_financing");
+  if (otherFinancing.length) note(flags, "scope_review_required_other_financing");
+  if (convertible.length) note(flags, "scope_review_required_convertible_debt");
   if (leases.length) note(flags, "separate_lease_evidence_not_included");
 
   const anyDebtEvidence = discovered.length > 0 || [cur, non, short, longTermDebt, leaseAgg, ...aggs].some(c => c.status !== "absent");
