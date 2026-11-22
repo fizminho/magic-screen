@@ -40,6 +40,8 @@ The guarded push mode:
 
 Use this only for a verified coverage gap. The run is AI review only, not human approval, and never writes production fundamentals or rankings.
 
+The current P1 follow-up is OTEX and GTM after the fresh full-universe refresh [#44993883641](https://github.com/fizminho/magic-screen/actions/runs/44993883641). Their targeted batch supplements the filing worksheets only; denominator, tax-receivable-agreement and cohort policy decisions remain for human approval.
+
 ## Gemini review ledger export
 
 The persistent review history and human-decision export is read-only. It makes no Gemini calls and does not change application data or rankings.
