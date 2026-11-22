@@ -34,10 +34,14 @@ function factsFor(facts, tags, accession, periodEnd) {
   return found;
 }
 
-function selectedValue(items) {
-  // Match secFactValue(): taxonomy and tag priority are preserved, then latest filed fact wins.
-  const eligible = items.filter(item => item.eligible_usd_instant)
-    .sort((a, b) => String(b.filed ?? "").localeCompare(String(a.filed ?? "")));
+function selectedValue(items, tags) {
+  // Match secFactValue(): taxonomy priority, then tag priority, then latest filed fact.
+  const taxonomyOrder = ["us-gaap", "ifrs-full"];
+  const eligible = items.filter(item => item.eligible_usd_instant).sort((a, b) =>
+    taxonomyOrder.indexOf(a.taxonomy) - taxonomyOrder.indexOf(b.taxonomy) ||
+    tags.indexOf(a.tag) - tags.indexOf(b.tag) ||
+    String(b.filed ?? "").localeCompare(String(a.filed ?? ""))
+  );
   return eligible.length ? eligible[0].value : null;
 }
 
@@ -46,7 +50,7 @@ export function diagnoseLegacyDebtFacts(facts, periodEnd, accession) {
   for (const [name, tags] of Object.entries(TAGS)) {
     groups[name] = factsFor(facts, tags, accession, periodEnd);
   }
-  const value = name => selectedValue(groups[name]);
+  const value = name => selectedValue(groups[name], TAGS[name]);
   const debtCurrentAggregate = value("debt_current_aggregate");
   const borrowingsCurrentAggregate = value("borrowings_current_aggregate");
   const debtCurrent = value("debt_current");
