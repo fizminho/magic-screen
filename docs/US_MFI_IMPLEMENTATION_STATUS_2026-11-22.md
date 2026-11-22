@@ -1,82 +1,58 @@
-# US MFI implementation status (2026-11-22)
+# US MFI implementation status (22 November 2026)
 
-Status against `US_MFI_AI_AGENT_HANDOVER.md`. This document distinguishes offline implementation, live read-only validation, human policy decisions, and production cutover.
+**Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
+**Current main at audit start:** e1754654d8ff98b0222e5bc2c60016a6f4023cad  
+**Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
-## Implemented in code
+This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
 
-| Priority | Delivered | Evidence |
+## Recently completed
+
+| Item | Result | Evidence |
 |---|---|---|
-| 1. Source-aware universe | `stock_universe_membership`, MFI refresh limited to MFI membership, authenticated `POST/DELETE /api/universe/us/stocks`, frontend add/remove | `worker/universe-membership.test.mjs` |
-| 2. Gemini batch | Bounded resumable batch endpoint, status/model-check endpoint, Actions orchestrator, retry-after surfaced, existing cache/locks/quota handling reused | `worker/gemini-batch.test.mjs`, `worker/gemini-accounting-review*.test.mjs` |
-| 4. Ranking verification | Pure rank assignment extracted and tested: tie handling, negative values, determinism, minimum cohort, completeness gate | `worker/mfi-ranking.test.mjs` |
+| Issuer-specific debt discovery | Merged and deployed; scans all SEC Company Facts taxonomies and separates royalty financing, other financing, leases and convertible debt | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
+| Gemini audit-ledger export | Merged; manual workflow exports read-only history and decisions without invoking Gemini or writing application data | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
+| Lease/ROU active-universe audit | Active-universe filtering and ADBE control exclusion test are already on main; duplicate stale PR closed unmerged | [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
+| Main build | Passed after PR #53 merge | [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008) |
 
-## Verified CI and live validation
+## Latest documented cohort baseline
 
-### Build and deploy
-
-- Current main: `62a8c0676648c6781ef5cf43a8a10bbcf6cd0574`.
-- Build run [#44938236891](https://github.com/fizminho/magic-screen/actions/runs/44938236891): passed on the current main SHA.
-- Verified steps include `npm run build`, Node test suites, Python sensitivity tests, Python syntax validation, and `wrangler deploy --dry-run`.
-- The Worker was deployed successfully in run [#44937456945](https://github.com/fizminho/magic-screen/actions/runs/44937456945) at code SHA `335200eb78259b25ee3e75d034f5d8c28af4b681`. The later main commits only changed the bakeoff workflow comment; no Worker source changed after that deployment.
-
-### Full-universe EdgarTools run
-
-Run [#44938236912](https://github.com/fizminho/magic-screen/actions/runs/44938236912) completed successfully, including universe discovery, extraction, raw evidence ingestion, read-only resolver/ranking/reconciliation previews, full-universe coverage validation, lease/ROU audit, accounting queue, policy cohort assessment, ranking sensitivity, and debt-note guardrail validation.
+The latest accepted full-universe evidence snapshot documented before this audit reported:
 
 | Measure | Result |
 |---|---:|
 | Active US MFI universe | 30 |
-| EdgarTools-supported active issuers | 28 |
+| EdgarTools-supported issuers | 28 |
 | Unsupported provider | 2 |
-| Extraction and ingestion records | 31 (30 active issuers plus ADBE regression control) |
-| Raw evidence ingested | 31 |
-| Resolver review required | 28 |
+| Accounting/valuation review required | 26 |
 | Shadow eligible | 2 |
 | Shadow ranked | 0 |
-| Production-approved | 0 |
+| Production approved | 0 |
 
-The ingestion response explicitly reported `production_fundamentals_changed=false` and `rankings_changed=false`. The run was evidence-only; it did not approve or write fundamentals, ratios, eligibility, or rankings.
+These figures are a historical accepted snapshot, not proof of a fresh full-universe refresh on the latest main commit.
 
-### Current legacy reconciliation result
+## Current pipeline architecture
 
-The latest live D1 snapshot reports:
+- EdgarTools is the designated primary extraction provider for the target US fundamentals workflow.
+- GitHub Actions extracts annual SEC filings, and the Worker stores raw evidence for deterministic read-only resolution, accounting review and shadow ranking.
+- The legacy Company Facts sync remains active on the Worker 30-minute cron and continues to populate the existing production fundamentals path during migration.
+- EdgarTools ingestion and shadow previews do not write production fundamentals, ratios, eligibility or rankings.
+- No production cutover has been approved.
 
-- 27 of 28 supported issuers have matching fiscal periods.
-- 27 issuers have at least one same-period input available on both sides.
-- No differences were found in the overlapping inputs.
-- Zero issuers have fully comparable legacy and EdgarTools metrics.
-- Legacy field coverage among supported issuers: EBIT 25/28, invested capital 23/28, gross debt 0/28, cash 24/28.
-- EdgarTools candidate coverage: EBIT 26/28, invested capital 27/28, conventional gross debt 17/28, unrestricted cash 25/28.
+## Latest workflow distinction
 
-The dominant blocker is legacy debt coverage, not a missing join in the reconciliation query. The query reads `stock_fundamentals.total_debt`; the current live snapshot has that field null for all 28 supported issuers, so their legacy status is `missing_required_facts`. The legacy Company Facts resolver intentionally requires sufficiently complete, accession-matched current/noncurrent debt components (or a recognised complete aggregate) and does not infer a total from an incomplete debt line. Missing debt remains unknown, not zero.
+- [Main push bakeoff #44985667878](https://github.com/fizminho/magic-screen/actions/runs/44985667878) passed its regression stages.
+- That run skipped dynamic universe discovery, raw evidence ingestion and full-universe validation. It must not be reported as a fresh full-universe acceptance.
+- The main Build and deployment after PR #55 succeeded in [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869); the subsequent PR #53 documentation/workflow merge passed [Build #44986762008](https://github.com/fizminho/magic-screen/actions/runs/44986762008).
 
-**Historical discrepancy to investigate:** the earlier 2026-11-21 reconciliation note reported BMBL as fully comparable with legacy debt of USD 588.465m. The latest live snapshot reports BMBL legacy debt as null and no fully comparable issuers. The current reconciliation query selects `f.total_debt` directly, but it does not expose the legacy row's `updated_at`/CIK, so the exact cause and timing of this state change are not established. Treat the latest live artifact as the current snapshot; do not rely on the older BMBL comparison until the historical row change is explained.
+## Open critical gates
 
-See [US MFI live validation findings (2026-11-22)](US_MFI_LIVE_VALIDATION_2026-11-22.md).
+1. Fresh dynamic universe extraction and raw evidence ingestion.
+2. Read-only Gemini ledger export and a deduplicated issuer-level human review queue.
+3. Live validation of BCRX custom royalty financing, IRWD convertible debt, OTEX gross/net carrying value and UPWK issuance costs.
+4. Legacy BMBL discrepancy investigation: prior note recorded USD 588.465m while latest live D1 reconciliation showed total_debt null. Add legacy row provenance before concluding.
+5. Cohort-wide owner approval for EBIT, debt, lease, cash, invested capital, NCI and ranking methodology.
+6. Legacy-versus-EdgarTools reconciliation, staging write rehearsal and rollback.
+7. Explicit owner approval before production cutover.
 
-## Still open: live review and owner decisions
-
-| Item | Current state / next action |
-|---|---|
-| Gemini batch dry run | Not yet run. Manually dispatch **Gemini accounting review batch** with `dry_run=true`, `include_full_scope=false`; inspect the planned tasks, cursor, and deduplication without making Gemini calls. |
-| Gemini live review | After dry-run inspection, explicitly run with `dry_run=false`. The deterministic resolver runs first; only unresolved tasks should reach Gemini. Quota waits and cached evidence must be respected. |
-| EBIT policy | Proposed only. Confirm consolidated annual operating-income treatment and the narrowly scoped HRB reconstruction policy. |
-| Debt policy | Proposed only. Approve conventional borrowing scope and treatment of lease/royalty/sale-leaseback financing separately. |
-| Lease policy | Proposed only. Approve US GAAP operating/finance lease and IFRS 16 treatment, including ROU and current-liability symmetry. |
-| Cash policy | Proposed only. Approve unrestricted cash baseline and security-level cash-equivalent criteria. |
-| Invested capital | Proposed only. Approve working-capital, PP&E, ROU and negative-working-capital treatment. |
-| Ranking tie rule | Owner decision required. Recommended migration choice: preserve legacy SQL `RANK()` semantics to avoid changing methodology during provider cutover. |
-| New-stock market cap | Use the dated active MFI universe snapshot automatically. If no reliable market cap is available, withhold ranking until one is supplied. |
-| Legacy reconciliation | Explain the historical BMBL debt discrepancy and add legacy row audit metadata before treating the historical comparison as settled. |
-| Scheduled ingestion and recovery | Observe scheduled runs, retry/recovery behaviour, and provider coverage over time. |
-| Rollback and production-write safeguard drill | Requires staging D1 and an approved cutover/rollback plan. |
-| Production cutover | Not approved. Production fundamentals, ratios, eligibility and rankings remain unchanged by the EdgarTools evidence path. |
-
-## Non-negotiable safeguards
-
-1. Annual 10-K/20-F/40-F only for annual Magic Formula metrics.
-2. Missing inputs are unknown, never zero.
-3. Do not add dimensional XBRL breakdowns to consolidated totals.
-4. Unsupported providers remain visible in coverage and excluded from ranking; no silent fallback.
-5. Gemini is for genuinely ambiguous filing interpretation, not routine arithmetic or deterministic checks.
-6. Do not write EdgarTools candidates into production `stock_fundamentals` until accounting policies, full-universe validation, reconciliation, and rollback are approved.
+See the masterplan for the full prioritised implementation sequence and checkboxes.
