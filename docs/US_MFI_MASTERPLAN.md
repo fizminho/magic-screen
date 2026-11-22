@@ -55,16 +55,16 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 
 ### P1. Refresh evidence for the current active cohort
 
-- [ ] Run EdgarTools fundamentals bakeoff with blank ticker override so it resolves the live active US MFI universe. Use Actions → Run workflow, the daily schedule, or a controlled main push whose commit message contains `[full-universe]` and touches a configured bakeoff path. The controlled push trigger is documented in README.
+- [x] Run EdgarTools fundamentals bakeoff with blank ticker override so it resolves the live active US MFI universe via the documented `[full-universe]` main-push trigger; [PR #62](https://github.com/fizminho/magic-screen/pull/62), [run #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
 - [x] Confirm live active-universe discovery, matching market-cap snapshot/quote date, annual filing extraction and raw evidence ingestion; 30 active issuers, 31 ingested records including ADBE regression control; [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
-- [ ] Confirm the full-universe validators, lease/ROU coverage audit, accounting exception queue, policy cohort assessment and ranking sensitivity report all complete.
+- [x] Confirm full-universe extraction/ingestion validators, lease/ROU coverage audit, accounting exception queue, policy cohort assessment and ranking sensitivity report all complete; all stages passed in [run #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
 - [x] Confirm the run explicitly reports production_fundamentals_changed=false, rankings_changed=false and production_write=false.
 - [x] Record run ID, active symbols, supported/unsupported counts and artifact links in implementation status.
-- [ ] Do not treat a push-triggered regression-only run as full-universe validation.
+- [x] Distinguish regression-only push runs from full-universe validation in README and masterplan; the run stages are explicitly checked before acceptance.
 
 ### P1. Build one issuer-level human review queue
 
-- [ ] Run the newly merged read-only Gemini review ledger export workflow manually.
+- [x] Run the read-only Gemini review ledger export using the controlled `[ledger-export]` main-push trigger and inspect its artifact; [PR #63](https://github.com/fizminho/magic-screen/pull/63), [run #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149).
 - [x] Reconcile exported history by issuer, task, accession, cache key and input hash. The current export has 139 unique history IDs/cache keys/input hashes, 26 issuers and no duplicate keys.
 - [x] Deduplicate completed/cached reviews; the export contains no duplicate cache keys or input hashes. Do not resend unchanged evidence.
 - [x] Separate deterministic missing facts, conflicting evidence, policy decisions and unsupported-provider cases in the full-universe accounting exception queue; 9 P1, 10 P2, 11 P3.
@@ -132,9 +132,9 @@ Owner approval required before implementation can change shadow assumptions or p
 
 ### P2. Engineering quality and documentation
 
-- [x] Add a complete Node test sweep to CI (all worker *.test.mjs files plus the lease/ROU audit test); [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
-- [x] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI; verified in [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482).
-- [ ] Add tests for all debt taxonomy discovery categories, dimension rejection, filing alignment and discovery-cap behaviour (implementation in progress on branch test/debt-discovery-regression-coverage; do not tick until CI passes and PR merges).
+- [x] Add a complete Node test sweep to CI (all worker *.test.mjs files plus the lease/ROU audit test); [PR #57](https://github.com/fizminho/magic-screen/pull/57), latest [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110).
+- [x] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI; verified in latest [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110).
+- [x] Add tests for debt taxonomy discovery categories, dimension rejection, filing alignment and deterministic 120-concept discovery cap; [PR #60](https://github.com/fizminho/magic-screen/pull/60), [CI #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191).
 - [ ] Ensure workflow outputs distinguish regression-only, targeted and full-universe modes.
 - [x] Consolidate agent handovers and implementation status around this masterplan.
 - [x] Correct README cron cadence and clearly distinguish the legacy Company Facts runtime from the EdgarTools evidence lane; [PR #56](https://github.com/fizminho/magic-screen/pull/56).
