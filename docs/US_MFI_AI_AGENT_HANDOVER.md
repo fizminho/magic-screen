@@ -16,6 +16,8 @@ Always inspect current main and open PRs before coding. Do not rely on historica
 - PR #55 deployment succeeded in [run #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869).
 - PR #53 merged: a manually triggered, read-only export of persistent Gemini review history and human decisions is available. It makes no Gemini calls and performs no application writes.
 - PR #57 merged: the read-only legacy-versus-EdgarTools reconciliation now exposes legacy row presence, stored CIK, updated_at and filed date, plus an explicit unavailable accession state. Its CI also runs the complete Node regression suite.
+- PR #59 merged: the masterplan now records verified housekeeping completion and keeps unresolved accounting and owner decisions unchecked.
+- Main commit `5400ab319cca5095901b42bf81036727860d37bd` passed [Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381), including full Node regression, Python policy tests, TypeScript build and Wrangler dry-run.
 - PR #28 was closed unmerged because its active-universe lease/ROU filtering and regression test are already present on main. Do not reapply it.
 - The latest documented accepted full-universe snapshot remains 30 active issuers, 28 EdgarTools-supported, 2 unsupported, 26 in accounting/valuation review, 2 shadow eligible, 0 shadow ranked and 0 production-approved.
 - The latest main push bakeoff was regression-only: dynamic universe discovery, ingestion and full-universe validation were skipped. A fresh full-universe run remains a priority.
