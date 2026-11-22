@@ -1,7 +1,7 @@
 # US MFI implementation status (22 November 2026)
 
 **Execution checklist:** [US MFI masterplan](US_MFI_MASTERPLAN.md)  
-**Main code baseline for this status snapshot:** 33fa04740b5c70e7e296cf4708f081b618393165  
+**Main code baseline for this status snapshot:** 181d26360125e57d4a9a72f621438bb8e65e6c2e  
 **Status:** Evidence and shadow implementation progressing; accounting approval and production migration remain blocked.
 
 This document is a concise status snapshot. The masterplan is authoritative for task order and completion checkboxes.
@@ -11,9 +11,9 @@ This document is a concise status snapshot. The masterplan is authoritative for 
 | Item | Result | Evidence |
 |---|---|---|
 | Issuer-specific debt discovery | Merged and deployed; scans all SEC Company Facts taxonomies and separates royalty financing, other financing, leases and convertible debt | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
-| Gemini audit-ledger export | Merged; manual and controlled [ledger-export] trigger; inspected 139 history rows and zero decisions. PR #64 adds evidence-ID metadata without raw response JSON; fresh export pending deployment | [PR #53](https://github.com/fizminho/magic-screen/pull/53), [PR #63](https://github.com/fizminho/magic-screen/pull/63), [PR #64](https://github.com/fizminho/magic-screen/pull/64), [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) |
+| Gemini audit-ledger export | Merged; manual and controlled [ledger-export] trigger; inspected 139 history rows and zero decisions. PR #64 adds evidence-ID metadata without raw response JSON; fresh export #44990799574 was inspected | [PR #53](https://github.com/fizminho/magic-screen/pull/53), [PR #63](https://github.com/fizminho/magic-screen/pull/63), [PR #64](https://github.com/fizminho/magic-screen/pull/64), [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149) |
 | Lease/ROU active-universe audit | Active-universe filtering and ADBE control exclusion test are already on main; duplicate stale PR closed unmerged | [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
-| Main build and regression | Full Node suite, Python policy tests, TypeScript build and Wrangler dry-run passed | [Build #44990629361](https://github.com/fizminho/magic-screen/actions/runs/44990629361) |
+| Main build and regression | Full Node suite, Python policy tests, TypeScript build and Wrangler dry-run passed | [Build #44990799577](https://github.com/fizminho/magic-screen/actions/runs/44990799577) |
 | Legacy reconciliation provenance | Merged; read-only response now includes legacy row presence, stored CIK, updated_at and filed date, and states accession is unavailable rather than inventing one | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
 | Complete Node regression suite | All worker *.test.mjs files and lease/ROU audit test passed; debt-discovery category, accession/period/dimension and discovery-cap tests included | [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 
@@ -51,7 +51,8 @@ Read-only export [#44990205149](https://github.com/fizminho/magic-screen/actions
 - Statuses: 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE.
 - Tasks: cash 26, debt 24, EBIT 20, financing 11, invested capital 26, lease 25, NCI 7.
 - Zero human decisions recorded.
-- The inspected export predates evidence-ID metadata. [PR #64](https://github.com/fizminho/magic-screen/pull/64) is merged and adds deduplicated evidence-ID metadata without exposing raw response JSON; rerun the export after deployment.
+- Fresh export [#44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990799574/artifacts/14741538700): 133/139 history rows contain evidence IDs (347 occurrences); six rows have no IDs. All 139 accessions match the current extraction. No duplicate cache/input hashes; zero human decisions.
+- Five active-universe symbols have no ledger history: ADBE (regression control), AFMJF and EGHSF (unsupported), plus supported ALEC and BCRX. Determine whether ALEC/BCRX need targeted reviews without resending cached evidence.
 
 ## Resolved issuer evidence from the fresh run
 
