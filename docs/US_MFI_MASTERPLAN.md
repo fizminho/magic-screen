@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #62)  
+**Last updated:** 22 November 2026 (post-PR #63 and full-universe evidence refresh)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -26,15 +26,15 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Area | Verified state | Evidence |
 |---|---|---|
 | Main branch at audit start | e1754654d8ff98b0222e5bc2c60016a6f4023cad | GitHub main ref |
-| Main code baseline after debt discovery test and legacy provenance release | 20cacaa33d24e1b865984d604d1d26c57ce4275d | PR #61 merge commit |
-| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44987844381](https://github.com/fizminho/magic-screen/actions/runs/44987844381), [PR #60 Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
+| Main code baseline after debt discovery, provenance, full-universe operations and ledger export trigger | a0e52ba194a8b3b0a69f57027a3150222da16d1d | PR #63 merge commit |
+| Build | Passing, including complete Node regression suite, Python policy tests, TypeScript build and Wrangler dry-run | [Main Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110), [PR #63 Build #44990076048](https://github.com/fizminho/magic-screen/actions/runs/44990076048) |
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
 | CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test; PR #60 adds debt discovery category, filing alignment, dimensional rejection and cap tests | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
-| Latest documented full cohort | 30 active; 28 supported; 2 unsupported; 26 review-required; 2 shadow eligible; 0 shadow ranked; 0 production approved | [Implementation status snapshot](US_MFI_IMPLEMENTATION_STATUS_2026-11-22.md), [live validation](US_MFI_LIVE_VALIDATION_2026-11-22.md) |
-| Latest main push bakeoff | Regression-only stages passed; dynamic universe, ingestion and full-universe stages skipped | [Bakeoff #44987320672](https://github.com/fizminho/magic-screen/actions/runs/44987320672) |
+| Latest full-universe cohort | 30 active; 28 supported; 2 unsupported (AFMJF, EGHSF); 26 accounting/valuation review; 2 shadow eligible (IRWD, SNDK); 0 ranked (minimum eligible cohort is 5); 0 production approved | [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44989926114/artifacts/14741293084) |
+| Latest main push bakeoff | Full dynamic-universe refresh, ingestion, resolver, reconciliation, lease/ROU, exception queue, policy cohort and sensitivity stages all passed; production unchanged | [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114) |
 | Production migration | Not approved; legacy Company Facts sync still runs on the 30-minute cron | worker/index.ts, wrangler.toml |
 
 **Important:** The 30-issuer coverage figures above are the latest documented accepted full-universe snapshot, not proof that the current cohort has just been refreshed. A fresh dynamic run is still required.
@@ -50,38 +50,62 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [x] Verify lease/ROU audit active-universe filtering and regression test already exist on main.
 - [x] Close stale PR #28 unmerged because its intended change is already present on main.
 - [x] Create this masterplan as the authoritative execution checklist.
-- [ ] Run the ledger export workflow and inspect the generated artifact. It supports manual dispatch or a controlled main push affecting the workflow, export script or README with `[ledger-export]` in the commit message; README documents both paths.
+- [x] Run the read-only ledger export and inspect the artifact: 139 history rows, 26 issuers, zero decisions; [Export #44990205149](https://github.com/fizminho/magic-screen/actions/runs/44990205149), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990205149/artifacts/14741890230).
 - [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
 
 ### P1. Refresh evidence for the current active cohort
 
 - [ ] Run EdgarTools fundamentals bakeoff with blank ticker override so it resolves the live active US MFI universe. Use Actions → Run workflow, the daily schedule, or a controlled main push whose commit message contains `[full-universe]` and touches a configured bakeoff path. The controlled push trigger is documented in README.
-- [ ] Confirm the workflow discovers the active universe, uses the matching market-cap snapshot and quote date, extracts annual filings, and ingests raw evidence.
+- [x] Confirm live active-universe discovery, matching market-cap snapshot/quote date, annual filing extraction and raw evidence ingestion; 30 active issuers, 31 ingested records including ADBE regression control; [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
 - [ ] Confirm the full-universe validators, lease/ROU coverage audit, accounting exception queue, policy cohort assessment and ranking sensitivity report all complete.
-- [ ] Confirm the run explicitly reports no production fundamentals or ranking changes.
-- [ ] Record the run ID, active symbols, supported/unsupported counts and artifact links in the implementation status document.
+- [x] Confirm the run explicitly reports production_fundamentals_changed=false, rankings_changed=false and production_write=false.
+- [x] Record run ID, active symbols, supported/unsupported counts and artifact links in implementation status.
 - [ ] Do not treat a push-triggered regression-only run as full-universe validation.
 
 ### P1. Build one issuer-level human review queue
 
 - [ ] Run the newly merged read-only Gemini review ledger export workflow manually.
-- [ ] Reconcile history and decisions by issuer, task, filing accession and evidence IDs.
-- [ ] Deduplicate completed/cached reviews; do not resend unchanged evidence.
-- [ ] Separate deterministic missing facts, conflicting evidence, policy decisions and unsupported-provider cases.
-- [ ] Rank the queue by impact on EBIT, debt/EV, invested capital/ROC and top-cohort ranking sensitivity.
+- [x] Reconcile exported history by issuer, task, accession, cache key and input hash. The current export has 139 unique history IDs/cache keys/input hashes, 26 issuers and no duplicate keys.
+- [x] Deduplicate completed/cached reviews; the export contains no duplicate cache keys or input hashes. Do not resend unchanged evidence.
+- [x] Separate deterministic missing facts, conflicting evidence, policy decisions and unsupported-provider cases in the full-universe accounting exception queue; 9 P1, 10 P2, 11 P3.
+- [x] Rank the first human-review tranche by impact on denominator distortion, debt/EV scope, EBIT reconstruction and cash/NCI/lease policy; see the current P1 order below.
 - [ ] Record each human decision with rationale, source evidence and reviewer; do not convert a Gemini candidate into an approval automatically.
 
 ### P1. Close deterministic accounting and issuer evidence gaps
 
 - [x] Add automated regression coverage for issuer-specific royalty, other financing, lease and convertible categories, accession/period/dimension rejection, and deterministic 120-concept cap; [PR #60](https://github.com/fizminho/magic-screen/pull/60), [CI #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191).
-- [ ] Validate live discovery against BCRX custom royalty financing and IRWD convertible debt; confirm both stay outside conventional debt candidates unless policy explicitly says otherwise.
-- [ ] Inspect filing evidence for OTEX gross/net debt carrying-value and issuance-cost reconciliation.
-- [ ] Explain UPWK gross debt versus net carrying value and preserve issuance costs separately.
+- [x] Validate live issuer evidence: BCRX has USD 465.688m separate royalty financing, USD 2.753m finance leases and a zero secured term-loan line; current conventional debt remains unknown. IRWD has USD 199.680m current convertible notes plus USD 385m revolver (USD 584.680m total) supported by its filing note. The legacy Company Facts shadow categorizes convertibles separately, so reconcile that category with the filing-based conventional-debt treatment under the owner-approved policy.
+- [x] Inspect OTEX filing evidence: USD 5,770.369m current/noncurrent carrying value reconciles to the debt note after USD 66.156m unamortized discounts and issuance costs; leases, restricted cash, investments and NCI remain separate policy questions.
+- [x] Explain UPWK debt: USD 360.998m principal less USD 1.228m unamortized issuance costs equals USD 359.770m current carrying value; noncurrent debt is explicitly zero. Keep USD 378.425m marketable securities separate and exclude restricted/customer escrow from unrestricted cash.
 - [x] Extend the debt shadow endpoint with legacy row presence, status, source, updated_at, fiscal period, filed date and CIK mapping update time; [PR #61](https://github.com/fizminho/magic-screen/pull/61).
-- [ ] Resolve BMBL legacy debt discrepancy: earlier note says USD 588.465m while latest live D1 row showed total_debt=null. Compare the newly exposed stored-row provenance to the SEC anchor before concluding why total_debt is null.
+- [x] Explain BMBL legacy debt discrepancy: legacy row exists but status is missing_required_facts, with total_debt=null; it matches FY2025 period/filed date and its EBIT, invested capital and cash match the EdgarTools preview. The accession is not stored on the legacy row; the current EdgarTools accession 0001830043-26-000027 supports USD 588.465m conventional debt. This is an unpopulated legacy field, not a difference in the newly extracted debt candidate.
 - [ ] Review remaining issuer-specific debt, financing, lease, NCI, cash and EBIT exceptions using the prioritised queue.
 - [ ] Keep royalty financing, convertibles, sale-leaseback, securitisation, customer financing, tax receivable agreements and contingent consideration separately classified pending policy.
 - [ ] Keep unsupported issuers visible; do not silently drop or replace them.
+
+### Current P1 human-review order (from full-universe run #44989926114)
+
+These are review priorities, not accounting approvals or ranking recommendations. The ordering reflects potential distortion to EY/ROC and unresolved EV scope.
+
+| Order | Issuer | Main blocker to resolve first |
+|---:|---|---|
+| 1 | OTEX | Candidate invested capital is only USD 16.745m against USD 1,082.597m EBIT, producing an extreme 64.65x ROC candidate; investigate near-zero/negative-working-capital offset before any ranking use. Debt carrying value reconciles. |
+| 2 | GTM | Non-positive invested capital and a separately identified USD 2.7319bn tax receivable agreement liability; resolve denominator and financing scope. |
+| 3 | SGHC | IFRS operating-profit reconstruction plus incomplete/ambiguous current debt and on-demand loans; resolve filing presentation and debt maturity buckets. |
+| 4 | PBI | USD 341.680m filing-specific EBIT bridge includes finance interest allocated to cost of financing; invested capital unresolved. |
+| 5 | HPQ | USD 9.666bn debt candidate but unrestricted cash unresolved; non-positive/negative-working-capital invested-capital risk. |
+| 6 | SSTK | Non-positive/near-zero invested-capital risk and USD 94.163m contributor royalties payable separately classified from conventional debt. |
+| 7 | XPOF | Invested-capital denominator and unrestricted cash unresolved; NCI and lease scope also require review. |
+| 8 | HRMY | Invested-capital denominator unresolved despite direct EBIT and debt candidates. |
+| 9 | HRB | USD 907.686m EBIT reconstructed from reported revenue less operating expenses and independently reconciled to pretax; manual approval and lease/IC scope remain. |
+
+The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are produced because the eligible cohort is below the minimum of five. Do not lower the minimum to force a ranking.
+
+### P1 ledger evidence gap
+
+- [x] Export and inspect the ledger: 139 history rows, 26 issuers, 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE and 2 NOT_APPLICABLE; zero human decisions are recorded.
+- [ ] Include evidence IDs in history API/export. Current export omits them; [PR #64](https://github.com/fizminho/magic-screen/pull/64) is open with a read-only metadata-only fix and regression tests.
+- [ ] After PR #64 deploys, rerun the ledger export and reconcile evidence IDs to the review queue. No human decision should be inferred from an AI status.
 
 ### P1. Approve a single cohort-wide accounting policy
 
