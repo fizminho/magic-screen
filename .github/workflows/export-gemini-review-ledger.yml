@@ -3,6 +3,12 @@ name: Export Gemini review audit ledger
 # Read-only audit export. No Gemini calls, decisions, production writes or ranking changes.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/export-gemini-review-ledger.yml"
+      - "scripts/export_gemini_review_ledger.mjs"
+      - "README.md"
 
 permissions:
   contents: read
@@ -13,6 +19,7 @@ concurrency:
 
 jobs:
   export:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ledger-export]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
