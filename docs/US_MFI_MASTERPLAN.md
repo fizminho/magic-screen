@@ -1,7 +1,7 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (post-PR #65 evidence-linked ledger reconciliation)  
+**Last updated:** 22 November 2026 (post-ALEC/BCRX targeted review and ledger export)  
 **Repository:** fizminho/magic-screen  
 **Status:** Active execution plan  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
@@ -50,7 +50,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 - [x] Verify lease/ROU audit active-universe filtering and regression test already exist on main.
 - [x] Close stale PR #28 unmerged because its intended change is already present on main.
 - [x] Create this masterplan as the authoritative execution checklist.
-- [x] Run the read-only ledger export and inspect the evidence-linked artifact: 139 history rows, 26 issuers, 133 rows with evidence IDs, 6 without IDs, zero decisions; [Export #44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44990799574/artifacts/14741538700).
+- [x] Run the read-only ledger export after the ALEC/BCRX targeted batch and inspect the artifact: 149 history rows, 28 issuers, 143 rows with evidence IDs (379 occurrences), 6 without IDs, zero decisions; [Export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44993168923/artifacts/14741769525).
 - [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
 
 ### P1. Refresh evidence for the current active cohort
@@ -103,16 +103,16 @@ The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are pr
 
 ### P1 ledger evidence gap
 
-- [x] Export and inspect the ledger: 139 history rows, 26 issuers, 92 ACCEPTED_CANDIDATE, 31 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 4 INSUFFICIENT_EVIDENCE and 2 NOT_APPLICABLE; zero human decisions are recorded.
+- [x] Export and inspect the latest ledger: 149 history rows across 28 issuers; 98 ACCEPTED_CANDIDATE, 34 REVIEW_REQUIRED, 10 CONFLICTING_EVIDENCE, 5 INSUFFICIENT_EVIDENCE and 2 NOT_APPLICABLE; zero human decisions are recorded. [Export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923).
 - [x] Include evidence IDs in review history API metadata without exposing raw response JSON; [PR #64](https://github.com/fizminho/magic-screen/pull/64), [CI #44990410412](https://github.com/fizminho/magic-screen/actions/runs/44990410412).
-- [x] After PR #64 deployment, rerun the ledger export and reconcile evidence IDs to the review queue; [PR #64](https://github.com/fizminho/magic-screen/pull/64), [export #44990799574](https://github.com/fizminho/magic-screen/actions/runs/44990799574). 133/139 rows contain one or more evidence IDs (347 ID occurrences); six rows have none (3 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE, 1 ACCEPTED_CANDIDATE).
+- [x] After PR #64 deployment and the targeted ALEC/BCRX review, rerun the ledger export and reconcile evidence IDs; [PR #64](https://github.com/fizminho/magic-screen/pull/64), [targeted batch #44991281916](https://github.com/fizminho/magic-screen/actions/runs/44991281916), [export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923). 143/149 rows contain one or more evidence IDs (379 ID occurrences); six rows have none (3 INSUFFICIENT_EVIDENCE, 2 NOT_APPLICABLE, 1 ACCEPTED_CANDIDATE).
 
 ### Evidence-linked review coverage gaps
 
 - [x] All 139 exported history rows carry a filing accession that matches the current EdgarTools extraction for that issuer.
 - [x] Evidence IDs are exposed for 133 rows (347 ID occurrences); six rows have no IDs: STRA debt_scope, SBC financing_scope, QTTB nci_scope, IRWD financing_scope, HRMY financing_scope and GTM financing_scope. The latter three are ACCEPTED_CANDIDATE/NOT_APPLICABLE records with no supporting evidence IDs in the normalized response; do not infer approval from the status.
-- [ ] Run a targeted review batch for the two supported active issuers absent from the ledger (ALEC and BCRX) after [PR #67](https://github.com/fizminho/magic-screen/pull/67) passes CI and merges. The guarded trigger allows at most two symbols, excludes full_scope, caps each Worker page at two new calls and stops after 15 minutes; cached evidence is reused. ADBE is only the regression control; AFMJF and EGHSF are provider-unsupported.
-- [ ] Record human decisions only after an analyst reviews the cited filing evidence; the current ledger still has zero decisions.
+- [x] Run the guarded targeted review batch for ALEC and BCRX after [PR #67](https://github.com/fizminho/magic-screen/pull/67); [run #44991281916](https://github.com/fizminho/magic-screen/actions/runs/44991281916). The run processed exactly two symbols, excluded full_scope, capped each Worker page at two new calls and stopped within 15 minutes; cached evidence was reused. Both issuers now have five task-history rows each under their current filing accessions. ADBE remains only the regression control; AFMJF and EGHSF remain provider-unsupported.
+- [ ] Record human decisions only after an analyst reviews the cited filing evidence; the latest ledger still has zero decisions. ALEC has four ACCEPTED_CANDIDATE tasks and EBIT REVIEW_REQUIRED. BCRX has cash/lease ACCEPTED_CANDIDATE, debt INSUFFICIENT_EVIDENCE, and financing/invested-capital REVIEW_REQUIRED. AI statuses are not human approvals.
 
 ### P1 Gemini task-status overlay (AI status is not approval)
 
@@ -176,12 +176,11 @@ Owner approval required before implementation can change shadow assumptions or p
 
 ## Next implementation sequence
 
-1. Run the full dynamic EdgarTools workflow and review its artifacts.
-2. Export and consolidate the Gemini audit ledger; build the prioritised issuer queue.
-3. Use the new legacy row provenance to explain the BMBL discrepancy; if the existing fields cannot explain it, add targeted history/audit evidence.
-4. Complete deterministic debt/financing classification validation for BCRX, IRWD, OTEX and UPWK.
-5. Work through shared policy decisions, then apply the approved policy cohort-wide.
-6. Reconcile legacy and EdgarTools, complete staging/rollback, and only then request cutover approval.
+1. Inspect the fresh post-review ledger [#44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923) and finish the post-merge full-universe bakeoff [#44993168825](https://github.com/fizminho/magic-screen/actions/runs/44993168825); confirm production remains unchanged.
+2. Start the P1 human-review tranche in the recorded order: OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB. Record explicit evidence-linked human decisions, not AI candidates.
+3. Complete deterministic debt/financing classification validation for BCRX, IRWD, OTEX and UPWK, including BCRX's unknown conventional debt and separate royalty financing.
+4. Work through shared policy decisions, then apply the approved policy cohort-wide.
+5. Reconcile legacy and EdgarTools, complete staging/rollback, and only then request cutover approval.
 
 ## Change-control rules for future agents
 
