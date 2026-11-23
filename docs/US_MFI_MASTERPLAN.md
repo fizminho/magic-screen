@@ -1,24 +1,88 @@
 # US Magic Formula Investing masterplan
 
 **Owner:** repository owner  
-**Last updated:** 22 November 2026 (fresh cohort and OTEX/GTM targeted AI cache check)  
+**Last updated:** 24 November 2026 (personal-use Shariah-first workflow pivot)  
 **Repository:** fizminho/magic-screen  
-**Status:** Active execution plan  
+**Status:** Active plan; new screening direction approved, implementation gates remain  
 **Source of truth:** This document governs implementation order, completion tracking and release gates. Older handovers and status snapshots are historical unless explicitly linked here.
+
+## Strategic direction (24 November 2026)
+
+The owner has chosen a lower-effort, personal-use workflow. The immediate objective is no longer to replace the MFI source or finish the full accounting-policy engine before producing a useful shortlist. Keep the existing MFI ticker universe as the starting point, apply a Shariah eligibility filter, then manually validate the remaining candidates against Investing Paths and display the verified results in InvestLah.
+
+This is a workflow decision, not authorization to change production data or rankings. The current production screener remains unchanged until the implementation is separately reviewed and approved.
+
+### Target workflow
+
+1. **Ticker universe — Magic Formula Investing (MFI)**
+   - Continue obtaining the US ticker universe from the existing MFI source/integration.
+   - Preserve source URL, retrieval timestamp and source snapshot/version where available.
+   - Do not substitute the EdgarTools/accounting shadow cohort for the MFI universe.
+
+2. **Shariah eligibility — Musaffa and HalalScreener**
+   - Check each MFI ticker against the selected Shariah sources.
+   - Only confirmed **Halal** tickers proceed to the active candidate shortlist.
+   - **Doubtful**, **Not Halal**, **No Data**, stale results and conflicting source results do not pass the filter. Keep them visible in a separate excluded/review state with source, checked date and reason.
+   - Do not silently treat missing data or stale status as Halal.
+   - Keep source-specific statuses; do not invent a combined ruling. If the two sources disagree, flag for manual review rather than auto-passing.
+   - No API, bulk collection or automated access is assumed to be permitted. Use only access methods and data use allowed by each provider's current terms.
+
+3. **Ranking validation — Investing Paths**
+   - Manually open Investing Paths for each Shariah-passing ticker and verify the displayed ranking/details.
+   - Record only the fields actually visible and checked, such as rank, Earnings Yield, Return on Capital, fiscal year/period and checked date.
+   - Record a direct source reference and a manual verification marker. A missing ticker means **Not Found / Not Checked**, not an inferred rank or an assumption that it is unranked.
+   - Do not scrape, crawl, bulk-download, automate browser access, bypass controls/rate limits, or use an intermediary AI to collect Investing Paths data. The prior ToS review found restrictions on automated collection and use of calculated outputs to build a competing product. Personal use does not itself waive those restrictions. Seek written permission before any automated or systematic reuse beyond what the site's terms allow.
+
+4. **InvestLah screener**
+   - Present the MFI universe, Shariah status by source, eligibility decision, manual Investing Paths validation and verification date.
+   - Clearly distinguish source facts, manual observations, stale/missing data and unverified candidates.
+   - Keep a visible audit trail so a user can tell why a ticker passed or was excluded.
+   - This is a personal-use tool. Do not expose the resulting data as a public feed, paid service or competing commercial product without reviewing source licenses and obtaining required permissions.
+
+### Gemini and Google policy guardrails
+
+- Do **not** use Gemini API, URL Context, Google Search Grounding, browser automation or another AI agent to visit Investing Paths and collect rankings automatically under the current plan.
+- Google Search Grounding is not to be used as a mechanism to collect URLs/content for a separate dataset or screening index. AI assistance does not remove the source website's restrictions.
+- Gemini may be used only as a drafting/analysis assistant for content the owner manually provides (for example, text or screenshots already lawfully accessed), and only where the selected Gemini product/account terms permit that use.
+- No Gemini API integration is approved in this phase. Do not send private credentials, API keys, account data or sensitive information to prompts.
+- Before any future Gemini API use, re-check the then-current Gemini API terms, prohibited-use policy, data-use/retention terms, billing tier and account eligibility. Do not assume a free-tier key is suitable for every personal application or that compliance guarantees uninterrupted access. Never evade enforcement, quotas or access restrictions.
+- Keep API keys server-side and out of source control if a future approved integration is considered.
+
+### Scope reduction and treatment of the accounting engine
+
+- Pause new expansion of the P1/P2/P3 accounting-policy and issuer-review work unless a specific task is needed to maintain existing functionality or the owner explicitly resumes it.
+- Do not delete the existing EdgarTools evidence lane, policy research, review ledger, tests or historical artifacts. They remain useful research and a possible future independent validation path.
+- Do not use the accounting shadow output to override the MFI ticker universe or the Shariah filter.
+- Existing production fundamentals, rankings, cron jobs, database records and workflows remain unchanged until a separately approved implementation and release plan is completed.
+- No production cutover, destructive cleanup, schema migration or source replacement is authorized by this strategy update.
+
+### Gates for the new workflow
+
+| Gate | Requirement | Current status |
+|---|---|---|
+| A. Source universe | Confirm current MFI ticker retrieval and provenance | Existing source retained; implementation review pending |
+| B. Shariah filter | Define source status mapping, freshness and conflict handling | Design approved; implementation pending |
+| C. Investing Paths validation | Manual-only validation with auditable observations | Approved approach; implementation pending |
+| D. Screener presentation | Display eligible shortlist and validation provenance | Not started |
+| E. Gemini | No automated Investing Paths collection; manual-input assistance only if terms allow | API integration not approved |
+| F. Release | Tests, review, rollback and explicit owner approval | Not approved |
 
 ## Executive objective
 
-Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, invested capital, earnings yield, return on capital and ranking are supported by filing-period-bound evidence and one approved accounting policy. Keep existing production fundamentals and rankings unchanged until the shadow cohort is complete, reconciled, approved and safely migrated.
+Maintain the existing US MFI ticker source and build a transparent personal-use screening workflow that narrows the universe to Shariah-passing candidates, then records manual Investing Paths ranking validation. The prior filing-backed accounting/valuation engine remains a separate read-only research lane and is not a prerequisite for the new shortlist. Existing production fundamentals and rankings must remain unchanged until a separately approved release.
 
 ## Non-negotiable guardrails
 
-- [ ] No production accounting policy or numeric ranking changes without explicit owner approval.
+- [x] No production accounting policy or numeric ranking changes without explicit owner approval.
 - [x] Missing inputs remain unknown, never zero.
 - [x] SEC facts/evidence must match filing accession, fiscal period, unit, currency and consolidated scope.
 - [x] Dimensional breakdowns are not added to consolidated totals.
 - [x] EdgarTools evidence ingestion and preview are read-only with respect to production fundamentals and rankings.
-- [x] Gemini is reserved for genuinely ambiguous interpretation; deterministic arithmetic and known fact mapping stay in code.
-- [x] Bursa/Malaysia behaviour remains outside this US migration.
+- [x] Gemini is not used to automate collection from Investing Paths; any future use must first pass current Google terms and source-site permission review.
+- [x] Manual Investing Paths validation is the approved interim approach.
+- [x] Only confirmed Halal candidates pass the Shariah filter; stale, missing, doubtful or conflicting results are not auto-approved.
+- [x] Personal-use scope only; no public/commercial redistribution or competing service without required permissions.
+- [x] Bursa/Malaysia behaviour remains outside this US workflow.
 - [ ] Production cutover requires a tested rollback and explicit owner approval.
 
 ## Current verified baseline
@@ -30,7 +94,7 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 | Debt taxonomy discovery | Merged and deployed | [PR #55](https://github.com/fizminho/magic-screen/pull/55), [deploy #44986755869](https://github.com/fizminho/magic-screen/actions/runs/44986755869) |
 | Review ledger export | Merged; read-only manual workflow | [PR #53](https://github.com/fizminho/magic-screen/pull/53) |
 | Legacy reconciliation provenance | Merged and deployed; exposes row presence, stored CIK, updated_at, filed date and explicit missing accession state | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [Build #44987271482](https://github.com/fizminho/magic-screen/actions/runs/44987271482), [Deploy #44987320724](https://github.com/fizminho/magic-screen/actions/runs/44987320724) |
-| CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test; PR #60 adds debt discovery category, filing alignment, dimensional rejection and cap tests | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/fizminho/magic-screen/actions/runs/44988077191) |
+| CI Node regression coverage | Build workflow runs all worker *.test.mjs files and lease/ROU audit test; PR #60 adds debt discovery category, filing alignment, dimensional rejection and cap tests | [PR #57](https://github.com/fizminho/magic-screen/pull/57), [PR #60](https://github.com/fizminho/magic-screen/pull/60), [Build #44988077191](https://github.com/actions/runs/44988077191) |
 | Lease/ROU active-universe scope | Already present on main; stale duplicate PR closed unmerged | scripts/build_lease_rou_coverage_report.mjs, .github/workflows/edgartools-bakeoff.yml; [PR #28](https://github.com/fizminho/magic-screen/pull/28) |
 | Latest full-universe cohort | 30 active; 28 supported; 2 unsupported (AFMJF, EGHSF); 26 accounting/valuation review; 2 shadow eligible (IRWD, SNDK); 0 ranked (minimum eligible cohort is 5); 0 production approved | [Fresh bakeoff #44993883641](https://github.com/fizminho/magic-screen/actions/runs/44993883641), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44993883641/artifacts/14742851802) |
 | Latest full-universe bakeoff | 30 unique active symbols; 29 extracted records including 2 unsupported and 1 ADBE regression control; 31 evidence records ingested; all resolver, ranking, reconciliation, lease/ROU, exception queue, policy cohort and sensitivity validations passed | [Bakeoff #44993883641](https://github.com/fizminho/magic-screen/actions/runs/44993883641) |
@@ -41,26 +105,52 @@ Deliver a reproducible US MFI screener whose annual EBIT, enterprise value, inve
 
 ## Priority plan
 
-### P0. Establish a clean, auditable project baseline
+### P0. Preserve production and establish the new workflow boundary
 
-- [x] Review main branch, latest commits, open PRs, workflows and implementation docs.
-- [x] Merge PR #55 after its build check passed; issuer-specific taxonomies now participate in read-only debt/financing discovery.
-- [x] Verify PR #55 deployment succeeded; production fundamentals and rankings remain outside the shadow route.
-- [x] Merge PR #53 after its build check passed; read-only audit-ledger export workflow is available.
-- [x] Verify lease/ROU audit active-universe filtering and regression test already exist on main.
-- [x] Close stale PR #28 unmerged because its intended change is already present on main.
-- [x] Create this masterplan as the authoritative execution checklist.
-- [x] Run the read-only ledger export after the ALEC/BCRX targeted batch and inspect the artifact: 149 history rows, 28 issuers, 143 rows with evidence IDs (379 occurrences), 6 without IDs, zero decisions; [Export #44993168923](https://github.com/fizminho/magic-screen/actions/runs/44993168923), [artifact](https://github.com/fizminho/magic-screen/actions/runs/44993168923/artifacts/14741769525).
-- [x] Reconcile stale or conflicting docs against this plan and the current code (README, legacy SEC note, EdgarTools provider note, completion plan, implementation status and agent handover now point to this masterplan).
+- [x] Record the owner-approved personal-use, Shariah-first direction.
+- [x] Retain MFI as the source of the ticker universe.
+- [x] Make manual Investing Paths validation the interim approved approach.
+- [x] Block Gemini/API/browser automation for Investing Paths collection unless both Google terms and source-site permissions are re-reviewed and allow it.
+- [ ] Inspect the current MFI ingestion path and identify the smallest safe reuse point; do not alter its behaviour yet.
+- [ ] Inspect existing Shariah status data/source integrations and document freshness, source provenance and missing/conflict behaviour.
+- [ ] Confirm how manual Investing Paths observations can be stored without scraping or changing production ranking fields.
 
-### P1. Refresh evidence for the current active cohort
+### P1. Implement Shariah-first shortlist (separate from production ranking)
 
-- [x] Run EdgarTools fundamentals bakeoff with blank ticker override so it resolves the live active US MFI universe via the documented `[full-universe]` main-push trigger; [PR #62](https://github.com/fizminho/magic-screen/pull/62), [run #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
-- [x] Confirm live active-universe discovery, matching market-cap snapshot/quote date, annual filing extraction and raw evidence ingestion; 30 active issuers, 31 ingested records including ADBE regression control; [Bakeoff #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
-- [x] Confirm full-universe extraction/ingestion validators, lease/ROU coverage audit, accounting exception queue, policy cohort assessment and ranking sensitivity report all complete; all stages passed in [run #44989926114](https://github.com/fizminho/magic-screen/actions/runs/44989926114).
-- [x] Confirm the run explicitly reports production_fundamentals_changed=false, rankings_changed=false and production_write=false.
-- [x] Record run ID, active symbols, supported/unsupported counts and artifact links in implementation status.
-- [x] Distinguish regression-only push runs from full-universe validation in README and masterplan; the run stages are explicitly checked before acceptance.
+- [ ] Define explicit status mapping for Musaffa and HalalScreener: Halal, Doubtful, Not Halal, No Data, stale and source conflict.
+- [ ] Pass only confirmed Halal tickers to the active candidate shortlist; keep all other statuses visible in a separate excluded/review list.
+- [ ] Preserve each provider's individual result, checked timestamp and source reference; do not collapse conflicting results into a false consensus.
+- [ ] Add tests for missing, stale, conflicting and non-Halal statuses.
+- [ ] Do not assume automated API or bulk access is permitted; verify current provider terms and available permissions before implementing integrations.
+
+### P1. Manual Investing Paths validation
+
+- [ ] Create a small manual validation record for each Shariah-passing ticker.
+- [ ] Capture rank, EY, ROC, fiscal period and checked date only when actually observed.
+- [ ] Support Not Checked, Not Found, Verified and Needs Recheck states; never infer ranking from absence in a partial page view.
+- [ ] Keep a source URL/reference and an audit trail for who/when verified the observation.
+- [ ] Do not implement scraping, crawling, automated browser access, proxy/rate-limit evasion or AI-mediated collection.
+
+### P2. Screener UX and release
+
+- [ ] Present MFI ticker, source provenance, Shariah statuses by provider, eligibility decision and manual Investing Paths validation.
+- [ ] Make excluded/review states explainable; avoid silently hiding unknown or stale statuses.
+- [ ] Keep the legacy accounting/valuation lane separate and label it as research/shadow only.
+- [ ] Add tests for eligibility filtering, provenance, stale data and manual-validation states.
+- [ ] Run CI and verify that production fundamentals, rankings, cron and database records are unchanged.
+- [ ] Release only after explicit owner approval and a rollback plan.
+
+### P2. Accounting research lane (paused)
+
+The detailed P1/P2/P3 issuer and accounting work below is retained as historical research and a possible future validation lane. New work is paused unless required to preserve existing behaviour or explicitly resumed by the owner. The detailed checklists below are not prerequisites for the Shariah-first shortlist.
+
+- [ ] Resume issuer-specific accounting review only with explicit owner direction.
+- [ ] Resume cohort-wide accounting policy approval only if the owner chooses to reactivate the accounting ranking route.
+- [ ] Do not migrate accounting shadow values into production under this plan.
+
+## Historical accounting-engine work and evidence
+
+The sections below preserve the prior work log and technical evidence. They remain useful context but do not supersede the strategic direction and priority sequence above.
 
 ### P1. Build one issuer-level human review queue
 
@@ -131,7 +221,8 @@ The two currently shadow-eligible issuers are IRWD and SNDK, but no ranks are pr
 Gemini ACCEPTED_CANDIDATE only means the task's evidence was accepted as a candidate. It is not human approval, policy approval or production eligibility.
 
 Targeted post-refresh check [#44994448916](https://github.com/fizminho/magic-screen/actions/runs/44994448916) processed exactly OTEX and GTM and completed successfully: 10 cached task completions, 5 review-required statuses, 4 deterministic skips, 0 failures and 0 pending. Every task was served from existing cache; no new Gemini calls or history rows were created. OTEX still has EBIT and NCI REVIEW_REQUIRED. GTM still has EBIT REVIEW_REQUIRED and invested-capital CONFLICTING_EVIDENCE. This confirms the blockers are unchanged and must not be represented as new sign-off.
-### P1. Approve a single cohort-wide accounting policy
+
+### P1. Approve a single cohort-wide accounting policy (paused)
 
 Owner approval required before implementation can change shadow assumptions or production values.
 
@@ -145,7 +236,7 @@ Owner approval required before implementation can change shadow assumptions or p
 - [ ] Sector suitability: define exclusions or review treatment for financial and other structurally non-comparable issuers.
 - [ ] Version and approve the policy; update regression fixtures and policy validation tests.
 
-### P1. Reconcile legacy Company Facts against EdgarTools
+### P1. Reconcile legacy Company Facts against EdgarTools (paused)
 
 - [ ] Confirm current legacy sync behaviour, cron cadence, production write fields and retry semantics.
 - [x] Add read-only legacy row provenance to reconciliation diagnostics. The preview now exposes row presence, stored CIK, updated_at, filed date and explicitly unavailable accession; [PR #57](https://github.com/fizminho/magic-screen/pull/57).
@@ -154,7 +245,7 @@ Owner approval required before implementation can change shadow assumptions or p
 - [ ] Define an approved shadow-to-production mapping and migration compatibility contract.
 - [ ] Preserve legacy path until the replacement is validated and rollback is tested.
 
-### P2. Engineering quality and documentation
+## Historical engineering quality and release notes
 
 - [x] Add a complete Node test sweep to CI (all worker *.test.mjs files plus the lease/ROU audit test); [PR #57](https://github.com/fizminho/magic-screen/pull/57), latest [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110).
 - [x] Keep Python syntax/unit checks, TypeScript build and Wrangler dry-run in required CI; verified in latest [Build #44990205110](https://github.com/fizminho/magic-screen/actions/runs/44990205110).
@@ -165,24 +256,14 @@ Owner approval required before implementation can change shadow assumptions or p
 - [x] Remove stale branch-specific agent instructions and point handovers to this plan. The ranking tie-method difference remains explicitly documented as an unresolved owner decision, not silently changed.
 - [ ] Keep dated issuer research notes as evidence records; do not duplicate their full content into this plan.
 
-### P3. Controlled release
-
-- [ ] All active issuers have current evidence or an explicitly approved exclusion.
-- [ ] Policy-sensitive issuer reviews are closed or explicitly excluded with rationale.
-- [ ] The approved cohort meets the minimum eligible ranking size.
-- [ ] Shadow EY, ROC, EV and ranking outputs pass independent validation and sensitivity checks.
-- [ ] Staging write rehearsal, rollback rehearsal and audit trail verification pass.
-- [ ] Owner explicitly approves production cutover.
-- [ ] Deploy in a controlled window and verify production fundamentals, ratios, eligibility and rankings.
-- [ ] Retain rollback capability and post-deployment reconciliation.
-
 ## Next implementation sequence
 
-1. **Owner policy gate:** obtain explicit decisions on EBIT/exceptional items, invested capital and negative-denominator handling, conventional debt and other financing obligations, lease/ROU symmetry, unrestricted cash and marketable securities, NCI, ranking ties/minimum cohort and quote staleness. Evidence-backed proposals are in the [cohort policy matrix](US_MFI_COHORT_ACCOUNTING_POLICY_MATRIX_2026-11-21.md) and [lease/cash recommendation](US_MFI_LEASE_CASH_POLICY_RECOMMENDATION_2026-11-22.md); neither is an approval.
-2. **P1 issuer sign-off:** continue in priority order OTEX, GTM, SGHC, PBI, HPQ, SSTK, XPOF, HRMY and HRB. Preserve the accession-bound worksheets; record decisions only against exact accession, task, cache key/input hash and evidence IDs. Current ledger still has zero human decisions.
-3. **Deterministic financing validation:** complete BCRX, IRWD, OTEX and UPWK debt/financing classification, including BCRX's unknown conventional debt and separate royalty financing.
-4. **Legacy reconciliation:** explain the legacy gap before any migration. Fresh run #44993883641 found 27 period-matched partial input comparisons with zero differences, but no full EV/EY/ROC comparisons because legacy total debt is absent for all 28 supported issuers.
-5. Complete staging/rollback only after policy approval and complete same-period reconciliation. Production cutover remains blocked until explicit owner approval.
+1. Inspect the current MFI ticker ingestion and existing Shariah data paths; identify reuse points without changing production behaviour.
+2. Implement and test the Shariah-first candidate filter with source-specific statuses, freshness and conflict handling.
+3. Add a manual Investing Paths verification workflow and audit record. No automated collection.
+4. Update the screener UI to show eligible candidates and excluded/review states with provenance.
+5. Run CI and verify production fundamentals, rankings, scheduled jobs and database state are unchanged. Request explicit owner approval before release.
+6. Keep the accounting-policy and EdgarTools production migration work paused unless the owner explicitly resumes it.
 
 ## Change-control rules for future agents
 
@@ -193,3 +274,4 @@ Owner approval required before implementation can change shadow assumptions or p
 - Before a new implementation, check whether the functionality already exists on main or in an open PR.
 - Do not merge on a build badge alone if live data validation or policy approval is the actual gate.
 - Do not perform production accounting writes, ranking changes or cutover without explicit owner approval.
+- Do not add automated access to third-party ranking sites without reviewing current terms and obtaining any required permission.
