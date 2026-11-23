@@ -62,6 +62,14 @@ The EdgarTools fundamentals bakeoff supports three execution modes:
 
 Do not supply a ticker override or custom market-cap map for a cohort refresh. Confirm the run's universe-resolution, extraction, evidence-ingestion, lease/ROU, exception-queue, policy-cohort and ranking-sensitivity stages before treating it as a full validation. All bakeoff modes are shadow-only and must report production data unchanged.
 
+## External MFI provider replacement evaluation
+
+The proposed free-only external-provider path and its completed read-only POC are documented here:
+- [External-provider replacement plan](docs/US_MFI_EXTERNAL_PROVIDER_REPLACEMENT_PLAN.md)
+- [Read-only POC report (24 November 2026)](docs/US_MFI_EXTERNAL_PROVIDER_POC_2026-11-24.md)
+
+The POC found no provider approved for automated production use under the current free-only and permitted-access requirements. Do not implement a scraper or provider adapter without a separately verified access permission and owner approval. Production rankings and the existing accounting path remain unchanged.
+
 ## US MFI implementation control
 
 The execution order and current completion checklist live in [US MFI masterplan](docs/US_MFI_MASTERPLAN.md). Read it before implementing US accounting, provider migration, ranking or production-release changes.
