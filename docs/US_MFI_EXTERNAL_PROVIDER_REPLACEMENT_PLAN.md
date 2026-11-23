@@ -2,7 +2,7 @@
 
 **Owner:** repository owner  
 **Created:** 24 November 2026  
-**Status:** Proposed; read-only proof of concept is the only approved first step  
+**Status:** Read-only POC completed 24 November 2026; no external provider approved for automated production use  
 **Scope:** US Magic Formula Investing workflow in InvestLah / Magic Screen  
 **Related control document:** [US MFI masterplan](US_MFI_MASTERPLAN.md)
 
@@ -13,6 +13,20 @@ The project has spent substantial effort building a filing-based accounting pipe
 The goal is to reduce accounting-policy maintenance and avoid making InvestLah responsible for independently reconstructing every issuer's EBIT, enterprise value and invested capital.
 
 **This is a proposal, not an approved production migration.** The first and only immediate phase is a read-only POC. Existing production fundamentals, rankings, SEC sync, P1/P2/P3 evidence, review history and database records must remain unchanged until the owner explicitly approves a later migration.
+
+## 1A. Read-only POC outcome (24 November 2026)
+
+The first POC is complete. See [US MFI external-provider POC report](US_MFI_EXTERNAL_PROVIDER_POC_2026-11-24.md).
+
+**Result: no candidate passed the free + permitted automated-access requirements.**
+
+- Investing Paths is the closest methodology fit, but its Terms of Service prohibit scraping, bulk-download and use of its data/calculated outputs to build a competing product. Do not build an adapter unless written permission explicitly authorizes the intended use.
+- Official Magic Formula Investing is free but requires registration; its registration terms limit content to personal information use and prohibit copying/redistribution/republication for commercial gain. No documented public API was identified.
+- AlphaStocks explicitly prohibits scraping/automated collection and restricts use to personal research. It is not an integration candidate under current terms.
+- Six of the 30 cohort symbols appeared in Investing Paths' visible top-25 snapshot; the other 24 were not individually resolved. They must not be labelled unranked or unsupported based on absence from the visible top 25.
+- No application data, code, database, cron, production fundamentals or rankings were changed during the POC.
+
+**Gate status:** Gate 0 completed; Gate 1 blocked; adapter implementation, shadow rollout and production cutover are not approved. The next viable action is to request written permission and a free authorized API/export from Investing Paths or official MFI. If neither is available, stop this external replacement path rather than build a prohibited scraper.
 
 ## 2. Target architecture
 
@@ -248,4 +262,4 @@ These are estimates, not commitments. They exclude waiting for provider access/p
 | Gate 4 | Approve production cutover and legacy scheduling changes |
 | Gate 5 | Approve later code/schema cleanup, if desired |
 
-**Current state:** Gate 0 is proposed. No implementation or production change is authorized by this document. The next action is to execute the read-only POC and return its evidence and recommendation for owner review.
+**Current state:** Gate 0 is completed. Gate 1 is blocked because no reviewed provider currently meets the free, permitted automated-access requirements. No adapter or production change is authorized. Review the POC report before any further work.
