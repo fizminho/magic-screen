@@ -50,7 +50,7 @@ export default function App(){
     if(!sync.ok) throw new Error(result.error||"MFI refresh failed");
    }
    const [stockResponse,pipelineResponse]=await Promise.all([
-    fetch("/api/stocks?market=US"+(force?"&refresh=1":"")),
+    fetch("/api/stocks?market=US"),
     fetch("/api/pipeline/status?market=US")
    ]);
    if(!stockResponse.ok) throw new Error("Unable to load the MFI candidate list");
