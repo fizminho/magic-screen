@@ -13,6 +13,13 @@ test("status mapping never promotes unknown wording to Halal", () => {
   for (const v of ["compliant", "", null, "halal?", "mostly halal"]) assert.equal(normalizeStatus(v), "unrecognised");
 });
 
+test("No data may be recorded without a source URL but can never pass", () => {
+  const r = ev({ musaffa: { status: "No data", checked_at: "2026-11-20", reference: null }, halalscreener: chk("Halal") });
+  assert.equal(r.decision, "excluded");
+  assert.equal(r.per_source.musaffa.fresh, false);
+  assert.match(r.per_source.musaffa.reason, /reference unavailable/);
+});
+
 test("only two fresh Halal results pass", () => {
   assert.equal(ev({ musaffa: chk("Halal"), halalscreener: chk("Halal") }).decision, "pass");
 });
