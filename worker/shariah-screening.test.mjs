@@ -59,7 +59,7 @@ test("Investing Paths: not found records cannot carry an inferred rank", () => {
 
 test("buildShortlist assigns audited states and de-duplicates the universe", () => {
   const universe = { source_url: "u", retrieved_at: "2026-11-24", tickers: ["A", "a", { symbol: "B" }, "C", "D"] };
-  const s = (symbol, source, status) => ({ symbol, source, status, checked_at: "2026-11-20" });
+  const s = (symbol, source, status) => ({ symbol, source, status, checked_at: "2026-11-20", reference: `${source} page checked manually` });
   const r = buildShortlist({
     universe, now: NOW,
     shariahChecks: [s("A", "musaffa", "Halal"), s("A", "halalscreener", "Halal"), s("B", "musaffa", "Halal"), s("B", "halalscreener", "Halal"), s("C", "musaffa", "Halal"), s("C", "halalscreener", "Doubtful")],
