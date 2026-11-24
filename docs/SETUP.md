@@ -1,14 +1,13 @@
 # Magic Screen setup
 
-## What is in this first build
+## Application overview
 
 - React + TypeScript screener UI, responsive for mobile and desktop.
 - Cloudflare Worker API and D1 cache.
-- 30 Bursa Malaysia and 30 US starter tickers. The initial universe is a curated starter list, not yet a dynamically discovered top-30-by-market-cap universe.
-- Weekday scheduled quote refresh, split by market.
-- Search, market switcher, sort and browser-session watchlist.
-- Conservative Shariah labels: all records start as **Unverified**.
-- No fabricated Magic Formula scores. Earnings Yield and Return on Capital remain blank until a reliable fundamentals source is integrated.
+- Bursa Malaysia and US market views.
+- US MFI candidate universe integration.
+- Manual Shariah-first shortlist workflow for US MFI candidates.
+- Manual Investing Paths observations; no automated collection from that provider.
 
 ## One-time Cloudflare setup
 
@@ -16,9 +15,7 @@
 
 In the Cloudflare dashboard, open **Storage & databases → D1 SQL Database** and create a database named `magic-screen-db`.
 
-Copy its database ID. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.toml` with that ID. The repository is already configured to bind the database as `DB`.
-
-The Worker creates its tables and index automatically on the first API request or scheduled refresh. You do not need to run SQL manually.
+Copy its database ID and confirm it matches the `database_id` value in `wrangler.toml`. The Worker binds the database as `DB`.
 
 ### 2. Connect GitHub for automatic deployment
 
@@ -31,27 +28,39 @@ Use these build settings:
 
 Save and deploy. Cloudflare Workers Builds can then build and deploy automatically whenever a commit is pushed to `main`. The Worker name in Cloudflare must remain `magic-screen`, matching `wrangler.toml`.
 
+A successful GitHub build or Wrangler dry-run is not proof of a successful live deployment. Verify the deployed Worker and application separately after release.
+
 ## Automatic quote refresh
 
-Two Cron Triggers run separate batches to stay within Cloudflare's per-invocation subrequest limits:
-- Bursa Malaysia: 22:17 UTC Sunday to Thursday (06:17 Malaysia time, Monday to Friday).
-- US equities: 22:47 UTC Monday to Friday (17:47 US Eastern during standard time, 18:47 during daylight time).
+The configured Cron Triggers run scheduled quote-refresh work:
+- `17 22 * * MON-FRI`
+- `47 22 * * MON-FRI`
+- `*/30 * * * *`
 
-The first quote adapter uses Yahoo Finance's chart endpoint for indicative quotes. The selected ticker universe is currently static; automatic universe discovery and Magic Formula re-ranking are future steps. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution-price feed. Provider throttling or market holidays can result in partial updates. The scheduled refresh does not fetch financial statements.
+Check the Worker implementation and Cloudflare dashboard before relying on the schedule. The first quote adapter uses Yahoo Finance's chart endpoint for indicative quotes. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution-price feed. Provider throttling or market holidays can result in partial updates.
 
-## Shariah status and Magic Formula
+## US MFI and Shariah workflow
 
-The first release intentionally does not infer Shariah compliance from a company name, sector, or ticker.
+The active US candidate universe remains sourced from Magic Formula Investing (MFI). The Shariah shortlist only includes active MFI candidates.
 
-For Bursa Malaysia, the Securities Commission Malaysia (SC) publishes the SAC list twice yearly. The latest general list available at project start is dated 29 May 2026. The SC also publishes status updates for newly listed companies. The SC dataset still needs to be mapped to Bursa tickers and imported before Malaysian rows can be labelled.
+A ticker is eligible only when both Musaffa and HalalScreener have fresh Halal results, with a checked date and source reference recorded for each provider. Doubtful, Not Halal, missing, stale, conflicting or unsupported evidence is not eligible; cases requiring clarification go to manual review.
 
-For US equities, Mizan publishes a free personal-use API covering 424 large-cap US companies and reports results under AAOIFI, Dow Jones Islamic, S&P Shariah and MSCI Islamic. Its documentation states that it is research output, not a fatwa, and that side-activity income is not yet checked. US API integration is a next step; until then, all US rows remain Unverified.
+The application supports manual JSON import and export for Shariah evidence and Investing Paths observations. Investing Paths rank, Earnings Yield, Return on Capital, fiscal period, checked date and source reference are entered manually.
 
-References:
-- Malaysia: [SC SAC list](https://www.sc.com.my/development/icm/shariah-compliant-securities/list-of-shariah-compliant-securities) and [new-listing status updates](https://www.sc.com.my/development/icm/shariah-compliant-securities/shariah-status-for-companies-seeking-listing-on-bursa-malaysia-securities-berhad).
-- US: [Mizan API documentation](https://askmizan.com/api-docs).
+These records are stored in the current browser's local storage. They do not automatically sync across devices or browsers. Export the JSON backup to preserve or move the records.
 
-Magic Formula ranking requires Earnings Yield and Return on Capital calculated from consistent, current financial statements. Those fields are not guessed from quote data. A future fundamentals provider integration should record the provider, reporting period, currency and refresh timestamp for every value.
+The application does not scrape provider websites or make automated Musaffa, HalalScreener or Investing Paths requests. Do not use old research snapshots as current evidence. Re-check provider results and dates before relying on a ticker's status.
+
+## Data-source limitations and project controls
+
+- MFI screening results define the candidate universe; they are not Investing Paths rankings.
+- Shariah status is evidence-based and manually recorded. No compliance status is inferred from a company name, ticker or sector.
+- Investing Paths observations are manually entered, not collected through automated access.
+- Gemini API integration is not approved.
+- The accounting-policy and EdgarTools production migration work is paused. Existing research artifacts may be retained, but AI task statuses are not human or policy approvals.
+- Do not add automated third-party data collection, production accounting writes, ranking changes or provider cutover without a fresh terms review and explicit owner approval.
+
+See the [US MFI masterplan](US_MFI_MASTERPLAN.md) for the current implementation checklist and release gates.
 
 ## Local development
 
@@ -64,4 +73,4 @@ The frontend can run without D1, but the live API requires the Worker runtime an
 
 ## Important
 
-This is an educational research tool, not investment advice. Prices can be delayed, incomplete or unavailable. Verify all information with the exchange, issuer filings and your broker before making investment decisions.
+This is an educational research tool, not investment advice. Prices can be delayed, incomplete or unavailable. Verify company information, provider evidence and Shariah status before making investment decisions.
