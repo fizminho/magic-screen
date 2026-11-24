@@ -3,7 +3,6 @@ import { MEMBERSHIP_DDL, SOURCE_MFI, SOURCE_FRONTEND, backfillMfiMemberships, ap
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { checkBearer, isBearerAuthorized, cooldownElapsed, withSecurityHeaders, publicErrorMessage, MFI_FORCE_COOLDOWN_MS, QUOTE_REFRESH_COOLDOWN_MS } from "./security.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
-import { runBatchPage, BATCH_STATUS } from "./gemini-batch.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { assignCombinedRanks, MINIMUM_ELIGIBLE_COHORT } from "./mfi-ranking.mjs";
 import { resolveFilingSpecificEbitCandidate } from "./filing-specific-ebit";
@@ -15,11 +14,9 @@ import { diagnoseLegacyDebtFacts } from "./legacy-debt-diagnostic.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { resolveLegacyDebtShadow } from "./legacy-debt-shadow.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
-import { parsePageParams, recordReviewDecision, listReviewHistory, listReviewDecisions, MAX_DECISION_BODY_BYTES, REVIEW_TASKS } from "./gemini-review-ledger.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
-import { runGeminiAccountingReview, listGeminiAccountingEscalations, getGeminiModelCandidates } from "./gemini-accounting-review.mjs";
 
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; GEMINI_API_KEY?: string; GEMINI_MODEL?: string; GEMINI_MIN_REQUEST_INTERVAL_MS?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
 const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";currency:string}[]> = {
   MY: [
     {symbol:"1155.KL",name:"Maybank",market:"MY",currency:"MYR"},{symbol:"1295.KL",name:"Public Bank",market:"MY",currency:"MYR"},
@@ -1294,141 +1291,6 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
         return json(await diagnoseSecExtensionFacts(env,symbol));
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC filing XBRL extension diagnostic"},503); }
-    }
-    if (url.pathname==="/api/fundamentals/edgartools/ai-review/batch" && (request.method==="GET" || request.method==="POST")) {
-      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
-      try {
-        await ensureSchema(env);
-        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (
-          symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,
-          fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,
-          provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,
-          ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))`).run();
-        const active=await env.DB.prepare("SELECT m.symbol FROM stock_master m WHERE m.market='US' AND m.listing_status='active' AND "+US_ACTIVE_UNIVERSE_SQL+" ORDER BY m.symbol").all<any>();
-        const symbolsActive=active.results.map((row:any)=>String(row.symbol));
-        const loadIssuer=async(symbol:string)=>{
-          const row=await env.DB.prepare(`SELECT e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json
-            FROM edgartools_filing_evidence e WHERE e.symbol=? AND e.market='US'
-            ORDER BY e.ingested_at DESC,e.accession_key DESC LIMIT 1`).bind(symbol).first<any>();
-          if(!row) return {state:"awaiting_evidence"};
-          if(row.provider_status!=="supported"||!row.payload_json) return {state:"unsupported"};
-          const company=JSON.parse(row.payload_json);
-          // Deterministic resolver first: only escalations it leaves unresolved are eligible for Gemini.
-          const resolver=resolveEdgarToolsEvidence(symbol,row.provider_status,row.accession,row.fiscal_period,company);
-          return {state:"supported",accession:row.accession,fiscalPeriod:row.fiscal_period,company,resolver,escalations:listGeminiAccountingEscalations(symbol,company,resolver)};
-        };
-        if (request.method==="GET") {
-          // Read-only coverage and queue status. Never exposes the API key.
-          const tasks=await env.DB.prepare("SELECT task,status,COUNT(*) AS n FROM gemini_accounting_review_cache GROUP BY task,status").all<any>().catch(()=>({results:[]} as any));
-          const plan=await runBatchPage({symbols:symbolsActive,cursor:null,loadIssuer,runReview:async()=>({}),maxNewCalls:0,maxTasks:0,dryRun:true,includeFullScope:url.searchParams.get("include_full_scope")==="1"});
-          let modelCheck:any=null;
-          if(url.searchParams.get("check_models")==="1" && env.GEMINI_API_KEY) {
-            try {
-              const res=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",{headers:{"x-goog-api-key":env.GEMINI_API_KEY}});
-              if(res.ok){
-                const body:any=await res.json();
-                const available=new Set((body.models??[]).map((m:any)=>String(m.name).replace(/^models\//,"")));
-                const configured=getGeminiModelCandidates(env.GEMINI_MODEL,(env as any).GEMINI_MODEL_FALLBACKS);
-                modelCheck={configured:configured.map((model:string)=>({model,available:available.has(model)}))};
-              } else modelCheck={error:"Model list HTTP "+res.status};
-            } catch(e){ modelCheck={error:"Model list request failed"}; }
-          }
-          return json({active_universe:symbolsActive.length,gemini_api_key_configured:!!env.GEMINI_API_KEY,gemini_model_configured:env.GEMINI_MODEL??null,model_check:modelCheck,
-            unsupported:plan.counts.UNSUPPORTED,awaiting_evidence:plan.counts.AWAITING_EVIDENCE,deterministic_only:plan.counts.SKIPPED_DETERMINISTIC,
-            issuers_with_pending_tasks:plan.issuers.filter((i:any)=>i.tasks.length>0).length,pending_tasks_planned:plan.counts.PENDING,
-            cached_reviews_by_task_status:tasks.results,coverage_note:"Unsupported and awaiting-evidence issuers remain visible and are not dropped. Quota exhaustion is never cached as a completed review.",
-            production_write:false,production_fundamentals_changed:false,rankings_changed:false});
-        }
-        const body=JSON.parse((await request.text())||"{}");
-        const dryRun=body.dry_run===true;
-        if(!dryRun && !env.GEMINI_API_KEY) return json({error:"GEMINI_API_KEY is not configured as a Worker secret"},503);
-        let selectedSymbols=symbolsActive;
-        if(body.symbols!==undefined) {
-          if(!Array.isArray(body.symbols)||body.symbols.length<1||body.symbols.length>30||
-            body.symbols.some((value:any)=>typeof value!=="string"||!/^[A-Z0-9.-]{1,15}$/.test(value.trim().toUpperCase())))
-            return json({error:"symbols must be an array of 1-30 valid ticker strings"},400);
-          const requestedValues=body.symbols as string[];
-          const requested=[...new Set(requestedValues.map((value:string)=>value.trim().toUpperCase()))];
-          const inactive=requested.filter((symbol:string)=>!symbolsActive.includes(symbol));
-          if(inactive.length) return json({error:"Requested symbols are not in the active US universe",symbols:inactive},400);
-          selectedSymbols=symbolsActive.filter((symbol:string)=>requested.includes(symbol));
-        }
-        const page=await runBatchPage({symbols:selectedSymbols,cursor:typeof body.cursor==="string"?body.cursor:null,loadIssuer,
-          runReview:(input:any)=>runGeminiAccountingReview(env,{...input,model:env.GEMINI_MODEL}),
-          maxNewCalls:Math.min(5,Math.max(1,Math.floor(Number(body.max_new_calls??2)))),
-          maxTasks:Math.min(25,Math.max(1,Math.floor(Number(body.max_tasks??12)))),
-          includeFullScope:body.include_full_scope===true,dryRun});
-        return json({...page,active_universe:symbolsActive.length,ai_review_only:true,production_write:false,production_fundamentals_changed:false,rankings_changed:false});
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini batch accounting review"},503); }
-    }
-    if (url.pathname==="/api/fundamentals/edgartools/ai-review" && (request.method==="GET" || request.method==="POST")) {
-      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
-      try {
-        await ensureSchema(env);
-        let payload:any={};
-        if(request.method==="POST") {
-          const body=await request.text();
-          if(new TextEncoder().encode(body).byteLength>4096) return json({error:"AI review request exceeds 4 KiB limit"},413);
-          payload=body?JSON.parse(body):{};
-        }
-        const symbol=String(payload.symbol??url.searchParams.get("symbol")??"").trim().toUpperCase();
-        if (!/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
-        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (
-          symbol TEXT NOT NULL,accession_key TEXT NOT NULL,market TEXT NOT NULL DEFAULT 'US',cik TEXT,accession TEXT,
-          fiscal_period TEXT,form TEXT,filed_at TEXT,reporting_currency TEXT,provider_status TEXT NOT NULL,
-          provider TEXT NOT NULL DEFAULT 'EdgarTools',provider_version TEXT,generated_at TEXT,payload_json TEXT NOT NULL,
-          ingested_at TEXT NOT NULL,PRIMARY KEY(symbol,accession_key))`).run();
-        const row=await env.DB.prepare(`SELECT e.provider_status,e.accession,e.fiscal_period,e.form,e.payload_json
-          FROM edgartools_filing_evidence e
-          WHERE e.symbol=? AND e.market='US'
-          ORDER BY e.ingested_at DESC,e.accession_key DESC LIMIT 1`).bind(symbol).first<any>();
-        if (!row || row.provider_status!=="supported" || !row.payload_json) return json({symbol,status:"evidence_unavailable",escalations:[],note:"No supported EdgarTools annual filing evidence is available."},404);
-        const company=JSON.parse(row.payload_json);
-        const resolver=resolveEdgarToolsEvidence(symbol,row.provider_status,row.accession,row.fiscal_period,company);
-        if (request.method==="GET" || payload.preview===true) {
-          return json({symbol,accession:row.accession,fiscal_period:row.fiscal_period,resolver_status:resolver.overall_status,
-            escalations:listGeminiAccountingEscalations(symbol,company,resolver),
-            production_write:false,production_fundamentals_changed:false,rankings_changed:false,
-            note:"Preview only. Gemini is called only for explicitly unresolved accounting interpretation tasks."});
-        }
-        if (!env.GEMINI_API_KEY) return json({error:"GEMINI_API_KEY is not configured as a Worker secret"},503);
-        const task=String(payload.task??"");
-        return json(await runGeminiAccountingReview(env,{symbol,accession:row.accession,fiscalPeriod:row.fiscal_period,
-          company,resolver,task,model:env.GEMINI_MODEL}));
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools + Gemini accounting review"},503); }
-    }
-    if ((url.pathname==="/api/fundamentals/edgartools/ai-review/history" && request.method==="GET")
-      || (url.pathname==="/api/fundamentals/edgartools/ai-review/decisions" && (request.method==="GET" || request.method==="POST"))) {
-      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
-      // Audit ledger only: touches gemini_accounting_review_* tables, never production fundamentals or rankings.
-      const audit={production_write:false,production_fundamentals_changed:false,rankings_changed:false};
-      try {
-        const isDecisions=url.pathname.endsWith("/decisions");
-        if (request.method==="POST") {
-          const body=await request.text();
-          if(new TextEncoder().encode(body).byteLength>MAX_DECISION_BODY_BYTES) return json({error:"Decision request exceeds 8 KiB limit"},413);
-          let payload:any; try { payload=JSON.parse(body||"{}"); } catch { return json({error:"Invalid JSON body"},400); }
-          const result:any=await recordReviewDecision(env,payload);
-          return result.ok ? json({...result.decision,...audit},201) : json({error:result.error},result.status);
-        }
-        const page:any=parsePageParams(url.searchParams);
-        if(!page.ok) return json({error:page.error},400);
-        const symbolParam=url.searchParams.get("symbol");
-        const symbol=symbolParam?symbolParam.trim().toUpperCase():null;
-        if(symbol && !/^[A-Z0-9.-]{1,15}$/.test(symbol)) return json({error:"A valid US ticker symbol is required"},400);
-        const task=url.searchParams.get("task");
-        if(task && !REVIEW_TASKS.has(task)) return json({error:"Unsupported accounting review task"},400);
-        const cacheKey=url.searchParams.get("cache_key");
-        if(cacheKey && !/^[0-9a-f]{64}$/.test(cacheKey)) return json({error:"cache_key must be a 64-character hex key"},400);
-        const rows=isDecisions
-          ? await listReviewDecisions(env,{symbol,task,cacheKey,limit:page.limit,offset:page.offset})
-          : await listReviewHistory(env,{symbol,task,limit:page.limit,offset:page.offset});
-        return json({[isDecisions?"decisions":"history"]:rows,limit:page.limit,offset:page.offset,
-          reviewer_identity_verified:false,...audit});
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini accounting review audit ledger"},503); }
-    }
-    if (url.pathname==="/api/ai/fundamentals/extract" && request.method==="POST") {
-      return json({error:"This legacy Company Facts tag-discovery endpoint is retired. Use /api/fundamentals/edgartools/ai-review for cached, ambiguity-only review."},410);
     }
     if (url.pathname==="/api/mfi/screen") {
       try {
