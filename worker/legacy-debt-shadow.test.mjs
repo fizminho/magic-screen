@@ -139,7 +139,7 @@ testCase("endpoint is authenticated, shadow-only and never writes", () => {
   assert.ok(end > start);
   const block = src.slice(start, end);
   assert.match(block, /UNIVERSE_SYNC_TOKEN/);
-  assert.match(block, /Unauthorized[\s\S]*401|401/);
+  assert.match(block, /checkBearer\(request,\s*env\.UNIVERSE_SYNC_TOKEN\)[\s\S]*authFailure\.status/);
   assert.match(block, /production_write:false/);
   assert.match(block, /rankings_changed:false/);
   assert.doesNotMatch(block, /\b(?:INSERT|UPDATE|DELETE|REPLACE)\b|\.run\(|\.batch\(/i);

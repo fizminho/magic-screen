@@ -61,9 +61,9 @@ This is a workflow decision, not authorization to change production data or rank
 | Gate | Requirement | Current status |
 |---|---|---|
 | A. Source universe | Confirm current MFI ticker retrieval and provenance | Existing source retained; implementation review pending |
-| B. Shariah filter | Define source status mapping, freshness and conflict handling | Design approved; implementation pending |
-| C. Investing Paths validation | Manual-only validation with auditable observations | Approved approach; implementation pending |
-| D. Screener presentation | Display eligible shortlist and validation provenance | Not started |
+| B. Shariah filter | Define source status mapping, freshness and conflict handling | Offline logic + tests implemented (`worker/shariah-screening.mjs`); not wired to production |
+| C. Investing Paths validation | Manual-only validation with auditable observations | Offline record validator + tests implemented; data entry is manual |
+| D. Screener presentation | Display eligible shortlist and validation provenance | Static personal report implemented (`scripts/build_shariah_shortlist.mjs`); in-app InvestLah display not started |
 | E. Gemini | No automated Investing Paths collection; manual-input assistance only if terms allow | API integration not approved |
 | F. Release | Tests, review, rollback and explicit owner approval | Not approved |
 

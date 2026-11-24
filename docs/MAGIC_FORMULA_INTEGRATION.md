@@ -36,3 +36,7 @@ After the secret is saved and the Worker deployment is live, request:
 `/api/mfi/screen?minimumMarketCap=50&select30=true`
 
 A successful response includes `imported`, `stocks`, `priceDate`, and `quarterDate`. A missing or expired session returns an explanatory error.
+
+## Forced refresh rate limit
+
+`force=1` from an anonymous caller is throttled for 15 minutes after the last successful sync; inside that window the cached result is returned. Failed upstream attempts are not separately persisted yet, so this is not a complete attempt-based rate limit. Configure a Cloudflare WAF rate-limiting rule as an additional control. A valid bearer token bypasses the application cooldown. See `SECURITY.md`.

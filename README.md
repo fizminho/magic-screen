@@ -93,3 +93,7 @@ Additional technical notes:
 - Workers Cron Triggers
 
 **US MFI market-cap provenance:** Full-universe EdgarTools runs take market caps from the same refreshed Magic Formula Investing response as the active ticker list, use its quote date for FX alignment, and validate every active symbol before ranking. The pinned 18 November 2026 map is regression-only; custom maps replace it without filling missing tickers from stale values.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for secrets, route access model and hardening notes.
