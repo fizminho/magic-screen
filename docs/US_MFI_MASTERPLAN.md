@@ -60,10 +60,10 @@ This is a workflow decision, not authorization to change production data or rank
 
 | Gate | Requirement | Current status |
 |---|---|---|
-| A. Source universe | Confirm current MFI ticker retrieval and provenance | Existing source retained; implementation review pending |
-| B. Shariah filter | Define source status mapping, freshness and conflict handling | Offline logic + tests implemented (`worker/shariah-screening.mjs`); not wired to production |
-| C. Investing Paths validation | Manual-only validation with auditable observations | Offline record validator + tests implemented; data entry is manual |
-| D. Screener presentation | Display eligible shortlist and validation provenance | Static personal report implemented (`scripts/build_shariah_shortlist.mjs`); in-app InvestLah display not started |
+| A. Source universe | Confirm current MFI ticker retrieval and provenance | Existing MFI source retained; screener shortlist uses only active MFI memberships. No source replacement. [PR #84](https://github.com/fizminho/magic-screen/pull/84) |
+| B. Shariah filter | Define source status mapping, freshness and conflict handling | Dual-source fresh-Halal gate, conflict handling, required source references and tests implemented; wired to the personal screener view. [PR #74](https://github.com/fizminho/magic-screen/pull/74) [PR #84](https://github.com/fizminho/magic-screen/pull/84) |
+| C. Investing Paths validation | Manual-only validation with auditable observations | Manual JSON import/validation, rank/EY/ROC/fiscal period/date/reference fields, local browser persistence and export backup implemented. No automated collection. [PR #84](https://github.com/fizminho/magic-screen/pull/84) |
+| D. Screener presentation | Display eligible shortlist and validation provenance | In-app Shariah shortlist tab implemented with separate eligibility states, per-source status/date/reference, manual Investing Paths observations and explanatory review reasons. Records stay in browser local storage. [PR #84](https://github.com/fizminho/magic-screen/pull/84) |
 | E. Gemini | No automated Investing Paths collection; manual-input assistance only if terms allow | API integration not approved |
 | F. Release | Tests, review, rollback and explicit owner approval | Not approved |
 
@@ -111,32 +111,32 @@ Maintain the existing US MFI ticker source and build a transparent personal-use 
 - [x] Retain MFI as the source of the ticker universe.
 - [x] Make manual Investing Paths validation the interim approved approach.
 - [x] Block Gemini/API/browser automation for Investing Paths collection unless both Google terms and source-site permissions are re-reviewed and allow it.
-- [ ] Inspect the current MFI ingestion path and identify the smallest safe reuse point; do not alter its behaviour yet.
-- [ ] Inspect existing Shariah status data/source integrations and document freshness, source provenance and missing/conflict behaviour.
-- [ ] Confirm how manual Investing Paths observations can be stored without scraping or changing production ranking fields.
+- [x] Inspect the current MFI ingestion path and reuse active MFI membership only; no source or production ranking behaviour changed.
+- [x] Inspect the legacy single-field Shariah status and replace its use in the Shariah tab with the dual-source fresh-status gate, explicit references and conflict/review states.
+- [x] Confirm manual Investing Paths records can be stored in browser local storage with JSON import/export, without scraping, Worker writes or production ranking fields.
 
 ### P1. Implement Shariah-first shortlist (separate from production ranking)
 
-- [ ] Define explicit status mapping for Musaffa and HalalScreener: Halal, Doubtful, Not Halal, No Data, stale and source conflict.
-- [ ] Pass only confirmed Halal tickers to the active candidate shortlist; keep all other statuses visible in a separate excluded/review list.
-- [ ] Preserve each provider's individual result, checked timestamp and source reference; do not collapse conflicting results into a false consensus.
-- [ ] Add tests for missing, stale, conflicting and non-Halal statuses.
-- [ ] Do not assume automated API or bulk access is permitted; verify current provider terms and available permissions before implementing integrations.
+- [x] Define explicit status mapping for Musaffa and HalalScreener: Halal, Doubtful, Not Halal, No Data, unrecognised, stale and source conflict.
+- [x] Pass only two-source fresh Halal tickers to the eligible shortlist; expose excluded, incomplete and manual-review states separately.
+- [x] Preserve each provider's individual status, checked timestamp and required manual source reference; conflicts remain review-only.
+- [x] Add regression tests for missing references, stale/future dates, conflicts, No Data, unknown wording and non-Halal statuses.
+- [x] Keep provider integrations out of scope; use owner-entered records only until current terms and permissions explicitly allow otherwise.
 
 ### P1. Manual Investing Paths validation
 
-- [ ] Create a small manual validation record for each Shariah-passing ticker.
-- [ ] Capture rank, EY, ROC, fiscal period and checked date only when actually observed.
-- [ ] Support Not Checked, Not Found, Verified and Needs Recheck states; never infer ranking from absence in a partial page view.
+- [x] Create a manual Investing Paths observation record for each candidate the owner chooses to validate.
+- [x] Capture rank, EY, ROC, fiscal period and checked date only when actually observed.
+- [x] Support Not Checked, Not Found and Verified states; invalid or absent observations stay Not Checked, and absence is never inferred as unranked. Needs Recheck remains a future refinement.
 - [ ] Keep a source URL/reference and an audit trail for who/when verified the observation.
 - [ ] Do not implement scraping, crawling, automated browser access, proxy/rate-limit evasion or AI-mediated collection.
 
 ### P2. Screener UX and release
 
-- [ ] Present MFI ticker, source provenance, Shariah statuses by provider, eligibility decision and manual Investing Paths validation.
-- [ ] Make excluded/review states explainable; avoid silently hiding unknown or stale statuses.
+- [x] Present MFI ticker, per-provider status/date/reference, eligibility decision and manual Investing Paths validation.
+- [x] Show excluded/review states and reasons; unknown, stale and conflicting records cannot pass.
 - [ ] Keep the legacy accounting/valuation lane separate and label it as research/shadow only.
-- [ ] Add tests for eligibility filtering, provenance, stale data and manual-validation states.
+- [x] Add tests for eligibility filtering, required provenance, stale data and manual-validation states.
 - [ ] Run CI and verify that production fundamentals, rankings, cron and database records are unchanged.
 - [ ] Release only after explicit owner approval and a rollback plan.
 
@@ -258,12 +258,13 @@ Owner approval required before implementation can change shadow assumptions or p
 
 ## Next implementation sequence
 
-1. Inspect the current MFI ticker ingestion and existing Shariah data paths; identify reuse points without changing production behaviour.
-2. Implement and test the Shariah-first candidate filter with source-specific statuses, freshness and conflict handling.
-3. Add a manual Investing Paths verification workflow and audit record. No automated collection.
-4. Update the screener UI to show eligible candidates and excluded/review states with provenance.
-5. Run CI and verify production fundamentals, rankings, scheduled jobs and database state are unchanged. Request explicit owner approval before release.
-6. Keep the accounting-policy and EdgarTools production migration work paused unless the owner explicitly resumes it.
+1. [x] Inspect MFI ingestion and reuse only active MFI memberships.
+2. [x] Implement and test dual-source Shariah eligibility, freshness, provenance and conflict handling.
+3. [x] Add manual Investing Paths JSON import/validation and local browser backup/export.
+4. [x] Integrate the Shariah shortlist and review states into the screener UI.
+5. [x] Pass build, Node regression, MFI policy tests, syntax checks and Wrangler dry-run on [PR #84](https://github.com/fizminho/magic-screen/pull/84). No database migration, production ranking write or provider automation was added.
+6. [ ] Verify the live app after the repository's deployment mechanism completes; release sign-off remains separate.
+7. Keep the accounting-policy and EdgarTools production migration work paused unless the owner explicitly resumes it.
 
 ## Change-control rules for future agents
 
