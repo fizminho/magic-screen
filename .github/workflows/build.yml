@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,6 +17,9 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
+      - name: Audit production dependencies (advisory)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
       - name: Run complete Node regression suite
         run: node --experimental-strip-types --test worker/*.test.mjs scripts/test_build_lease_rou_coverage_report.mjs
       - name: Run US MFI policy sensitivity regression tests
