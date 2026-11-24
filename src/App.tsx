@@ -82,7 +82,7 @@ export default function App(){
   const tickerList=universe.map(s=>({ticker:s.symbol,company_name:s.name}));
   const prompt=[
    "You are assisting with PERSONAL Shariah stock research. Research only the tickers supplied below.",
-   "For every ticker, check both Musaffa and HalalScreener using only access and methods permitted by each service. Do not bypass login, paywalls, CAPTCHAs, rate limits or access controls. Do not scrape or bulk-extract restricted pages. If you cannot lawfully verify a source, return No data and explain why.",
+   "For every ticker, check both Musaffa and HalalScreener only if their current terms permit AI or automated research access. If those terms do not permit it, do not access that source; return No data and explain that a manual check is required. Never bypass login, paywalls, CAPTCHAs, rate limits or access controls. Do not scrape or bulk-extract restricted pages.",
    "Return exactly two shariahChecks records per ticker: source musaffa and source halalscreener. Use the exact displayed status: Halal, Doubtful, Not Halal, or No data. Include checked_at (YYYY-MM-DD), direct source URL in reference, methodology, latest financial period, non-compliant income %, interest-bearing debt %, interest-bearing assets %, evidence and limitations when available.",
    "Never guess, infer or calculate a missing status or ratio. Use null for unavailable numeric/text fields. Do not substitute Mizan or any other provider. Do not research Investing Paths. I will check Investing Paths separately and enter those observations manually.",
    "Return ONLY valid JSON, without Markdown fences or commentary. Use this exact structure:",
@@ -107,7 +107,8 @@ export default function App(){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(item.checked_at||"")||Number.isNaN(Date.parse(item.checked_at)))throw new Error("Invalid checked_at date for "+item.symbol);
     if(typeof item.reference!=="string"||!/^https?:\/\//i.test(item.reference))throw new Error("A direct HTTP(S) source reference is required for "+item.symbol);
    }
-   const preview=buildShortlist({universe:{tickers:universe},shariahChecks:parsed.shariahChecks,ipObservations:parsed.ipObservations,now:Date.now()});
+   if(parsed.ipObservations.length)throw new Error("AI JSON must not contain Investing Paths observations. Record those manually in the app.");
+   const preview=buildShortlist({universe:{tickers:universe},shariahChecks:parsed.shariahChecks,ipObservations:[],now:Date.now()});
    setManual({shariahChecks:parsed.shariahChecks,ipObservations:parsed.ipObservations});
    setMessage(`Imported ${parsed.shariahChecks.length} provider checks. ${preview.ignored_invalid_shariah_records.length+preview.ignored_invalid_investing_paths_records.length} records need correction.`);
    setPasteOpen(false);setJsonText("");
