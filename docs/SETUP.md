@@ -13,7 +13,6 @@
 1. Create or use the D1 database named `magic-screen-db`.
 2. Confirm its ID matches `wrangler.toml`.
 3. Configure the Worker secret `MFI_SESSION_COOKIE` with the owner's authenticated Magic Formula Investing session cookie.
-4. Optionally configure `UNIVERSE_SYNC_TOKEN` if the owner wants to bypass the public MFI refresh cooldown.
 5. Connect the GitHub repository to Cloudflare Workers Builds.
 
 Build command:
@@ -32,7 +31,7 @@ A successful GitHub build or Wrangler dry-run is not proof of a live deployment.
 
 ## MFI workflow
 
-The app reads the cached MFI ticker universe from `GET /api/stocks`. Use **Refresh MFI** to request a fresh screen. The Worker caches successful MFI results for six hours and applies a 15-minute cooldown to anonymous forced refreshes.
+The app reads the cached MFI ticker universe from `GET /api/stocks`. Use **Refresh MFI** to request a fresh screen. The Worker caches successful MFI results for six hours and applies a 15-minute cooldown to forced refreshes.
 
 See [MFI integration](MAGIC_FORMULA_INTEGRATION.md) for session setup and endpoint details.
 
