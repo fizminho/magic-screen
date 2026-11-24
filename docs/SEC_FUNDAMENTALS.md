@@ -26,7 +26,7 @@ The SEC data is not a pre-calculated Magic Formula ranking. The Worker calculate
 
 ## Endpoint
 
-`GET /api/fundamentals/sync?limit=10`
+`GET /api/fundamentals/sync?limit=10` (requires `Authorization: Bearer $UNIVERSE_SYNC_TOKEN`)
 
 - `limit`: number of companies to process in a request, capped at 10. This endpoint remains available for controlled/manual diagnostics, but the UI does not call it during normal page loads.
 - `GET /api/fundamentals/status` reports total MFI candidates, calculated companies, unmapped tickers, incomplete facts, provider errors, and the latest update time.
