@@ -1,14 +1,7 @@
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
-// @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { MEMBERSHIP_DDL, SOURCE_MFI, backfillMfiMemberships, applyMfiSelection, invalidateUsRanks } from "./universe-membership.mjs";
+import { isBearerAuthorized, cooldownElapsed, withSecurityHeaders, publicErrorMessage, MFI_FORCE_COOLDOWN_MS } from "./security.mjs";
 
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; } { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 let membershipReady=false;
 async function ensureMembershipSchema(env: Env) {
@@ -30,6 +23,7 @@ async function ensureSchema(env: Env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS stock_master (symbol TEXT NOT NULL, market TEXT NOT NULL, company_name TEXT NOT NULL, currency TEXT NOT NULL, exchange TEXT, sector TEXT, listing_status TEXT NOT NULL DEFAULT 'active', source TEXT NOT NULL, source_updated_at TEXT NOT NULL, PRIMARY KEY(symbol,market))").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_stock_master_market_name ON stock_master(market,company_name)").run();
   await ensureMembershipSchema(env);
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS mfi_screening_meta (id INTEGER PRIMARY KEY CHECK(id=1), minimum_market_cap INTEGER NOT NULL, selected_count INTEGER NOT NULL, result_count INTEGER NOT NULL, source_updated_at TEXT NOT NULL, price_date TEXT, quarter_date TEXT)").run();
 }
 async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true, forceRefresh=false) {
   await ensureSchema(env);
