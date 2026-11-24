@@ -36,3 +36,7 @@ After the secret is saved and the Worker deployment is live, request:
 `/api/mfi/screen?minimumMarketCap=50&select30=true`
 
 A successful response includes `imported`, `stocks`, `priceDate`, and `quarterDate`. A missing or expired session returns an explanatory error.
+
+## Forced refresh rate limit
+
+`force=1` from an anonymous caller is honoured at most once per 15 minutes; inside that window the cached result is returned. A valid bearer token bypasses the limit. See `SECURITY.md`.
