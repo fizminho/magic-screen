@@ -1,7 +1,9 @@
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { MEMBERSHIP_DDL, SOURCE_MFI, backfillMfiMemberships, applyMfiSelection, invalidateUsRanks } from "./universe-membership.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { isBearerAuthorized, cooldownElapsed, withSecurityHeaders, publicErrorMessage, MFI_FORCE_COOLDOWN_MS } from "./security.mjs";
 
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; } { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 let membershipReady=false;
 async function ensureMembershipSchema(env: Env) {
@@ -27,7 +29,7 @@ async function ensureSchema(env: Env) {
 }
 async function syncMagicFormulaUniverse(env: Env, minimumMarketCap=50, select30=true, forceRefresh=false) {
   await ensureSchema(env);
-  await env.DB.prepare("CREATE TABLE IF NOT EXISTS mfi_screening_meta (id INTEGER PRIMARY KEY CHECK(id=1), minimum_market_cap INTEGER NOT NULL, selected_count INTEGER NOT NULL, result_count INTEGER NOT NULL, source_updated_at TEXT NOT NULL, price_date TEXT, quarter_date TEXT)").run();
+
 
   // Reuse the last successful MFI result for six hours when the screen settings match.
   // This avoids a login/session round-trip every time someone opens the screener.
