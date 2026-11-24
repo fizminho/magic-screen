@@ -36,7 +36,7 @@ function ageDays(checkedAt, now) {
 export function assessSourceCheck(check, now, maxAgeDays) {
   if (!check) return { status: "unchecked", fresh: false, reason: "not checked" };
   const status = normalizeStatus(check.status);
-  if (typeof check.reference !== "string" || !check.reference.trim()) return { status, fresh: false, reason: "missing source reference" };
+  if (typeof check.reference !== "string" || !check.reference.trim()) return { status, fresh: false, reason: status === "no_data" ? "source reference unavailable" : "missing source reference" };
   const age = ageDays(check.checked_at, now);
   if (age === null) return { status, fresh: false, reason: "missing or invalid checked date" };
   if (age < 0) return { status, fresh: false, reason: "checked date is in the future" };
