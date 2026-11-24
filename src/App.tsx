@@ -116,6 +116,10 @@ export default function App(){
  }
  function saveIp(){
   if(!ipSymbol||!ipReference.trim()||!/^https?:\/\//i.test(ipReference)) {setMessage("Select a ticker and enter the Investing Paths page URL.");return;}
+  if(ipFound&&[ipRank,ipEy,ipRoc,ipYear,ipPeriod].every(v=>!v.trim())){setMessage("Enter at least one visible Investing Paths value.");return;}
+  if(ipRank&&(!Number.isInteger(Number(ipRank))||Number(ipRank)<1)){setMessage("Rank must be a positive whole number.");return;}
+  if(ipYear&&(!Number.isInteger(Number(ipYear))||Number(ipYear)<1990)){setMessage("Enter a valid fiscal year.");return;}
+  if([ipEy,ipRoc].some(v=>v.trim()&&!Number.isFinite(Number(v)))){setMessage("EY and ROC must be valid numbers.");return;}
   const observation:CheckRecord={symbol:ipSymbol,collection_method:"manual",manually_verified:true,found:ipFound,checked_at:ipDate,source_reference:ipReference.trim()};
   if(ipFound)Object.assign(observation,{rank:ipRank===""?null:Number(ipRank),earnings_yield:ipEy===""?null:Number(ipEy),return_on_capital:ipRoc===""?null:Number(ipRoc),fiscal_year:ipYear===""?null:Number(ipYear),fiscal_period:ipPeriod||null});
   setManual(old=>({...old,ipObservations:[...old.ipObservations.filter(x=>String(x.symbol).toUpperCase()!==ipSymbol),observation]}));
