@@ -357,3 +357,27 @@
 .mfi-exclusion-reasons{display:block;color:#a7b3c7;font-size:10px;line-height:1.6;max-width:760px}
 
 .mfi-reconciliation{margin-top:12px}.mfi-reconciliation .preview-cohort-note{margin:10px 0;color:#aab7ca;font-size:11px;line-height:1.6}.mfi-reconciliation .preview-table{min-width:900px}.mfi-reconciliation .preview-table td{white-space:nowrap}
+
+
+/* Manual, local-only Shariah-first screener */
+.shariah-panel{margin:0 0 18px;padding:18px;border:1px solid #33435c;border-radius:10px;background:#111a2b}
+.shariah-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.shariah-panel-head h3{margin:5px 0;color:#edf3fb;font:700 17px Manrope,sans-serif}
+.shariah-panel-head p{max-width:690px;margin:0;color:#9ba9c0;font-size:11px;line-height:1.6}
+.shariah-actions,.shariah-modal-actions{display:flex;gap:8px;flex-wrap:wrap}
+.shariah-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:16px 0}
+.shariah-summary>div{padding:12px;border:1px solid #2b3951;border-radius:7px;background:#0d1627}
+.shariah-summary b{display:block;color:#dff5c7;font:700 22px "DM Mono",monospace}
+.shariah-summary span{display:block;margin-top:4px;color:#91a1ba;font-size:9px}
+.shariah-filter-row{display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.shariah-filter-row label{display:flex;align-items:center;gap:9px;color:#91a1ba;font-size:10px}
+.shariah-filter-row select{height:36px;padding:0 10px;border:1px solid #34445e;border-radius:6px;background:#0b1426;color:#e8eef8;font:11px "DM Sans"}
+.shariah-filter-row>span,.shariah-local-note{color:#8292ac;font-size:9px}
+.shariah-local-note{display:block;margin-top:12px;line-height:1.5}
+.shariah-import-dialog{width:min(100%,720px);max-height:90vh;overflow:auto}
+.shariah-modal-actions{margin:12px 0}
+.shariah-modal-actions .csv-upload{margin:0;min-width:170px;padding:10px}
+.shariah-json{display:block;width:100%;min-height:260px;max-height:45vh;resize:vertical;margin:12px 0;padding:12px;border:1px solid #34445e;border-radius:7px;background:#0b1426;color:#dce7f7;font:11px/1.5 ui-monospace,SFMono-Regular,monospace}
+.shariah-cell{min-width:150px;color:#dce7f7;font-size:10px}
+.shariah-cell small{display:block;margin-top:4px;color:#8798b2;font-size:9px}
+@media(max-width:760px){.shariah-panel-head{display:block}.shariah-actions{margin-top:14px}.shariah-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.shariah-filter-row{align-items:flex-start}.shariah-filter-row label{width:100%;justify-content:space-between}.shariah-filter-row select{max-width:65%}}

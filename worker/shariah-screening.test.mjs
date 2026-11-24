@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { normalizeStatus, evaluateShariah, validateInvestingPathsObservation, buildShortlist, renderReportHtml } from "./shariah-screening.mjs";
 
 const NOW = Date.parse("2026-11-24T00:00:00Z");
-const chk = (status, checked_at = "2026-11-20") => ({ status, checked_at });
+const chk = (status, checked_at = "2026-11-20") => ({ status, checked_at, reference: "manual source page" });
 const ev = (checks, opts = {}) => evaluateShariah("x", checks, { now: NOW, ...opts });
 
 test("status mapping never promotes unknown wording to Halal", () => {
@@ -59,7 +59,7 @@ test("Investing Paths: not found records cannot carry an inferred rank", () => {
 
 test("buildShortlist assigns audited states and de-duplicates the universe", () => {
   const universe = { source_url: "u", retrieved_at: "2026-11-24", tickers: ["A", "a", { symbol: "B" }, "C", "D"] };
-  const s = (symbol, source, status) => ({ symbol, source, status, checked_at: "2026-11-20" });
+  const s = (symbol, source, status) => ({ symbol, source, status, checked_at: "2026-11-20", reference: `${source} page checked manually` });
   const r = buildShortlist({
     universe, now: NOW,
     shariahChecks: [s("A", "musaffa", "Halal"), s("A", "halalscreener", "Halal"), s("B", "musaffa", "Halal"), s("B", "halalscreener", "Halal"), s("C", "musaffa", "Halal"), s("C", "halalscreener", "Doubtful")],
@@ -88,4 +88,9 @@ test("duplicate Shariah source records never auto-pass", () => {
   const r = buildShortlist({ universe: { tickers: ["DUP"] }, now: NOW, shariahChecks: [row("musaffa"), row("musaffa"), row("halalscreener")] });
   assert.notEqual(r.rows[0].state, "eligible_validated");
   assert.equal(r.ignored_invalid_shariah_records.length, 1);
+});
+
+test("Shariah checks without a manual source reference cannot pass", () => {
+  const missing = { status: "Halal", checked_at: "2026-11-20" };
+  assert.equal(ev({ musaffa: { ...missing, reference: "Musaffa page" }, halalscreener: missing }).decision, "excluded");
 });
