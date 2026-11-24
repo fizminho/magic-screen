@@ -1,62 +1,47 @@
 # Magic Screen
 
-A Cloudflare-first stock research dashboard for Bursa Malaysia and US equities.
+A lightweight, personal US stock research app built around one workflow:
 
-## Current capabilities
+**MFI tickers → Musaffa + HalalScreener research → Shariah validation → manual Investing Paths ranking.**
 
-- Responsive React + TypeScript screener
-- Bursa Malaysia and US market views
-- US candidate universe sourced from the authenticated Magic Formula Investing (MFI) screener
-- Quote snapshots cached in Cloudflare D1
-- Search, sort, market switcher and watchlist
-- Shariah-first US shortlist with separate eligible, review and excluded states
-- Copyable AI research prompt and paste-only JSON import for Shariah evidence
-- Manual Investing Paths observations with rank, Earnings Yield, Return on Capital, fiscal period, checked date and source reference
+## What it does
 
-## US MFI and Shariah workflow
+- Gets the US candidate ticker universe from Magic Formula Investing (MFI).
+- Copies the current ticker list with a ready-to-use AI research prompt.
+- Accepts AI results as pasted JSON. No file upload or download.
+- Requires fresh Halal results from both Musaffa and HalalScreener before a ticker passes.
+- Flags missing, stale, doubtful or conflicting evidence for review.
+- Lets the owner record Investing Paths rank, Earnings Yield, Return on Capital, fiscal period, checked date and source URL manually.
+- Saves research records in this browser's local storage.
 
-1. The active US candidate universe remains sourced from MFI. The Shariah shortlist only includes active MFI candidates.
-2. A ticker is eligible only when both Musaffa and HalalScreener have a fresh Halal result and each check includes its checked date and source reference.
-3. Doubtful, Not Halal, missing, stale, conflicting or unsupported evidence is not eligible. Cases requiring clarification are routed to manual review.
-4. Investing Paths ranking observations are entered manually. The screener records rank, Earnings Yield, Return on Capital, fiscal period, checked date and source reference.
-5. Shariah evidence and manual ranking observations are stored in the current browser's local storage. Copy/paste is the only import/export workflow; records do not automatically sync between devices.
+## Daily workflow
 
-The app does not scrape provider sites or make automated Musaffa, HalalScreener or Investing Paths requests. AI research is performed outside the app with a user-copied prompt; the app does not require a Gemini account, Gemini API key or any LLM integration. Do not treat old research snapshots as current screening evidence. Re-check provider results and dates before relying on a ticker's status.
+1. Open the Shariah shortlist and refresh the MFI universe when needed.
+2. Tap **Copy tickers + AI prompt** and paste it into an AI assistant.
+3. Ask the assistant to return the requested JSON using permitted source access only.
+4. Copy the JSON response and paste it into Magic Screen.
+5. Review the source evidence and import the records.
+6. Manually check eligible tickers on Investing Paths and record the visible ranking details.
 
-## Data sources and limitations
+## Important boundaries
 
-- **US candidate list:** Magic Formula Investing. MFI screening results define the candidate universe; they are not the Investing Paths ranking.
-- **Shariah evidence:** Musaffa and HalalScreener, recorded manually with provenance. No compliance status is inferred from a company name, ticker or sector.
-- **Investing Paths observations:** manually recorded research values; not collected through automated access.
-- **US financial statements:** SEC EDGAR is the underlying filing source. EdgarTools research and accounting validation remain a separate, paused migration lane; production ranking cutover is not approved.
-- **Quotes:** Yahoo Finance's unofficial chart endpoint, provided on a best-effort basis without an uptime or usage guarantee.
-- **Bursa Malaysia universe:** imported through the protected universe-import endpoint. Verify listing data against Bursa sources.
+- The app has no user login, Gemini integration, LLM API key, or paid screening API.
+- The owner must configure the MFI session cookie once as a Cloudflare Worker secret. It is never sent to the browser.
+- AI access to Musaffa and HalalScreener must follow each provider's current terms. If AI/automated access is not permitted, the assistant must not access that source and should return No data for manual follow-up.
+- Investing Paths checks remain manual. No scraping, browser automation, bulk extraction or AI collection.
+- Shariah research is not a fatwa or investment advice. Verify evidence before relying on a result.
+- Records are local to the current browser and do not sync across devices. There is no file-based import/export.
 
-The screener is a research aid, not investment advice. Verify current filings, provider evidence and Shariah status before making an investment decision.
+## Data and privacy
 
-## Research and implementation status
+No AI provider receives an API key from this app. The prompt is copied to the user's chosen AI assistant only after the user taps the copy button. Pasted results are stored locally in the browser. The app does not send Shariah records to a server.
 
-- The Shariah-first manual workflow and screener UI are implemented; see the [US MFI masterplan](docs/US_MFI_MASTERPLAN.md).
-- The external-provider evaluation found no provider approved for automated production use under the current free-only and permitted-access requirements. See the [replacement plan](docs/US_MFI_EXTERNAL_PROVIDER_REPLACEMENT_PLAN.md) and [read-only POC report](docs/US_MFI_EXTERNAL_PROVIDER_POC_2026-11-24.md).
-- No LLM API integration or AI account is required. Do not add automated collection, scraping, or third-party ranking-site access without reviewing current terms and obtaining any required permission.
-- The accounting-policy and EdgarTools production migration work is paused. Existing research artifacts and tests are retained, but AI task statuses are not human or policy approvals.
-- Repository CI and Wrangler dry-run do not prove that the live application has deployed. Live deployment verification and release sign-off remain separate gates.
+## Deployment
 
-## Technical notes
-
-- [Cloudflare setup](docs/SETUP.md)
-- [Intentional design decisions](docs/INTENTIONAL_DESIGN_DECISIONS.md)
-- [EdgarTools provider decision and rollout](docs/EDGARTOOLS_PROVIDER.md)
-- [SEC fundamentals pipeline](docs/SEC_FUNDAMENTALS.md)
-- [Magic Formula Investing integration](docs/MAGIC_FORMULA_INTEGRATION.md)
-- [Stock universe and Bursa import](docs/STOCK_UNIVERSE.md)
-- [Security](SECURITY.md)
-
-## Stack
-
-- React, TypeScript, Vite
+- React + TypeScript + Vite
 - Cloudflare Workers Static Assets
-- Cloudflare D1
-- Workers Cron Triggers
+- Cloudflare D1 for the MFI ticker cache
 
-**Important:** Do not enable automated third-party data collection, production accounting writes, ranking changes or provider cutover without a fresh terms review and explicit owner approval.
+See [setup](docs/SETUP.md), [MFI integration](docs/MAGIC_FORMULA_INTEGRATION.md), [provider access policy](docs/PROVIDER_ACCESS_POLICY.md), and [security](SECURITY.md).
+
+Research tool only. Not investment advice.

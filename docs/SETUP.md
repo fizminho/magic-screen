@@ -1,76 +1,62 @@
 # Magic Screen setup
 
-## Application overview
+## Architecture
 
-- React + TypeScript screener UI, responsive for mobile and desktop.
+- React + TypeScript + Vite frontend.
 - Cloudflare Worker API and D1 cache.
-- Bursa Malaysia and US market views.
-- US MFI candidate universe integration.
-- Manual Shariah-first shortlist workflow for US MFI candidates.
-- Manual Investing Paths observations; no automated collection from that provider.
+- MFI is the only US ticker-universe source.
+- Shariah checks and manual Investing Paths observations stay in browser localStorage.
+- No user account, Gemini API, LLM API key, provider API or automated Investing Paths collection.
 
-## One-time Cloudflare setup
+## Cloudflare setup
 
-### 1. Create the D1 database
+1. Create or use the D1 database named `magic-screen-db`.
+2. Confirm its ID matches `wrangler.toml`.
+3. Configure the Worker secret `MFI_SESSION_COOKIE` with the owner's authenticated Magic Formula Investing session cookie.
+5. Connect the GitHub repository to Cloudflare Workers Builds.
 
-In the Cloudflare dashboard, open **Storage & databases → D1 SQL Database** and create a database named `magic-screen-db`.
+Build command:
 
-Copy its database ID and confirm it matches the `database_id` value in `wrangler.toml`. The Worker binds the database as `DB`.
+```bash
+npm run build
+```
 
-### 2. Connect GitHub for automatic deployment
+Deploy command:
 
-In Cloudflare, open **Workers & Pages → Create application → Connect to Git**. Select GitHub, then choose `fizminho/magic-screen` and the `main` branch.
+```bash
+npx wrangler deploy
+```
 
-Use these build settings:
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Root directory: `/`
+A successful GitHub build or Wrangler dry-run is not proof of a live deployment. Verify the Worker and app after release.
 
-Save and deploy. Cloudflare Workers Builds can then build and deploy automatically whenever a commit is pushed to `main`. The Worker name in Cloudflare must remain `magic-screen`, matching `wrangler.toml`.
+## MFI workflow
 
-A successful GitHub build or Wrangler dry-run is not proof of a successful live deployment. Verify the deployed Worker and application separately after release.
+The app reads the cached MFI ticker universe from `GET /api/stocks`. Use **Refresh MFI** to request a fresh screen. The Worker caches successful MFI results for six hours and applies a 15-minute cooldown to forced refreshes.
 
-## Automatic quote refresh
+See [MFI integration](MAGIC_FORMULA_INTEGRATION.md) for session setup and endpoint details.
 
-The configured Cron Triggers run scheduled quote-refresh work:
-- `17 22 * * MON-FRI`
-- `47 22 * * MON-FRI`
-- `*/30 * * * *`
+## Shariah workflow
 
-Check the Worker implementation and Cloudflare dashboard before relying on the schedule. The first quote adapter uses Yahoo Finance's chart endpoint for indicative quotes. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution-price feed. Provider throttling or market holidays can result in partial updates.
+1. Copy the ticker list and AI prompt from the app.
+2. Paste into an AI assistant that can research the sources.
+3. The assistant must follow Musaffa and HalalScreener terms. If AI/automated access is not allowed, it must not access the source and must return No data.
+4. Copy the raw JSON response.
+5. Paste it into Magic Screen and validate.
+6. Check eligible tickers manually on Investing Paths and record rank, EY, ROC, fiscal period, date and source URL.
 
-## US MFI and Shariah workflow
+Both Musaffa and HalalScreener must show fresh Halal results. Doubtful, Not Halal, No data, stale or conflicting results do not pass. Source-specific statuses remain visible.
 
-The active US candidate universe remains sourced from Magic Formula Investing (MFI). The Shariah shortlist only includes active MFI candidates.
+## Local storage
 
-A ticker is eligible only when both Musaffa and HalalScreener have fresh Halal results, with a checked date and source reference recorded for each provider. Doubtful, Not Halal, missing, stale, conflicting or unsupported evidence is not eligible; cases requiring clarification go to manual review.
+Shariah and Investing Paths records are stored only in the current browser. They do not sync between devices or browsers. The app intentionally has no file upload/download workflow. Clearing browser data can remove the records.
 
-The application supports copyable AI prompts and paste-only JSON import for Shariah evidence, plus a manual Investing Paths entry form. Investing Paths rank, Earnings Yield, Return on Capital, fiscal period, checked date and source reference are entered manually.
-
-These records are stored in the current browser's local storage. They do not automatically sync across devices or browsers. The workflow uses copy/paste text only.
-
-The application does not scrape provider websites or make automated Musaffa, HalalScreener or Investing Paths requests. Do not use old research snapshots as current evidence. Re-check provider results and dates before relying on a ticker's status.
-
-## Data-source limitations and project controls
-
-- MFI screening results define the candidate universe; they are not Investing Paths rankings.
-- Shariah status is evidence-based and manually recorded. No compliance status is inferred from a company name, ticker or sector.
-- Investing Paths observations are manually entered, not collected through automated access.
-- The app has no LLM API integration and requires no Gemini account or API key. AI research runs externally using the copied prompt.
-- The accounting-policy and EdgarTools production migration work is paused. Existing research artifacts may be retained, but AI task statuses are not human or policy approvals.
-- Do not add automated third-party data collection, production accounting writes, ranking changes or provider cutover without a fresh terms review and explicit owner approval.
-
-See the [US MFI masterplan](US_MFI_MASTERPLAN.md) for the current implementation checklist and release gates.
-
-## Local development
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-The frontend can run without D1, but the live API requires the Worker runtime and an initialised D1 database.
+The frontend can start without a live MFI session, but the Worker needs the D1 binding and `MFI_SESSION_COOKIE` for a fresh MFI screen.
 
-## Important
-
-This is an educational research tool, not investment advice. Prices can be delayed, incomplete or unavailable. Verify company information, provider evidence and Shariah status before making investment decisions.
+Research tool only. Not investment advice.

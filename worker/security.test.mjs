@@ -1,41 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { timingSafeEqual, checkBearer, isBearerAuthorized, cooldownElapsed, withSecurityHeaders, SECURITY_HEADERS, CSP, publicErrorMessage } from "./security.mjs";
+import { cooldownElapsed, withSecurityHeaders, SECURITY_HEADERS, CSP, publicErrorMessage } from "./security.mjs";
+import { readFileSync } from "node:fs";
 
-const req = (auth) => new Request("https://x.test/api", { headers: auth === undefined ? {} : { Authorization: auth } });
-
-test("timingSafeEqual matches only identical strings", () => {
-  assert.equal(timingSafeEqual("abc", "abc"), true);
-  assert.equal(timingSafeEqual("abc", "abd"), false);
-  assert.equal(timingSafeEqual("abc", "abcd"), false);
-  assert.equal(timingSafeEqual("", "a"), false);
-  assert.equal(timingSafeEqual(undefined, undefined), true);
-});
-
-test("checkBearer fails closed when token is not configured", () => {
-  assert.deepEqual(checkBearer(req("Bearer x"), undefined), { status: 503, error: "UNIVERSE_SYNC_TOKEN is not configured" });
-  assert.equal(checkBearer(req("Bearer "), "").status, 503);
-});
-
-test("checkBearer rejects missing, malformed and wrong tokens", () => {
-  for (const h of [undefined, "", "Bearer", "Bearer ", "Basic secret", "bearer secret", "Bearer wrong", "Bearer secret2"]) {
-    assert.equal(checkBearer(req(h), "secret")?.status, 401, String(h));
-  }
-});
-
-test("checkBearer accepts the exact bearer token", () => {
-  assert.equal(checkBearer(req("Bearer secret"), "secret"), null);
-  assert.equal(isBearerAuthorized(req("Bearer secret"), "secret"), true);
-  assert.equal(isBearerAuthorized(req("Bearer nope"), "secret"), false);
-});
-
-test("cooldownElapsed gates repeat refreshes", () => {
+test("cooldownElapsed gates repeated MFI refreshes", () => {
   const now = Date.parse("2026-11-24T12:00:00Z");
   assert.equal(cooldownElapsed(null, 60000, now), true);
   assert.equal(cooldownElapsed("garbage", 60000, now), false);
   assert.equal(cooldownElapsed("2026-11-24T11:59:30Z", 60000, now), false);
   assert.equal(cooldownElapsed("2026-11-24T11:58:00Z", 60000, now), true);
-  assert.equal(cooldownElapsed("2026-11-24T12:05:00Z", 60000, now), false); // clock skew
+  assert.equal(cooldownElapsed("2026-11-24T12:05:00Z", 60000, now), false);
 });
 
 test("withSecurityHeaders adds headers, keeps status/body and works on immutable responses", async () => {
@@ -50,7 +24,7 @@ test("CSP blocks framing, plugins and foreign scripts", () => {
   assert.match(CSP, /frame-ancestors 'none'/);
   assert.match(CSP, /object-src 'none'/);
   assert.match(CSP, /script-src 'self'(;|$)/);
-  assert.doesNotMatch(CSP, /unsafe-eval/);
+  assert.doesNotMatch(CSP, /unsafe-eval|fonts\.googleapis|fonts\.gstatic/);
 });
 
 test("publicErrorMessage hides internals", () => {
@@ -59,35 +33,12 @@ test("publicErrorMessage hides internals", () => {
   finally { console.error = orig; }
 });
 
-// ---- Route access regression guard (reads the Worker source) ----
-import { readFileSync } from "node:fs";
-const src = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
-const routeBlock = (needle) => {
-  const start = src.indexOf(needle);
-  assert.ok(start > 0, `route not found: ${needle}`);
-  return src.slice(start, start + 700);
-};
-
-test("no hand-rolled bearer comparison remains (must use constant-time checkBearer)", () => {
-  assert.doesNotMatch(src, /!==\s*"Bearer "\s*\+\s*env\./);
-});
-
-test("sensitive routes require the bearer token", () => {
-  for (const route of [
-    'url.pathname==="/api/fundamentals/sync"',
-    'url.pathname==="/api/fundamentals/edgartools/ingest"',
-    'url.pathname==="/api/admin/cleanup-sec-universe"',
-    'url.pathname==="/api/universe/import-my"',
-    'url.pathname==="/api/universe/us/stocks"',
-  ]) assert.match(routeBlock(route), /checkBearer\(request,env\.UNIVERSE_SYNC_TOKEN\)/, route);
-});
-
-test("responses are wrapped with security headers and no wildcard CORS", () => {
-  assert.match(src, /withSecurityHeaders\(await handleRequest\(request, env\)\)/);
-  assert.doesNotMatch(src, /access-control-allow-origin/i);
-});
-
-test("anonymous refresh paths are rate-limited", () => {
+test("Worker exposes only the MFI research API and no user/admin/accounting routes", () => {
+  const src = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
+  for (const route of ["/api/health", "/api/pipeline/status", "/api/mfi/screen", "/api/stocks"]) assert.ok(src.includes(route), route);
+  for (const retired of ["/api/fundamentals/", "/api/admin/", "/api/universe/", "/api/ai/", "UNIVERSE_SYNC_TOKEN", "GEMINI_API_KEY", "ScheduledController", "Yahoo Finance"]) {
+    assert.ok(!src.includes(retired), retired);
+  }
   assert.match(src, /cooldownElapsed\(meta\?\.source_updated_at, MFI_FORCE_COOLDOWN_MS\)/);
-  assert.match(src, /cooldownElapsed\(lastRefresh\?\.t, QUOTE_REFRESH_COOLDOWN_MS\)/);
+  assert.match(src, /withSecurityHeaders\(await handleRequest\(request, env\)\)/);
 });

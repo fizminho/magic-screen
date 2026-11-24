@@ -43,14 +43,17 @@ export default function App(){
 
  async function load(force=false){
   setLoading(true);
+  let refreshError="";
   try{
    if(force){
-    const sync=await fetch("/api/mfi/screen?minimumMarketCap=50&select30=true&force=1");
-    const result=await sync.json() as {error?:string};
-    if(!sync.ok) throw new Error(result.error||"MFI refresh failed");
+    try{
+     const sync=await fetch("/api/mfi/screen?minimumMarketCap=50&select30=true&force=1");
+     const result=await sync.json() as {error?:string};
+     if(!sync.ok) refreshError=result.error||"MFI refresh failed";
+    }catch(e){refreshError=e instanceof Error?e.message:"MFI refresh failed";}
    }
    const [stockResponse,pipelineResponse]=await Promise.all([
-    fetch("/api/stocks?market=US"+(force?"&refresh=1":"")),
+    fetch("/api/stocks?market=US"),
     fetch("/api/pipeline/status?market=US")
    ]);
    if(!stockResponse.ok) throw new Error("Unable to load the MFI candidate list");
@@ -58,7 +61,7 @@ export default function App(){
    setStocks((data.stocks||[]).filter((s:Stock)=>(s.universe_sources||[]).includes("Magic Formula Investing")));
    setUpdatedAt(data.updatedAt||null);
    if(pipelineResponse.ok)setPipeline(await pipelineResponse.json());
-   setStatus(force?"MFI candidate list refreshed.":"MFI candidate list loaded.");
+   setStatus(refreshError?"Showing cached MFI candidates. Refresh unavailable: "+refreshError:force?"MFI candidate list refreshed.":"MFI candidate list loaded.");
   }catch(e){setStatus(e instanceof Error?e.message:"Unable to load data.");}
   finally{setLoading(false);}
  }
@@ -82,7 +85,7 @@ export default function App(){
   const tickerList=universe.map(s=>({ticker:s.symbol,company_name:s.name}));
   const prompt=[
    "You are assisting with PERSONAL Shariah stock research. Research only the tickers supplied below.",
-   "For every ticker, check both Musaffa and HalalScreener using only access and methods permitted by each service. Do not bypass login, paywalls, CAPTCHAs, rate limits or access controls. Do not scrape or bulk-extract restricted pages. If you cannot lawfully verify a source, return No data and explain why.",
+   "For every ticker, check both Musaffa and HalalScreener only if their current terms permit AI or automated research access. If those terms do not permit it, do not access that source; return No data and explain that a manual check is required. Never bypass login, paywalls, CAPTCHAs, rate limits or access controls. Do not scrape or bulk-extract restricted pages.",
    "Return exactly two shariahChecks records per ticker: source musaffa and source halalscreener. Use the exact displayed status: Halal, Doubtful, Not Halal, or No data. Include checked_at (YYYY-MM-DD), direct source URL in reference, methodology, latest financial period, non-compliant income %, interest-bearing debt %, interest-bearing assets %, evidence and limitations when available.",
    "Never guess, infer or calculate a missing status or ratio. Use null for unavailable numeric/text fields. Do not substitute Mizan or any other provider. Do not research Investing Paths. I will check Investing Paths separately and enter those observations manually.",
    "Return ONLY valid JSON, without Markdown fences or commentary. Use this exact structure:",
@@ -107,7 +110,8 @@ export default function App(){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(item.checked_at||"")||Number.isNaN(Date.parse(item.checked_at)))throw new Error("Invalid checked_at date for "+item.symbol);
     if(typeof item.reference!=="string"||!/^https?:\/\//i.test(item.reference))throw new Error("A direct HTTP(S) source reference is required for "+item.symbol);
    }
-   const preview=buildShortlist({universe:{tickers:universe},shariahChecks:parsed.shariahChecks,ipObservations:parsed.ipObservations,now:Date.now()});
+   if(parsed.ipObservations.length)throw new Error("AI JSON must not contain Investing Paths observations. Record those manually in the app.");
+   const preview=buildShortlist({universe:{tickers:universe},shariahChecks:parsed.shariahChecks,ipObservations:[],now:Date.now()});
    setManual({shariahChecks:parsed.shariahChecks,ipObservations:parsed.ipObservations});
    setMessage(`Imported ${parsed.shariahChecks.length} provider checks. ${preview.ignored_invalid_shariah_records.length+preview.ignored_invalid_investing_paths_records.length} records need correction.`);
    setPasteOpen(false);setJsonText("");
@@ -115,6 +119,10 @@ export default function App(){
  }
  function saveIp(){
   if(!ipSymbol||!ipReference.trim()||!/^https?:\/\//i.test(ipReference)) {setMessage("Select a ticker and enter the Investing Paths page URL.");return;}
+  if(ipFound&&[ipRank,ipEy,ipRoc,ipYear,ipPeriod].every(v=>!v.trim())){setMessage("Enter at least one visible Investing Paths value.");return;}
+  if(ipRank&&(!Number.isInteger(Number(ipRank))||Number(ipRank)<1)){setMessage("Rank must be a positive whole number.");return;}
+  if(ipYear&&(!Number.isInteger(Number(ipYear))||Number(ipYear)<1990)){setMessage("Enter a valid fiscal year.");return;}
+  if([ipEy,ipRoc].some(v=>v.trim()&&!Number.isFinite(Number(v)))){setMessage("EY and ROC must be valid numbers.");return;}
   const observation:CheckRecord={symbol:ipSymbol,collection_method:"manual",manually_verified:true,found:ipFound,checked_at:ipDate,source_reference:ipReference.trim()};
   if(ipFound)Object.assign(observation,{rank:ipRank===""?null:Number(ipRank),earnings_yield:ipEy===""?null:Number(ipEy),return_on_capital:ipRoc===""?null:Number(ipRoc),fiscal_year:ipYear===""?null:Number(ipYear),fiscal_period:ipPeriod||null});
   setManual(old=>({...old,ipObservations:[...old.ipObservations.filter(x=>String(x.symbol).toUpperCase()!==ipSymbol),observation]}));
