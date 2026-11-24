@@ -158,7 +158,7 @@ export default function App() {
     ipObservations:manualShariahData.ipObservations,
     now:Date.now()
   }), [mfiUniverse,manualShariahData,pipeline?.mfi_last_sync,updatedAt]);
-  const shariahBySymbol = useMemo(() => new Map(shariahShortlist.rows.map((row:any) => [row.symbol,row])), [shariahShortlist]);
+  const shariahBySymbol = useMemo(() => new Map<string, any>(shariahShortlist.rows.map((row:any):[string,any] => [row.symbol,row])), [shariahShortlist]);
 
   function loadShariahTemplate() {
     const example = mfiUniverse[0]?.symbol ?? "EXAMPLE";
