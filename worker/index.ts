@@ -1,9 +1,9 @@
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { MEMBERSHIP_DDL, SOURCE_MFI, backfillMfiMemberships, applyMfiSelection, invalidateUsRanks } from "./universe-membership.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
-import { isBearerAuthorized, cooldownElapsed, withSecurityHeaders, publicErrorMessage, MFI_FORCE_COOLDOWN_MS } from "./security.mjs";
+import { cooldownElapsed, withSecurityHeaders, publicErrorMessage, MFI_FORCE_COOLDOWN_MS } from "./security.mjs";
 
-interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; UNIVERSE_SYNC_TOKEN?: string; MFI_SESSION_COOKIE?: string; }
+interface Env { DB: D1Database; ASSETS: Fetcher; APP_ENV?: string; MFI_SESSION_COOKIE?: string; }
 const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 let membershipReady=false;
 async function ensureMembershipSchema(env: Env) {
@@ -136,7 +136,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
       const minimumMarketCap = Math.min(5000000, Math.max(50, Number(url.searchParams.get("minimumMarketCap") ?? 50)));
       const select30 = url.searchParams.get("select30") !== "false";
       let forceRefresh = url.searchParams.get("force") === "1";
-      if (forceRefresh && !isBearerAuthorized(request, env.UNIVERSE_SYNC_TOKEN)) {
+      if (forceRefresh) {
         const meta = await env.DB.prepare("SELECT source_updated_at FROM mfi_screening_meta WHERE id=1").first<any>().catch(() => null);
         if (!cooldownElapsed(meta?.source_updated_at, MFI_FORCE_COOLDOWN_MS)) forceRefresh = false;
       }
