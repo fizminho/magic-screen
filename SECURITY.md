@@ -15,7 +15,7 @@ Use a long random `UNIVERSE_SYNC_TOKEN` (`openssl rand -base64 32`).
 
 ## Route access model
 - **Public (read-only, cached):** `/api/health`, `/api/stocks`, `/api/universe`, `/api/pipeline/status`, `/api/fundamentals/status`, `/api/fundamentals/edgartools/ranking-preview/public`, `/api/mfi/screen`.
-- **Public but rate-limited:** `/api/mfi/screen?force=1` (15 min) and `/api/stocks?refresh=1` (5 min) — within the window they serve cache. A valid bearer token bypasses the limit.
+- **Public refresh paths:** `/api/mfi/screen?force=1` uses a 15-minute cooldown based on the last successful MFI sync; failed MFI attempts are not independently persisted, so configure the recommended WAF rate limit. `/api/stocks?refresh=1` uses a 5-minute cooldown based on refresh-log attempts. A valid bearer token bypasses the application cooldown.
 - **Bearer token required:** everything else, including `/api/fundamentals/sync`, all `/edgartools/*` ingest/review routes, `/api/universe/*` writes and `/api/admin/*`.
 - Token checks are constant-time and fail closed (503) when the secret is unset.
 
