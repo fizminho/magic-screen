@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Check, Clipboard, ClipboardPaste, RefreshCw, Search, ShieldCheck } from "lucide-react";
+// @ts-ignore — pure ESM screening logic is tested independently in Node.
 import { buildShortlist } from "../worker/shariah-screening.mjs";
 
 type Stock = { symbol:string; company_name:string; market:string; price:number|null; market_cap:number|null; earnings_yield:number|null; return_on_capital:number|null; magic_formula_rank:number|null; universe_sources?:string[] };
@@ -45,7 +46,7 @@ export default function App(){
   try{
    if(force){
     const sync=await fetch("/api/mfi/screen?minimumMarketCap=50&select30=true&force=1");
-    const result=await sync.json();
+    const result=await sync.json() as {error?:string};
     if(!sync.ok) throw new Error(result.error||"MFI refresh failed");
    }
    const [stockResponse,pipelineResponse]=await Promise.all([
@@ -53,7 +54,7 @@ export default function App(){
     fetch("/api/pipeline/status?market=US")
    ]);
    if(!stockResponse.ok) throw new Error("Unable to load the MFI candidate list");
-   const data=await stockResponse.json();
+   const data=await stockResponse.json() as {stocks?:Stock[];updatedAt?:string|null};
    setStocks((data.stocks||[]).filter((s:Stock)=>(s.universe_sources||[]).includes("Magic Formula Investing")));
    setUpdatedAt(data.updatedAt||null);
    if(pipelineResponse.ok)setPipeline(await pipelineResponse.json());
