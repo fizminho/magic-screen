@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { normalizeStatus, evaluateShariah, validateInvestingPathsObservation, buildShortlist, renderReportHtml } from "./shariah-screening.mjs";
 
 const NOW = Date.parse("2026-11-24T00:00:00Z");
-const chk = (status, checked_at = "2026-11-20") => ({ status, checked_at });
+const chk = (status, checked_at = "2026-11-20") => ({ status, checked_at, reference: "manual source page" });
 const ev = (checks, opts = {}) => evaluateShariah("x", checks, { now: NOW, ...opts });
 
 test("status mapping never promotes unknown wording to Halal", () => {
@@ -88,4 +88,9 @@ test("duplicate Shariah source records never auto-pass", () => {
   const r = buildShortlist({ universe: { tickers: ["DUP"] }, now: NOW, shariahChecks: [row("musaffa"), row("musaffa"), row("halalscreener")] });
   assert.notEqual(r.rows[0].state, "eligible_validated");
   assert.equal(r.ignored_invalid_shariah_records.length, 1);
+});
+
+test("Shariah checks without a manual source reference cannot pass", () => {
+  const missing = { status: "Halal", checked_at: "2026-11-20" };
+  assert.equal(ev({ musaffa: { ...missing, reference: "Musaffa page" }, halalscreener: missing }).decision, "excluded");
 });
