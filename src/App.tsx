@@ -43,11 +43,14 @@ export default function App(){
 
  async function load(force=false){
   setLoading(true);
+  let refreshError="";
   try{
    if(force){
-    const sync=await fetch("/api/mfi/screen?minimumMarketCap=50&select30=true&force=1");
-    const result=await sync.json() as {error?:string};
-    if(!sync.ok) throw new Error(result.error||"MFI refresh failed");
+    try{
+     const sync=await fetch("/api/mfi/screen?minimumMarketCap=50&select30=true&force=1");
+     const result=await sync.json() as {error?:string};
+     if(!sync.ok) refreshError=result.error||"MFI refresh failed";
+    }catch(e){refreshError=e instanceof Error?e.message:"MFI refresh failed";}
    }
    const [stockResponse,pipelineResponse]=await Promise.all([
     fetch("/api/stocks?market=US"),
@@ -58,7 +61,7 @@ export default function App(){
    setStocks((data.stocks||[]).filter((s:Stock)=>(s.universe_sources||[]).includes("Magic Formula Investing")));
    setUpdatedAt(data.updatedAt||null);
    if(pipelineResponse.ok)setPipeline(await pipelineResponse.json());
-   setStatus(force?"MFI candidate list refreshed.":"MFI candidate list loaded.");
+   setStatus(refreshError?"Showing cached MFI candidates. Refresh unavailable: "+refreshError:force?"MFI candidate list refreshed.":"MFI candidate list loaded.");
   }catch(e){setStatus(e instanceof Error?e.message:"Unable to load data.");}
   finally{setLoading(false);}
  }
