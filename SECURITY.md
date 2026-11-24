@@ -7,9 +7,8 @@ Magic Screen is a single-owner personal research app. It has no end-user account
 | Secret | Location | Purpose |
 |---|---|---|
 | `MFI_SESSION_COOKIE` | Cloudflare Worker secret | Owner's authenticated MFI session. Required to refresh the candidate universe. |
-| `UNIVERSE_SYNC_TOKEN` | Optional Cloudflare Worker secret | Allows the owner to bypass the anonymous MFI refresh cooldown. |
 
-Never put either secret in source code, frontend variables, GitHub commits, prompts, or chat. Configure with `npx wrangler secret put MFI_SESSION_COOKIE`. Treat the MFI cookie like a password and rotate it if exposed or expired.
+Never put the MFI cookie in source code, frontend variables, GitHub commits, prompts, or chat. Configure with `npx wrangler secret put MFI_SESSION_COOKIE`. Treat the cookie like a password and rotate it if exposed or expired.
 
 No Gemini or other AI API key is used by the application.
 
