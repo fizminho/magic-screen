@@ -1,6 +1,8 @@
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { MEMBERSHIP_DDL, SOURCE_MFI, SOURCE_FRONTEND, backfillMfiMemberships, applyMfiSelection, addFrontendStock, removeFrontendStock, invalidateUsRanks, normaliseUsSymbol } from "./universe-membership.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
+import { checkBearer, isBearerAuthorized, cooldownElapsed, withSecurityHeaders, publicErrorMessage, MFI_FORCE_COOLDOWN_MS, QUOTE_REFRESH_COOLDOWN_MS } from "./security.mjs";
+// @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { runBatchPage, BATCH_STATUS } from "./gemini-batch.mjs";
 // @ts-ignore JavaScript module is contract-tested directly with Node.js.
 import { assignCombinedRanks, MINIMUM_ELIGIBLE_COHORT } from "./mfi-ranking.mjs";
@@ -52,7 +54,7 @@ const symbols: Record<string, {symbol:string;name:string;market:"MY"|"US";curren
     {symbol:"ADBE",name:"Adobe",market:"US",currency:"USD"},{symbol:"INTU",name:"Intuit",market:"US",currency:"USD"},{symbol:"TSLA",name:"Tesla",market:"US",currency:"USD"}
   ]
 };
-const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store","access-control-allow-origin":"*"}});
+const json = (data: unknown, status=200) => new Response(JSON.stringify(data), {status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 const US_ACTIVE_UNIVERSE_SQL="EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)";
 let membershipReady=false;
 async function ensureMembershipSchema(env: Env) {
@@ -944,6 +946,14 @@ async function diagnoseSecExtensionFacts(env:Env,symbol:string) {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    return withSecurityHeaders(await handleRequest(request, env));
+  },
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    return handleScheduled(controller, env, ctx);
+  }
+};
+
+async function handleRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname==="/api/pipeline/status" && request.method==="GET") {
       try {
@@ -954,16 +964,18 @@ export default {
         const mfi=await env.DB.prepare("SELECT source_updated_at,price_date,quarter_date,result_count,minimum_market_cap,selected_count FROM mfi_screening_meta WHERE id=1").first<any>();
         const sec=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='stale_fiscal_period' THEN 1 ELSE 0 END),0) AS stale_fiscal_period,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").first<any>();
         return json({market,last_quote_sync:quotes?.last_updated??null,mfi_last_sync:mfi?.source_updated_at??null,mfi_price_date:mfi?.price_date??null,mfi_quarter_date:mfi?.quarter_date??null,mfi_count:mfi?.result_count??0,mfi_minimum_market_cap:mfi?.minimum_market_cap??null,mfi_selected_count:mfi?.selected_count??null,sec});
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
+      } catch(e) { return json({error:publicErrorMessage(e,"Status unavailable")},503); }
     }
     if (url.pathname==="/api/fundamentals/status" && request.method==="GET") {
       try {
         await ensureSchema(env);
         const status=await env.DB.prepare("SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS q.market_cap THEN 1 ELSE 0 END),0) AS calculated,COALESCE(SUM(CASE WHEN f.status='calculated' AND f.market_cap IS NOT q.market_cap THEN 1 ELSE 0 END),0) AS stale_market_cap,COALESCE(SUM(CASE WHEN f.status='missing_required_facts' THEN 1 ELSE 0 END),0) AS incomplete,COALESCE(SUM(CASE WHEN f.status='negative_invested_capital' THEN 1 ELSE 0 END),0) AS negative_invested_capital,COALESCE(SUM(CASE WHEN f.status='zero_invested_capital' THEN 1 ELSE 0 END),0) AS zero_invested_capital,COALESCE(SUM(CASE WHEN f.status='provider_error' THEN 1 ELSE 0 END),0) AS provider_error,COALESCE(SUM(CASE WHEN cm.cik IS NULL OR cm.cik='UNMAPPED' THEN 1 ELSE 0 END),0) AS unmapped,COALESCE(SUM(CASE WHEN q.market_cap IS NULL THEN 1 ELSE 0 END),0) AS awaiting_market_cap,COALESCE(SUM(CASE WHEN q.market_cap IS NOT NULL AND cm.cik IS NOT NULL AND cm.cik!='UNMAPPED' AND f.status IS NULL THEN 1 ELSE 0 END),0) AS awaiting_fundamentals,MAX(f.updated_at) AS last_updated FROM stock_master m LEFT JOIN stock_fundamentals f ON f.symbol=m.symbol AND f.market='US' LEFT JOIN stock_snapshot q ON q.symbol=m.symbol AND q.market='US' LEFT JOIN sec_company_map cm ON cm.symbol=m.symbol WHERE m.market='US' AND m.listing_status='active' AND EXISTS (SELECT 1 FROM stock_universe_membership um WHERE um.market='US' AND um.symbol=m.symbol AND um.active=1)").first<any>();
         return json({source:"SEC EDGAR Company Facts",...status});
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e)},503); }
+      } catch(e) { return json({error:publicErrorMessage(e,"Status unavailable")},503); }
     }
     if (url.pathname==="/api/fundamentals/sync" && request.method==="GET") {
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         const limit=Math.min(10,Math.max(1,Number(url.searchParams.get("limit")??8)));
         return json(await syncUsFundamentals(env,limit));
@@ -971,8 +983,7 @@ export default {
     }
 
     if (url.pathname==="/api/fundamentals/edgartools/universe" && request.method==="GET") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureSchema(env);
         // INTENTIONAL: refresh the active MFI candidate list at most once per six hours.
@@ -985,8 +996,7 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"EdgarTools universe discovery"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/ingest" && request.method==="POST") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         const declaredLength=Number(request.headers.get("Content-Length")??0);
         if (declaredLength>8*1024*1024) return json({error:"Payload exceeds 8 MiB limit"},413);
@@ -1030,8 +1040,7 @@ export default {
     }
 
     if (url.pathname==="/api/fundamentals/edgartools/resolve-preview" && request.method==="GET") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureEdgarToolsEvidenceSchema(env);
         // INTENTIONAL: read-only resolver preview. It never writes stock_fundamentals,
@@ -1075,8 +1084,7 @@ export default {
     if ((url.pathname==="/api/fundamentals/edgartools/ranking-preview" || url.pathname==="/api/fundamentals/edgartools/ranking-preview/public") && request.method==="GET") {
       const publicPreview=url.pathname.endsWith("/public");
       if (!publicPreview) {
-        if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-        if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+        { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       }
       try {
         await ensureEdgarToolsEvidenceSchema(env);
@@ -1115,8 +1123,7 @@ export default {
     }
     if (url.pathname==="/api/fundamentals/legacy-debt-shadow-preview" && request.method==="POST") {
       // SHADOW ONLY: database SELECTs plus SEC fetches. Do not initialise schema here.
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         const payload:any=await request.json();
         const requested=Array.isArray(payload.symbols)?payload.symbols:[payload.symbol];
@@ -1167,8 +1174,7 @@ export default {
       } catch(error) { return json({error:error instanceof Error?error.message:String(error),source:"Legacy SEC debt shadow preview"},503); }
     }
     if (url.pathname==="/api/fundamentals/legacy-debt-diagnostic" && request.method==="POST") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureSchema(env);
         const payload:any=await request.json();
@@ -1228,8 +1234,7 @@ export default {
       } catch(error) { return json({error:error instanceof Error?error.message:String(error),source:"Legacy SEC debt diagnostic"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/reconciliation-preview" && request.method==="GET") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureEdgarToolsEvidenceSchema(env);
         // INTENTIONAL: compare legacy production fundamentals with accession-bound EdgarTools candidates without writing either side.
@@ -1279,8 +1284,7 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Legacy vs EdgarTools reconciliation preview"},503); }
     }
     if (url.pathname==="/api/fundamentals/diagnose-extensions" && request.method==="POST") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         // INTENTIONAL: initialize D1 tables here so the protected diagnostic works independently
         // of whether the screener or another API route has been opened first.
@@ -1292,8 +1296,7 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"SEC filing XBRL extension diagnostic"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/ai-review/batch" && (request.method==="GET" || request.method==="POST")) {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureSchema(env);
         await env.DB.prepare(`CREATE TABLE IF NOT EXISTS edgartools_filing_evidence (
@@ -1359,8 +1362,7 @@ export default {
       } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Gemini batch accounting review"},503); }
     }
     if (url.pathname==="/api/fundamentals/edgartools/ai-review" && (request.method==="GET" || request.method==="POST")) {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureSchema(env);
         let payload:any={};
@@ -1397,8 +1399,7 @@ export default {
     }
     if ((url.pathname==="/api/fundamentals/edgartools/ai-review/history" && request.method==="GET")
       || (url.pathname==="/api/fundamentals/edgartools/ai-review/decisions" && (request.method==="GET" || request.method==="POST"))) {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       // Audit ledger only: touches gemini_accounting_review_* tables, never production fundamentals or rankings.
       const audit={production_write:false,production_fundamentals_changed:false,rankings_changed:false};
       try {
@@ -1433,15 +1434,19 @@ export default {
       try {
         const minimumMarketCap = Math.min(5000000,Math.max(50,Number(url.searchParams.get("minimumMarketCap") ?? 50)));
         const select30 = url.searchParams.get("select30") !== "false";
-        const forceRefresh = url.searchParams.get("force")==="1";
+        let forceRefresh = url.searchParams.get("force")==="1";
+        if (forceRefresh && !isBearerAuthorized(request, env.UNIVERSE_SYNC_TOKEN)) {
+          // Anonymous callers cannot spend the owner's MFI session more than once per cooldown window.
+          const meta = await env.DB.prepare("SELECT source_updated_at FROM mfi_screening_meta WHERE id=1").first<any>().catch(()=>null);
+          if (!cooldownElapsed(meta?.source_updated_at, MFI_FORCE_COOLDOWN_MS)) forceRefresh = false;
+        }
         const result = await syncMagicFormulaUniverse(env,minimumMarketCap,select30,forceRefresh);
         return json(result);
-      } catch(e) { return json({error:e instanceof Error?e.message:String(e),source:"Magic Formula Investing"},503); }
+      } catch(e) { return json({error:publicErrorMessage(e,"Magic Formula refresh unavailable"),source:"Magic Formula Investing"},503); }
     }
     if (url.pathname==="/api/health") return json({ok:true,service:"magic-screen",environment:env.APP_ENV ?? "development"});
     if (url.pathname==="/api/admin/cleanup-sec-universe" && request.method==="POST") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         // INTENTIONAL: do not call ensureSchema here. This is a targeted cleanup against
         // existing production tables and must not trigger unrelated schema/seed writes.
@@ -1487,8 +1492,7 @@ export default {
     }
     if (url.pathname==="/api/universe/us/stocks" && (request.method==="POST" || request.method==="DELETE")) {
       // Frontend-managed US universe membership. Protected by the same bearer token as other universe writes.
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureSchema(env);
         const now=new Date().toISOString();
@@ -1519,8 +1523,7 @@ export default {
       } catch (e) { return json({error:e instanceof Error?e.message:String(e)},400); }
     }
     if (url.pathname==="/api/universe/import-my" && request.method==="POST") {
-      if (!env.UNIVERSE_SYNC_TOKEN) return json({error:"UNIVERSE_SYNC_TOKEN is not configured"},503);
-      if (request.headers.get("Authorization") !== "Bearer " + env.UNIVERSE_SYNC_TOKEN) return json({error:"Unauthorized"},401);
+      { const authFailure=checkBearer(request,env.UNIVERSE_SYNC_TOKEN); if (authFailure) return json({error:authFailure.error},authFailure.status); }
       try {
         await ensureSchema(env);
         const payload: any = await request.json();
@@ -1548,7 +1551,7 @@ export default {
         // never repopulate the displayed US universe from the broad SEC ticker directory.
         const result = await env.DB.prepare("SELECT * FROM stock_master WHERE market=? AND listing_status='active' ORDER BY company_name").bind(market).all();
         return json({market,stocks:result.results,count:result.results.length});
-      } catch (e) { return json({market,stocks:[],count:0,error:String(e)},502); }
+      } catch (e) { return json({market,stocks:[],count:0,error:publicErrorMessage(e,"Universe read failed")},502); }
     }
     if (url.pathname==="/api/stocks") {
       const market = url.searchParams.get("market")==="US" ? "US" : "MY";
@@ -1556,11 +1559,15 @@ export default {
       try {
         await ensureSchema(env);
         if (url.searchParams.get("refresh")==="1") {
-          try {
+          const lastRefresh = isBearerAuthorized(request, env.UNIVERSE_SYNC_TOKEN) ? null
+            : await env.DB.prepare("SELECT MAX(started_at) AS t FROM refresh_log").first<any>().catch(()=>null);
+          if (!cooldownElapsed(lastRefresh?.t, QUOTE_REFRESH_COOLDOWN_MS)) {
+            refresh = {updated:0,failed:0,remaining:null,skipped:"cooldown"};
+          } else try {
             refresh = await refreshQuotes(env, market);
           } catch (error) {
             // INTENTIONAL: D1 write-quota exhaustion or quote-provider failure must not block cached reads.
-            refresh = {updated:0,failed:0,remaining:null,error:String(error)};
+            refresh = {updated:0,failed:0,remaining:null,error:publicErrorMessage(error,"Quote refresh failed")};
           }
         }
         // INTENTIONAL: SEC fundamentals are authoritative for US calculations. The snapshot is a quote/cache projection and can lag the fundamentals table; prefer same-market-cap SEC ratios and derive the displayed status from the SEC record.
@@ -1583,12 +1590,13 @@ export default {
         });
         return json({market,stocks,updatedAt:latest?.updated_at ?? null,sourceStatus:stocks.some((row:any)=>row.price!=null)?"Quote cache connected":"Waiting for scheduled quote sync",refresh});
       } catch (error) {
-        return json({market,stocks:[],updatedAt:null,sourceStatus:"Cached stock read failed",error:String(error),refresh},503);
+        return json({market,stocks:[],updatedAt:null,sourceStatus:"Cached stock read failed",error:publicErrorMessage(error,"Cached stock read failed"),refresh},503);
       }
     }
     return env.ASSETS.fetch(request);
-  },
-  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+}
+
+async function handleScheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (controller.cron === "*/30 * * * *") {
       // INTENTIONAL: SEC ingestion is its own cron lane. Return after scheduling it so this
       // invocation does not also trigger a quote refresh for an unrelated market.
@@ -1598,5 +1606,4 @@ export default {
     }
     const market = controller.cron.startsWith("17 ") ? "MY" : "US";
     ctx.waitUntil(refreshQuotes(env, market));
-  }
-};
+}
