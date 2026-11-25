@@ -93,7 +93,9 @@ jobs:
           npx --yes wrangler@4 d1 execute magic-screen-db --local --command "INSERT INTO passkey_credential(id,public_key,algorithm,name,created_at) VALUES ('ci-passkey-revoke-target','ci-public-key',-7,'CI target','$now'),('ci-passkey-revoke-backup','ci-public-key',-7,'CI backup','$now');"
           npx --yes wrangler@4 d1 execute magic-screen-db --local --command "INSERT INTO session(token_hash,credential_id,created_at,expires_at,last_seen_at,user_agent) VALUES ('$target_hash','ci-passkey-revoke-target','$now','$expires','$now','CI'),('$backup_hash','ci-passkey-revoke-backup','$now','$expires','$now','CI');"
           revoke_status="$(curl --silent --output /tmp/revoke-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/auth/credentials/ci-passkey-revoke-target -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$target_token" --data '{}')"
-          test "$revoke_status" = "200"
+          echo "passkey revoke HTTP status: $revoke_status"
+          cat /tmp/revoke-response.json
+          if [[ "$revoke_status" != "200" ]]; then tail -n 100 /tmp/magic-folio-wrangler.log; exit 1; fi
           jq -e '.ok == true and .passkeyCount == 1' /tmp/revoke-response.json >/dev/null
           target_session_status="$(curl --silent --output /tmp/revoked-session.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/auth/credentials -H "Cookie: magicfolio_session=$target_token")"
           test "$target_session_status" = "401"
