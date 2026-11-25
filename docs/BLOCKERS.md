@@ -1,20 +1,37 @@
 # Blockers
 
-## 2026-11-25: Local execution and Cloudflare access required
+## Phase A automation
 
-The AI portfolio runbook cannot safely pass Phase A yet because this session's GitHub integration can inspect and commit repository files but cannot run shell commands, Node/npm tests, Wrangler, or Cloudflare D1 exports/queries.
+A GitHub Actions workflow now automates the Phase A checks:
 
-Required owner/environment action:
-- Provide an execution environment with a checkout of `chore/ai-portfolio-rebuild`, Node.js 22, npm, Wrangler, and authorized Cloudflare credentials.
-- Export and verify the production D1 backup before any destructive migration.
-- Capture the exact remote D1 table inventory before generating legacy DROP statements.
+- Workflow: `.github/workflows/phase-a-preflight.yml`
+- Existing Cloudflare credentials reused from the deployment workflow:
+  - `secrets.CLOUDFLARE_API_TOKEN`
+  - `vars.CLOUDFLARE_ACCOUNT_ID`, falling back to `secrets.CLOUDFLARE_ACCOUNT_ID`
+- It performs a remote D1 export, verifies the backup is non-empty, captures the live `sqlite_master` inventory, installs dependencies, builds, and runs the existing Node regression suite.
+- It does not deploy, apply migrations, alter remote data, or delete secrets.
+- The D1 backup and inventory are uploaded as a GitHub Actions artifact with a one-day retention period. The SQL backup is sensitive production data: download it promptly and move it to approved secure storage. Do not commit it or paste it into chat.
+- The workflow is triggered by a push to `chore/ai-portfolio-rebuild` that changes this workflow or this blocker document. It can also be run manually with the explicit `YES` confirmation. Manual runs default to `NO`.
 
-Until those checks are complete, do not remove legacy code that may still be serving production, do not apply migrations remotely, and do not delete `MFI_SESSION_COOKIE`.
+### Important security gate
 
+The current deploy workflow proves the repository already references the Cloudflare token/account ID secret names, but GitHub does not reveal whether those credentials are configured or whether the token has D1 read permissions. The workflow validates presence and the actual Wrangler export verifies access. It never prints credential values.
 
-## Exact Phase A commands to unblock
+If the run fails because the token lacks D1 permissions, update the existing Cloudflare API token's permissions in GitHub/Cloudflare settings. Do not add a token value to source code or chat. If the account/database identity is unexpected, stop and correct the configuration before retrying.
 
-Run these from a local checkout of the repository, on branch chore/ai-portfolio-rebuild, with Node.js 22, npm, Wrangler authenticated to the correct Cloudflare account, and permission to access the production D1 database.
+## Phase A completion criteria
+
+Do not mark A4/A5/A6 complete until the Actions run is green and its artifact contains:
+1. A non-empty production D1 SQL export.
+2. The live D1 schema inventory.
+
+The run must also show successful dependency installation, build, and regression tests. Record the workflow run URL, backup filename, table inventory, and pass/fail summary in `docs/CLEANUP_LOG.md`.
+
+Until all gates pass, do not remove legacy code that may still serve production, do not apply remote migrations, and do not delete `MFI_SESSION_COOKIE`.
+
+## Local fallback
+
+If Actions is unavailable, run from a local checkout of `chore/ai-portfolio-rebuild` with Node.js 22, npm, Wrangler authenticated to the correct Cloudflare account, and D1 read/export permission:
 
 ```bash
 git switch chore/ai-portfolio-rebuild
@@ -22,20 +39,15 @@ git status --short
 git log --oneline -20
 git branch -a
 
-# A4: export and verify a production backup before any destructive change
 BACKUP="backup-$(date +%F).sql"
 npx wrangler d1 export magic-screen-db --remote --output "./$BACKUP"
 test -s "./$BACKUP" && echo "BACKUP_OK: $BACKUP"
 
-# A5: capture the actual live schema inventory (do not guess table names)
-npx wrangler d1 execute magic-screen-db --remote --command "SELECT name, type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY type, name;" | tee /tmp/magic-screen-d1-inventory.txt
+npx wrangler d1 execute magic-screen-db --remote --command "SELECT name, type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY type, name;"
 
-# A6: capture baseline
 npm install
 npm run build
 node --experimental-strip-types --test worker/*.test.mjs
 ```
 
-Do not paste the SQL backup into chat or commit it. Keep it in a secure local location. Paste only the git command output, inventory table names/types, backup filename plus confirmation that the file is non-empty, and build/test summaries. Do not paste environment files, session cookies, API keys, or Wrangler credentials.
-
-If Wrangler reports the wrong account or database, stop. Do not run the export/inventory against a guessed database.
+Keep SQL backups out of git and in secure storage. Never paste environment files, session cookies, API keys, Wrangler credentials, or SQL backup contents into chat.
