@@ -87,6 +87,7 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
   const jobId = inserted.meta?.last_row_id;
   let refreshed = 0;
   let filingCount = 0;
+  let newFilingCount = 0;
   let factsUpdated = 0;
   let factsCached = 0;
   let failed = 0;
@@ -112,6 +113,8 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
           ? payload.name.trim().slice(0, 200) : instrument.symbol;
         await storeFilings(env, instrument, filings, companyName, fetchedAt);
         filingCount += filings.length;
+        const recentCutoff = new Date(now - 86400000).toISOString().slice(0, 10);
+        newFilingCount += filings.filter((filing) => filing.filingDate >= recentCutoff).length;
         await pause(SEC_PAUSE_MS);
         const factsResult = await refreshCompanyFacts(env, instrument, env.SEC_USER_AGENT, fetcher, now);
         if (factsResult === "updated") factsUpdated++;
@@ -126,16 +129,16 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
       if (index < instruments.length - 1) await pause(SEC_PAUSE_MS);
     }
 
-    const status = failed === 0 ? (instruments.length ? "success" : "skipped_no_data") : refreshed ? "partial" : "failed";
+    const status = failed > 0 ? (refreshed ? "partial" : "failed") : !instruments.length ? "skipped_no_data" : newFilingCount ? "success" : "skipped_no_new_data";
     const detail = JSON.stringify({
-      instruments: instruments.length, refreshed, failed, filings: filingCount,
+      instruments: instruments.length, refreshed, failed, filings: filingCount, newFilings: newFilingCount,
       companyfactsUpdated: factsUpdated, companyfactsCached: factsCached,
       reason: instruments.length ? undefined : "no_owned_us_instruments_with_cik"
     }).slice(0, 1000);
     await env.DB.prepare(
       "UPDATE job_run SET finished_at=?,status=?,detail=? WHERE id=?"
     ).bind(new Date().toISOString(), status, detail, jobId).run();
-    return { status, instruments: instruments.length, refreshed, failed, filingCount, factsUpdated, factsCached };
+    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached };
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     await env.DB.prepare(
