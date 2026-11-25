@@ -47,7 +47,8 @@ export function constantTimeEqual(left, right) {
 }
 
 async function bodyJson(request) {
-  if (!(request.headers.get("content-type") || "").toLowerCase().startsWith("application/json")) throw new Error("json_required");
+  const mediaType = (request.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (mediaType !== "application/json") throw new Error("json_required");
   const length = Number(request.headers.get("content-length") || 0);
   if (length > MAX_BODY_BYTES) throw new Error("body_too_large");
   const raw = await request.text();
