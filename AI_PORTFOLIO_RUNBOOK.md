@@ -263,7 +263,7 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 ### E6. API surface (all JSON, `cache-control: no-store`)
 `GET /api/health` (public, minimal) · `GET /api/auth/state` · `POST /api/auth/register/options|verify` (setup token or session) · `POST /api/auth/login/options|verify` · `POST /api/auth/logout` · `GET|PATCH|DELETE /api/auth/credentials` · `GET /api/me` · `GET /api/export` (holdings + watchlist + settings as JSON/CSV, session required) · `GET|PUT|DELETE /api/holdings` · `GET|POST|DELETE /api/watchlist` · `GET /api/dashboard` · `GET /api/news?symbol=` · `GET /api/analysis/latest?kind=` · `POST /api/analysis/run` (manual, 10-minute cooldown, counts against the daily cap) · `POST /api/push/*` · `GET|PUT /api/settings`
 
-- [x] `/api/quotes/latest`, `/api/quotes/snapshots` and `/api/holdings` read/write/delete routes require an owner session; writes also require exact Origin and JSON. Remaining routes must follow the same rule. The local D1 smoke test exercises holdings upsert, list and delete.
+- [x] `/api/quotes/latest`, `/api/quotes/snapshots`, `/api/holdings` and `/api/watchlist` routes require an owner session; writes/deletes also require exact Origin and JSON. The local D1 smoke test exercises holdings and watchlist upsert, list and delete.
 - [ ] Input validation on every route (symbol regex, market enum, numeric ranges). Public errors are generic (`publicErrorMessage` helper already exists).
 - [ ] Holdings import: paste CSV (`symbol,market,quantity,avg_cost`) parsed in the browser, sent as JSON.
 
