@@ -81,7 +81,7 @@ export default function JobsPanel({ onError, onNotice }: { onError: (value: stri
         {loading ? <p>Loading job history…</p> : runs.length === 0 ? <p>No job executions recorded yet.</p> : runs.map((item, index) => (
           <div className="credential-row" key={item.job + item.startedAt + index}>
             <div className="credential-meta">
-              <b>{label(item.job)}</b>
+              <b>{label(item.job.replace(/^manual_/, ""))}</b> <span>{item.job.startsWith("manual_") ? "Manual" : "Cron"}</span>
               <span>{new Date(item.startedAt).toLocaleString()} · {item.finishedAt ? "Finished " + new Date(item.finishedAt).toLocaleString() : "In progress"}</span>
               <span>{item.status}{item.detail ? " · " + item.detail : ""}</span>
             </div>
