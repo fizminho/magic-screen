@@ -1,11 +1,11 @@
 import { parseSecSubmissions } from "../lib/sec.mjs";
 import { parseSecCompanyFacts } from "../lib/sec-companyfacts.mjs";
-import { dispatchFilingAlerts } from "../lib/alerts.mjs";
+import { dispatchFilingAlerts, dispatchHoldingMoveAlerts } from "../lib/alerts.mjs";
 
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
 const SEC_COMPANYFACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK";
 const FACTS_TTL_MS = 6 * 60 * 60 * 1000;
-const MAX_INSTRUMENTS = 8;
+const MAX_INSTRUMENTS = 6;
 const SEC_PAUSE_MS = 550;
 
 function validUserAgent(value) {
@@ -131,8 +131,9 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
       if (index < instruments.length - 1) await pause(SEC_PAUSE_MS);
     }
 
-    const pushResult = await dispatchFilingAlerts(env);
-    pushAlertsSent = pushResult.sent || 0;
+    const filingPushResult = await dispatchFilingAlerts(env);
+    const movePushResult = await dispatchHoldingMoveAlerts(env, now);
+    pushAlertsSent = (filingPushResult.sent || 0) + (movePushResult.sent || 0);
     const status = failed > 0 ? (refreshed ? "partial" : "failed") : !instruments.length ? "skipped_no_data" : newFilingCount ? "success" : "skipped_no_new_data";
     const detail = JSON.stringify({
       instruments: instruments.length, refreshed, failed, filings: filingCount, newFilings: newFilingCount,
