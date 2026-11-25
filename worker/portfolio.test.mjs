@@ -133,7 +133,7 @@ test("holding deletion requires an owner session and same Origin", async () => {
   assert.equal(response.status, 401);
 });
 
-test("holding deletion removes only the holding record", async () => {
+test("holding deletion removes the position and deactivates an unused instrument", async () => {
   const { DB, calls } = fakeDb();
   const response = await handlePortfolioRequest(new Request(`${origin}/api/holdings/US/AAPL`, {
     method: "DELETE",
@@ -142,7 +142,9 @@ test("holding deletion removes only the holding record", async () => {
   }), { ...envConfig, DB }, "/api/holdings/US/AAPL");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { deleted: true, market: "US", symbol: "AAPL" });
-  assert.match(calls.prepared.at(-1).sql, /^DELETE FROM holding/);
+  assert.ok(calls.prepared.some((statement) => /^DELETE FROM holding/.test(statement.sql)));
+  assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("UPDATE instrument")));
+  assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("DELETE FROM quote_latest")));
 });
 
 test("holding deletion returns 404 when the holding does not exist", async () => {
@@ -233,7 +235,9 @@ test("watchlist deletion removes an item only after owner session and Origin che
   }), { ...envConfig, DB }, "/api/watchlist/MY/1155");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { deleted: true, market: "MY", symbol: "1155" });
-  assert.match(calls.prepared.at(-1).sql, /^DELETE FROM watchlist/);
+  assert.ok(calls.prepared.some((statement) => /^DELETE FROM watchlist/.test(statement.sql)));
+  assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("UPDATE instrument")));
+  assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("DELETE FROM quote_latest")));
 });
 
 test("watchlist deletion returns 404 for an unknown item", async () => {
