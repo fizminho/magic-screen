@@ -46,6 +46,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [supported, setSupported] = useState(true);
+  const [showIosInstallHint, setShowIosInstallHint] = useState(false);
 
   async function refreshState() {
     const next = await api<AuthState>("/api/auth/state");
@@ -61,6 +62,14 @@ export default function App() {
     }
   }
   useEffect(() => {
+    const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const installed = window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    setShowIosInstallHint(iosDevice && !installed);
+    if (import.meta.env.PROD && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
+    }
     setSupported(window.isSecureContext && typeof window.PublicKeyCredential !== "undefined" &&
       typeof navigator.credentials?.create === "function" && typeof navigator.credentials?.get === "function");
     refreshState().catch(() => setError("Unable to connect to Magic Folio. Please refresh the page."));
@@ -164,6 +173,11 @@ export default function App() {
         </a>
         <span className="market-pill">US · BURSA MALAYSIA</span>
       </header>
+      {showIosInstallHint && (
+        <aside className="install-hint">
+          On iPhone or iPad, use Share → Add to Home Screen. Push notifications work only from the installed app on supported iOS versions.
+        </aside>
+      )}
       <main className="content">
         <section className="page-heading">
           <span className="eyebrow"><span className="eyebrow-line" /> PRIVATE BY DESIGN</span>
