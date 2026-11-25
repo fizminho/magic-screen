@@ -16,6 +16,7 @@ test("CSP blocks inline styles, framing, plugins and foreign scripts", () => {
   assert.match(CSP, /frame-ancestors 'none'/);
   assert.match(CSP, /object-src 'none'/);
   assert.match(CSP, /script-src 'self'(;|$)/);
+  assert.match(CSP, /connect-src 'self' https:\/\/api\.marketdata\.app/);
   assert.doesNotMatch(CSP, /unsafe-inline|unsafe-eval|fonts\.googleapis|fonts\.gstatic/);
 });
 
