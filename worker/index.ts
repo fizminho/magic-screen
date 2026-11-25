@@ -21,6 +21,8 @@ import { handleExportRequest } from "./lib/export.mjs";
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
 // @ts-ignore AI analysis route is covered by Node regression tests.
 import { handleAnalysisRequest } from "./lib/analysis.mjs";
+// @ts-ignore Web Push cryptography and routes are covered by Node regression tests.
+import { handlePushRequest } from "./lib/push.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -32,6 +34,9 @@ interface Env {
   RP_ORIGIN?: string;
   SETUP_TOKEN?: string;
   SEC_USER_AGENT?: string;
+  VAPID_PRIVATE_KEY?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 export default {
@@ -60,6 +65,8 @@ export default {
       response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/run") {
       response = await handleAnalysisRequest(request, env, url);
+    } else if (url.pathname.startsWith("/api/push/")) {
+      response = await handlePushRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
       response = await handleSettingsRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/export") {
