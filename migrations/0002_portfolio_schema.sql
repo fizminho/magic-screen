@@ -104,7 +104,7 @@ CREATE INDEX idx_session_credential ON session(credential_id);
 CREATE TABLE auth_attempt (
   ip_hash TEXT NOT NULL,
   window TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('options','verify_fail')),
+  kind TEXT NOT NULL CHECK (kind IN ('options','verify_fail','sec_fetch')),
   count INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (ip_hash, window, kind)
 ) WITHOUT ROWID;
