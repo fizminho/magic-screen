@@ -137,7 +137,8 @@ test("dashboard endpoint applies the owner's configured concentration threshold"
     { ...envConfig, DB }, "/api/dashboard"
   );
   const result = await response.json();
-  assert.equal(result.thresholds.maxPositionPct, 20);\n  assert.equal(result.thresholds.alertMovePct, 5);
+  assert.equal(result.thresholds.maxPositionPct, 20);
+  assert.equal(result.thresholds.alertMovePct, 5);
   assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
   assert.ok(result.riskFlags.some((flag) => flag.code === "large_daily_move"));
 });
