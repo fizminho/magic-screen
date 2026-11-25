@@ -44,7 +44,6 @@ while (( ${#remaining[@]} > 0 )); do
     [[ -v remaining["$table"] ]] || continue
     has_child=0
     for other in "${!remaining[@]}"; do
-      [[ "$other" == "$table" ]] && continue
       if [[ "${dependencies[$other]}" == *" $table "* ]]; then
         has_child=1
         break
