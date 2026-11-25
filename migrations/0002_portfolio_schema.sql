@@ -93,12 +93,14 @@ CREATE TABLE auth_challenge (
 CREATE INDEX idx_auth_challenge_exp ON auth_challenge(expires_at);
 CREATE TABLE session (
   token_hash TEXT PRIMARY KEY,
+  credential_id TEXT NOT NULL REFERENCES passkey_credential(id) ON DELETE CASCADE,
   created_at TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   last_seen_at TEXT NOT NULL,
   user_agent TEXT
 );
 CREATE INDEX idx_session_exp ON session(expires_at);
+CREATE INDEX idx_session_credential ON session(credential_id);
 CREATE TABLE auth_attempt (
   ip_hash TEXT NOT NULL,
   window TEXT NOT NULL,
