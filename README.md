@@ -19,9 +19,11 @@ The D1 schema is defined in `migrations/`. A one-time production reset is separa
 
 ## Development
 
+Use `npm run cf:dev` to run the Worker, D1 local database and Vite assets together. `npm run dev` starts Vite only and does not provide the Worker auth API.
+
 ```bash
 npm install
-npm run dev
+npm run cf:dev
 npm run build
 node --experimental-strip-types --test worker/*.test.mjs
 ```
