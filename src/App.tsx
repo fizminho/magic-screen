@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { client as webauthnClient } from "@passwordless-id/webauthn";
 
 type AuthState = { registered: boolean; authenticated: boolean; passkeyCount: number; needsSetup: boolean };
+type PasskeyCredential = { id: string; name: string; createdAt: string; lastUsedAt: string | null; backedUp: boolean };
 type RegistrationOptions = { challenge: string; user: { id: string; name: string; displayName: string }; rpId: string; rpName: string; excludeCredentials: Array<{ id: string; type: "public-key" }> };
 type WebAuthnTransport = "ble" | "hybrid" | "internal" | "nfc" | "usb" | "smart-card";
 type LoginOptions = { challenge: string; rpId: string; allowCredentials: Array<{ id: string; transports: WebAuthnTransport[] }> };
@@ -37,7 +38,7 @@ async function withoutWebAuthnDebug<T>(operation: () => Promise<T>): Promise<T> 
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
-  const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [credentials, setCredentials] = useState<PasskeyCredential[]>([]);
   const [credentialNames, setCredentialNames] = useState<Record<string, string>>({});
   const [setupToken, setSetupToken] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,7 +50,7 @@ export default function App() {
     const next = await api<AuthState>("/api/auth/state");
     setAuth(next);
     if (next.authenticated) {
-      const result = await api<{ credentials: Credential[] }>("/api/auth/credentials");
+      const result = await api<{ credentials: PasskeyCredential[] }>("/api/auth/credentials");
       setCredentials(result.credentials);
       setCredentialNames(Object.fromEntries(result.credentials.map((item) => [item.id, item.name])));
     } else {
