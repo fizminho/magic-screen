@@ -145,6 +145,7 @@ test("holding deletion removes the position and deactivates an unused instrument
   assert.ok(calls.prepared.some((statement) => /^DELETE FROM holding/.test(statement.sql)));
   assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("UPDATE instrument")));
   assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("DELETE FROM quote_latest")));
+  assert.ok(calls.prepared.some((statement) => statement.sql.startsWith("DELETE FROM sec_companyfacts_cache")));
 });
 
 test("holding deletion returns 404 when the holding does not exist", async () => {
