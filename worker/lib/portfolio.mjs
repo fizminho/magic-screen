@@ -91,6 +91,20 @@ async function upsertHoldings(request, env) {
   return jsonResponse({ saved });
 }
 
+async function deactivateUnusedInstrument(env, market, symbol) {
+  await env.DB.prepare(
+    "UPDATE instrument AS i SET active=0 WHERE i.market=? AND i.symbol=? " +
+    "AND NOT EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
+    "AND NOT EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id)"
+  ).bind(market, symbol).run();
+  await env.DB.prepare(
+    "DELETE FROM quote_latest WHERE instrument_id = (" +
+    "SELECT i.id FROM instrument i WHERE i.market=? AND i.symbol=? AND i.active=0 " +
+    "AND NOT EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
+    "AND NOT EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id))"
+  ).bind(market, symbol).run();
+}
+
 async function deleteHolding(request, env, pathname) {
   assertRequestOrigin(request, env);
   const session = await getOwnerSession(request, env);
@@ -117,6 +131,7 @@ async function deleteHolding(request, env, pathname) {
     "(SELECT id FROM instrument WHERE market = ? AND symbol = ?) RETURNING instrument_id"
   ).bind(market, symbol).first();
   if (!deleted) return jsonResponse({ error: "Holding not found." }, 404);
+  await deactivateUnusedInstrument(env, market, symbol);
   return jsonResponse({ deleted: true, market, symbol });
 }
 
@@ -213,6 +228,7 @@ async function deleteWatchlistItem(request, env, pathname) {
     "(SELECT id FROM instrument WHERE market = ? AND symbol = ?) RETURNING instrument_id"
   ).bind(market, symbol).first();
   if (!deleted) return jsonResponse({ error: "Watchlist item not found." }, 404);
+  await deactivateUnusedInstrument(env, market, symbol);
   return jsonResponse({ deleted: true, market, symbol });
 }
 
