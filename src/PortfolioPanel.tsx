@@ -62,8 +62,6 @@ type PublicResearchBrief = {
 };
 
 
-type ResearchInboxItem = { symbol: string; brief: PublicResearchBrief; createdAt: string };
-
 type ResearchInboxItem = { brief: PublicResearchBrief & { symbol: string }; model: string; createdAt: string };
 
 type ResearchResult = {
@@ -147,9 +145,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [researchResult, setResearchResult] = useState<(ResearchResult & { symbol: string }) | null>(null);
   const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
   const [inboxLoading, setInboxLoading] = useState(true);
-  const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
-  const [inboxLoading, setResearchInboxLoading] = useState(true);
-  const [researchInboxSymbol, setResearchInboxSymbol] = useState("");
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -500,35 +495,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       onError(cause instanceof Error ? cause.message : "Unable to generate the research brief.");
     } finally { setResearchLoadingSymbol(""); }
   }
-
-  async function refreshResearchInbox() {
-    setResearchInboxLoading(true);
-    try {
-      const result = await api<{ briefs: ResearchInboxItem[] }>("/api/analysis/briefs");
-      setResearchInbox(result.briefs);
-    } catch (cause) {
-      const status = cause instanceof Error ? (cause as Error & { status?: number }).status : undefined;
-      if (status !== 401) onError(cause instanceof Error ? cause.message : "Unable to load research inbox.");
-    } finally { setResearchInboxLoading(false); }
-  }
-
-  async function openInboxBrief(symbol: string) {
-    setResearchInboxSymbol(symbol);
-    onError(""); onNotice("");
-    try {
-      const result = await api<ResearchResult & { brief: PublicResearchBrief | null }>(
-        `/api/analysis/latest?symbol=${encodeURIComponent(symbol)}`
-      );
-      if (!result.brief) throw new Error("This brief is no longer available for an instrument in your portfolio or watchlist.");
-      setResearchResult({ ...result, brief: result.brief, symbol });
-    } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Unable to open this research brief.");
-    } finally { setResearchInboxSymbol(""); }
-  }
-
-  useEffect(() => {
-    void refreshResearchInbox();
-  }, []);
 
   async function refreshUsQuotes() {
     if (!marketToken.trim()) { onError("Save your Market Data API token first."); return; }
