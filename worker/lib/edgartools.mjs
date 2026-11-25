@@ -75,10 +75,18 @@ export async function handleEdgarToolsRequest(request, env, url) {
     const writes = [];
     let metricCount = 0;
     for (const company of report.companies) {
-      if (!SYMBOL_RE.test(company?.symbol || "") || company.provider_status !== "supported" ||
-          typeof company.accession !== "string" || !/^\d{10}-\d{2}-\d{6}$/.test(company.accession) ||
-          !["10-K", "20-F", "40-F"].includes(company.form) || !Array.isArray(company.metrics) || company.metrics.length > 500) {
+      if (!SYMBOL_RE.test(company?.symbol || "") ||
+          !["supported", "unsupported_provider", "extraction_error"].includes(company.provider_status) ||
+          !Array.isArray(company.metrics) || company.metrics.length > 500) {
         return jsonResponse({ error: "Invalid normalized company record." }, 400);
+      }
+      if (company.provider_status !== "supported") {
+        if (company.metrics.length !== 0) return jsonResponse({ error: "Unsupported company cannot contain normalized metrics." }, 400);
+        continue;
+      }
+      if (typeof company.accession !== "string" || !/^\d{10}-\d{2}-\d{6}$/.test(company.accession) ||
+          !["10-K", "20-F", "40-F"].includes(company.form)) {
+        return jsonResponse({ error: "Invalid normalized filing metadata." }, 400);
       }
       const seen = new Set();
       for (const metric of company.metrics) {
