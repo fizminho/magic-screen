@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
-import { validatePushSubscription, sendPushToSubscription, handlePushRequest } from "./lib/push.mjs";
+import { validatePushSubscription, sendPushToSubscription, deliverPushBatch, handlePushRequest } from "./lib/push.mjs";
 
 function b64url(bytes) {
   let binary = "";
@@ -108,4 +108,35 @@ test("push subscription and test routes require an owner session", async () => {
   };
   const response = await handlePushRequest(request, { DB, APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, new URL(request.url));
   assert.equal(response.status, 401);
+});
+
+
+test("push batch continues after provider failures and removes expired subscriptions", async () => {
+  const env = await makeVapidEnv();
+  const receivers = await Promise.all([makeReceiver(), makeReceiver(), makeReceiver(), makeReceiver()]);
+  const subscriptions = receivers.map((item) => item.subscription);
+  const deleted = [];
+  const updated = [];
+  const DB = { prepare(sql) {
+    return { bind(...args) { this.args = args; return this; }, async run() {
+      if (sql.startsWith("DELETE")) deleted.push(this.args[0]);
+      if (sql.startsWith("UPDATE")) updated.push(this.args[1]);
+      return {};
+    } };
+  } };
+  let call = 0;
+  const fetcher = async () => {
+    call++;
+    if (call === 1) return new Response(null, { status: 410 });
+    if (call === 2) return new Response(null, { status: 503 });
+    if (call === 3) throw new Error("network_timeout");
+    return new Response(null, { status: 201 });
+  };
+  const result = await deliverPushBatch({ ...env, DB }, subscriptions, {
+    title: "Magic Folio", body: "Test", url: "/"
+  }, fetcher);
+  assert.deepEqual(result, { attempted: 4, sent: 1, removed: 1, failed: 2 });
+  assert.equal(call, 4);
+  assert.deepEqual(deleted, [subscriptions[0].endpoint]);
+  assert.deepEqual(updated, [subscriptions[3].endpoint]);
 });
