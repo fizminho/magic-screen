@@ -154,16 +154,22 @@ jobs:
             }
           done
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
+          echo "watchlist POST HTTP status: $watchlist_status"
+          cat /tmp/watchlist-post.json
           test "$watchlist_status" = "200"
           jq -e '.added == 1' /tmp/watchlist-post.json >/dev/null
           watchlist_get_status="$(curl --silent --output /tmp/watchlist-get.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/watchlist -H "Cookie: magicfolio_session=$backup_token")"
+          echo "watchlist GET HTTP status: $watchlist_get_status"
+          cat /tmp/watchlist-get.json
           test "$watchlist_get_status" = "200"
           jq -e '.items | length == 1 and .[0].symbol == "MSFT"' /tmp/watchlist-get.json >/dev/null
           export_json_status="$(curl --silent --output /tmp/export.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/export?format=json -H "Cookie: magicfolio_session=$backup_token")"
+          echo "JSON export HTTP status: $export_json_status"
           test "$export_json_status" = "200"
           jq -e '.holdings | length == 2' /tmp/export.json >/dev/null
           jq -e '.watchlist | length == 1' /tmp/export.json >/dev/null
           export_csv_status="$(curl --silent --output /tmp/export.csv --dump-header /tmp/export-headers --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/export?format=csv -H "Cookie: magicfolio_session=$backup_token")"
+          echo "CSV export HTTP status: $export_csv_status"
           test "$export_csv_status" = "200"
           grep -qi '^content-type: text/csv' /tmp/export-headers
           grep -q '^record_type,symbol,market' /tmp/export.csv
