@@ -551,7 +551,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       {researchResult && (
         <section className="tool-card tool-wide research-panel">
           <div className="watchlist-heading">
-            <div><span className="eyebrow">PUBLIC COMPANY RESEARCH · {researchResult.confidence.toUpperCase()} CONFIDENCE</span><h3>{researchResult.symbol} research brief</h3></div>
+            <div><span className="eyebrow">PUBLIC COMPANY RESEARCH · {researchResult.brief.confidence.toUpperCase()} CONFIDENCE</span><h3>{researchResult.symbol} research brief</h3></div>
             <button className="button button-quiet button-small" onClick={() => setResearchResult(null)}>Close</button>
           </div>
           <p>{researchResult.brief.company_summary}</p>
