@@ -164,12 +164,13 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     setWatchlist(result.items);
   }
 
-  async function refreshDashboard() {
+  async function refreshDashboard(): Promise<boolean> {
     try {
       const snapshot = await api<Dashboard>("/api/dashboard");
       setDashboard(snapshot);
       setOfflineSnapshotAt(null);
       saveDashboardSnapshot(snapshot).catch(() => undefined);
+      return false;
     } catch (cause) {
       const status = cause instanceof Error ? (cause as Error & { status?: number }).status : undefined;
       if (status === 401) {
@@ -182,7 +183,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         if (cached) {
           setDashboard(cached.data);
           setOfflineSnapshotAt(cached.savedAt);
-          return;
+          return true;
         }
       }
       throw cause;
@@ -195,7 +196,15 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   }
 
   async function refreshPortfolio() {
-    await Promise.all([refreshHoldings(), refreshWatchlist(), refreshDashboard(), refreshSettings()]);
+    const results = await Promise.allSettled([
+      refreshHoldings(), refreshWatchlist(), refreshDashboard(), refreshSettings()
+    ]);
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (!failures.length) return;
+    const dashboardResult = results[2];
+    if (dashboardResult.status === "fulfilled" && dashboardResult.value === true &&
+        failures.every((failure) => failure.reason instanceof TypeError || !navigator.onLine)) return;
+    throw failures[0].reason;
   }
 
   async function enablePushNotifications() {
@@ -743,12 +752,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
               onChange={(event) => setSettings((current) => ({ ...current, maxPositionPct: Number(event.target.value) }))} required /></label>
             <button className="button button-secondary field-wide" type="submit" disabled={busy}>Save settings</button>
           </form>
-          <p className="fine-print">Position size is used for rule-based concentration warnings. Daily move and position-size thresholds power local rule-based warnings. Push notifications are not active yet.</p>
-          <div className="tool-actions">
-            <a className="button button-secondary" href="/api/export?format=json">Download JSON</a>
-            <a className="button button-quiet" href="/api/export?format=csv">Download CSV</a>
-          </div>
-          <p className="fine-print">Exports include holdings, watchlist and settings only. Provider quote snapshots are excluded.</p>
+          <p className="fine-print">Position size is used for rule-based concentration warnings. Daily move and position-size thresholds power local rule-based warnings. Push delivery is configured separately above.</p>
         </section>
 
         <section className="tool-card tool-wide">
