@@ -152,7 +152,8 @@ export async function sendPushToSubscription(env, subscription, payload, fetcher
       ttl: "60",
       urgency: "normal"
     },
-    body: encrypted
+    body: encrypted,
+    signal: AbortSignal.timeout(5_000)
   });
   return response;
 }
