@@ -100,6 +100,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [secCompanyName, setSecCompanyName] = useState("");
   const [secFilings, setSecFilings] = useState<Array<{form:string;title:string;summary:string;filingDate:string;reportDate:string|null;url:string;accessionNumber:string}>>([]);
   const [secLoading, setSecLoading] = useState(false);
+  const [secLoadingSymbol, setSecLoadingSymbol] = useState("");
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -262,7 +263,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   async function loadSecFilings(item: { symbol: string; market: "US" | "MY"; cik: string | null }) {
     if (item.market !== "US") { onError("SEC filings are available for US instruments only."); return; }
     if (!item.cik) { onError("Add the SEC CIK to this instrument first."); return; }
-    onError(""); onNotice(""); setSecLoading(true);
+    onError(""); onNotice(""); setSecLoadingSymbol(item.symbol); setSecLoading(true);
     try {
       const result = await api<{ companyName: string; filings: Array<{ form: string; title: string; summary: string; filingDate: string; reportDate: string | null; url: string; accessionNumber: string }> }>(
         `/api/sec/filings?symbol=${encodeURIComponent(item.symbol)}`
@@ -273,7 +274,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       onNotice(`Loaded ${result.filings.length} recent SEC filings for ${item.symbol}.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to load SEC filings.");
-    } finally { setSecLoading(false); }
+    } finally { setSecLoading(false); setSecLoadingSymbol(""); }
   }
 
   async function refreshUsQuotes() {
@@ -366,7 +367,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <td>{formatMoney(item.avgCost, item.currency)}</td>
                   <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
                   <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
-                  <td>{item.market === "US" && item.cik ? <button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading}>{secLoading && secSymbol === item.symbol ? "Loading…" : "Filings"}</button> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
+                  <td>{item.market === "US" && item.cik ? <button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                   <td><button className="button button-danger button-small" onClick={() => removeHolding(item)} disabled={busy}>Remove</button></td>
                 </tr>
               ))
