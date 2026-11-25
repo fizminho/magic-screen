@@ -26,7 +26,7 @@ const RETENTION_DAYS = 30;
 
 function safeUserAgent(value) {
   return typeof value === "string" && value.length >= 12 && value.length <= 200 &&
-    value.includes("@") && !/[\r\n]/.test(value);
+    value.includes("@") && /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) && !/[\r\n]/.test(value);
 }
 
 async function fetchSubmissions(cik, userAgent, fetcher) {
