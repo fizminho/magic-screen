@@ -38,6 +38,14 @@ export async function handleAdminJobsRequest(request, env, url, ctx) {
       return jsonResponse({ error: "Choose a supported job." }, 400);
     }
 
+    const activeRun = await env.DB.prepare(
+      "SELECT id FROM job_run WHERE status='running' AND job IN " +
+      "('sec_refresh','scheduled_research_brief','manual_sec_refresh','manual_research_brief') LIMIT 1"
+    ).first();
+    if (activeRun) {
+      return jsonResponse({ error: "A scheduled or manual research job is already running. Refresh execution history before trying again." }, 409);
+    }
+
     const now = new Date();
     const expiresAt = new Date(now.getTime() + LOCK_TTL_MS).toISOString();
     const lockValue = expiresAt + "|" + crypto.randomUUID();
