@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateResearchBrief } from "./lib/analysis.mjs";
+import { validateResearchBrief, handleAnalysisRequest } from "./lib/analysis.mjs";
 
 const allowed = new Set(["0000320193-26-000101", "0000320193-26-000102"]);
 
@@ -122,7 +122,7 @@ function analysisRequest(body = { symbol: "AAPL" }) {
 
 test("analysis endpoint requires owner session and exact Origin", async () => {
   const { DB } = analysisDb({ authenticated: false });
-  const response = await (await import("./lib/analysis.mjs")).handleAnalysisRequest(
+  const response = await handleAnalysisRequest(
     analysisRequest(), { ...envConfig, DB, AI: { run: async () => ({ response: "{}" }) } },
     new URL(`${origin}/api/analysis/run`)
   );
@@ -132,7 +132,7 @@ test("analysis endpoint requires owner session and exact Origin", async () => {
 test("analysis endpoint rejects stale public SEC facts before calling the model", async () => {
   const { DB } = analysisDb({ factsAgeMs: 7 * 60 * 60 * 1000 });
   let called = false;
-  const response = await (await import("./lib/analysis.mjs")).handleAnalysisRequest(
+  const response = await handleAnalysisRequest(
     analysisRequest(), { ...envConfig, DB, AI: { run: async () => { called = true; return { response: "{}" }; } } },
     new URL(`${origin}/api/analysis/run`)
   );
@@ -143,7 +143,7 @@ test("analysis endpoint rejects stale public SEC facts before calling the model"
 test("analysis endpoint sends only public SEC facts and metadata to Workers AI", async () => {
   const { DB, calls } = analysisDb();
   let prompt = "";
-  const response = await (await import("./lib/analysis.mjs")).handleAnalysisRequest(
+  const response = await handleAnalysisRequest(
     analysisRequest(), {
       ...envConfig, DB,
       AI: { async run(model, input) {
@@ -177,7 +177,7 @@ test("analysis endpoint sends only public SEC facts and metadata to Workers AI",
 test("analysis endpoint atomically blocks requests beyond the daily quota", async () => {
   const { DB, calls } = analysisDb({ quotaAllowed: false });
   let called = false;
-  const response = await (await import("./lib/analysis.mjs")).handleAnalysisRequest(
+  const response = await handleAnalysisRequest(
     analysisRequest(), { ...envConfig, DB, AI: { run: async () => { called = true; return { response: "{}" }; } } },
     new URL(`${origin}/api/analysis/run`)
   );
