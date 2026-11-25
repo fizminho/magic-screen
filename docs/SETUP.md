@@ -89,12 +89,13 @@ Register a new passkey, add a second recovery passkey, and remove the temporary 
 
 ## Cloudflare deployment
 
-1. Confirm the D1 database binding in `wrangler.toml`.
-2. Configure GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and the account ID variable/secret.
-3. Ensure the token can deploy Workers, list Worker secrets and read/write D1.
-4. Merge reviewed changes to `main`; GitHub Actions builds, applies pending migrations and deploys the Worker.
+1. In Cloudflare Workers Builds, connect this repository and select the `main` production branch.
+2. Set the build/deploy command to `npm run cf:deploy`.
+3. Ensure the Worker build uses the repository root and the committed `wrangler.toml`.
+4. Cloudflare runs the command on updates to `main`; the script builds the frontend, applies pending remote D1 migrations with Wrangler, then deploys the Worker and assets.
+5. Keep the one-time production reset out of this automatic path. It is a separate manual workflow requiring the exact confirmation `DROP-ALL-LEGACY-DATA`.
 
-The one-time production reset is a separate manual workflow. It permanently removes all existing user tables and data in `magic-screen-db`. It can run only from `main`, after the production RP hostname and `SETUP_TOKEN` are configured and all preflight checks pass.
+No `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` GitHub Actions secret is required for Cloudflare's native Git integration. GitHub Actions should continue to run CI, regression and security checks only.
 
 ## Secrets
 
