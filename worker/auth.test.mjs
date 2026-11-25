@@ -72,3 +72,12 @@ test("challenge parser binds registration and login to different ceremony types"
   assert.equal(decodeClientChallenge(login, "webauthn.get"), "login-challenge");
   assert.equal(decodeClientChallenge("not-valid"), null);
 });
+
+test("auth rejects a matching Origin header on a mismatched request host", async () => {
+  const response = await handleAuthRequest(new Request("https://attacker.example/api/auth/login/options", {
+    method: "POST",
+    headers: { origin: "https://folio.example", "content-type": "application/json" },
+    body: "{}"
+  }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/options");
+  assert.equal(response.status, 403);
+});
