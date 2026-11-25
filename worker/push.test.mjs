@@ -91,3 +91,21 @@ test("public push config exposes only the VAPID public key without requiring a s
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { enabled: true, publicKey: "public-key" });
 });
+
+test("push subscription and test routes require an owner session", async () => {
+  const request = new Request("https://folio.example/api/push/test", {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: "https://folio.example" },
+    body: "{}"
+  });
+  const DB = {
+    prepare() {
+      return {
+        bind() { return this; },
+        async first() { return null; }
+      };
+    }
+  };
+  const response = await handlePushRequest(request, { DB, APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, new URL(request.url));
+  assert.equal(response.status, 401);
+});
