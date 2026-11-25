@@ -162,6 +162,7 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
   let skipped = 0;
   let failed = 0;
   let quotaExhausted = false;
+  const generatedSymbols = [];
 
   try {
     const cutoff = new Date(now - 86400000).toISOString().slice(0, 10);
@@ -245,6 +246,7 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
           "ON CONFLICT(input_hash) DO UPDATE SET model=excluded.model,output_json=excluded.output_json,created_at=excluded.created_at"
         ).bind(MODEL, inputHash, JSON.stringify(brief), new Date(now).toISOString()).run();
         generated++;
+        generatedSymbols.push({ symbol: instrument.symbol, inputHash });
       } catch (error) {
         failed++;
         const code = error instanceof Error ? error.message : "unknown";
@@ -253,16 +255,16 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
     }
 
     let pushAlertsSent = 0;
-    if (generated > 0) {
+    for (const item of generatedSymbols) {
       try {
         const pushResult = await dispatchAlert(env, {
-          dedupeKey: `brief-batch:${new Date(now).toISOString().slice(0, 10)}`,
+          dedupeKey: `brief:${item.symbol}:${item.inputHash}`,
           kind: "brief",
-          title: "Magic Folio research ready",
-          body: `${generated} new public research brief${generated === 1 ? "" : "s"} available.`,
-          url: "/"
+          title: `${item.symbol} research ready`,
+          body: `New public SEC research brief is available for ${item.symbol}.`,
+          url: `/#/holding/${encodeURIComponent(item.symbol)}`
         });
-        pushAlertsSent = pushResult.sent || 0;
+        pushAlertsSent += pushResult.sent || 0;
       } catch {
         // Scheduled research remains successful if optional push delivery is unavailable.
       }
