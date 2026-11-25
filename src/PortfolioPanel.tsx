@@ -120,6 +120,13 @@ function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "No timestamp";
 }
 
+function decodeVapidPublicKey(value: string): ArrayBuffer {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64 + "=".repeat((4 - base64.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0)).buffer;
+}
+
 export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -147,6 +154,9 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdingsCsv, setHoldingsCsv] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pushConfigured, setPushConfigured] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
   const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<string | null>(null);
   const [pushState, setPushState] = useState<"checking" | "unsupported" | "not-configured" | "not-subscribed" | "subscribed">("checking");
   const [pushBusy, setPushBusy] = useState(false);
@@ -187,6 +197,84 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
 
   async function refreshPortfolio() {
     await Promise.all([refreshHoldings(), refreshWatchlist(), refreshDashboard(), refreshSettings()]);
+  }
+
+  async function refreshPushState() {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+      const config = await api<{ enabled: boolean; publicKey: string | null }>("/api/push/config");
+      setPushConfigured(Boolean(config.enabled && config.publicKey));
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
+      setPushSubscribed(Boolean(subscription));
+    } catch {
+      setPushConfigured(false);
+      setPushSubscribed(false);
+    }
+  }
+
+  async function enablePush() {
+    onError(""); onNotice(""); setPushBusy(true);
+    try {
+      if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+        throw new Error("This browser does not support Web Push notifications.");
+      }
+      const config = await api<{ enabled: boolean; publicKey: string | null }>("/api/push/config");
+      if (!config.enabled || !config.publicKey) throw new Error("Push notifications have not been configured on the server yet.");
+      const permission = Notification.permission === "granted"
+        ? "granted" : await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Notification permission was not granted.");
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeVapidPublicKey(config.publicKey)
+        });
+      }
+      await api("/api/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify(subscription.toJSON())
+      });
+      setPushConfigured(true);
+      setPushSubscribed(true);
+      onNotice("Push notifications enabled on this device.");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to enable push notifications.");
+    } finally { setPushBusy(false); }
+  }
+
+  async function disablePush() {
+    onError(""); onNotice(""); setPushBusy(true);
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = registration ? await registration.pushManager.getSubscription() : null;
+      if (subscription) {
+        await api("/api/push/subscribe", {
+          method: "DELETE",
+          body: JSON.stringify({ endpoint: subscription.endpoint })
+        });
+        await subscription.unsubscribe();
+      }
+      setPushSubscribed(false);
+      onNotice("Push notifications disabled on this device.");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to disable push notifications.");
+    } finally { setPushBusy(false); }
+  }
+
+  async function sendPushTest() {
+    onError(""); onNotice(""); setPushBusy(true);
+    try {
+      const result = await api<{ sent: number; removed: number }>("/api/push/test", {
+        method: "POST", body: "{}"
+      });
+      if (result.sent) onNotice("Test notification sent. Check this device.");
+      else onError("No active push subscription received the test notification.");
+      await refreshPushState();
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to send a test notification.");
+    } finally { setPushBusy(false); }
   }
 
   useEffect(() => {
@@ -232,6 +320,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     refreshPortfolio()
       .catch((cause) => onError(cause instanceof Error ? cause.message : "Unable to load portfolio data."))
       .finally(() => setLoading(false));
+    refreshPushState();
   }, []);
 
   async function enablePushNotifications() {
@@ -767,6 +856,30 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             <button className="button button-quiet" type="button" onClick={() => downloadExport("csv")} disabled={busy}>Download CSV</button>
           </div>
           <p className="fine-print">CSV is spreadsheet-safe. Quote snapshots and SEC filing metadata are not included in this export.</p>
+        </section>
+
+        <section className="tool-card">
+          <span className="eyebrow">WEB PUSH</span>
+          <h3>Device notifications</h3>
+          <p>Receive filing alerts, significant holding moves and research-brief updates. Push messages never contain quantities or profit/loss amounts.</p>
+          {!pushConfigured ? <p className="fine-print">Push delivery is not configured on the server yet.</p> :
+            pushSubscribed ? <p className="fine-print">This device is subscribed to Magic Folio notifications.</p> :
+              <p className="fine-print">Notifications are off for this device. Permission is requested only after you tap Enable.</p>}
+          <div className="tool-actions">
+            {!pushSubscribed ?
+              <button className="button button-secondary" type="button" onClick={enablePush} disabled={pushBusy || !pushConfigured}>
+                {pushBusy ? "Working…" : "Enable notifications"}
+              </button> :
+              <>
+                <button className="button button-secondary" type="button" onClick={sendPushTest} disabled={pushBusy}>
+                  {pushBusy ? "Working…" : "Send test"}
+                </button>
+                <button className="button button-quiet" type="button" onClick={disablePush} disabled={pushBusy}>
+                  Disable
+                </button>
+              </>}
+          </div>
+          <p className="fine-print">On iPhone and iPad, add Magic Folio to the Home Screen first. Push requires a supported iOS version and an installed web app.</p>
         </section>
 
         <section className="tool-card">
