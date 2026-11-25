@@ -149,6 +149,9 @@ test("analysis endpoint sends only public SEC facts and metadata to Workers AI",
       AI: { async run(model, input) {
         assert.equal(model, "@cf/zai-org/glm-4.7-flash");
         prompt = input.messages.map((message) => message.content).join("\n");
+        assert.match(input.messages[0].content, /untrusted evidence/);
+        assert.match(prompt, /exact reporting period/);
+        assert.match(prompt, /quarterly duration figures with annual duration figures/);
         return { response: JSON.stringify({
           company_summary: "Apple reported revenue in its latest filing.",
           financial_strengths: ["Revenue was reported."],
