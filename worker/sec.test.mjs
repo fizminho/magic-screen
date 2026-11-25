@@ -166,7 +166,7 @@ test("SEC lookup is rate-limited and handles SEC upstream throttling", async () 
 test("fresh SEC filing metadata is served from D1 without an upstream request", async () => {
   const fetchedAt = new Date().toISOString();
   const { DB, calls } = fakeDb({
-    cache: { fetchedAt, companyName: "Apple Inc." },
+    cache: { cik: "0000320193", fetchedAt, companyName: "Apple Inc." },
     filings: [{
       form: "10-Q", title: "AAPL · 10-Q filed 2026-11-24", summary: "Quarterly report.",
       filingDate: "2026-11-24", reportDate: "2026-09-30",
@@ -206,4 +206,25 @@ test("SEC cache miss persists filing metadata and a six-hour cache marker", asyn
   assert.equal(calls.statements.length, 4);
   assert.match(calls.statements[1].sql, /INSERT INTO sec_filing/);
   assert.match(calls.statements[3].sql, /INSERT INTO sec_fetch_cache/);
+});
+
+test("SEC cache is invalidated when an instrument CIK changes", async () => {
+  const fetchedAt = new Date().toISOString();
+  const { DB, calls } = fakeDb({
+    cache: { cik: "0000789019", fetchedAt, companyName: "Old Company" },
+    filings: []
+  });
+  let fetchCalls = 0;
+  const response = await handleSecRequest(
+    new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
+    new URL(`${origin}/api/sec/filings?symbol=AAPL`),
+    async () => {
+      fetchCalls++;
+      return new Response(JSON.stringify(submissions()), { status: 200 });
+    }
+  );
+  assert.equal(response.status, 200);
+  assert.equal(fetchCalls, 1);
+  assert.equal(calls.batch, 1);
 });
