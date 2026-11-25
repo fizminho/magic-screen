@@ -72,8 +72,33 @@ jobs:
           test "$register_status" = "403"
           login_status="$(curl --silent --output /tmp/login-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/auth/login/options -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' --data '{}')"
           test "$login_status" = "403"
-          private_status="$(curl --silent --output /tmp/credentials-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/auth/credentials)"
           test "$private_status" = "401"
+          # Seed two synthetic owner passkeys and active sessions to verify that
+          # deleting one passkey revokes only its own sessions and preserves the last passkey.
+          target_token="$(openssl rand -hex 32)"
+          backup_token="$(openssl rand -hex 32)"
+          target_hash="$(printf '%s' "$target_token" | sha256sum | awk '{print $1}')"
+          backup_hash="$(printf '%s' "$backup_token" | sha256sum | awk '{print $1}')"
+          now="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          expires="$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%S.000Z)"
+          npx --yes wrangler@4 d1 execute magic-screen-db --local --command "
+            INSERT INTO passkey_credential(id,public_key,algorithm,name,created_at) VALUES
+              ('ci-passkey-revoke-target','ci-public-key',-7,'CI target','$now'),
+              ('ci-passkey-revoke-backup','ci-public-key',-7,'CI backup','$now');
+            INSERT INTO session(token_hash,credential_id,created_at,expires_at,last_seen_at,user_agent) VALUES
+              ('$target_hash','ci-passkey-revoke-target','$now','$expires','$now','CI'),
+              ('$backup_hash','ci-passkey-revoke-backup','$now','$expires','$now','CI');
+          "
+          revoke_status="$(curl --silent --output /tmp/revoke-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/auth/credentials/ci-passkey-revoke-target -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$target_token" --data '{}')"
+          test "$revoke_status" = "200"
+          jq -e '.ok == true and .passkeyCount == 1' /tmp/revoke-response.json >/dev/null
+          remaining_target="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM session WHERE token_hash='$target_hash';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
+          test "$remaining_target" = "0"
+          backup_sessions="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM session WHERE token_hash='$backup_hash';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
+          test "$backup_sessions" = "1"
+          last_key_status="$(curl --silent --output /tmp/last-passkey-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/auth/credentials/ci-passkey-revoke-backup -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
+          test "$last_key_status" = "409"
+          jq -e '.error == "The last passkey cannot be deleted."' /tmp/last-passkey-response.json >/dev/null
       - name: Validate Wrangler bundling and assets without deploying
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 deploy --dry-run
