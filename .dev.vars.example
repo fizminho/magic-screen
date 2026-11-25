@@ -15,4 +15,4 @@ VAPID_PUBLIC_KEY=
 # GEMINI_API_KEY=
 
 # Replace with your real contact email before using SEC EDGAR APIs.
-SEC_USER_AGENT=Magic Folio/0.1 (contact: your-email@example.com)
+SEC_USER_AGENT=
