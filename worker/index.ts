@@ -19,6 +19,8 @@ import { handleSettingsRequest } from "./lib/settings.mjs";
 import { handleExportRequest } from "./lib/export.mjs";
 // @ts-ignore Scheduled job modules are covered by Node regression tests.
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
+// @ts-ignore AI analysis route is covered by Node regression tests.
+import { handleAnalysisRequest } from "./lib/analysis.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -58,6 +60,8 @@ export default {
       response = await handleResearchRequest(request, env, url);
     } else if (url.pathname === "/api/sec/companyfacts") {
       response = await handleSecCompanyFactsRequest(request, env, url);
+    } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/run") {
+      response = await handleAnalysisRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
       response = await handleSettingsRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/export") {
