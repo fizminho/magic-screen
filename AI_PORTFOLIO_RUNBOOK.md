@@ -125,7 +125,7 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 - [ ] **B1.** Run `npm outdated` and `npm audit` on the branch; capture actual output in `docs/CLEANUP_LOG.md`. The branch preflight workflow now runs the production audit. Do not assert a CVE not present in output.
 - [ ] **B2.** (PRs are closed later, in H8.) For each open Dependabot PR from A3: read the diff; if it is a **security fix or a patch/minor bump with green CI**, apply the same version change on the cleanup branch (`npm install pkg@version`). Majors: apply only if the build and tests pass; otherwise note as deferred.
 - [ ] **B3.** `npm audit fix` (no `--force`). If high/critical remain, upgrade the direct dependency manually; if impossible, record the advisory ID and a mitigation.
-- [ ] **B4.** Generate and commit `package-lock.json`, then switch workflows to `npm ci`. The audit is now blocking and build/deploy workflow actions are SHA-pinned. Lockfile generation remains outstanding because no npm runtime is available in this GitHub-only editing session.
+- [x] **B4.** Generated and committed `package-lock.json` (lockfile v3) through a scoped branch workflow. Build, preflight, reset and deploy workflows use `npm ci`; production audit is blocking and actions are SHA-pinned.
 - [x] **B5.** `.github/dependabot.yml` groups minor and patch npm updates and retains the GitHub Actions ecosystem.
 - [x] **B6.** Added `.dev.vars.example` with names/placeholders only; `.gitignore` ignores local secrets while explicitly allowing the example file, `.env*`, and `backup-*.sql`.
 - [ ] **B7.** Verify no secrets in history: `git log -p | grep -iE "(api[_-]?key|secret|cookie|token)\s*[:=]"` and review hits manually.
