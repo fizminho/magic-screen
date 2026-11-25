@@ -9,6 +9,7 @@ SETUP_TOKEN=
 
 # Optional public VAPID key for Web Push. Never put the private key here.
 VAPID_PUBLIC_KEY=
+VAPID_SUBJECT=mailto:you@example.com
 
 # Configure these as Worker secrets only when the matching feature is implemented.
 # VAPID_PRIVATE_KEY=
