@@ -154,7 +154,7 @@ export async function handleSecCompanyFactsRequest(request, env, url, fetcher = 
         Number.isFinite(Date.parse(cached.fetchedAt)) &&
         Date.now() - Date.parse(cached.fetchedAt) < CACHE_SECONDS * 1000) {
       try {
-        return jsonResponse({ ...JSON.parse(cached.factsJson), cached: true });
+        return jsonResponse({ ...JSON.parse(cached.factsJson), fetchedAt: cached.fetchedAt, cached: true });
       } catch {
         // A malformed cache is discarded and refreshed from the official SEC endpoint.
       }
