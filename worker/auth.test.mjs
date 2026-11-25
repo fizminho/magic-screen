@@ -67,9 +67,11 @@ test("challenge parser binds registration and login to different ceremony types"
   const encode = (value) => base64url(new TextEncoder().encode(JSON.stringify(value)));
   const registration = encode({ type: "webauthn.create", challenge: "registration-challenge" });
   const login = encode({ type: "webauthn.get", challenge: "login-challenge" });
+  const crossOrigin = encode({ type: "webauthn.create", challenge: "cross-origin", crossOrigin: true });
   assert.equal(decodeClientChallenge(registration), "registration-challenge");
   assert.equal(decodeClientChallenge(login), null);
   assert.equal(decodeClientChallenge(login, "webauthn.get"), "login-challenge");
+  assert.equal(decodeClientChallenge(crossOrigin), null);
   assert.equal(decodeClientChallenge("not-valid"), null);
 });
 
