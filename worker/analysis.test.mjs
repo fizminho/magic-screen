@@ -234,3 +234,56 @@ test("research inbox does not expose briefs without an owner session", async () 
   );
   assert.equal(response.status, 401);
 });
+
+
+test("research inbox requires owner session and returns only owned instruments", async () => {
+  const queries = [];
+  const DB = {
+    prepare(sql) {
+      queries.push(sql);
+      return {
+        bind() { return this; },
+        async first() {
+          if (sql.includes("FROM session WHERE token_hash")) return {
+            token_hash: "session-hash", credential_id: "credential-1",
+            expires_at: new Date(Date.now() + 60_000).toISOString(),
+            last_seen_at: new Date().toISOString()
+          };
+          return null;
+        },
+        async all() {
+          if (sql.includes("FROM analysis a JOIN instrument")) return { results: [{
+            outputJson: JSON.stringify({
+              symbol: "AAPL", company_summary: "Latest public filing summary.",
+              financial_strengths: [], financial_risks: [], filing_signals: [], unknowns: [],
+              confidence: "medium", source_accessions: []
+            }),
+            createdAt: "2026-11-25T01:00:00.000Z"
+          }] };
+          return { results: [] };
+        }
+      };
+    }
+  };
+  const unauthDb = {
+    prepare(sql) {
+      return { bind() { return this; }, async first() { return null; }, async all() { return { results: [] }; } };
+    }
+  };
+  const unauth = await handleAnalysisRequest(
+    new Request(`${origin}/api/analysis/briefs`, { headers: { cookie } }),
+    { ...envConfig, DB: unauthDb }, new URL(`${origin}/api/analysis/briefs`)
+  );
+  assert.equal(unauth.status, 401);
+
+  const response = await handleAnalysisRequest(
+    new Request(`${origin}/api/analysis/briefs`, { headers: { cookie } }),
+    { ...envConfig, DB }, new URL(`${origin}/api/analysis/briefs`)
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.briefs.length, 1);
+  assert.equal(body.briefs[0].symbol, "AAPL");
+  assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /EXISTS \(SELECT 1 FROM holding/);
+  assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /EXISTS \(SELECT 1 FROM watchlist/);
+});
