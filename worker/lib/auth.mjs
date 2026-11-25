@@ -5,6 +5,7 @@ const COOKIE_LOCAL = "magicfolio_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 const CHALLENGE_SECONDS = 120;
 const MAX_BODY_BYTES = 32 * 1024;
+const SETUP_TOKEN_MIN_LENGTH = 32;
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), {
   status,
@@ -110,9 +111,9 @@ async function authorizeRegistration(request, env) {
   const count = await passkeyCount(env);
   const session = await sessionFor(request, env);
   if (count > 0 && session) return { count, session, setup: false };
-  if (count === 0 && env.SETUP_TOKEN && env.SETUP_TOKEN.length >= 43) {
+  if (count === 0 && env.SETUP_TOKEN && env.SETUP_TOKEN.length >= SETUP_TOKEN_MIN_LENGTH) {
     const supplied = request.headers.get("x-setup-token") || "";
-    if (supplied.length >= 24 && supplied.length <= 256 &&
+    if (supplied.length >= SETUP_TOKEN_MIN_LENGTH && supplied.length <= 256 &&
         constantTimeEqual(await sha256Hex(supplied), await sha256Hex(env.SETUP_TOKEN))) {
       return { count, session: null, setup: true };
     }
