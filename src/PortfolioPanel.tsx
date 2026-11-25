@@ -62,6 +62,8 @@ type PublicResearchBrief = {
 };
 
 
+type ResearchInboxItem = { symbol: string; brief: PublicResearchBrief; createdAt: string };
+
 type ResearchResult = {
   brief: PublicResearchBrief;
   model: string;
@@ -141,6 +143,9 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [secLoadingSymbol, setSecLoadingSymbol] = useState("");
   const [researchLoadingSymbol, setResearchLoadingSymbol] = useState("");
   const [researchResult, setResearchResult] = useState<(ResearchResult & { symbol: string }) | null>(null);
+  const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
+  const [researchInboxLoading, setResearchInboxLoading] = useState(true);
+  const [researchInboxSymbol, setResearchInboxSymbol] = useState("");
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -467,6 +472,35 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setResearchLoadingSymbol(""); }
   }
 
+  async function refreshResearchInbox() {
+    setResearchInboxLoading(true);
+    try {
+      const result = await api<{ briefs: ResearchInboxItem[] }>("/api/analysis/briefs");
+      setResearchInbox(result.briefs);
+    } catch (cause) {
+      const status = cause instanceof Error ? (cause as Error & { status?: number }).status : undefined;
+      if (status !== 401) onError(cause instanceof Error ? cause.message : "Unable to load research inbox.");
+    } finally { setResearchInboxLoading(false); }
+  }
+
+  async function openInboxBrief(symbol: string) {
+    setResearchInboxSymbol(symbol);
+    onError(""); onNotice("");
+    try {
+      const result = await api<ResearchResult & { brief: PublicResearchBrief | null }>(
+        `/api/analysis/latest?symbol=${encodeURIComponent(symbol)}`
+      );
+      if (!result.brief) throw new Error("This brief is no longer available for an instrument in your portfolio or watchlist.");
+      setResearchResult({ ...result, brief: result.brief, symbol });
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to open this research brief.");
+    } finally { setResearchInboxSymbol(""); }
+  }
+
+  useEffect(() => {
+    void refreshResearchInbox();
+  }, []);
+
   async function refreshUsQuotes() {
     if (!marketToken.trim()) { onError("Save your Market Data API token first."); return; }
     const symbols = [...new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol))];
@@ -648,12 +682,12 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           <div><span className="eyebrow">SCHEDULED & SAVED ANALYSIS</span><h3>Research inbox</h3></div>
           <div className="row-actions">
             <span className="holding-count">{researchInbox.length} briefs</span>
-            <button className="button button-small" type="button" onClick={refreshResearchInbox} disabled={inboxLoading}>
+            <button className="button button-small" type="button" onClick={refreshResearchInbox} disabled={researchInboxLoading}>
               {researchInboxLoading ? "Refreshing…" : "Refresh"}
             </button>
           </div>
         </div>
-        {inboxLoading ? <p>Loading saved research…</p> :
+        {researchInboxLoading ? <p>Loading saved research…</p> :
           researchInbox.length === 0 ? <p>No research briefs yet. Run Research on a US holding or watchlist item with a configured SEC CIK. Scheduled briefs will appear here after new SEC filings are processed.</p> :
           <div className="research-inbox-list">
             {researchInbox.map((item) => (
@@ -664,7 +698,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <small>{formatDate(item.createdAt)}</small>
                 </div>
                 <p>{item.brief.company_summary}</p>
-                <button className="button button-small" type="button" onClick={() => openInboxBrief(item)}>
+                <button className="button button-small" type="button" onClick={() => openInboxBrief(item.symbol)}>
                   Read brief
                 </button>
               </article>
