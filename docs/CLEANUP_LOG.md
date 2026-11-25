@@ -134,3 +134,14 @@ Preflight run `45528932617` on commit `89a5e20ee781d4486368da71846eacec65410e0b`
 - CSP now permits only `https://api.marketdata.app` as an additional browser connection origin; scripts and styles remain self-hosted with no inline allowance.
 - CI passed on branch commit `c84c002a41af21091de23e796693595e008eac9c`: locked install, production build, full dependency audit (0 vulnerabilities), Node regression suite, fresh local D1 migrations/schema checks, destructive reset exercise against local D1 only, Worker auth/portfolio/quote smoke tests, and Wrangler dry-run. No production D1 reset or deployment occurred.
 - Outstanding: SEC EDGAR filing adapter and CIK mapping, scheduled jobs, Gemini, push notifications, PWA, full dashboard/insights screens, device-level passkey tests, GitHub repository security settings and Git-history secret review.
+
+
+### SEC EDGAR filing metadata
+
+- Added optional 10-digit CIK storage to US instruments through migration `0003_sec_company_identifier.sql`; CIK can be entered on holdings/watchlist forms or imported through the holdings CSV.
+- Added owner-only `GET /api/sec/filings?symbol=...` using the official SEC submissions JSON API and a required `SEC_USER_AGENT` containing the owner's real contact email.
+- The endpoint returns selected recent filing metadata and official SEC links only; no filing body is mirrored.
+- Added a six-hour per-instrument D1 response cache and 30-day metadata retention in migration `0004_sec_filing_cache.sql`.
+- SEC cache misses are limited to five upstream lookups per source IP per hour. Cached responses do not consume the upstream lookup allowance.
+- Added fixture tests for filing filtering, accession/CIK binding, archive URL construction, owner-session gating, missing contact header, cache hit/miss and upstream throttling.
+- Outstanding: automatic ticker-to-CIK lookup, companyfacts/fundamentals, scheduled SEC refresh and SEC filing alert rules.
