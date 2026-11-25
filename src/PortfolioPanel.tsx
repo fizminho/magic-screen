@@ -7,6 +7,7 @@ import type { QuoteSnapshot } from "./providers/types";
 type Holding = {
   symbol: string;
   market: "US" | "MY";
+  cik: string | null;
   name: string;
   currency: "USD" | "MYR";
   quantity: number;
@@ -45,6 +46,7 @@ type Dashboard = {
 type WatchlistItem = {
   symbol: string;
   market: "US" | "MY";
+  cik: string | null;
   name: string;
   currency: "USD" | "MYR";
   note: string | null;
@@ -92,6 +94,12 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [watchSymbol, setWatchSymbol] = useState("");
   const [watchMarket, setWatchMarket] = useState<"US" | "MY">("US");
   const [watchNote, setWatchNote] = useState("");
+  const [watchCik, setWatchCik] = useState("");
+  const [cik, setCik] = useState("");
+  const [secSymbol, setSecSymbol] = useState("");
+  const [secCompanyName, setSecCompanyName] = useState("");
+  const [secFilings, setSecFilings] = useState<Array<{form:string;title:string;summary:string;filingDate:string;reportDate:string|null;url:string;accessionNumber:string}>>([]);
+  const [secLoading, setSecLoading] = useState(false);
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -161,11 +169,12 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             market,
             quantity: nextQuantity,
             avgCost: nextAvgCost,
-            notes: notes.trim() || null
+            notes: notes.trim() || null,
+            cik: market === "US" ? (cik.trim() || null) : null
           }]
         })
       });
-      setSymbol(""); setQuantity(""); setAvgCost(""); setNotes("");
+      setSymbol(""); setQuantity(""); setAvgCost(""); setNotes(""); setCik("");
       await refreshPortfolio();
       onNotice("Holding saved.");
     } catch (cause) {
@@ -209,10 +218,11 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       await api("/api/watchlist", {
         method: "POST",
         body: JSON.stringify({ items: [{
-          symbol: watchSymbol.trim().toUpperCase(), market: watchMarket, note: watchNote.trim() || null
+          symbol: watchSymbol.trim().toUpperCase(), market: watchMarket, note: watchNote.trim() || null,
+          cik: watchMarket === "US" ? (watchCik.trim() || null) : null
         }] })
       });
-      setWatchSymbol(""); setWatchNote("");
+      setWatchSymbol(""); setWatchNote(""); setWatchCik("");
       await refreshWatchlist();
       onNotice("Watchlist item saved.");
     } catch (cause) {
@@ -247,6 +257,23 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     }
     await refreshPortfolio();
     return { saved, unmatched };
+  }
+
+  async function loadSecFilings(item: { symbol: string; market: "US" | "MY"; cik: string | null }) {
+    if (item.market !== "US") { onError("SEC filings are available for US instruments only."); return; }
+    if (!item.cik) { onError("Add the SEC CIK to this instrument first."); return; }
+    onError(""); onNotice(""); setSecLoading(true);
+    try {
+      const result = await api<{ companyName: string; filings: Array<{ form: string; title: string; summary: string; filingDate: string; reportDate: string | null; url: string; accessionNumber: string }> }>(
+        `/api/sec/filings?symbol=${encodeURIComponent(item.symbol)}`
+      );
+      setSecSymbol(item.symbol);
+      setSecCompanyName(result.companyName);
+      setSecFilings(result.filings);
+      onNotice(`Loaded ${result.filings.length} recent SEC filings for ${item.symbol}.`);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to load SEC filings.");
+    } finally { setSecLoading(false); }
   }
 
   async function refreshUsQuotes() {
