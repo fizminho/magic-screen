@@ -32,7 +32,7 @@ function validDate(value) {
 
 function safeUserAgent(value) {
   return typeof value === "string" && value.length >= 12 && value.length <= 200 &&
-    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) && !/[\r\n]/.test(value);
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) && !/@(?:example\.(?:com|org|net)|invalid)$/i.test(value) && !/(?:your-email|yourname|test@)/i.test(value) && !/[\r\n]/.test(value);
 }
 
 function accessionMatchesCik(accession, cik) {
