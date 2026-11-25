@@ -18,10 +18,10 @@ cp .dev.vars.example .dev.vars
 
 Generate a long random local `SETUP_TOKEN` and set it in `.dev.vars`. Keep `RP_ID=localhost`, `RP_ORIGIN=http://localhost:8787` and `APP_ENV=development` for local testing. Never commit `.dev.vars`.
 
-Then run:
+Run the Worker and static assets together so the browser can reach the `/api/auth/*` routes:
 
 ```bash
-npm run dev
+npm run cf:dev
 ```
 
 ## First production passkey
