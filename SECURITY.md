@@ -10,7 +10,7 @@ Magic Folio is a private, single-owner portfolio research application. Portfolio
 - The first passkey requires the temporary `SETUP_TOKEN` Worker secret. Subsequent passkeys require an authenticated owner session.
 - Register at least two passkeys on separate devices before removing `SETUP_TOKEN`.
 - Session cookies are HttpOnly and SameSite=Strict. Production uses the `__Host-session` cookie with Secure and Path=/; local development uses a non-`__Host-` cookie over localhost.
-- D1 stores only SHA-256 session-token hashes. Sessions expire after 7 days idle or 30 days absolute. Last-seen writes are throttled to once per hour.
+- D1 stores only SHA-256 session-token hashes and binds each session to the passkey that created it. Removing a passkey revokes its sessions. Sessions expire after 7 days idle or 30 days absolute. Last-seen writes are throttled to once per hour.
 - Auth endpoints require the exact configured Origin and JSON content type for state-changing requests. Challenges and failed-verification attempts are rate limited.
 - Credential counters are checked when authenticators provide a non-zero counter. Synced passkeys that report zero remain supported.
 - Credential listing, renaming, deletion and sign-out-everywhere endpoints require an owner session. Deletion is atomic and refuses to remove the final passkey.
