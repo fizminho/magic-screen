@@ -2,6 +2,7 @@ import { parseSecSubmissions } from "../lib/sec.mjs";
 import { parseSecCompanyFacts } from "../lib/sec-companyfacts.mjs";
 import { dispatchFilingAlerts, dispatchHoldingMoveAlerts } from "../lib/alerts.mjs";
 
+const SEC_TICKER_DIRECTORY = "https://www.sec.gov/files/company_tickers.json";
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
 const SEC_COMPANYFACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK";
 const FACTS_TTL_MS = 6 * 60 * 60 * 1000;
@@ -36,6 +37,44 @@ async function fetchJson(url, userAgent, fetcher) {
   if (response.status === 429) throw new Error("sec_rate_limited");
   if (!response.ok) throw new Error("sec_unavailable");
   return response.json();
+}
+
+async function backfillMissingCiks(env, userAgent, fetcher) {
+  const missing = await env.DB.prepare(
+    "SELECT i.id,i.symbol FROM instrument i LEFT JOIN holding h ON h.instrument_id=i.id " +
+    "LEFT JOIN watchlist w ON w.instrument_id=i.id WHERE i.market='US' AND i.active=1 " +
+    "AND i.cik IS NULL AND (h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) " +
+    "ORDER BY i.symbol LIMIT 100"
+  ).all();
+  const instruments = missing.results || [];
+  if (!instruments.length) return 0;
+
+  let payload;
+  try {
+    payload = await fetchJson(SEC_TICKER_DIRECTORY, userAgent, fetcher);
+  } catch (error) {
+    console.warn("SEC CIK directory lookup failed:", error instanceof Error ? error.message : "unknown");
+    return 0;
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return 0;
+  const byTicker = new Map();
+  for (const entry of Object.values(payload)) {
+    if (!entry || typeof entry !== "object" || typeof entry.ticker !== "string") continue;
+    const ticker = entry.ticker.trim().toUpperCase();
+    const cikNumber = Number(entry.cik_str);
+    if (!ticker || !Number.isInteger(cikNumber) || cikNumber <= 0 || cikNumber > 9_999_999_999) continue;
+    if (!byTicker.has(ticker)) byTicker.set(ticker, String(cikNumber).padStart(10, "0"));
+  }
+
+  let resolved = 0;
+  for (const instrument of instruments) {
+    const cik = byTicker.get(String(instrument.symbol).toUpperCase());
+    if (!cik) continue;
+    await env.DB.prepare("UPDATE instrument SET cik=? WHERE id=? AND cik IS NULL")
+      .bind(cik, instrument.id).run();
+    resolved++;
+  }
+  return resolved;
 }
 
 async function storeFilings(env, instrument, filings, companyName, fetchedAt) {
@@ -96,6 +135,7 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
 
   try {
     if (!validUserAgent(env.SEC_USER_AGENT)) throw new Error("sec_user_agent_not_configured");
+    const cikResolved = await backfillMissingCiks(env, env.SEC_USER_AGENT, fetcher);
     const cursorRow = await env.DB.prepare(
       "SELECT value FROM setting WHERE key='sec_refresh_cursor'"
     ).first();
@@ -164,13 +204,13 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
     const status = failed > 0 ? (refreshed ? "partial" : "failed") : !instruments.length ? "skipped_no_data" : newFilingCount ? "success" : "skipped_no_new_data";
     const detail = JSON.stringify({
       instruments: instruments.length, refreshed, failed, filings: filingCount, newFilings: newFilingCount,
-      companyfactsUpdated: factsUpdated, companyfactsCached: factsCached, pushAlertsSent, rateLimited,
+      companyfactsUpdated: factsUpdated, companyfactsCached: factsCached, cikResolved, pushAlertsSent, rateLimited,
       reason: instruments.length ? undefined : "no_owned_us_instruments_with_cik"
     }).slice(0, 1000);
     await env.DB.prepare(
       "UPDATE job_run SET finished_at=?,status=?,detail=? WHERE id=?"
     ).bind(new Date().toISOString(), status, detail, jobId).run();
-    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached, pushAlertsSent, rateLimited };
+    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached, cikResolved, pushAlertsSent, rateLimited };
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     await env.DB.prepare(
