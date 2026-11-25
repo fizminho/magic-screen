@@ -22,7 +22,7 @@ function fakeDb({ authenticated = true, rows = [], changes = 1, deleted = true }
               last_seen_at: new Date().toISOString()
             } : null;
           }
-          if (sql.startsWith("DELETE FROM holding")) return deleted ? { instrument_id: 7 } : null;
+          if (sql.startsWith("DELETE FROM holding") || sql.startsWith("DELETE FROM watchlist")) return deleted ? { instrument_id: 7 } : null;
           return null;
         },
         async all() { return { results: rows }; },
@@ -152,5 +152,96 @@ test("holding deletion returns 404 when the holding does not exist", async () =>
     headers: { origin, cookie, "content-type": "application/json" },
     body: "{}"
   }), { ...envConfig, DB }, "/api/holdings/MY/1155");
+  assert.equal(response.status, 404);
+});
+
+test("watchlist cannot be read without an owner session", async () => {
+  const { DB } = fakeDb({ authenticated: false });
+  const response = await handlePortfolioRequest(
+    new Request(`${origin}/api/watchlist`), { ...envConfig, DB }, "/api/watchlist"
+  );
+  assert.equal(response.status, 401);
+});
+
+test("watchlist list returns owner-only rows with quote status", async () => {
+  const row = { symbol: "MSFT", market: "US", note: "Watch earnings", quoteStatus: "stale" };
+  const { DB } = fakeDb({ rows: [row] });
+  const response = await handlePortfolioRequest(
+    new Request(`${origin}/api/watchlist`, { headers: { cookie } }),
+    { ...envConfig, DB }, "/api/watchlist"
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { items: [row] });
+});
+
+test("watchlist additions require same Origin and an owner session", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [] })
+  }), { ...envConfig, DB }, "/api/watchlist");
+  assert.equal(response.status, 403);
+  assert.equal(calls.batch, 0);
+});
+
+test("watchlist additions upsert instruments and notes in one bounded D1 batch", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [
+      { symbol: "MSFT", market: "US", note: "Watch earnings" },
+      { symbol: "1155", market: "MY" }
+    ] })
+  }), { ...envConfig, DB }, "/api/watchlist");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { added: 2 });
+  assert.equal(calls.batch, 1);
+  assert.equal(calls.statements.length, 4);
+  assert.deepEqual(calls.statements[0].values, ["MSFT", "US", "MSFT", "MSFT", "USD"]);
+  assert.deepEqual(calls.statements[1].values.slice(0, 1), ["Watch earnings"]);
+});
+
+test("watchlist rejects invalid or duplicate items before D1 writes", async () => {
+  const { DB, calls } = fakeDb();
+  const invalid = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [{ symbol: "MSFT", market: "OTHER" }] })
+  }), { ...envConfig, DB }, "/api/watchlist");
+  assert.equal(invalid.status, 400);
+
+  const duplicate = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [
+      { symbol: "MSFT", market: "US" },
+      { symbol: "MSFT", market: "US" }
+    ] })
+  }), { ...envConfig, DB }, "/api/watchlist");
+  assert.equal(duplicate.status, 400);
+  assert.equal(calls.batch, 0);
+});
+
+test("watchlist deletion removes an item only after owner session and Origin checks", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/watchlist/MY/1155`, {
+    method: "DELETE",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: "{}"
+  }), { ...envConfig, DB }, "/api/watchlist/MY/1155");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { deleted: true, market: "MY", symbol: "1155" });
+  assert.match(calls.prepared.at(-1).sql, /^DELETE FROM watchlist/);
+});
+
+test("watchlist deletion returns 404 for an unknown item", async () => {
+  const { DB } = fakeDb({ deleted: false });
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/watchlist/US/UNKNOWN`, {
+    method: "DELETE",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: "{}"
+  }), { ...envConfig, DB }, "/api/watchlist/US/UNKNOWN");
   assert.equal(response.status, 404);
 });
