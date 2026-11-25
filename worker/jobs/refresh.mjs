@@ -3,7 +3,7 @@ import { parseSecCompanyFacts } from "../lib/sec-companyfacts.mjs";
 
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
 const SEC_COMPANYFACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK";
-const FACTS_TTL_MS = 24 * 60 * 60 * 1000;
+const FACTS_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_INSTRUMENTS = 8;
 const SEC_PAUSE_MS = 550;
 
