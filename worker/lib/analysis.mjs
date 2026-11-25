@@ -8,6 +8,7 @@ import {
 const MODEL = "@cf/zai-org/glm-4.7-flash";
 const CACHE_MS = 24 * 60 * 60 * 1000;
 const DAILY_LIMIT = 5;
+const MAX_SCHEDULED_CANDIDATES = 8;
 const MAX_INPUT_CHARS = 18_000;
 
 function validSymbol(value) {
@@ -171,10 +172,11 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
       "WHERE i.market='US' AND i.active=1 AND (h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) " +
       "AND f.filing_date>=? AND i.cik IS NOT NULL " +
       "ORDER BY i.symbol LIMIT ?"
-    ).bind(cutoff, Math.min(8, Math.max(1, maxBriefs))).all();
+    ).bind(cutoff, MAX_SCHEDULED_CANDIDATES).all();
     const instruments = candidates.results || [];
 
     for (const instrument of instruments) {
+      if (generated >= Math.min(5, Math.max(1, maxBriefs))) break;
       try {
         const factsRow = await env.DB.prepare(
           "SELECT cik,fetched_at AS fetchedAt,facts_json AS factsJson FROM sec_companyfacts_cache WHERE instrument_id=?"
@@ -252,6 +254,7 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
     const status = !instruments.length ? "skipped_no_new_data"
       : failed && (generated || cachedCount) ? "partial"
       : failed ? "failed"
+      : quotaExhausted && (generated || cachedCount) ? "partial"
       : quotaExhausted ? "skipped_quota"
       : generated || cachedCount ? "success"
       : "skipped_no_usable_data";
