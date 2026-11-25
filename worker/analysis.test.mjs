@@ -185,3 +185,52 @@ test("analysis endpoint atomically blocks requests beyond the daily quota", asyn
   assert.equal(called, false);
   assert.equal(calls.analysisWrites, 0);
 });
+
+
+test("research inbox requires an owner session and returns only saved briefs for owned US instruments", async () => {
+  const calls = [];
+  const DB = {
+    prepare(sql) {
+      const statement = {
+        values: [],
+        bind(...values) { this.values = values; return this; },
+        async first() {
+          if (sql.includes("FROM session WHERE token_hash")) return {
+            token_hash: "session-hash", credential_id: "credential-1",
+            expires_at: new Date(Date.now() + 60_000).toISOString(),
+            last_seen_at: new Date().toISOString()
+          };
+          return null;
+        },
+        async all() {
+          calls.push(sql);
+          return { results: [
+            { outputJson: JSON.stringify({ symbol: "AAPL", company_summary: "Recent public filing summary.", confidence: "medium" }), model: "@cf/zai-org/glm-4.7-flash", createdAt: "2026-11-25T01:00:00.000Z" },
+            { outputJson: "{invalid", model: "bad", createdAt: "2026-11-24T01:00:00.000Z" }
+          ] };
+        },
+        async run() { return { meta: { changes: 1 } }; }
+      };
+      return statement;
+    }
+  };
+  const request = new Request(`${origin}/api/analysis/inbox`, { headers: { cookie } });
+  const response = await handleAnalysisRequest(request, { ...envConfig, DB }, new URL(`${origin}/api/analysis/inbox`));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.briefs.length, 1);
+  assert.equal(body.briefs[0].brief.symbol, "AAPL");
+  assert.match(calls[0], /EXISTS\(SELECT 1 FROM holding/);
+  assert.match(calls[0], /EXISTS\(SELECT 1 FROM watchlist/);
+  assert.match(calls[0], /ORDER BY a.created_at DESC LIMIT 50/);
+});
+
+test("research inbox does not expose briefs without an owner session", async () => {
+  const { DB } = analysisDb({ authenticated: false });
+  const response = await handleAnalysisRequest(
+    new Request(`${origin}/api/analysis/inbox`, { headers: { cookie } }),
+    { ...envConfig, DB },
+    new URL(`${origin}/api/analysis/inbox`)
+  );
+  assert.equal(response.status, 401);
+});
