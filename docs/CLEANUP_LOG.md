@@ -56,3 +56,19 @@ The destructive workflow has **not** been executed. It will remain blocked until
 - Outstanding: inspect actual audit/outdated output, verify secret history and enable repository security settings.
 - Outstanding: delete the Cloudflare `MFI_SESSION_COOKIE` secret only after the new Worker has been deployed successfully.
 - No production D1 reset or Cloudflare secret deletion has been performed.
+
+
+### CI verification and dependency triage
+
+Latest branch preflight on `97e85ba043f33a7b4c3a5c09da700306b76565a0` completed successfully:
+
+- `npm ci`: passed.
+- `npm run build`: passed (TypeScript + Vite).
+- `npm audit --audit-level=high`: passed, **0 vulnerabilities** across production and development dependencies.
+- `node --experimental-strip-types --test worker/*.test.mjs`: passed.
+- `npx --yes wrangler@4 deploy --dry-run`: passed.
+- `npm outdated`: only major-version upgrades available in the reviewed list: React/React DOM 19, Vite 8, TypeScript 7, React types 19 and plugin-react 6. Current compatible major versions were retained to avoid unnecessary migration risk.
+- Open Dependabot PRs reviewed: #75, #77, #79, #80, #81, #82, #83. All represent major upgrades or an obsolete dependency PR; no security patch/minor upgrade was found. PR #81 for `lucide-react` is obsolete because that dependency was removed from the project.
+- A TypeScript import typing error in the new Worker shell was found by CI and fixed with an explicit JS helper boundary. The subsequent preflight passed all checks.
+
+The latest passing preflight is linked from the repository Actions page. Earlier failures were caused by a typo in the pinned setup-node SHA and the TypeScript declaration boundary; both were corrected before the passing run.
