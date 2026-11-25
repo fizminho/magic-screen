@@ -127,10 +127,12 @@ function formatCachedFiling(row, symbol, cik) {
 
 async function readCachedFilings(env, instrumentId, symbol, cik) {
   const cache = await env.DB.prepare(
-    "SELECT cik, fetched_at AS fetchedAt, company_name AS companyName FROM sec_fetch_cache WHERE instrument_id=?"
+    "SELECT cik, fetched_at, company_name FROM sec_fetch_cache WHERE instrument_id=?"
   ).bind(instrumentId).first();
-  if (!cache || cache.cik !== cik || !Number.isFinite(Date.parse(cache.fetchedAt)) ||
-      Date.now() - Date.parse(cache.fetchedAt) >= CACHE_SECONDS * 1000) return null;
+  const cacheCik = cache?.cik == null ? "" : String(cache.cik).padStart(10, "0");
+  const cachedAt = cache?.fetched_at || cache?.fetchedAt;
+  if (!cache || cacheCik !== cik || !Number.isFinite(Date.parse(cachedAt)) ||
+      Date.now() - Date.parse(cachedAt) >= CACHE_SECONDS * 1000) return null;
 
   const rows = await env.DB.prepare(
     "SELECT form, title, summary, filing_date AS filingDate, report_date AS reportDate, " +
@@ -139,7 +141,7 @@ async function readCachedFilings(env, instrumentId, symbol, cik) {
     "ORDER BY filing_date DESC LIMIT 20"
   ).bind(instrumentId, cik).all();
   return {
-    companyName: cache.companyName,
+    companyName: cache.company_name || cache.companyName,
     filings: (rows.results || []).map((row) => formatCachedFiling(row, symbol, cik)),
     cached: true
   };
