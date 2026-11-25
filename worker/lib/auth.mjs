@@ -100,7 +100,7 @@ async function authorizeRegistration(request, env) {
   const count = await passkeyCount(env);
   const session = await sessionFor(request, env);
   if (count > 0 && session) return { count, session, setup: false };
-  if (count === 0 && env.SETUP_TOKEN) {
+  if (count === 0 && env.SETUP_TOKEN && env.SETUP_TOKEN.length >= 32) {
     const supplied = request.headers.get("x-setup-token") || "";
     if (supplied.length >= 24 && supplied.length <= 256 &&
         constantTimeEqual(await sha256Hex(supplied), await sha256Hex(env.SETUP_TOKEN))) {
@@ -134,6 +134,7 @@ async function recordAttempt(request, env, kind, limit) {
 
 async function issueChallenge(env, purpose) {
   const challenge = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  await env.DB.prepare("DELETE FROM auth_challenge WHERE expires_at <= ?").bind(nowIso()).run();
   await env.DB.prepare(
     "INSERT INTO auth_challenge(challenge, purpose, expires_at) VALUES(?,?,?)"
   ).bind(challenge, purpose, addSeconds(CHALLENGE_SECONDS)).run();
@@ -168,7 +169,7 @@ function algorithmName(algorithm) {
 
 async function handleState(request, env) {
   const [count, session] = await Promise.all([passkeyCount(env), sessionFor(request, env)]);
-  return json({ registered: count > 0, authenticated: Boolean(session), passkeyCount: count, needsSetup: count === 0 });
+  return json({ configured: count > 0, registered: count > 0, authenticated: Boolean(session), passkeyCount: count, needsSetup: count === 0 });
 }
 
 async function registerOptions(request, env) {
@@ -176,6 +177,7 @@ async function registerOptions(request, env) {
   await recordAttempt(request, env, "options", 10);
   await authorizeRegistration(request, env);
   const challenge = await issueChallenge(env, "register");
+  const existing = await env.DB.prepare("SELECT id FROM passkey_credential ORDER BY created_at").all();
   const proposedOwnerHandle = await ownerHandle(env);
   await env.DB.prepare("INSERT OR IGNORE INTO setting(key,value) VALUES('owner_user_handle',?)")
     .bind(proposedOwnerHandle).run();
@@ -183,26 +185,31 @@ async function registerOptions(request, env) {
   return json({
     challenge,
     user: { id: userId, name: "Magic Folio owner", displayName: "Magic Folio" },
-    rpId: getRp(env, request).rpId
+    rpId: getRp(env, request).rpId,
+    rpName: env.RP_NAME || "Magic Folio",
+    excludeCredentials: (existing.results || []).map((row) => ({ id: row.id, type: "public-key" }))
   });
 }
 
 async function registerVerify(request, env) {
   checkOrigin(request, env);
-  const authorization = await authorizeRegistration(request, env);
   const payload = await bodyJson(request);
   const challenge = payload?.response?.clientDataJSON
     ? decodeClientChallenge(payload.response.clientDataJSON)
     : null;
   if (!await consumeChallenge(env, challenge, "register")) return json({ error: "Registration expired. Try again." }, 400);
+  const authorization = await authorizeRegistration(request, env);
 
   const { origin, rpId } = getRp(env, request);
-  const verified = await webauthn.verifyRegistration(payload, {
-    challenge,
-    origin,
-    domain: rpId,
-    userVerified: true
-  });
+  let verified;
+  try {
+    verified = await webauthn.verifyRegistration(payload, {
+      challenge, origin, domain: rpId, userVerified: true
+    });
+  } catch {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Passkey registration could not be verified." }, 400);
+  }
 
   const credential = verified.credential;
   if (!credential?.id || !credential.publicKey || !credential.algorithm) {
@@ -247,6 +254,14 @@ async function registerVerify(request, env) {
   });
 }
 
+function decodeBase64urlText(encoded) {
+  try {
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(normalized);
+    return new TextDecoder().decode(Uint8Array.from(raw, (character) => character.charCodeAt(0)));
+  } catch { return null; }
+}
+
 function decodeClientChallenge(encoded, expectedType = "webauthn.create") {
   try {
     const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
@@ -286,6 +301,12 @@ async function loginVerify(request, env) {
     "SELECT id, public_key, algorithm, counter FROM passkey_credential WHERE id = ?"
   ).bind(credentialId).first();
   if (!row) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Sign-in failed." }, 401);
+  }
+
+  const owner = await env.DB.prepare("SELECT value FROM setting WHERE key='owner_user_handle'").first();
+  if (!owner?.value || decodeBase64urlText(payload?.response?.userHandle || "") !== owner.value) {
     await recordAttempt(request, env, "verify_fail", 5);
     return json({ error: "Sign-in failed." }, 401);
   }
