@@ -68,3 +68,9 @@ jobs:
         run: bash scripts/reset-production-d1.sh
       - name: Deploy the replacement Worker and assets
         run: npx --yes wrangler@4 deploy
+      - name: Verify live Worker health
+        shell: bash
+        run: |
+          set -euo pipefail
+          RP_ORIGIN="$(sed -n 's/^RP_ORIGIN = "\([^"]*\)"/\1/p' wrangler.toml)"
+          curl --fail --silent --show-error "$RP_ORIGIN/api/health" | jq -e '.ok == true and .service == "magic-folio"'
