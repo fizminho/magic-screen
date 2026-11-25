@@ -296,9 +296,9 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   async function sendTestPush() {
     onError(""); onNotice(""); setPushBusy(true);
     try {
-      const result = await api<{ sent: number; removed: number }>("/api/push/test", { method: "POST", body: "{}" });
-      onNotice(result.sent ? "Test notification sent. Check this device." : "No active push subscription received the test.");
-      if (result.removed) setPushState("not-subscribed");
+      const result = await api<{ attempted: number; sent: number; removed: number; failed: number }>("/api/push/test", { method: "POST", body: "{}" });
+      onNotice(`Push test: ${result.sent} sent, ${result.failed} failed, ${result.removed} expired subscription(s) removed.`);
+      if (result.attempted > 0 && result.sent === 0 && result.removed > 0) setPushState("not-subscribed");
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to send a test notification.");
     } finally { setPushBusy(false); }
