@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseManualQuotesCsv } from "../src/providers/manual-csv.ts";
+import { parseYahooChartQuote } from "./lib/quotes.mjs";
 
 test("manual Bursa CSV parser normalizes symbols and computes daily change", () => {
   const now = Date.parse("2026-11-25T04:00:00.000Z");
@@ -56,4 +57,29 @@ test("manual CSV marks old prices stale and rejects unclosed CSV quotes", () => 
   );
   assert.equal(quote.status, "stale");
   assert.throws(() => parseManualQuotesCsv('symbol,price,asOf\n"1155,6.4,2026-11-24\n', now), /unclosed quoted field/);
+});
+
+test("Yahoo chart quote parser preserves quote timestamp and calculates fractional daily change", () => {
+  const now = Date.parse("2026-11-25T16:00:00.000Z");
+  const quote = parseYahooChartQuote({
+    chart: { result: [{
+      meta: { regularMarketPrice: 105, previousClose: 100, regularMarketTime: Math.floor(now / 1000) - 60 },
+      indicators: { quote: [{ close: [98, 100, 105] }] }
+    }] }
+  }, "AAPL", now);
+  assert.equal(quote.symbol, "AAPL");
+  assert.equal(quote.market, "US");
+  assert.equal(quote.price, 105);
+  assert.equal(quote.prevClose, 100);
+  assert.equal(quote.changePct, 0.05);
+  assert.equal(quote.provider, "yahoo-finance");
+  assert.equal(quote.status, "ok");
+});
+
+test("Yahoo chart quote parser rejects empty or future quote payloads", () => {
+  assert.throws(() => parseYahooChartQuote({ chart: { result: [] } }, "AAPL"));
+  const future = Math.floor(Date.now() / 1000) + 3600;
+  assert.throws(() => parseYahooChartQuote({
+    chart: { result: [{ meta: { regularMarketPrice: 100, regularMarketTime: future }, indicators: { quote: [{ close: [99] }] } }] }
+  }, "AAPL"));
 });
