@@ -17,11 +17,11 @@ Magic Folio is a private, single-owner portfolio research application. Portfolio
 
 ## Data and API boundaries
 
-- Require an authenticated owner session for all portfolio, settings, export, push-subscription and AI-analysis endpoints. The current quote snapshot, holdings, watchlist and dashboard routes enforce the owner session; state-changing requests also enforce exact Origin and JSON.
+- Require an authenticated owner session for all portfolio, settings, export, push-subscription and AI-analysis endpoints. The current quote snapshot, holdings, watchlist, dashboard and SEC filing routes enforce the owner session; state-changing requests also enforce exact Origin and JSON. SEC lookups require an explicit app/contact User-Agent, are limited to 5 fresh requests per IP/hour, cache metadata for 6 hours and retain only 30 days of filing metadata and official links.
 - Keep authentication state and health endpoints minimal. Return generic public errors.
 - Store only hashed session tokens; never log challenge payloads, credential public keys or session tokens.
 - Never send holding quantities, cost basis, session tokens, passkey material, provider credentials or setup secrets to an LLM.
-- Treat quote, news, RSS and user-supplied text as untrusted data.
+- Treat quote, news, RSS, SEC metadata and user-supplied text as untrusted data. Do not mirror SEC filing documents or send full filing text to an LLM.
 - Keep server-side API keys in Worker secrets, never in frontend bundles or Git. The optional MarketData.app token is owner-entered, stored only in this tab's `sessionStorage`, and sent directly to MarketData.app; it is never sent to the Worker or stored in D1.
 - Use parameterized D1 queries and schema migrations. Do not execute DDL at request time.
 
