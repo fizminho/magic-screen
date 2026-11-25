@@ -1,6 +1,6 @@
 import { getOwnerSession, rateLimitRequest, jsonResponse } from "./auth.mjs";
 
-const SEC_FORMS = new Set(["10-K", "10-Q", "8-K", "20-F", "40-F", "6-K", "DEF 14A", "S-1", "F-1", "SC 13D", "SC 13G"]);
+const SEC_FORMS = new Set(["10-K", "10-Q", "8-K", "20-F", "40-F", "6-K", "DEF 14A", "S-1", "F-1", "3", "4", "5", "144", "SC 13D", "SC 13D/A", "SC 13G", "SC 13G/A"]);
 const FORM_LABELS = {
   "10-K": "Annual report",
   "10-Q": "Quarterly report",
@@ -11,8 +11,14 @@ const FORM_LABELS = {
   "DEF 14A": "Proxy statement",
   "S-1": "Registration statement",
   "F-1": "Foreign issuer registration statement",
+  "3": "Initial statement of beneficial ownership",
+  "4": "Insider transaction report",
+  "5": "Annual statement of beneficial ownership changes",
+  "144": "Notice of proposed sale of securities",
   "SC 13D": "Beneficial ownership filing",
-  "SC 13G": "Beneficial ownership filing"
+  "SC 13D/A": "Beneficial ownership amendment",
+  "SC 13G": "Beneficial ownership filing",
+  "SC 13G/A": "Beneficial ownership amendment"
 };
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
 const CACHE_SECONDS = 6 * 60 * 60;
