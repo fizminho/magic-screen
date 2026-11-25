@@ -222,19 +222,19 @@ test("research inbox requires owner session and returns only owned instruments",
     }
   };
   const unauth = await handleAnalysisRequest(
-    new Request(`${origin}/api/analysis/briefs`, { headers: { cookie } }),
-    { ...envConfig, DB: unauthDb }, new URL(`${origin}/api/analysis/briefs`)
+    new Request(`${origin}/api/analysis/inbox`, { headers: { cookie } }),
+    { ...envConfig, DB: unauthDb }, new URL(`${origin}/api/analysis/inbox`)
   );
   assert.equal(unauth.status, 401);
 
   const response = await handleAnalysisRequest(
-    new Request(`${origin}/api/analysis/briefs`, { headers: { cookie } }),
-    { ...envConfig, DB }, new URL(`${origin}/api/analysis/briefs`)
+    new Request(`${origin}/api/analysis/inbox`, { headers: { cookie } }),
+    { ...envConfig, DB }, new URL(`${origin}/api/analysis/inbox`)
   );
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.briefs.length, 1);
-  assert.equal(body.briefs[0].symbol, "AAPL");
+  assert.equal(body.briefs[0].brief.symbol, "AAPL");
   assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /EXISTS \(SELECT 1 FROM holding/);
   assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /EXISTS \(SELECT 1 FROM watchlist/);
 });
