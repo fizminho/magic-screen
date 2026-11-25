@@ -635,7 +635,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                 watchlist.length === 0 ? <tr><td colSpan={6} className="empty-cell">Nothing on your watchlist yet.</td></tr> :
                 watchlist.map((item) => (
                   <tr key={`${item.market}:${item.symbol}`}>
-                    <td><b>{item.brief.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
+                    <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
                     <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
                     <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
                     <td>{item.note || " "}</td>
