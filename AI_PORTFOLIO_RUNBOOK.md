@@ -1,7 +1,7 @@
 # AI Stock Portfolio: Cleanup & Rebuild Runbook
 
 **Repo:** `magic-screen` (React 18 + Vite + Cloudflare Worker + D1)
-**Goal:** Turn the Magic Formula/Shariah screener into a personal **AI stock portfolio assistant** for **US + Bursa Malaysia**, as a **PWA with push notifications**, on **Cloudflare free tier only**, using the **Gemini API (free tier)** for personal use.
+**Goal:** Turn the Magic Formula/Shariah screener into a personal **AI stock portfolio assistant** for **US + Bursa Malaysia**, as a **PWA with push notifications**, on **Cloudflare free tier only**, using **Cloudflare Workers AI** for public-data-only research briefs.
 **Auth:** single owner account, **passkey (WebAuthn) only**.
 **Audience:** an autonomous AI coding agent. Execute phases in order. Tick every box (`- [x]`) as you go. Do not skip "Done when" checks.
 
@@ -12,12 +12,12 @@
 ## 0. Agent operating rules (read first)
 
 1. Work on a branch `chore/ai-portfolio-rebuild`. Never push directly to `main`. Open one PR at the end (Phase H).
-2. **Never print, log, commit, or echo a secret** (Gemini key, VAPID private key, setup token, session cookies, Cloudflare token, old `MFI_SESSION_COOKIE`).
+2. **Never print, log, commit, or echo a secret** (VAPID private key, setup token, session cookies, Cloudflare token, old `MFI_SESSION_COOKIE`).
 3. **Production D1 reset is owner-authorized without backup.** The owner explicitly approved dropping all existing user tables and data in `magic-screen-db`; use only the guarded one-time cutover workflow. Closing PRs is reversible; deleting branches is not, so do NOT delete branches.
 4. Every phase ends with its verification commands. If one fails, fix it before moving on. If blocked after 2 attempts, stop and write the blocker in `docs/BLOCKERS.md`.
 5. Keep it **lightweight**: target ≤ 4 runtime npm dependencies in the frontend, ≤ 3 in the Worker. Prefer Web APIs (fetch, WebCrypto, Service Worker) over libraries.
 6. Everything must work on the **free tier**. If a design needs a paid feature, pick another design.
-7. Any external data source is **untrusted input**. Never put a news headline or RSS text where it can act as an instruction to Gemini (see Appendix D).
+7. Any external data source is **untrusted input**. Never put a news headline or RSS text where it can act as an instruction to the AI model (see Appendix D).
 8. Respect provider terms. Prefer official APIs and RSS. Any unofficial endpoint must sit behind an adapter interface so it can be swapped, and must be listed in `docs/DATA_SOURCES.md` with its risk.
 
 ---
@@ -29,7 +29,7 @@
 | D1 | Rename Worker/DB? | **No.** Rename only user-facing name (title, manifest) to "Magic Folio". Renaming creates orphaned Cloudflare resources. |
 | D2 | Keep Shariah tagging? | **Yes, minimal**: a manual `shariah_flag` column (compliant / non_compliant / unknown) and a UI filter. Delete the dual-source screening engine. |
 | D3 | Close ALL open PRs? | **Yes**, but first extract their security-relevant bumps into the cleanup branch (Phase B). |
-| D4 | Holdings storage | **Server-side D1** behind owner login (needed so cron jobs and push alerts can analyse them). Quantities are never sent to Gemini (weights only). |
+| D4 | Holdings storage | **Server-side D1** behind owner login (needed so cron jobs and push alerts can analyse them). Quantities, cost basis and private notes are never sent to Workers AI. |
 | D5 | Currency | Show USD and MYR totals **separately**. No FX dependency in v1. |
 | D6 | Frontend framework | Keep React for v1 (lower risk). Optional later: alias to Preact. |
 | D7 | Login | **Single owner account, passkey only** (WebAuthn, no password fallback). Owner registers **at least 2 passkeys** (e.g. phone + laptop). |
@@ -56,7 +56,7 @@ Second pass done. "Verified" means confirmed in a listing or README during this 
 | `nealfennimore/passkeys` | Passkeys demo on Workers + KV + D1 | README states it is **not secure** | Storage layout only | Any code |
 | `@passwordless-id/webauthn@2.4.1` | MIT WebAuthn client/server library; official project docs advertise Cloudflare Workers/WebCrypto support | Project README, package metadata and docs reviewed; selected and pinned | Passkey browser ceremony + server verification | Hand-rolling WebAuthn verification; demo code copy |
 
-**Takeaways baked into this plan:** (1) one structured-JSON Gemini call per brief, no agent framework; (2) scheduled digest + push; (3) minimal data to the LLM; (4) the LLM may only pick from a candidate list we supply; (5) deterministic, rules-based risk checks computed in code (Ghostfolio-style) and passed to Gemini; (6) simulate and advise only; (7) data export so the owner is never locked in.
+**Takeaways baked into this plan:** (1) one structured-JSON Workers AI call per public-data brief, no agent framework; (2) scheduled digest + push; (3) minimal data to the LLM; (4) the LLM may only pick from a candidate list we supply; (5) deterministic, rules-based risk checks computed in code (Ghostfolio-style) and kept separate from Workers AI; (6) simulate and advise only; (7) data export so the owner is never locked in.
 
 - [ ] **R1.** Before coding, record in `docs/REFERENCES.md` the licence of any repo you read closely beyond README level. Do not copy from AGPL or unlicensed repos.
 
@@ -86,9 +86,9 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 | Cron Triggers | 5 per account | Use **4** |
 | Subrequests per invocation | Low on free plan (check limits page; assume ~50) | ≤ 40 per run, chunk with a cursor |
 | D1 free-limit enforcement | Queries fail once daily limits are exceeded | Handle errors, never loop-retry |
-| Gemini free tier | Per-model RPM/RPD/TPM limits | Daily cap setting `GEMINI_DAILY_CAP=20` calls; one call per brief |
+| Workers AI Free | 10,000 Neurons/day shared allowance | Cache by input hash; cap daily briefs below the free allocation |
 
-- [ ] **A0.** Open the current Cloudflare Workers limits/pricing pages and the Gemini rate-limits page. Write the numbers you confirmed into `docs/FREE_TIER_BUDGET.md` with the date. If any budget row above is exceeded by reality, reduce cron frequency.
+- [ ] **A0.** Open current Cloudflare Workers AI model availability, limits, pricing and data-usage pages. Write the numbers you confirmed into `docs/FREE_TIER_BUDGET.md` with the date. If any budget row above is exceeded by reality, reduce cron frequency.
 
 ---
 
@@ -190,11 +190,11 @@ worker/
   lib/db.ts           typed query helpers, d1.batch wrappers
   lib/quotes.ts       QuoteProvider interface + Yahoo-style adapter
   lib/news.ts         RSS fetch/parse/dedupe, ticker matching
-  lib/gemini.ts       request builder, schema, validator, daily cap
+  lib/workers-ai.ts   public-data request builder, schema, validator, daily cap
   lib/push.ts         VAPID + Web Push send, subscription cleanup
   lib/schedule.ts     market windows (UTC), holiday-safe checks
   jobs/refresh.ts     quotes + news + alert evaluation
-  jobs/brief.ts       Gemini brief per market
+  jobs/brief.ts       public-company research brief per market
   jobs/recommend.ts   weekly recommendations
   security.mjs        (kept)
 ```
@@ -273,7 +273,7 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 - [x] Holdings and Bursa quote CSV parsers are covered for duplicate rows, malformed values, limits, timestamps and optional fields.
 - [x] SEC fixture tests cover filing-form filtering, CIK/accession binding, official archive URL construction, User-Agent gating, owner-session gating, per-IP throttling, six-hour cache hit/miss and cache invalidation when CIK changes.
 - [ ] Add cryptographic WebAuthn signature/counter-regression fixtures and run actual browser passkey registration/login on supported devices.
-- [ ] Add market-window/DST, Gemini output validation, alert dedupe and SEC filing/news dedupe/matching tests.
+- [ ] Add market-window/DST, Workers AI output validation, alert dedupe and SEC filing/news dedupe/matching tests.
 
 **Done when:** `node --experimental-strip-types --test worker/**/*.test.mjs` passes; `wrangler dev` serves `/api/health`; a passkey register → login → dashboard → manual analysis → test push flow works locally.
 
@@ -281,7 +281,7 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 
 ## Phase F: PWA frontend
 
-Screens (mobile-first, one column): **Passkey sign-in / first-run setup · Dashboard** (totals per currency, day change, top movers, latest brief) · **Holdings** (list + add/edit/import CSV) · **Stock detail** (quote, news with impact tags, Gemini note) · **Insights** (daily brief, weekly recommendations, diversification summary by sector/market) · **Settings** (alert threshold, enable notifications, passkeys list/add/remove, export data, Shariah filter, sign out).
+Screens (mobile-first, one column): **Passkey sign-in / first-run setup · Dashboard** (totals per currency, day change, top movers, latest brief) · **Holdings** (list + add/edit/import CSV) · **Stock detail** (quote, news with impact tags, AI research brief) · **Insights** (daily brief, weekly recommendations, diversification summary by sector/market) · **Settings** (alert threshold, enable notifications, passkeys list/add/remove, export data, Shariah filter, sign out).
 
 - [ ] **F1.** `public/manifest.webmanifest`: name, short_name, `display: standalone`, `start_url: /`, theme/background colours, 192/512 PNG icons plus a maskable icon. Link it in `index.html`.
 - [ ] **F1b.** Update `index.html` title and meta description (they still describe the MFI/Shariah screener) and `package.json` name/description.
@@ -566,14 +566,14 @@ The LLM may only recommend from `instrument WHERE is_candidate = 1`.
 | Risk | Mitigation |
 |---|---|
 | Unofficial quote endpoint changes or blocks | Adapter interface; `status: unavailable` shown in UI; second adapter as fallback |
-| Gemini hallucination | Candidate-only picks, id citation validation, confidence labels, disclaimers |
+| AI hallucination | Candidate-only picks, id citation validation, confidence labels, disclaimers |
 | Prompt injection via headlines | Data-in-JSON framing, schema output, code-side validation, test H4 |
-| Free-tier quota exhausted | Daily cap, caching by hash, chunked cron runs, handle D1/Gemini limit errors without retry loops |
+| Workers AI free allowance exhausted | Daily cap, caching by hash, chunked cron runs, handle D1/Gemini limit errors without retry loops |
 | Push not delivered on iOS | Install-to-Home-Screen hint; in-app brief always available |
 | Lose all passkeys / locked out | 2+ passkeys required by the UI; documented D1-reset recovery with `SETUP_TOKEN`; Cloudflare account secured separately |
 | Domain change invalidates passkeys | Decide `RP_ID` up front (D8); treat a domain change as a re-registration event |
 | Someone registers first on a fresh deploy | Setup-token gate; delete the token right after first registration |
-| Holdings leak | Auth on all routes, no quantities to Gemini, no amounts in push text, no secrets in repo |
+| Holdings leak | Auth on all routes, no holdings data to Workers AI, no amounts in push text, no secrets in repo |
 | Cron DST drift (US) | Windows widened to cover EST and EDT; handler checks actual market state |
 | Terms-of-service of data sources | Personal use only, no redistribution, documented in `docs/DATA_SOURCES.md` |
 
