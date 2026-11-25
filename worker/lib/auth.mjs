@@ -1,0 +1,502 @@
+import { server as webauthn } from "@passwordless-id/webauthn";
+
+const COOKIE_PROD = "__Host-session";
+const COOKIE_LOCAL = "magicfolio_session";
+const SESSION_SECONDS = 60 * 60 * 24 * 30;
+const CHALLENGE_SECONDS = 120;
+const MAX_BODY_BYTES = 32 * 1024;
+
+const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers }
+});
+
+const nowIso = () => new Date().toISOString();
+const addSeconds = (seconds) => new Date(Date.now() + seconds * 1000).toISOString();
+
+export function base64url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+export function parseCookies(header = "") {
+  const result = Object.create(null);
+  for (const part of header.split(";")) {
+    const index = part.indexOf("=");
+    if (index < 1) continue;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (key && !(key in result)) result[key] = value;
+  }
+  return result;
+}
+
+export async function sha256Hex(value) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(bytes)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+
+export function constantTimeEqual(left, right) {
+  const a = new TextEncoder().encode(String(left ?? ""));
+  const b = new TextEncoder().encode(String(right ?? ""));
+  let mismatch = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i++) mismatch |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return mismatch === 0;
+}
+
+async function bodyJson(request) {
+  const mediaType = (request.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  if (mediaType !== "application/json") throw new Error("json_required");
+  const length = Number(request.headers.get("content-length") || 0);
+  if (length > MAX_BODY_BYTES) throw new Error("body_too_large");
+  const raw = await request.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) throw new Error("body_too_large");
+  return JSON.parse(raw || "{}");
+}
+
+function cookieName(env) { return env.APP_ENV === "production" ? COOKIE_PROD : COOKIE_LOCAL; }
+
+function cookieHeader(token, env, maxAge = SESSION_SECONDS) {
+  const secure = env.APP_ENV === "production" ? "; Secure" : "";
+  return `${cookieName(env)}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly${secure}; SameSite=Strict`;
+}
+
+function getRp(env, request) {
+  const requestOrigin = new URL(request.url).origin;
+  const configuredOrigin = env.RP_ORIGIN || (env.APP_ENV === "production" ? "" : requestOrigin);
+  const parsedOrigin = configuredOrigin ? new URL(configuredOrigin) : null;
+  const origin = parsedOrigin?.origin || "";
+  const rpId = env.RP_ID || (env.APP_ENV === "production" ? "" : new URL(origin || requestOrigin).hostname);
+  if (!origin || !rpId || parsedOrigin.pathname !== "/" || parsedOrigin.search || parsedOrigin.hash || parsedOrigin.hostname !== rpId) {
+    throw new Error("invalid_rp_configuration");
+  }
+  if (env.APP_ENV === "production" && parsedOrigin.protocol !== "https:") throw new Error("invalid_rp_configuration");
+  if (env.APP_ENV !== "production" && (parsedOrigin.hostname !== "localhost" || parsedOrigin.protocol !== "http:")) {
+    throw new Error("invalid_rp_configuration");
+  }
+  return { origin, rpId };
+}
+
+function checkOrigin(request, env) {
+  const { origin } = getRp(env, request);
+  if (new URL(request.url).origin !== origin || request.headers.get("origin") !== origin) throw new Error("origin_rejected");
+}
+
+async function sessionFor(request, env) {
+  const token = parseCookies(request.headers.get("cookie") || "")[cookieName(env)];
+  if (!token || token.length < 32 || token.length > 256) return null;
+  const tokenHash = await sha256Hex(token);
+  const idleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const row = await env.DB.prepare(
+    "SELECT token_hash, credential_id, expires_at, last_seen_at FROM session WHERE token_hash = ? AND expires_at > ? AND last_seen_at > ?"
+  ).bind(tokenHash, nowIso(), idleCutoff).first();
+  if (!row) return null;
+  const refreshAfter = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  if (row.last_seen_at < refreshAfter) {
+    await env.DB.prepare("UPDATE session SET last_seen_at = ? WHERE token_hash = ?")
+      .bind(nowIso(), tokenHash).run();
+  }
+  return { tokenHash, credentialId: row.credential_id, expiresAt: row.expires_at };
+}
+
+async function passkeyCount(env) {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS total FROM passkey_credential").first();
+  return Number(row?.total || 0);
+}
+
+async function authorizeRegistration(request, env) {
+  const count = await passkeyCount(env);
+  const session = await sessionFor(request, env);
+  if (count > 0 && session) return { count, session, setup: false };
+  if (count === 0 && env.SETUP_TOKEN && env.SETUP_TOKEN.length >= 43) {
+    const supplied = request.headers.get("x-setup-token") || "";
+    if (supplied.length >= 24 && supplied.length <= 256 &&
+        constantTimeEqual(await sha256Hex(supplied), await sha256Hex(env.SETUP_TOKEN))) {
+      return { count, session: null, setup: true };
+    }
+  }
+  throw new Error("registration_not_authorized");
+}
+
+async function ownerHandle(env) {
+  const row = await env.DB.prepare("SELECT value FROM setting WHERE key = 'owner_user_handle'").first();
+  return row?.value || crypto.randomUUID();
+}
+
+async function recordAttempt(request, env, kind, limit) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const ipHash = await sha256Hex(`${env.RP_ID || "local"}:${ip}`);
+  const current = new Date();
+  await env.DB.prepare("DELETE FROM auth_attempt WHERE window < ?").bind(current.toISOString().slice(0, 13)).run();
+  const window = kind === "verify_fail"
+    ? current.toISOString().slice(0, 14) + String(Math.floor(current.getUTCMinutes() / 15) * 15).padStart(2, "0")
+    : current.toISOString().slice(0, 13);
+  await env.DB.prepare(
+    "INSERT INTO auth_attempt(ip_hash, window, kind, count) VALUES(?,?,?,1) " +
+    "ON CONFLICT(ip_hash, window, kind) DO UPDATE SET count = count + 1"
+  ).bind(ipHash, window, kind).run();
+  const row = await env.DB.prepare(
+    "SELECT count FROM auth_attempt WHERE ip_hash = ? AND window = ? AND kind = ?"
+  ).bind(ipHash, window, kind).first();
+  if (Number(row?.count || 0) > limit) throw new Error("rate_limited");
+}
+
+async function issueChallenge(env, purpose) {
+  const challenge = base64url(crypto.getRandomValues(new Uint8Array(32)));
+  await env.DB.prepare("DELETE FROM auth_challenge WHERE expires_at <= ?").bind(nowIso()).run();
+  await env.DB.prepare(
+    "INSERT INTO auth_challenge(challenge, purpose, expires_at) VALUES(?,?,?)"
+  ).bind(challenge, purpose, addSeconds(CHALLENGE_SECONDS)).run();
+  return challenge;
+}
+
+async function consumeChallenge(env, challenge, purpose) {
+  if (typeof challenge !== "string" || challenge.length < 20 || challenge.length > 256) return false;
+  const row = await env.DB.prepare(
+    "DELETE FROM auth_challenge WHERE challenge = ? AND purpose = ? AND expires_at > ? RETURNING challenge"
+  ).bind(challenge, purpose, nowIso()).first();
+  return Boolean(row);
+}
+
+async function createSession(env, request, credentialId) {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = base64url(bytes);
+  const tokenHash = await sha256Hex(token);
+  const now = nowIso();
+  await env.DB.prepare("DELETE FROM session WHERE expires_at <= ? OR last_seen_at <= ?")
+    .bind(now, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).run();
+  await env.DB.prepare(
+    "INSERT INTO session(token_hash, credential_id, created_at, expires_at, last_seen_at, user_agent) VALUES(?,?,?,?,?,?)"
+  ).bind(tokenHash, credentialId, now, addSeconds(SESSION_SECONDS), now,
+    (request.headers.get("user-agent") || "").slice(0, 300)).run();
+  return token;
+}
+
+function algorithmName(algorithm) {
+  if (algorithm === -7) return "ES256";
+  if (algorithm === -257) return "RS256";
+  throw new Error("unsupported_passkey_algorithm");
+}
+
+async function handleState(request, env) {
+  const [count, session] = await Promise.all([passkeyCount(env), sessionFor(request, env)]);
+  return json({ configured: count > 0, registered: count > 0, authenticated: Boolean(session), passkeyCount: count, needsSetup: count === 0 });
+}
+
+async function registerOptions(request, env) {
+  checkOrigin(request, env);
+  await bodyJson(request);
+  await recordAttempt(request, env, "options", 10);
+  await authorizeRegistration(request, env);
+  const challenge = await issueChallenge(env, "register");
+  const existing = await env.DB.prepare("SELECT id FROM passkey_credential ORDER BY created_at").all();
+  const proposedOwnerHandle = await ownerHandle(env);
+  await env.DB.prepare("INSERT OR IGNORE INTO setting(key,value) VALUES('owner_user_handle',?)")
+    .bind(proposedOwnerHandle).run();
+  const userId = await ownerHandle(env);
+  return json({
+    challenge,
+    user: { id: userId, name: "Magic Folio owner", displayName: "Magic Folio" },
+    rpId: getRp(env, request).rpId,
+    rpName: env.RP_NAME || "Magic Folio",
+    excludeCredentials: (existing.results || []).map((row) => ({ id: row.id, type: "public-key" }))
+  });
+}
+
+async function registerVerify(request, env) {
+  checkOrigin(request, env);
+  const payload = await bodyJson(request);
+  const challenge = payload?.response?.clientDataJSON
+    ? decodeClientChallenge(payload.response.clientDataJSON)
+    : null;
+  if (!await consumeChallenge(env, challenge, "register")) return json({ error: "Registration expired. Try again." }, 400);
+  const authorization = await authorizeRegistration(request, env);
+
+  const { origin, rpId } = getRp(env, request);
+  let verified;
+  try {
+    verified = await webauthn.verifyRegistration(payload, {
+      challenge, origin, domain: rpId, userVerified: true
+    });
+  } catch {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Passkey registration could not be verified." }, 400);
+  }
+
+  const registrationFlags = decodeBase64urlBytes(payload?.response?.authenticatorData);
+  const flags = registrationFlags?.[32] ?? 0;
+  const idBytes = decodeBase64urlBytes(payload?.id);
+  const rawIdBytes = decodeBase64urlBytes(payload?.rawId);
+  const attestedIdBytes = extractAttestedCredentialId(payload?.response?.authenticatorData);
+  if (payload?.type !== "public-key" || !registrationFlags || registrationFlags.length < 55 ||
+      !(flags & 0x01) || !(flags & 0x04) || !sameBytes(idBytes, rawIdBytes) ||
+      !sameBytes(idBytes, attestedIdBytes)) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Passkey registration requires user presence and verification." }, 400);
+  }
+
+  const credential = verified.credential;
+  if (!credential?.id || credential.id !== payload.id || !credential.publicKey || !credential.algorithm) {
+    return json({ error: "Passkey registration could not be verified." }, 400);
+  }
+  const algorithm = credential.algorithm === "ES256" ? -7 : credential.algorithm === "RS256" ? -257 : null;
+  if (!algorithm || Number(payload?.response?.publicKeyAlgorithm) !== algorithm) return json({ error: "This passkey algorithm is not supported." }, 400);
+
+  const ownerId = payload?.user?.id;
+  const storedOwner = await env.DB.prepare("SELECT value FROM setting WHERE key='owner_user_handle'").first();
+  if (typeof ownerId !== "string" || ownerId.length < 16 || ownerId.length > 128 ||
+      !storedOwner?.value || !constantTimeEqual(ownerId, storedOwner.value)) {
+    return json({ error: "Passkey registration could not be verified." }, 400);
+  }
+  const transports = Array.isArray(credential.transports) ? JSON.stringify(credential.transports) : null;
+  const backedUp = Boolean(flags & 0x10) ? 1 : 0;
+  const now = nowIso();
+  let inserted = 0;
+
+  if (authorization.count === 0) {
+    const results = await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO setting(key,value) VALUES('owner_user_handle',?)").bind(ownerId),
+      env.DB.prepare(
+        "INSERT INTO passkey_credential(id,public_key,algorithm,counter,transports,backed_up,name,created_at,last_used_at) " +
+        "SELECT ?,?,?,?,?,?,?,?,NULL WHERE (SELECT value FROM setting WHERE key='owner_user_handle') = ? " +
+        "AND NOT EXISTS (SELECT 1 FROM passkey_credential)"
+      ).bind(credential.id, credential.publicKey, algorithm, Number(verified.authenticator?.counter || 0),
+        transports, backedUp, "Primary passkey", now, ownerId)
+    ]);
+    inserted = Number(results?.[1]?.meta?.changes || 0);
+  } else {
+    const result = await env.DB.prepare(
+      "INSERT OR IGNORE INTO passkey_credential(id,public_key,algorithm,counter,transports,backed_up,name,created_at,last_used_at) VALUES(?,?,?,?,?,?,?,?,NULL)"
+    ).bind(credential.id, credential.publicKey, algorithm, Number(verified.authenticator?.counter || 0),
+      transports, backedUp, "Passkey", now).run();
+    inserted = Number(result?.meta?.changes || 0);
+  }
+  if (inserted !== 1) return json({ error: "This passkey could not be added. Refresh and try again." }, 409);
+
+  const token = await createSession(env, request, credential.id);
+  return json({ ok: true, authenticated: true, passkeyCount: await passkeyCount(env) }, 201, {
+    "set-cookie": cookieHeader(token, env)
+  });
+}
+
+export function decodeBase64urlBytes(encoded) {
+  try {
+    if (typeof encoded !== "string" || !/^[A-Za-z0-9_-]+={0,2}$/.test(encoded)) return null;
+    const unpadded = encoded.replace(/=+$/, "");
+    const normalized = unpadded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+    const raw = atob(padded);
+    return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+  } catch { return null; }
+}
+
+function decodeBase64urlText(encoded) {
+  try {
+    const bytes = decodeBase64urlBytes(encoded);
+    return bytes ? new TextDecoder().decode(bytes) : null;
+  } catch { return null; }
+}
+
+export function extractAttestedCredentialId(authenticatorData) {
+  const bytes = decodeBase64urlBytes(authenticatorData);
+  if (!bytes || bytes.length < 55 || !(bytes[32] & 0x40)) return null;
+  const length = (bytes[53] << 8) | bytes[54];
+  if (length < 1 || 55 + length > bytes.length) return null;
+  return bytes.slice(55, 55 + length);
+}
+
+function sameBytes(left, right) {
+  if (!left || !right || left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i++) mismatch |= left[i] ^ right[i];
+  return mismatch === 0;
+}
+
+export function decodeClientChallenge(encoded, expectedType = "webauthn.create") {
+  try {
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(normalized);
+    const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
+    const parsed = JSON.parse(new TextDecoder().decode(bytes));
+    return parsed?.type === expectedType && parsed.crossOrigin !== true ? parsed.challenge : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loginOptions(request, env) {
+  checkOrigin(request, env);
+  await bodyJson(request);
+  await recordAttempt(request, env, "options", 10);
+  const rows = await env.DB.prepare("SELECT id FROM passkey_credential ORDER BY created_at").all();
+  if (!rows.results?.length) return json({ error: "No passkey is registered yet." }, 403);
+  const challenge = await issueChallenge(env, "login");
+  return json({
+    challenge,
+    rpId: getRp(env, request).rpId,
+    allowCredentials: []
+  });
+}
+
+async function loginVerify(request, env) {
+  checkOrigin(request, env);
+  const payload = await bodyJson(request);
+  const challenge = decodeClientChallenge(payload?.response?.clientDataJSON, "webauthn.get");
+  if (!await consumeChallenge(env, challenge, "login")) return json({ error: "Sign-in expired. Try again." }, 400);
+  const credentialId = payload?.id;
+  if (typeof credentialId !== "string" || credentialId.length > 1024) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Sign-in failed." }, 401);
+  }
+  const row = await env.DB.prepare(
+    "SELECT id, public_key, algorithm, counter FROM passkey_credential WHERE id = ?"
+  ).bind(credentialId).first();
+  if (!row) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Sign-in failed." }, 401);
+  }
+
+  const owner = await env.DB.prepare("SELECT value FROM setting WHERE key='owner_user_handle'").first();
+  if (!owner?.value || decodeBase64urlText(payload?.response?.userHandle || "") !== owner.value) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Sign-in failed." }, 401);
+  }
+
+  const { origin, rpId } = getRp(env, request);
+  try {
+    const expected = { challenge, origin, domain: rpId, userVerified: true };
+    if (Number(row.counter) > 0) expected.counter = Number(row.counter);
+    const verified = await webauthn.verifyAuthentication(payload, {
+      id: row.id,
+      publicKey: row.public_key,
+      algorithm: algorithmName(Number(row.algorithm)),
+      transports: []
+    }, expected);
+    await env.DB.prepare(
+      "UPDATE passkey_credential SET counter = ?, last_used_at = ? WHERE id = ?"
+    ).bind(Math.max(Number(row.counter), Number(verified.counter || 0)), nowIso(), row.id).run();
+  } catch {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Sign-in failed." }, 401);
+  }
+
+  const token = await createSession(env, request, row.id);
+  return json({ ok: true, authenticated: true }, 200, { "set-cookie": cookieHeader(token, env) });
+}
+
+
+async function credentialsList(request, env) {
+  const session = await sessionFor(request, env);
+  if (!session) return json({ error: "Sign in required." }, 401);
+  const rows = await env.DB.prepare(
+    "SELECT id, name, created_at, last_used_at, backed_up FROM passkey_credential ORDER BY created_at"
+  ).all();
+  return json({
+    credentials: (rows.results || []).map((row) => ({
+      id: row.id, name: row.name, createdAt: row.created_at,
+      lastUsedAt: row.last_used_at, backedUp: Boolean(row.backed_up)
+    })),
+    passkeyCount: (rows.results || []).length
+  });
+}
+
+async function credentialMutation(request, env, pathname) {
+  checkOrigin(request, env);
+  const session = await sessionFor(request, env);
+  if (!session) return json({ error: "Sign in required." }, 401);
+  const prefix = "/api/auth/credentials/";
+  let credentialId;
+  try { credentialId = decodeURIComponent(pathname.slice(prefix.length)); }
+  catch { return json({ error: "Invalid passkey." }, 400); }
+  if (!credentialId || credentialId.length > 1024 || credentialId.includes("/")) {
+    return json({ error: "Invalid passkey." }, 400);
+  }
+
+  if (request.method === "PATCH") {
+    const payload = await bodyJson(request);
+    const name = typeof payload?.name === "string" ? payload.name.trim() : "";
+    if (!name || name.length > 40 || [...name].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) return json({ error: "Passkey name must be 1 to 40 characters." }, 400);
+    const result = await env.DB.prepare("UPDATE passkey_credential SET name = ? WHERE id = ?")
+      .bind(name, credentialId).run();
+    if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "Passkey not found." }, 404);
+    return json({ ok: true });
+  }
+
+  if (request.method === "DELETE") {
+    await bodyJson(request);
+    const results = await env.DB.batch([
+      env.DB.prepare(
+        "DELETE FROM session WHERE credential_id = ? AND EXISTS " +
+        "(SELECT 1 FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1)"
+      ).bind(credentialId, credentialId),
+      env.DB.prepare(
+        "DELETE FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1 RETURNING id"
+      ).bind(credentialId)
+    ]);
+    const deleted = Number(results?.[1]?.meta?.changes || 0) === 1;
+    if (!deleted) {
+      const exists = await env.DB.prepare("SELECT 1 AS found FROM passkey_credential WHERE id = ?").bind(credentialId).first();
+      if (!exists) return json({ error: "Passkey not found." }, 404);
+      return json({ error: "The last passkey cannot be deleted." }, 409);
+    }
+    return json({ ok: true, passkeyCount: await passkeyCount(env) }, 200,
+      session.credentialId === credentialId ? { "set-cookie": cookieHeader("", env, 0) } : {});
+  }
+
+  return json({ error: "Method not allowed." }, 405, { allow: "PATCH, DELETE" });
+}
+
+async function logoutAll(request, env) {
+  checkOrigin(request, env);
+  await bodyJson(request);
+  const session = await sessionFor(request, env);
+  if (!session) return json({ error: "Sign in required." }, 401);
+  await env.DB.prepare("DELETE FROM session").run();
+  return json({ ok: true }, 200, { "set-cookie": cookieHeader("", env, 0) });
+}
+
+async function logout(request, env) {
+  checkOrigin(request, env);
+  await bodyJson(request);
+  const session = await sessionFor(request, env);
+  if (session) await env.DB.prepare("DELETE FROM session WHERE token_hash = ?").bind(session.tokenHash).run();
+  return json({ ok: true }, 200, { "set-cookie": cookieHeader("", env, 0) });
+}
+
+export async function handleAuthRequest(request, env, pathname) {
+  try {
+    if (pathname === "/api/auth/state" && request.method === "GET") return await handleState(request, env);
+    if (pathname === "/api/auth/credentials" && request.method === "GET") return await credentialsList(request, env);
+    if (pathname.startsWith("/api/auth/credentials/") && ["PATCH", "DELETE"].includes(request.method)) {
+      return await credentialMutation(request, env, pathname);
+    }
+    if (request.method === "POST" && pathname === "/api/auth/logout-all") return await logoutAll(request, env);
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "GET, POST, PATCH, DELETE" });
+    if (pathname === "/api/auth/register/options") return await registerOptions(request, env);
+    if (pathname === "/api/auth/register/verify") return await registerVerify(request, env);
+    if (pathname === "/api/auth/login/options") return await loginOptions(request, env);
+    if (pathname === "/api/auth/login/verify") return await loginVerify(request, env);
+    if (pathname === "/api/auth/logout") return await logout(request, env);
+    return json({ error: "Not found." }, 404);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "rate_limited") return json({ error: "Too many attempts. Try again later." }, 429);
+    if (message === "body_too_large") return json({ error: "Request too large." }, 413);
+    if (message === "json_required") return json({ error: "Content-Type must be application/json." }, 415);
+    if (message === "origin_rejected") return json({ error: "Request origin rejected." }, 403);
+    if (message === "registration_not_authorized") return json({ error: "Registration is not authorized." }, 403);
+    console.error("Passkey request failed:", message);
+    return json({ error: "Authentication request failed." }, 400);
+  }
+}
+
+
+// Shared owner-session primitives for other authenticated API modules.
+export const getOwnerSession = sessionFor;
+export const assertRequestOrigin = checkOrigin;
+export const readJsonBody = bodyJson;
+export const jsonResponse = json;
+
+export const rateLimitRequest = recordAttempt;

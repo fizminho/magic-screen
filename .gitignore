@@ -3,6 +3,7 @@ dist
 .wrangler
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 .env
 .env.*
 !.env.example
@@ -16,3 +17,9 @@ __pycache__
 *.pyc
 data/*.json
 dist-reports
+backup-*.sql
+
+# Generated PWA PNG assets (created by prebuild/predev)
+/public/icon-192.png
+/public/icon-512.png
+/public/apple-touch-icon.png

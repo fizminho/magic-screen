@@ -1,62 +1,106 @@
-# Magic Screen setup
+# Magic Folio setup
 
 ## Architecture
 
 - React + TypeScript + Vite frontend.
-- Cloudflare Worker API and D1 cache.
-- MFI is the only US ticker-universe source.
-- Shariah checks and manual Investing Paths observations stay in browser localStorage.
-- No user account, Gemini API, LLM API key, provider API or automated Investing Paths collection.
+- Cloudflare Worker with static assets.
+- Cloudflare D1 for owner portfolio data.
+- Passkey-only single-owner authentication using `@passwordless-id/webauthn`.
+- Optional MarketData.app Free Forever browser adapter for US delayed quotes.
+- Manual CSV imports for Bursa Malaysia quotes.
+- Cloudflare Workers AI uses the Worker AI binding and does not require an external API key. The Workers Free allocation is 10,000 Neurons/day; do not enable paid billing or prepaid credits without owner approval.
+- Official SEC EDGAR submissions and Company Facts are used for US public-company research.
 
-## Cloudflare setup
-
-1. Create or use the D1 database named `magic-screen-db`.
-2. Confirm its ID matches `wrangler.toml`.
-3. Configure the Worker secret `MFI_SESSION_COOKIE` with the owner's authenticated Magic Formula Investing session cookie.
-5. Connect the GitHub repository to Cloudflare Workers Builds.
-
-Build command:
+## Local development
 
 ```bash
-npm run build
+npm ci
+cp .dev.vars.example .dev.vars
 ```
 
-Deploy command:
+Generate a random 32-byte (or longer) local `SETUP_TOKEN` and set it in `.dev.vars`. Keep `RP_ID=localhost`, `RP_ORIGIN=http://localhost:8787` and `APP_ENV=development` for local testing. Never commit `.dev.vars`.
+
+Run the Worker, local D1 and Vite assets together:
 
 ```bash
-npx wrangler deploy
+npm run cf:dev
 ```
 
-A successful GitHub build or Wrangler dry-run is not proof of a live deployment. Verify the Worker and app after release.
+`npm run dev` alone starts only Vite and will not provide the authentication or portfolio APIs.
 
-## MFI workflow
+## First production passkey
 
-The app reads the cached MFI ticker universe from `GET /api/stocks`. Use **Refresh MFI** to request a fresh screen. The Worker caches successful MFI results for six hours and applies a 15-minute cooldown to forced refreshes.
+1. Confirm the final production hostname. Passkeys are bound to `RP_ID`; changing the hostname later requires re-registration.
+2. Set `RP_ID` as the hostname only and `RP_ORIGIN` as the exact HTTPS origin in `wrangler.toml`.
+3. Generate a random 32-byte (or longer) setup token and set it as the Cloudflare Worker secret named `SETUP_TOKEN`. Do not put it in `wrangler.toml`, GitHub vars or frontend code.
+4. Deploy the replacement Worker and verify `/api/health`.
+5. Open the site in a supported HTTPS browser and enter the setup token once to create the first passkey.
+6. Sign in and add a second passkey on a separate device.
+7. Delete the temporary Worker secret `SETUP_TOKEN` after confirming both passkeys work.
+8. Protect the Cloudflare account with strong 2FA or a passkey.
 
-See [MFI integration](MAGIC_FORMULA_INTEGRATION.md) for session setup and endpoint details.
+The setup token is a one-time bootstrap gate, not a login password. Normal sign-in always uses the browser passkey prompt.
 
-## Shariah workflow
+For SEC EDGAR filing lookup, configure the Worker variable `SEC_USER_AGENT` with an application name and your real contact email, for example `Magic Folio/0.1 (contact: you@example.com)`. Do not use the placeholder address. SEC lookups remain disabled until this value is valid. Add the company's 1–10 digit CIK to its US holding or watchlist item (the app stores it as a 10-digit string). You can find the CIK through [SEC EDGAR company search](https://www.sec.gov/edgar/search/). The owner-only lookup returns recent filing metadata and links to the original SEC documents; it does not copy filing bodies. The endpoint is limited to five lookups per hour.
 
-1. Copy the ticker list and AI prompt from the app.
-2. Paste into an AI assistant that can research the sources.
-3. The assistant must follow Musaffa and HalalScreener terms. If AI/automated access is not allowed, it must not access the source and must return No data.
-4. Copy the raw JSON response.
-5. Paste it into Magic Screen and validate.
-6. Check eligible tickers manually on Investing Paths and record rank, EY, ROC, fiscal period, date and source URL.
+## Scheduled jobs and AI research briefs
 
-Both Musaffa and HalalScreener must show fresh Halal results. Doubtful, Not Halal, No data, stale or conflicting results do not pass. Source-specific statuses remain visible.
+Two UTC cron triggers are configured in `wrangler.toml`:
 
-## Local storage
+- `0 1 * * 2-6`: refresh SEC submissions and Company Facts for up to eight owned US instruments with a valid CIK. After the refresh completes, generate public-data-only research briefs for recent filers, up to five per day.
+- `0 2 * * 6`: weekly housekeeping for expired filing metadata, caches, alert records, job history, authentication challenges and rate-limit buckets.
 
-Shariah and Investing Paths records are stored only in the current browser. They do not sync between devices or browsers. The app intentionally has no file upload/download workflow. Clearing browser data can remove the records.
+Each scheduled task writes a `job_run` record with its status and bounded detail. Brief generation shares the five uncached analyses/day quota with manual analysis and reuses the 24-hour input-hash cache. The AI prompt contains only public SEC Company Facts and filing metadata. It does not include holding quantities, average cost, notes, portfolio weights, watchlist state, account identifiers, credentials or quote data. If no recent filing or fresh Company Facts are available, the job records a skipped status and does not call Workers AI. For each newly generated brief, it attempts a deduplicated ticker-specific Web Push notification that opens the app; the ticker is included in the notification title and body. Cached briefs do not trigger notifications. Push delivery is optional and cannot fail the research job; it requires VAPID secrets and at least one registered browser subscription. The existing daily push quota applies.
 
-## Development
+## Web Push notifications
+
+Web Push uses the Worker’s built-in WebCrypto implementation. No Node-only `web-push` package is included in the Worker bundle.
+
+1. Generate a P-256 VAPID key pair locally with `npx --yes web-push generate-vapid-keys`. Do not paste the private key into Git, a chat, or frontend configuration.
+2. Set the public key as `VAPID_PUBLIC_KEY` in the `[vars]` section of `wrangler.toml` and set `VAPID_SUBJECT` to a real `mailto:` contact.
+3. Store the private key only as a Worker secret: `npx wrangler secret put VAPID_PRIVATE_KEY`.
+4. Deploy, subscribe a supported browser, and use the authenticated `POST /api/push/test` endpoint to verify delivery.
+5. Keep the subscription private to the owner. The Worker accepts only HTTPS endpoints from supported browser push services and removes expired subscriptions when the service returns 404/410.
+
+Never store VAPID private keys in `.dev.vars.example`, GitHub artifacts, the browser, or D1.
+
+## Market data
+
+MarketData.app is optional. The owner must create their own account and API token. The free tier has 100 credits/day, at least 24-hour delayed US quotes and a one-IP-at-a-time restriction. The token is entered after passkey sign-in and stored only in the current browser tab's session storage. It is sent directly to MarketData.app, never to the Worker or D1. Refresh quotes from one device/IP at a time; other devices read the private quote snapshots from D1.
+
+Bursa quotes are manual CSV only until a licensed provider is approved. Use this header format:
+
+```csv
+symbol,price,asOf,prevClose
+1155,6.42,2026-11-24T08:00:00+08:00,6.30
+```
+
+Add the Bursa instruments as MY holdings first, then import their actual quote timestamp and price. Do not scrape Bursa pages or undocumented broker endpoints. Review [data sources](DATA_SOURCES.md) for the current licence and provider decisions.
+
+## Passkey recovery
+
+If all passkeys are lost, use the secured Cloudflare account to set a new temporary `SETUP_TOKEN`, then clear only the passkey and session records:
 
 ```bash
-npm install
-npm run dev
+npx wrangler d1 execute magic-screen-db --remote --command "DELETE FROM passkey_credential; DELETE FROM session;"
 ```
 
-The frontend can start without a live MFI session, but the Worker needs the D1 binding and `MFI_SESSION_COOKIE` for a fresh MFI screen.
+Register a new passkey, add a second recovery passkey, and remove the temporary token. This recovery does not delete portfolio holdings. Never run a full D1 reset for routine passkey recovery.
 
-Research tool only. Not investment advice.
+## Cloudflare deployment
+
+1. In Cloudflare Workers Builds, connect this repository and select the `main` production branch.
+2. Set the build/deploy command to `npm run cf:deploy`.
+3. Ensure the Worker build uses the repository root and the committed `wrangler.toml`.
+4. Cloudflare runs the command on updates to `main`; the script builds the frontend, applies pending remote D1 migrations with Wrangler, then deploys the Worker and assets.
+5. Keep the one-time production reset out of this automatic path. It is a separate manual workflow requiring the exact confirmation `DROP-ALL-LEGACY-DATA`.
+
+No `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID` GitHub Actions secret is required for Cloudflare's native Git integration. GitHub Actions should continue to run CI, regression and security checks only.
+
+## Secrets
+
+Configure runtime credentials as Cloudflare Worker secrets only when the corresponding feature requires them. Workers AI uses a Cloudflare binding, not a model API key. Never put VAPID private, setup or session secrets in frontend variables, source files or GitHub artifacts.
+
+## Verification
+
+`npm ci`, `npm run build`, `node --experimental-strip-types --test worker/*.test.mjs`, `npm audit --audit-level=high`, and `npx wrangler deploy --dry-run` are the expected pre-deployment checks. A successful CI run is not proof of a live deployment.

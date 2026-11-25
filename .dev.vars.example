@@ -1,0 +1,18 @@
+# Local Worker development only. Use non-production values.
+APP_ENV=development
+RP_ID=localhost
+RP_NAME=Magic Folio
+RP_ORIGIN=http://localhost:8787
+
+# Generate a long random value locally for first-passkey registration only.
+SETUP_TOKEN=
+
+# Optional public VAPID key for Web Push. Never put the private key here.
+VAPID_PUBLIC_KEY=
+VAPID_SUBJECT=mailto:you@example.com
+
+# Configure these as Worker secrets only when the matching feature is implemented.
+# VAPID_PRIVATE_KEY=
+
+# Replace with your real contact email before using SEC EDGAR APIs.
+SEC_USER_AGENT=

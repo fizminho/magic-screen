@@ -1,21 +1,13 @@
-// Shared security helpers for the lightweight MFI Worker.
-export function cooldownElapsed(lastIso, cooldownMs, now = Date.now()) {
-  if (!lastIso) return true;
-  const last = Date.parse(lastIso);
-  if (Number.isNaN(last)) return false;
-  const age = now - last;
-  return age >= cooldownMs;
-}
-
-export const MFI_FORCE_COOLDOWN_MS = 15 * 60 * 1000;
-
+// Shared response security headers for the Magic Folio Worker.
 export const CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self'",
   "font-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
   "img-src 'self' data:",
-  "connect-src 'self'",
+  "connect-src 'self' https://api.marketdata.app",
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",

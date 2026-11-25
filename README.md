@@ -1,47 +1,42 @@
-# Magic Screen
+# Magic Folio
 
-A lightweight, personal US stock research app built around one workflow:
+Magic Folio is a private, single-owner portfolio research workspace for US and Bursa Malaysia equities.
 
-**MFI tickers → Musaffa + HalalScreener research → Shariah validation → manual Investing Paths ranking.**
+## Product principles
 
-## What it does
+- Portfolio tracking and research, not brokerage or auto-trading.
+- Passkey-only owner authentication. No password fallback.
+- Shariah status is a manually maintained field, not an automated screening verdict or religious ruling.
+- AI analysis receives only the minimum necessary portfolio context. Holding quantities and credentials must never be sent to an LLM.
+- Market data and news are source-labelled, timestamped and treated as untrusted input.
+- Free-tier-first architecture. Do not introduce paid services without explicit owner approval.
 
-- Gets the US candidate ticker universe from Magic Formula Investing (MFI).
-- Copies the current ticker list with a ready-to-use AI research prompt.
-- Accepts AI results as pasted JSON. No file upload or download.
-- Requires fresh Halal results from both Musaffa and HalalScreener before a ticker passes.
-- Flags missing, stale, doubtful or conflicting evidence for review.
-- Lets the owner record Investing Paths rank, Earnings Yield, Return on Capital, fiscal period, checked date and source URL manually.
-- Saves research records in this browser's local storage.
+## Current rebuild status
 
-## Daily workflow
+The legacy screener UI and public MFI Worker endpoints have been removed. The replacement includes passkey bootstrap/sign-in, passkey inventory and recovery controls, owner-only holdings and watchlist APIs/UI, currency-separated dashboard summaries and risk thresholds, quote snapshot APIs, an optional browser-only MarketData.app US delayed-quote adapter, and a strict manual Bursa CSV import parser/UI.
 
-1. Open the Shariah shortlist and refresh the MFI universe when needed.
-2. Tap **Copy tickers + AI prompt** and paste it into an AI assistant.
-3. Ask the assistant to return the requested JSON using permitted source access only.
-4. Copy the JSON response and paste it into Magic Screen.
-5. Review the source evidence and import the records.
-6. Manually check eligible tickers on Investing Paths and record the visible ranking details.
+MarketData.app is optional and not enabled until the owner supplies their own API token. Its free tier is 100 credits/day, at least 24-hour delayed, US-only and one source IP at a time. The token stays in browser session storage and is never sent to the Worker. Bursa prices are manual/CSV until a licensed data source is approved. SEC EDGAR filing metadata and Company Facts lookup are implemented for US instruments with an owner-supplied CIK and configured contact User-Agent. A daily UTC scheduled job refreshes SEC submissions and Company Facts for up to eight owned US instruments, then generates public-data-only research briefs for recent filers using Cloudflare Workers AI (`@cf/zai-org/glm-4.7-flash`). Scheduled and manual briefs share a five-uncached-brief daily quota and input-hash cache; each scheduled task records its outcome in `job_run`. The AI receives public SEC facts and filing metadata only, never holdings, quantities, cost basis, notes, watchlist status, credentials or quote-provider data. A weekly UTC housekeeping job prunes expired SEC metadata and operational records. Gemini API is not used. When a scheduled brief is newly generated, the Worker attempts a deduplicated push notification for that ticker and opens the app with the ticker shown in the notification. Delivery uses the existing VAPID subscriptions and daily push quota; unavailable push delivery never blocks research generation. News ingestion remains future work.
 
-## Important boundaries
+The D1 schema is defined in `migrations/`. A one-time production reset is separately guarded by `.github/workflows/reset-production-d1.yml` and requires the exact manual confirmation `DROP-ALL-LEGACY-DATA`. It is not run by ordinary deployments.
 
-- The app has no user login, Gemini integration, LLM API key, or paid screening API.
-- The owner must configure the MFI session cookie once as a Cloudflare Worker secret. It is never sent to the browser.
-- AI access to Musaffa and HalalScreener must follow each provider's current terms. If AI/automated access is not permitted, the assistant must not access that source and should return No data for manual follow-up.
-- Investing Paths checks remain manual. No scraping, browser automation, bulk extraction or AI collection.
-- Shariah research is not a fatwa or investment advice. Verify evidence before relying on a result.
-- Records are local to the current browser and do not sync across devices. There is no file-based import/export.
+## Development
 
-## Data and privacy
+Use `npm run cf:dev` to run the Worker, local D1 database and Vite assets together. `npm run dev` starts Vite only and does not provide the Worker APIs.
 
-No AI provider receives an API key from this app. The prompt is copied to the user's chosen AI assistant only after the user taps the copy button. Pasted results are stored locally in the browser. The app does not send Shariah records to a server.
+```bash
+npm ci
+cp .dev.vars.example .dev.vars
+npm run cf:dev
+npm run build
+node --experimental-strip-types --test worker/*.test.mjs
+```
 
 ## Deployment
 
-- React + TypeScript + Vite
-- Cloudflare Workers Static Assets
-- Cloudflare D1 for the MFI ticker cache
+Cloudflare Workers Builds is the production deployment mechanism, linked directly to the GitHub `main` branch. Set its build/deploy command to `npm run cf:deploy`. That command builds the app, applies pending D1 migrations remotely through Wrangler, and then deploys the Worker and static assets. No Cloudflare deployment token or account ID is needed in GitHub Actions for this flow.
 
-See [setup](docs/SETUP.md), [MFI integration](docs/MAGIC_FORMULA_INTEGRATION.md), [provider access policy](docs/PROVIDER_ACCESS_POLICY.md), and [security](SECURITY.md).
+GitHub Actions remains responsible for CI, regression tests and security checks. The one-time destructive D1 reset remains a separate, explicitly manual workflow and is never part of normal deployment.
 
-Research tool only. Not investment advice.
+See [setup](docs/SETUP.md), [data sources](docs/DATA_SOURCES.md), [free-tier budget](docs/FREE_TIER_BUDGET.md), [references](docs/REFERENCES.md), and [security](SECURITY.md).
+
+Research and education only. Not investment advice.

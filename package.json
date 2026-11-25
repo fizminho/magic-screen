@@ -1,20 +1,24 @@
 {
-  "name": "magic-screen",
+  "name": "magic-folio",
+  "description": "Private portfolio intelligence for US and Bursa Malaysia stocks.",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/generate-pwa-icons.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/generate-pwa-icons.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "cf:dev": "npm run build && wrangler dev",
-    "cf:deploy": "npm run build && wrangler deploy",
+    "cf:migrate:remote": "wrangler d1 migrations apply magic-screen-db --remote",
+    "cf:deploy": "npm run build && npm run cf:migrate:remote && wrangler deploy",
     "cf:typegen": "wrangler types"
   },
   "dependencies": {
-    "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "@passwordless-id/webauthn": "2.4.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261121.1",
