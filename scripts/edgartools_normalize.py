@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-PERIOD_RE = re.compile(r"^(\\d{4}-\\d{2}-\\d{2})(?: \\((FY|Q[1-4])\\))?$")
+PERIOD_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?: \((FY|Q[1-4])\))?$")
 
 # Keep these keys and tag aliases aligned with worker/lib/sec-companyfacts.mjs.
 METRIC_TAGS = {
@@ -56,12 +56,16 @@ def normalize_company(company: dict[str, Any]) -> dict[str, Any]:
             metric = TAG_TO_METRIC.get(concept_tag(row.get("concept")))
             if not metric:
                 continue
+            # Cash flow statements contain both beginning and ending cash rows.
+            # Cash balance is mapped only from the balance sheet to avoid ambiguity.
+            if metric == "cashAndEquivalents" and statement_name != "balance_sheet":
+                continue
             for column, value in row.items():
                 match = PERIOD_RE.fullmatch(column)
                 if not match or not isinstance(value, (int, float)) or isinstance(value, bool):
                     continue
                 period_end, fiscal_label = match.groups()
-                period_type = "duration" if statement_name != "balance_sheet" else "instant"
+                period_type = "instant" if statement_name == "balance_sheet" else "duration"
                 key = (period_end, period_type)
                 period = periods.setdefault(key, {
                     "period_end": period_end,
@@ -96,7 +100,7 @@ def normalize_company(company: dict[str, Any]) -> dict[str, Any]:
 
 
 def compare_companyfacts(normalized: dict[str, Any], sec_payload: dict[str, Any]) -> dict[str, Any]:
-    """Compare normalized values with the app's parsed SEC CompanyFacts response shape."""
+    """Compare against the app's parsed /api/sec/companyfacts response shape."""
     accession = (normalized.get("filing") or {}).get("accession_number")
     sec_filing = next((x for x in sec_payload.get("facts", []) if x.get("accessionNumber") == accession), None)
     if not sec_filing:
@@ -147,7 +151,7 @@ def main() -> int:
         for company in normalized["companies"]:
             company["sec_companyfacts_comparison"] = compare_companyfacts(company, sec_payload)
 
-    Path(args.output).write_text(json.dumps(normalized, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    Path(args.output).write_text(json.dumps(normalized, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     mapped = sum(
         len(period["metrics"])
         for company in normalized["companies"]
