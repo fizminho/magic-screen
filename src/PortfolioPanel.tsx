@@ -81,25 +81,6 @@ function formatMoney(value: number | null, currency: "USD" | "MYR") {
   return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 4 }).format(value);
 }
 
-function summarizeMarket(holdings: Holding[], market: "US" | "MY") {
-  const positions = holdings.filter((item) => item.market === market);
-  const priced = positions.filter((item) => item.price !== null && Number.isFinite(item.price));
-  const costed = priced.filter((item) => item.avgCost !== null && Number.isFinite(item.avgCost));
-  const marketValue = priced.reduce((total, item) => total + item.quantity * (item.price as number), 0);
-  const costBasis = costed.reduce((total, item) => total + item.quantity * (item.avgCost as number), 0);
-  const unrealizedPnl = costed.reduce((total, item) =>
-    total + item.quantity * ((item.price as number) - (item.avgCost as number)), 0);
-  return {
-    total: positions.length,
-    priced: priced.length,
-    stale: priced.filter((item) => item.quoteStatus === "stale").length,
-    costed: costed.length,
-    marketValue,
-    unrealizedPnl,
-    unrealizedPnlPct: costBasis > 0 ? unrealizedPnl / costBasis : null
-  };
-}
-
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "No timestamp";
 }
@@ -303,9 +284,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     item.market === watchMarket && item.symbol === watchSymbol.trim().toUpperCase()
   );
 
-  const usSummary = summarizeMarket(holdings, "US");
-  const mySummary = summarizeMarket(holdings, "MY");
-
   return (
     <section className="portfolio-panel">
       <div className="portfolio-heading">
@@ -346,30 +324,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           })}
         </div>
         <p className="dashboard-disclaimer">US and MY values are kept separate because they use different currencies. Metrics use available quotes, including stale prices where marked.</p>
-      </div>
-
-      <div className="portfolio-summary">
-        {([
-          { market: "US" as const, currency: "USD" as const, label: "United States", summary: usSummary },
-          { market: "MY" as const, currency: "MYR" as const, label: "Bursa Malaysia", summary: mySummary }
-        ]).map(({ market: summaryMarket, currency, label, summary }) => (
-          <article className="summary-card" key={summaryMarket}>
-            <div className="summary-card-heading"><span>{label}</span><span>{summary.total} positions</span></div>
-            <strong className="summary-value">{formatMoney(summary.marketValue || (summary.priced ? 0 : null), currency)}</strong>
-            <span className="summary-caption">Indicative market value · {summary.priced}/{summary.total} priced</span>
-            <div className="summary-pnl">
-              <span>Unrealized P&amp;L</span>
-              <strong className={summary.unrealizedPnl > 0 ? "quote-positive" : summary.unrealizedPnl < 0 ? "quote-negative" : ""}>
-                {summary.costed ? formatMoney(summary.unrealizedPnl, currency) : "Add average cost"}
-                {summary.unrealizedPnlPct !== null ? ` (${(summary.unrealizedPnlPct * 100).toFixed(2)}%)` : ""}
-              </strong>
-            </div>
-            <span className="summary-caption">
-              {summary.costed} positions with cost data
-              {summary.stale ? ` · ${summary.stale} stale quote(s)` : ""}
-            </span>
-          </article>
-        ))}
       </div>
 
       <div className="holdings-table-wrap">
