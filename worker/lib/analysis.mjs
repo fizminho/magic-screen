@@ -154,11 +154,11 @@ async function generateBrief(env, prompt, allowedAccessions, symbol) {
  * Holdings/watchlist are used only as an existence filter; no private portfolio
  * fields are selected or included in the model prompt.
  */
-export async function runScheduledResearchBrief(env, { now = Date.now(), maxBriefs = 5 } = {}) {
+export async function runScheduledResearchBrief(env, { now = Date.now(), maxBriefs = 5, triggerType = "cron" } = {}) {
   const startedAt = new Date(now).toISOString();
   const inserted = await env.DB.prepare(
-    "INSERT INTO job_run(job,started_at,status,detail) VALUES('scheduled_research_brief',?,'running','Scheduled brief generation started')"
-  ).bind(startedAt).run();
+    "INSERT INTO job_run(job,started_at,status,detail) VALUES(?,?,'running',?)"
+  ).bind(triggerType === "manual" ? "manual_research_brief" : "scheduled_research_brief", startedAt, triggerType === "manual" ? "Manual brief generation started" : "Scheduled brief generation started").run();
   const jobId = inserted.meta?.last_row_id;
   let generated = 0;
   let cachedCount = 0;
