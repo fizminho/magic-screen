@@ -25,3 +25,6 @@ RP_NAME = "Magic Folio"
 # RP_ORIGIN = "https://magic-screen.example.workers.dev"
 # Set a descriptive SEC User-Agent with a real contact email before enabling filings.
 # SEC_USER_AGENT = "Magic Folio/0.1 (contact: your-email@example.com)"
+
+[triggers]
+crons = ["0 1 * * 2-6", "0 2 * * 6"]
