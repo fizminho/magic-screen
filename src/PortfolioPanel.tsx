@@ -82,6 +82,7 @@ type WatchlistItem = {
   price: number | null;
   changePct: number | null;
   quoteAsOf: string | null;
+  quoteProvider: string | null;
   quoteStatus: "ok" | "stale" | "unavailable";
 };
 
@@ -124,6 +125,11 @@ function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString() : "No timestamp";
 }
 
+function quoteSourceLabel(provider: string | null) {
+  if (provider === "yahoo-finance") return "Yahoo Finance";
+  if (provider === "manual-csv") return "Manual CSV";
+  return "No source";
+}
 
 export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -479,19 +485,21 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setResearchLoadingSymbol(""); }
   }
 
-  async function refreshUsQuotes() {
-    const symbols = [...new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol))];
-    if (!symbols.length) { onError("Add at least one US holding or watchlist item before refreshing quotes."); return; }
+  async function refreshMarketQuotes() {
+    const total = usCount + myCount;
+    if (!total) { onError("Add a holding or watchlist item before refreshing quotes."); return; }
     onError(""); onNotice(""); setBusy(true);
     try {
-      const result = await api<{ saved: number; failed: number; symbols: number; failedSymbols: string[] }>("/api/quotes/refresh-us", {
-        method: "POST",
-        body: "{}"
-      });
-      onNotice(`Saved ${result.saved} of ${result.symbols} US quote snapshots from Yahoo Finance. ${result.failed ? `Unavailable: ${result.failedSymbols.join(", ")}.` : ""}`);
+      const result = await api<{
+        saved: number; failed: number; symbols: number; failedSymbols: string[];
+        byMarket: { US: { saved: number; failed: number; symbols: number }; MY: { saved: number; failed: number; symbols: number } };
+      }>("/api/quotes/refresh", { method: "POST", body: "{}" });
+      const { US, MY } = result.byMarket;
+      const failures = result.failed ? ` Unavailable: ${result.failedSymbols.join(", ")}.` : "";
+      onNotice(`Yahoo Finance updated ${result.saved}/${result.symbols} quotes (US ${US.saved}/${US.symbols}, Bursa ${MY.saved}/${MY.symbols}).${failures}`);
       await refreshPortfolio();
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Unable to refresh US quotes.");
+      onError(cause instanceof Error ? cause.message : "Unable to refresh market quotes.");
     } finally { setBusy(false); }
   }
 
@@ -612,7 +620,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <td>{item.quantity.toLocaleString()}</td>
                   <td>{formatMoney(item.avgCost, item.currency)}</td>
                   <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
-                  <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
+                  <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? quoteSourceLabel(item.quoteProvider) : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
                   <td>{item.market === "US" && item.cik ? <div className="row-actions"><button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading || !!researchLoadingSymbol}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button><button className="button button-small button-secondary" onClick={() => loadResearchBrief(item)} disabled={secLoading || !!researchLoadingSymbol}>{researchLoadingSymbol === item.symbol ? "Researching…" : "Research"}</button></div> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                   <td><button className="button button-danger button-small" onClick={() => removeHolding(item)} disabled={busy}>Remove</button></td>
                 </tr>
@@ -637,7 +645,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <tr key={`${item.market}:${item.symbol}`}>
                     <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
                     <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
-                    <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
+                    <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? quoteSourceLabel(item.quoteProvider) : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
                     <td>{item.note || " "}</td>
                     <td>{item.market === "US" && item.cik ? <div className="row-actions"><button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading || !!researchLoadingSymbol}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button><button className="button button-small button-secondary" onClick={() => loadResearchBrief(item)} disabled={secLoading || !!researchLoadingSymbol}>{researchLoadingSymbol === item.symbol ? "Researching…" : "Research"}</button></div> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                     <td><button className="button button-danger button-small" onClick={() => removeWatchlistItem(item)} disabled={busy}>Remove</button></td>
@@ -765,13 +773,13 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         </section>
 
         <section className="tool-card">
-          <span className="eyebrow">US QUOTES</span>
-          <h3>Refresh US market prices</h3>
-          <p>Fetches public Yahoo Finance chart data through the Worker and saves the latest available quote for your active US holdings and watchlist. No API token required. Availability and delay depend on the exchange and data source.</p>
-          <button className="button button-primary" onClick={refreshUsQuotes} disabled={busy || usCount === 0}>
-            {busy ? "Refreshing…" : `Refresh US quotes (${usCount})`}
+          <span className="eyebrow">US & BURSA QUOTES</span>
+          <h3>Refresh market prices</h3>
+          <p>Fetches public Yahoo Finance chart data for your active US and Bursa holdings and watchlist. Bursa symbols are mapped to Yahoo's .KL ticker format automatically. No API token required. Quotes may be delayed and are not exchange-grade real-time prices.</p>
+          <button className="button button-primary" onClick={refreshMarketQuotes} disabled={busy || usCount + myCount === 0}>
+            {busy ? "Refreshing…" : `Refresh all quotes (${usCount + myCount})`}
           </button>
-          <p className="fine-print">Existing saved prices are retained when a symbol cannot be refreshed. Quotes are indicative and may be delayed. Bursa Malaysia quotes remain manual CSV imports.</p>
+          <p className="fine-print">Existing saved prices are retained when a symbol cannot be refreshed. Yahoo Finance is the quote source for both markets; manual Bursa CSV import remains available as a fallback.</p>
         </section>
 
         <section className="tool-card">
@@ -815,15 +823,15 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         </section>
 
         <section className="tool-card tool-wide">
-          <span className="eyebrow">BURSA MALAYSIA · MANUAL IMPORT</span>
+          <span className="eyebrow">BURSA MALAYSIA · CSV FALLBACK</span>
           <h3>Import Bursa quote CSV</h3>
-          <p>First add your Bursa holdings or watchlist items above. Then paste a CSV using this header: <code>symbol,price,asOf,prevClose</code>. The final column is optional. Use the actual quote timestamp and MYR price.</p>
+          <p>If Yahoo Finance cannot provide a quote, you can still import Bursa prices manually. First add the instruments above, then paste a CSV using this header: <code>symbol,price,asOf,prevClose</code>. The final column is optional. Use the actual quote timestamp and MYR price.</p>
           <textarea className="csv-field" rows={5} value={manualCsv} onChange={(event) => setManualCsv(event.target.value)}
             placeholder={"symbol,price,asOf,prevClose\n1155,6.42,2026-11-24T08:00:00+08:00,6.30"} />
           <button className="button button-secondary" onClick={importBursaCsv} disabled={busy || !manualCsv.trim() || myCount === 0}>
             {busy ? "Importing…" : `Import Bursa quotes (${myCount} symbols)`}
           </button>
-          <p className="fine-print">No Bursa website scraping or unofficial API. Quotes are private and tagged with their import timestamp.</p>
+          <p className="fine-print">Manual CSV remains available as a fallback. Imported quotes are tagged with their source and quote timestamp.</p>
         </section>
       </div>
     </section>

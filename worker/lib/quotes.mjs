@@ -17,7 +17,7 @@ function validateSnapshot(value) {
   if (!["US", "MY"].includes(market)) throw new Error("invalid_quote");
   if (!["USD", "MYR"].includes(currency)) throw new Error("invalid_quote");
   if ((market === "US" && (currency !== "USD" || provider !== "yahoo-finance")) ||
-      (market === "MY" && (currency !== "MYR" || provider !== "manual-csv"))) throw new Error("invalid_quote");
+      (market === "MY" && (currency !== "MYR" || !["yahoo-finance", "manual-csv"].includes(provider)))) throw new Error("invalid_quote");
   if (!["ok", "stale", "unavailable"].includes(status)) throw new Error("invalid_quote");
 
   if (status === "unavailable") {
@@ -39,7 +39,7 @@ function validateSnapshot(value) {
   };
 }
 
-export function parseYahooChartQuote(payload, symbol, now = Date.now()) {
+export function parseYahooChartQuote(payload, symbol, now = Date.now(), market = "US") {
   const result = payload?.chart?.result?.[0];
   const meta = result?.meta;
   const quote = result?.indicators?.quote?.[0];
@@ -57,15 +57,16 @@ export function parseYahooChartQuote(payload, symbol, now = Date.now()) {
     throw new Error("quote_unavailable");
   }
   return {
-    symbol, market: "US", price, prevClose,
+    symbol, market, price, prevClose,
     changePct: prevClose && prevClose > 0 ? (price - prevClose) / prevClose : null,
-    asOf: asOfDate.toISOString(), currency: "USD", provider: "yahoo-finance",
+    asOf: asOfDate.toISOString(), currency: market === "MY" ? "MYR" : "USD", provider: "yahoo-finance",
     status: now - asOfDate.getTime() > 5 * 24 * 60 * 60 * 1000 ? "stale" : "ok"
   };
 }
 
-async function fetchYahooQuote(symbol, fetcher = fetch) {
-  const url = new URL(YAHOO_CHART_ROOT + encodeURIComponent(symbol));
+async function fetchYahooQuote(symbol, market, fetcher = fetch) {
+  const yahooSymbol = market === "MY" && !symbol.endsWith(".KL") ? `${symbol}.KL` : symbol;
+  const url = new URL(YAHOO_CHART_ROOT + encodeURIComponent(yahooSymbol));
   url.searchParams.set("range", "5d");
   url.searchParams.set("interval", "1d");
   const response = await fetcher(url.toString(), {
@@ -75,7 +76,7 @@ async function fetchYahooQuote(symbol, fetcher = fetch) {
     cf: { cacheTtl: 60, cacheEverything: true }
   });
   if (!response.ok) throw new Error("quote_provider_error");
-  return parseYahooChartQuote(await response.json(), symbol);
+  return parseYahooChartQuote(await response.json(), symbol, Date.now(), market);
 }
 
 async function listLatestQuotes(request, env) {
@@ -122,43 +123,61 @@ async function saveSnapshots(request, env) {
   return jsonResponse({ saved: snapshots.length - unmatchedSymbols.length, unmatchedSymbols });
 }
 
-async function refreshUsQuotes(request, env, fetcher = fetch) {
+async function refreshMarketQuotes(request, env, fetcher = fetch) {
   assertRequestOrigin(request, env);
   const session = await getOwnerSession(request, env);
   if (!session) return jsonResponse({ error: "Sign in required." }, 401);
   const rows = await env.DB.prepare(
-    "SELECT symbol FROM instrument WHERE active = 1 AND market = 'US' ORDER BY symbol LIMIT 50"
+    "SELECT symbol, market FROM instrument WHERE active = 1 AND market IN ('US', 'MY') ORDER BY market, symbol LIMIT 70"
   ).all();
-  const symbols = [...new Set((rows.results || []).map((row) => row.symbol).filter((symbol) =>
-    typeof symbol === "string" && SYMBOL_PATTERN.test(symbol) && symbol === symbol.toUpperCase()
-  ))];
-  if (!symbols.length) return jsonResponse({ saved: 0, failed: 0, symbols: 0, failedSymbols: [] });
+  const instruments = [...new Map((rows.results || [])
+    .filter((row) => typeof row.symbol === "string" && SYMBOL_PATTERN.test(row.symbol) &&
+      row.symbol === row.symbol.toUpperCase() && ["US", "MY"].includes(row.market))
+    .map((row) => [`${row.market}:${row.symbol}`, { symbol: row.symbol, market: row.market }])).values()];
+  if (!instruments.length) return jsonResponse({
+    saved: 0, failed: 0, symbols: 0, failedSymbols: [],
+    byMarket: { US: { saved: 0, failed: 0, symbols: 0 }, MY: { saved: 0, failed: 0, symbols: 0 } }
+  });
 
   const quotes = [];
   const failedSymbols = [];
-  for (const symbol of symbols) {
-    try { quotes.push(await fetchYahooQuote(symbol, fetcher)); }
-    catch { failedSymbols.push(symbol); }
+  const byMarket = {
+    US: { saved: 0, failed: 0, symbols: 0 },
+    MY: { saved: 0, failed: 0, symbols: 0 }
+  };
+  for (const instrument of instruments) {
+    byMarket[instrument.market].symbols++;
+    try { quotes.push(await fetchYahooQuote(instrument.symbol, instrument.market, fetcher)); }
+    catch {
+      byMarket[instrument.market].failed++;
+      failedSymbols.push(`${instrument.market}:${instrument.symbol}`);
+    }
   }
   let saved = 0;
   if (quotes.length) {
     const statements = quotes.map((quote) => env.DB.prepare(
       "INSERT INTO quote_latest(instrument_id, price, prev_close, change_pct, as_of, provider, status) " +
-      "SELECT id, ?, ?, ?, ?, ?, ? FROM instrument WHERE market = 'US' AND symbol = ? AND active = 1 " +
+      "SELECT id, ?, ?, ?, ?, ?, ? FROM instrument WHERE market = ? AND symbol = ? AND active = 1 " +
       "ON CONFLICT(instrument_id) DO UPDATE SET price=excluded.price, prev_close=excluded.prev_close, " +
       "change_pct=excluded.change_pct, as_of=excluded.as_of, provider=excluded.provider, status=excluded.status"
-    ).bind(quote.price, quote.prevClose, quote.changePct, quote.asOf, quote.provider, quote.status, quote.symbol));
+    ).bind(quote.price, quote.prevClose, quote.changePct, quote.asOf, quote.provider, quote.status, quote.market, quote.symbol));
     const results = await env.DB.batch(statements);
-    saved = results.reduce((count, result) => count + (Number(result?.meta?.changes || 0) > 0 ? 1 : 0), 0);
+    saved = results.reduce((count, result, index) => {
+      if (Number(result?.meta?.changes || 0) > 0) {
+        byMarket[quotes[index].market].saved++;
+        return count + 1;
+      }
+      return count;
+    }, 0);
   }
-  return jsonResponse({ saved, failed: failedSymbols.length, symbols: symbols.length, failedSymbols });
+  return jsonResponse({ saved, failed: failedSymbols.length, symbols: instruments.length, failedSymbols, byMarket });
 }
 
 export async function handleQuoteRequest(request, env, pathname, fetcher = fetch) {
   try {
     if (pathname === "/api/quotes/latest" && request.method === "GET") return await listLatestQuotes(request, env);
     if (pathname === "/api/quotes/snapshots" && request.method === "POST") return await saveSnapshots(request, env);
-    if (pathname === "/api/quotes/refresh-us" && request.method === "POST") return await refreshUsQuotes(request, env, fetcher);
+    if ((pathname === "/api/quotes/refresh" || pathname === "/api/quotes/refresh-us") && request.method === "POST") return await refreshMarketQuotes(request, env, fetcher);
     return jsonResponse({ error: "Not found." }, 404);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
