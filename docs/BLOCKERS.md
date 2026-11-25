@@ -6,7 +6,7 @@ The owner explicitly authorized a complete clean rebuild of the existing `magic-
 
 - No production backup is required.
 - All existing user tables and their data, including MFI/Shariah and retired SEC/EdgarTools data, are disposable and may be dropped.
-- The replacement schema is defined in `migrations/0002_portfolio_schema.sql`.
+- The replacement schema is defined across `migrations/0002_portfolio_schema.sql` through the current numbered migrations.
 - The one-time reset is implemented by `scripts/reset-production-d1.sh` and `.github/workflows/reset-production-d1.yml`.
 - The production workflow requires the exact manual confirmation `DROP-ALL-LEGACY-DATA`, can run only from `main`, explicitly sets `D1_SCOPE=--remote`, verifies the RP configuration and temporary setup secret, runs build/audit/tests/Wrangler dry-run, enumerates actual user tables, drops them, reapplies migrations, deploys and checks `/api/health`.
 - The script is also exercised against a local D1 database in CI. It has successfully removed and recreated a local database with 17 tables. This is **not** a production reset.
@@ -19,7 +19,7 @@ The normal deployment workflow applies pending migrations and deploys. It does *
 - Legacy MFI endpoints, provider session-cookie usage, runtime DDL and old screener UI have been removed from the rebuild branch.
 - New D1 portfolio schema and migrations are in place.
 - Passkey bootstrap, login, session handling, credential management, recovery documentation and security headers are implemented.
-- Owner-only quote snapshot, holdings, watchlist, dashboard and SEC EDGAR submissions APIs are implemented. SEC filing metadata is cached in D1 for six hours and retained for 30 days; only official SEC links are stored. Dashboard values, daily changes and concentration metrics are calculated separately for USD and MYR, avoiding a misleading cross-currency total. `PortfolioPanel` supports position entry/removal, holdings CSV import, US delayed-quote refresh with a tab-scoped Market Data token, Bursa CSV quote import and watchlist management. The token is sent directly to MarketData.app, not to the Worker. Watchlist UI is now integrated with the owner-only API; settings/dashboard/export routes are still pending.
+- Owner-only quote snapshot, holdings, watchlist, dashboard and SEC EDGAR submissions APIs are implemented. SEC filing metadata is cached in D1 for six hours and retained for 30 days; only official SEC links are stored. Dashboard values, daily changes and concentration metrics are calculated separately for USD and MYR, avoiding a misleading cross-currency total. `PortfolioPanel` supports position entry/removal, holdings CSV import, US delayed-quote refresh with a tab-scoped Market Data token, Bursa CSV quote import and watchlist management. The token is sent directly to MarketData.app, not to the Worker. Watchlist UI is integrated with the owner-only API; settings and export routes are still pending.
 - CI run `45528932617` passed after the final WebAuthn credential-ID/algorithm binding and cross-origin checks: build, full dependency audit, regression tests, fresh local D1 migrations, local destructive-reset exercise, Worker auth smoke tests and Wrangler dry-run.
 - No production deployment, production reset, or Cloudflare secret deletion has been performed.
 
