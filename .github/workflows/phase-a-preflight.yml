@@ -28,12 +28,18 @@ jobs:
       - name: Build
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm run build
-      - name: Audit production dependencies
+      - name: Audit all dependencies
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm audit --audit-level=high
       - name: Run complete Node regression suite
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: node --experimental-strip-types --test worker/*.test.mjs
+      - name: Apply D1 migrations to a fresh local database
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: npx --yes wrangler@4 d1 migrations apply magic-screen-db --local
+      - name: Verify local D1 schema
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
       - name: Validate Wrangler bundling and assets without deploying
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 deploy --dry-run
