@@ -114,7 +114,7 @@ async function loadEdgarToolsMetrics(DB, symbol) {
       typeof row.accession === "string" &&
       typeof row.metric === "string" &&
       Number.isFinite(Number(row.value)) &&
-      /^\\d{4}-\\d{2}-\\d{2}$/.test(row.periodEnd || "")
+      /^\d{4}-\d{2}-\d{2}$/.test(row.periodEnd || "")
     );
   } catch {
     // Keep the original SEC-only brief available if migration or shadow data is absent.
