@@ -167,6 +167,8 @@ jobs:
           grep -q '^record_type,symbol,market' /tmp/export.csv
           grep -q 'AAPL' /tmp/export.csv
           watchlist_delete_status="$(curl --silent --output /tmp/watchlist-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/watchlist/US/MSFT -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
+          echo "watchlist delete HTTP status: $watchlist_delete_status"
+          cat /tmp/watchlist-delete.json
           test "$watchlist_delete_status" = "200"
           jq -e '.deleted == true and .symbol == "MSFT"' /tmp/watchlist-delete.json >/dev/null
       - name: Validate Wrangler bundling and assets without deploying
