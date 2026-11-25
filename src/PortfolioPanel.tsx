@@ -529,7 +529,24 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   }
 
   useEffect(() => {
+    let active = true;
+
+    async function loadPortfolio() {
+      try {
+        await refreshPortfolio();
+      } catch (cause) {
+        if (active) onError(cause instanceof Error ? cause.message : "Unable to load your portfolio.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadPortfolio();
     void refreshResearchInbox();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const usCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol)).size;
