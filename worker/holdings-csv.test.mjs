@@ -7,8 +7,8 @@ test("holdings CSV parses US and Bursa positions with optional average cost", ()
     "symbol,market,quantity,avg_cost\nAAPL,US,2,100.25\n1155,MY,500,\n"
   );
   assert.deepEqual(rows, [
-    { symbol: "AAPL", market: "US", quantity: 2, avgCost: 100.25 },
-    { symbol: "1155", market: "MY", quantity: 500, avgCost: null }
+    { symbol: "AAPL", market: "US", quantity: 2, avgCost: 100.25, cik: null },
+    { symbol: "1155", market: "MY", quantity: 500, avgCost: null, cik: null }
   ]);
 });
 
@@ -17,7 +17,7 @@ test("holdings CSV supports quoted fields, whitespace and UTF-8 BOM", () => {
     '\uFEFFsymbol,market,quantity,avg_cost\r\n" msft "," us ",10,0\r\n'
   );
   assert.deepEqual(rows, [
-    { symbol: "MSFT", market: "US", quantity: 10, avgCost: 0 }
+    { symbol: "MSFT", market: "US", quantity: 10, avgCost: 0, cik: null }
   ]);
 });
 
@@ -39,4 +39,14 @@ test("holdings CSV requires the agreed columns and limits each batch to 20 rows"
   const rows = ["symbol,market,quantity,avg_cost"];
   for (let i = 0; i < 21; i++) rows.push(`T${i},US,1,1`);
   assert.throws(() => parseHoldingsCsv(rows.join("\n")), /limited to 20/);
+});
+
+test("holdings CSV accepts an optional US CIK and rejects CIK on Bursa rows", () => {
+  const rows = parseHoldingsCsv(
+    "symbol,market,quantity,avg_cost,cik\nAAPL,US,2,100,320193\n"
+  );
+  assert.deepEqual(rows[0], { symbol: "AAPL", market: "US", quantity: 2, avgCost: 100, cik: "320193" });
+  assert.throws(() => parseHoldingsCsv(
+    "symbol,market,quantity,avg_cost,cik\n1155,MY,2,6.4,123456\n"
+  ), /CIK must be/);
 });
