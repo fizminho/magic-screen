@@ -116,6 +116,13 @@ export default function JobsPanel({ onError, onNotice }: { onError: (value: stri
     }
   }
 
+  const briefSections: Array<{ heading: string; items: string[] }> = [
+    { heading: "Financial strengths", items: researchResult?.brief.financial_strengths || [] },
+    { heading: "Financial risks", items: researchResult?.brief.financial_risks || [] },
+    { heading: "Filing signals", items: researchResult?.brief.filing_signals || [] },
+    { heading: "Unknowns", items: researchResult?.brief.unknowns || [] }
+  ];
+
   return (
     <section className="auth-panel jobs-panel">
       <span className="eyebrow">OPERATIONS</span>
@@ -157,12 +164,7 @@ export default function JobsPanel({ onError, onNotice }: { onError: (value: stri
             <span>{researchResult.brief.confidence} confidence</span>
           </div>
           <p>{researchResult.brief.company_summary}</p>
-          {([
-            ["Financial strengths", researchResult.brief.financial_strengths],
-            ["Financial risks", researchResult.brief.financial_risks],
-            ["Filing signals", researchResult.brief.filing_signals],
-            ["Unknowns", researchResult.brief.unknowns]
-          ] as Array<[string, string[]]>).map(([heading, items]) => items.length > 0 && (
+          {briefSections.map(({ heading, items }) => items.length > 0 && (
             <div className="credential-row" key={heading}>
               <div className="credential-meta">
                 <b>{heading}</b>
