@@ -224,7 +224,12 @@ async function registerVerify(request, env) {
 
   const registrationFlags = decodeBase64urlBytes(payload?.response?.authenticatorData);
   const flags = registrationFlags?.[32] ?? 0;
-  if (!registrationFlags || registrationFlags.length < 37 || !(flags & 0x01) || !(flags & 0x04)) {
+  const idBytes = decodeBase64urlBytes(payload?.id);
+  const rawIdBytes = decodeBase64urlBytes(payload?.rawId);
+  const attestedIdBytes = extractAttestedCredentialId(payload?.response?.authenticatorData);
+  if (payload?.type !== "public-key" || !registrationFlags || registrationFlags.length < 55 ||
+      !(flags & 0x01) || !(flags & 0x04) || !sameBytes(idBytes, rawIdBytes) ||
+      !sameBytes(idBytes, attestedIdBytes)) {
     await recordAttempt(request, env, "verify_fail", 5);
     return json({ error: "Passkey registration requires user presence and verification." }, 400);
   }
@@ -234,7 +239,7 @@ async function registerVerify(request, env) {
     return json({ error: "Passkey registration could not be verified." }, 400);
   }
   const algorithm = credential.algorithm === "ES256" ? -7 : credential.algorithm === "RS256" ? -257 : null;
-  if (!algorithm) return json({ error: "This passkey algorithm is not supported." }, 400);
+  if (!algorithm || Number(payload?.response?.publicKeyAlgorithm) !== algorithm) return json({ error: "This passkey algorithm is not supported." }, 400);
 
   const ownerId = payload?.user?.id;
   const storedOwner = await env.DB.prepare("SELECT value FROM setting WHERE key='owner_user_handle'").first();
@@ -289,6 +294,21 @@ function decodeBase64urlText(encoded) {
     const bytes = decodeBase64urlBytes(encoded);
     return bytes ? new TextDecoder().decode(bytes) : null;
   } catch { return null; }
+}
+
+export function extractAttestedCredentialId(authenticatorData) {
+  const bytes = decodeBase64urlBytes(authenticatorData);
+  if (!bytes || bytes.length < 55 || !(bytes[32] & 0x40)) return null;
+  const length = (bytes[53] << 8) | bytes[54];
+  if (length < 1 || 55 + length > bytes.length) return null;
+  return bytes.slice(55, 55 + length);
+}
+
+function sameBytes(left, right) {
+  if (!left || !right || left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i++) mismatch |= left[i] ^ right[i];
+  return mismatch === 0;
 }
 
 export function decodeClientChallenge(encoded, expectedType = "webauthn.create") {
