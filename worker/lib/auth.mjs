@@ -498,3 +498,5 @@ export const getOwnerSession = sessionFor;
 export const assertRequestOrigin = checkOrigin;
 export const readJsonBody = bodyJson;
 export const jsonResponse = json;
+
+export const rateLimitRequest = recordAttempt;
