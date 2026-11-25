@@ -13,16 +13,19 @@ Magic Folio is a private, single-owner portfolio research workspace for US and B
 
 ## Current rebuild status
 
-The legacy screener UI and public MFI Worker endpoints have been removed. The replacement Worker now serves passkey-only first-run setup, sign-in, credential management and session controls. Portfolio/holdings APIs, market data, news, scheduled jobs, push alerts and Gemini analysis remain later runbook phases.
+The legacy screener UI and public MFI Worker endpoints have been removed. The replacement includes passkey bootstrap/sign-in, passkey inventory and recovery controls, owner-only holdings APIs/UI, quote snapshot APIs, an optional browser-only MarketData.app US delayed-quote adapter, and a strict manual Bursa CSV import parser/UI.
+
+MarketData.app is optional and not enabled until the owner supplies their own API token. Its free tier is 100 credits/day, at least 24-hour delayed, US-only and one source IP at a time. The token stays in browser session storage and is never sent to the Worker. Bursa prices are manual/CSV until a licensed data source is approved. No publisher news scraping, SEC ingestion, scheduled jobs, push alerts or Gemini analysis are enabled yet.
 
 The D1 schema is defined in `migrations/`. A one-time production reset is separately guarded by `.github/workflows/reset-production-d1.yml` and requires the exact manual confirmation `DROP-ALL-LEGACY-DATA`. It is not run by ordinary deployments.
 
 ## Development
 
-Use `npm run cf:dev` to run the Worker, D1 local database and Vite assets together. `npm run dev` starts Vite only and does not provide the Worker auth API.
+Use `npm run cf:dev` to run the Worker, local D1 database and Vite assets together. `npm run dev` starts Vite only and does not provide the Worker APIs.
 
 ```bash
 npm ci
+cp .dev.vars.example .dev.vars
 npm run cf:dev
 npm run build
 node --experimental-strip-types --test worker/*.test.mjs
@@ -30,8 +33,8 @@ node --experimental-strip-types --test worker/*.test.mjs
 
 ## Deployment
 
-GitHub Actions builds the app, applies pending non-destructive D1 migrations and deploys the Cloudflare Worker on changes merged to `main`. The one-time destructive reset must be run separately after the replacement Worker is complete and reviewed.
+GitHub Actions builds the app, applies pending non-destructive D1 migrations and deploys the Cloudflare Worker on changes merged to `main`. The one-time destructive reset must be run separately after the replacement Worker is complete, configured and reviewed.
 
-See [setup](docs/SETUP.md), [free-tier budget](docs/FREE_TIER_BUDGET.md), [references](docs/REFERENCES.md), and [security](SECURITY.md).
+See [setup](docs/SETUP.md), [data sources](docs/DATA_SOURCES.md), [free-tier budget](docs/FREE_TIER_BUDGET.md), [references](docs/REFERENCES.md), and [security](SECURITY.md).
 
 Research and education only. Not investment advice.
