@@ -5,7 +5,7 @@ export const CSP = [
   "style-src 'self'",
   "font-src 'self'",
   "img-src 'self' data:",
-  "connect-src 'self'",
+  "connect-src 'self' https://api.marketdata.app",
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",
