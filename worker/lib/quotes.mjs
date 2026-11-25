@@ -70,7 +70,7 @@ async function saveSnapshots(request, env) {
 
   const statements = snapshots.map((quote) => env.DB.prepare(
     "INSERT INTO quote_latest(instrument_id, price, prev_close, change_pct, as_of, provider, status) " +
-    "SELECT id, ?, ?, ?, ?, ?, ? FROM instrument WHERE market = ? AND symbol = ? " +
+    "SELECT id, ?, ?, ?, ?, ?, ? FROM instrument WHERE market = ? AND symbol = ? AND active = 1 " +
     "ON CONFLICT(instrument_id) DO UPDATE SET price=excluded.price, prev_close=excluded.prev_close, " +
     "change_pct=excluded.change_pct, as_of=excluded.as_of, provider=excluded.provider, status=excluded.status"
   ).bind(
