@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "worker/**"
+      - "public/**"
+      - "scripts/**"
       - "src/**"
       - "index.html"
       - "package.json"
@@ -19,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-magic-screen-worker
+  group: magic-folio-production-cutover
   cancel-in-progress: false
 
 jobs:
@@ -60,3 +62,9 @@ jobs:
         run: npx --yes wrangler@4 d1 migrations apply magic-screen-db --remote
       - name: Deploy Worker and static assets
         run: npx --yes wrangler@4 deploy
+      - name: Verify live Worker health
+        shell: bash
+        run: |
+          set -euo pipefail
+          RP_ORIGIN="$(sed -n 's/^RP_ORIGIN = "\([^"]*\)"/\1/p' wrangler.toml)"
+          curl --fail --silent --show-error "$RP_ORIGIN/api/health" | jq -e '.ok == true and .service == "magic-folio"'
