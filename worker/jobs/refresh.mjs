@@ -96,24 +96,38 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
 
   try {
     if (!validUserAgent(env.SEC_USER_AGENT)) throw new Error("sec_user_agent_not_configured");
-    const result = await env.DB.prepare(
-      "SELECT DISTINCT i.id,i.symbol,i.cik FROM instrument i " +
-      "LEFT JOIN holding h ON h.instrument_id=i.id " +
-      "LEFT JOIN watchlist w ON w.instrument_id=i.id " +
-      "WHERE i.market='US' AND i.active=1 AND i.cik IS NOT NULL AND (h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) " +
-      "ORDER BY i.symbol LIMIT ?"
-    ).bind(MAX_INSTRUMENTS).all();
+    const cursorRow = await env.DB.prepare(
+      "SELECT value FROM setting WHERE key='sec_refresh_cursor'"
+    ).first();
+    const cursor = typeof cursorRow?.value === "string" ? cursorRow.value : "";
+    const selectInstruments = (afterSymbol) => {
+      const base =
+        "SELECT DISTINCT i.id,i.symbol,i.cik FROM instrument i " +
+        "LEFT JOIN holding h ON h.instrument_id=i.id " +
+        "LEFT JOIN watchlist w ON w.instrument_id=i.id " +
+        "WHERE i.market='US' AND i.active=1 AND i.cik IS NOT NULL AND " +
+        "(h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) ";
+      return afterSymbol
+        ? env.DB.prepare(base + "AND i.symbol > ? ORDER BY i.symbol LIMIT ?").bind(afterSymbol, MAX_INSTRUMENTS).all()
+        : env.DB.prepare(base + "ORDER BY i.symbol LIMIT ?").bind(MAX_INSTRUMENTS).all();
+    };
+    let result = await selectInstruments(cursor);
+    if (!(result.results || []).length && cursor) result = await selectInstruments("");
     const instruments = result.results || [];
+    let lastProcessedSymbol = "";
+    let rateLimited = false;
 
     for (let index = 0; index < instruments.length; index++) {
       const instrument = instruments[index];
+      let submissionsStored = false;
       try {
-        const payload = await fetchJson(`${SEC_SUBMISSIONS}${instrument.cik}.json`, env.SEC_USER_AGENT, fetcher);
+        const payload = await fetchJson(SEC_SUBMISSIONS + instrument.cik + ".json", env.SEC_USER_AGENT, fetcher);
         const filings = parseSecSubmissions(payload, instrument.symbol, instrument.cik, now);
         const fetchedAt = new Date(now).toISOString();
         const companyName = typeof payload.name === "string" && payload.name.trim()
           ? payload.name.trim().slice(0, 200) : instrument.symbol;
         await storeFilings(env, instrument, filings, companyName, fetchedAt);
+        submissionsStored = true;
         filingCount += filings.length;
         const recentCutoff = new Date(now - 86400000).toISOString().slice(0, 10);
         newFilingCount += filings.filter((filing) => filing.filingDate >= recentCutoff).length;
@@ -122,13 +136,26 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
         if (factsResult === "updated") factsUpdated++;
         else factsCached++;
         refreshed++;
+        lastProcessedSymbol = instrument.symbol;
       } catch (error) {
         failed++;
-        // Log only a bounded error code, never request headers, payloads or secrets.
         const code = error instanceof Error ? error.message : "unknown";
         console.warn("SEC refresh instrument failed:", instrument.symbol, code.slice(0, 64));
+        if (code === "sec_rate_limited") {
+          rateLimited = true;
+          if (submissionsStored) lastProcessedSymbol = instrument.symbol;
+          break;
+        }
+        lastProcessedSymbol = instrument.symbol;
       }
       if (index < instruments.length - 1) await pause(SEC_PAUSE_MS);
+    }
+
+    if (lastProcessedSymbol) {
+      await env.DB.prepare(
+        "INSERT INTO setting(key,value) VALUES('sec_refresh_cursor',?) " +
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value"
+      ).bind(lastProcessedSymbol).run();
     }
 
     const filingPushResult = await dispatchFilingAlerts(env);
@@ -137,13 +164,13 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
     const status = failed > 0 ? (refreshed ? "partial" : "failed") : !instruments.length ? "skipped_no_data" : newFilingCount ? "success" : "skipped_no_new_data";
     const detail = JSON.stringify({
       instruments: instruments.length, refreshed, failed, filings: filingCount, newFilings: newFilingCount,
-      companyfactsUpdated: factsUpdated, companyfactsCached: factsCached, pushAlertsSent,
+      companyfactsUpdated: factsUpdated, companyfactsCached: factsCached, pushAlertsSent, rateLimited,
       reason: instruments.length ? undefined : "no_owned_us_instruments_with_cik"
     }).slice(0, 1000);
     await env.DB.prepare(
       "UPDATE job_run SET finished_at=?,status=?,detail=? WHERE id=?"
     ).bind(new Date().toISOString(), status, detail, jobId).run();
-    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached, pushAlertsSent };
+    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached, pushAlertsSent, rateLimited };
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     await env.DB.prepare(
@@ -172,8 +199,9 @@ export async function runWeeklyHousekeeping(env, { now = Date.now() } = {}) {
         .bind(cutoff90, jobId ?? -1),
       env.DB.prepare("DELETE FROM auth_challenge WHERE expires_at <= ?").bind(new Date(now).toISOString()),
       env.DB.prepare("DELETE FROM auth_attempt WHERE window < ?").bind(new Date(now - 86400000).toISOString().slice(0, 13)),
-      env.DB.prepare("DELETE FROM setting WHERE (key LIKE 'ai_daily_%' OR key LIKE 'push_daily_%') AND substr(key,10,10) < ?")
-        .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10))
+      env.DB.prepare("DELETE FROM setting WHERE (key LIKE 'ai_daily_%' AND substr(key,10,10) < ?) OR " +
+        "(key LIKE 'push_daily_%' AND substr(key,12,10) < ?)")
+        .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10), new Date(now - 7 * 86400000).toISOString().slice(0, 10))
     ]);
     const changes = results.reduce((sum, item) => sum + Number(item.meta?.changes || 0), 0);
     await env.DB.prepare(
