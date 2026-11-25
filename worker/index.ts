@@ -17,8 +17,6 @@ import { handleSecCompanyFactsRequest } from "./lib/sec-companyfacts.mjs";
 import { handleSettingsRequest } from "./lib/settings.mjs";
 // @ts-ignore The JavaScript export module is exercised by Node regression tests.
 import { handleExportRequest } from "./lib/export.mjs";
-// @ts-ignore The public research module is exercised by its Node regression tests.
-import { handleResearchRequest } from "./lib/research.mjs";
 // @ts-ignore Scheduled job modules are covered by Node regression tests.
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
 // @ts-ignore AI analysis route is covered by Node regression tests.
@@ -58,8 +56,6 @@ export default {
       response = await handleQuoteRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/sec/filings") {
       response = await handleSecRequest(request, env, url);
-    } else if (url.pathname === "/api/research/brief") {
-      response = await handleResearchRequest(request, env, url);
     } else if (url.pathname === "/api/sec/companyfacts") {
       response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/run") {
