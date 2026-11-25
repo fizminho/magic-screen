@@ -108,6 +108,18 @@ jobs:
             -H "Content-Type: application/json" --data-binary @edgartools-normalized.json \
             "$NORMALIZED_URL" > edgartools-normalized-ingest-response.json
           cat edgartools-normalized-ingest-response.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("edgartools-normalized.json").read_text())
+          response = json.loads(Path("edgartools-normalized-ingest-response.json").read_text())
+          expected = sum(len(company.get("metrics", [])) for company in report["companies"])
+          if response.get("received") != len(report["companies"]) or response.get("metric_records") != expected:
+              raise SystemExit("Normalized D1 ingestion response does not match the artifact.")
+          if response.get("production_fundamentals_changed") is not False or response.get("rankings_changed") is not False:
+              raise SystemExit("Normalized ingestion violated shadow-only guardrails.")
+          print(f"Stored {response['metric_records']} normalized analytics metrics; production data and ranks unchanged.")
+          PY
       - name: Ingest raw evidence into D1
         if: ${{ !inputs.symbols }}
         env:
@@ -141,5 +153,6 @@ jobs:
             edgartools-shadow.json
             edgartools-normalized.json
             edgartools-ingest-response.json
+            edgartools-normalized-ingest-response.json
           if-no-files-found: warn
           retention-days: 14
