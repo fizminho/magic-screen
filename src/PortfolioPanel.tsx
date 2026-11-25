@@ -305,7 +305,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             return (
               <div className="market-metric-card" key={marketCode}>
                 <div className="market-metric-title"><b>{marketCode === "US" ? "United States" : "Bursa Malaysia"}</b><span>{item?.quoteCoveragePct ?? 0}% quote coverage</span></div>
-                <strong>{formatMoney(item?.marketValue ?? null, marketCode === "US" ? "USD" : "MYR")}</strong>
+                <strong>{item ? formatMoney(item.marketValue, marketCode === "US" ? "USD" : "MYR") : "—"}</strong>
                 <div className="market-metric-details">
                   <span>Largest: {item?.largestPosition ? `${item.largestPosition.symbol} · ${item.largestPosition.weightPct}%` : "—"}</span>
                   <span>Top 3: {item?.topThreeConcentrationPct === null || item?.topThreeConcentrationPct === undefined ? "—" : `${item.topThreeConcentrationPct}%`}</span>
