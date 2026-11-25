@@ -1,111 +1,27 @@
-name: Phase A - Production D1 backup and baseline
+name: Phase A - Repository baseline
 
 on:
   push:
     branches:
       - chore/ai-portfolio-rebuild
   workflow_dispatch:
-    inputs:
-      confirm_production_read:
-        description: Confirm read-only export and inventory of the production D1 database
-        required: true
-        type: choice
-        options:
-          - NO
-          - YES
-        default: NO
 
 permissions:
   contents: read
-  actions: read
-
-concurrency:
-  group: magic-folio-phase-a
-  cancel-in-progress: false
 
 jobs:
-  production-snapshot:
-    name: Backup and inventory production D1
-    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[phase-a-run]')) || (github.event_name == 'workflow_dispatch' && inputs.confirm_production_read == 'YES')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Verify existing Cloudflare credentials
-        shell: bash
-        run: |
-          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" ]]; then
-            echo "::error::Missing existing GitHub secret CLOUDFLARE_API_TOKEN."
-            exit 1
-          fi
-          if [[ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
-            echo "::error::Missing existing GitHub variable/secret CLOUDFLARE_ACCOUNT_ID."
-            exit 1
-          fi
-
-      - name: Export production D1 backup
-        id: backup
-        shell: bash
-        run: |
-          set -euo pipefail
-          backup_file="backup-$(date -u +%F)-${GITHUB_RUN_ID}.sql"
-          npx --yes wrangler@4 d1 export magic-screen-db --remote --output "./$backup_file"
-          test -s "./$backup_file"
-          echo "file=$backup_file" >> "$GITHUB_OUTPUT"
-          echo "backup_ok=true" >> "$GITHUB_OUTPUT"
-          echo "Production D1 export completed; backup file is non-empty. The export may temporarily make the database unavailable while it runs."
-          echo "Backup filename: $backup_file"
-          echo "Backup size: $(wc -c < "$backup_file") bytes"
-
-      - name: Capture live D1 schema inventory
-        id: inventory
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@4 d1 execute magic-screen-db --remote --command "SELECT name, type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY type, name;" > d1-schema-inventory.txt
-          test -s d1-schema-inventory.txt
-          echo "Live D1 schema inventory captured."
-          {
-            echo "### Production D1 inventory"
-            echo 'See the `d1-schema-inventory.txt` file in the workflow artifact.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload protected short-lived backup artifact
-        if: always() && steps.backup.outputs.backup_ok == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: magic-folio-phase-a-backup-${{ github.run_id }}
-          path: |
-            ${{ steps.backup.outputs.file }}
-            d1-schema-inventory.txt
-          if-no-files-found: warn
-          retention-days: 1
-          compression-level: 0
-
   baseline:
     name: Install, build and regression tests
-    if: github.event_name == 'push' || inputs.confirm_production_read == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288ca8ca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-
       - name: Install dependencies (baseline; lockfile not yet present)
         run: npm install --no-audit --no-fund
-
       - name: Build
         run: npm run build
-
       - name: Run complete Node regression suite
         run: node --experimental-strip-types --test worker/*.test.mjs
