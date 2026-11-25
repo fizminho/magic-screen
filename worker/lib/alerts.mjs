@@ -52,6 +52,8 @@ export async function dispatchAlert(env, alert, fetcher = fetch) {
   const subscriptions = await env.DB.prepare(
     "SELECT endpoint,p256dh,auth FROM push_subscription ORDER BY created_at DESC LIMIT 5"
   ).all();
+  if (!(subscriptions.results || []).length) return { status: "no_subscriptions", sent: 0 };
+
   let sent = 0;
   const statements = [];
   for (const subscription of subscriptions.results || []) {
