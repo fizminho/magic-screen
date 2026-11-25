@@ -25,7 +25,7 @@ The library is used as a dependency; no demo code was copied. Its browser client
 - Self-service use does not permit redistribution. The app must remain single-owner/private, and quote snapshots must never be exposed to another user, public API or export.
 - The provider explicitly allows personal browser dashboards that only the subscriber accesses. Its CORS support is intended for that use. The API token is visible in browser requests, so it must be entered by the owner after passkey login, kept only in browser session memory/session storage, never committed or sent to the Worker.
 - Each account may connect from only one IP at a time. Switching devices/IPs is allowed, but simultaneous requests from multiple IPs are not. Refresh should be initiated from one device; the resulting owner-only D1 snapshot can then be read on the owner's other devices.
-- Free plan data must be deleted if the provider account is closed. The quote response's source timestamp must be preserved and the UI must label the data as at least 24 hours delayed.
+- Free plan data must be deleted if the provider account is closed. Use the documented delayed-quotes endpoint (`/v1/stocks/quotes/`), not the real-time-prices endpoint. Without a UTP entitlement the free tier returns historical (at least one day old) quotes. Preserve the `updated` timestamp and label the data `24h delayed`.
 - Coverage documented by the provider is US exchange data (IEX/UTP). It is not a Bursa Malaysia feed.
 
 References:
@@ -34,7 +34,7 @@ References:
 - https://www.marketdata.app/docs/account/data-policies/single-ip/
 - https://www.marketdata.app/docs/api/cors/
 - https://www.marketdata.app/docs/account/data-freshness/
-- https://www.marketdata.app/docs/api/stocks/prices/
+- https://www.marketdata.app/docs/api/stocks/quotes/
 
 Do not enable this adapter until the owner has their own account/API token and accepts the 24-hour delay and single-IP restriction.
 
