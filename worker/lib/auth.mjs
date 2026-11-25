@@ -159,14 +159,14 @@ async function consumeChallenge(env, challenge, purpose) {
   return Boolean(row);
 }
 
-async function createSession(env, request) {
+async function createSession(env, request, credentialId) {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const token = base64url(bytes);
   const tokenHash = await sha256Hex(token);
   const now = nowIso();
   await env.DB.prepare(
-    "INSERT INTO session(token_hash, created_at, expires_at, last_seen_at, user_agent) VALUES(?,?,?,?,?)"
-  ).bind(tokenHash, now, addSeconds(SESSION_SECONDS), now,
+    "INSERT INTO session(token_hash, credential_id, created_at, expires_at, last_seen_at, user_agent) VALUES(?,?,?,?,?,?)"
+  ).bind(tokenHash, credentialId, now, addSeconds(SESSION_SECONDS), now,
     (request.headers.get("user-agent") || "").slice(0, 300)).run();
   return token;
 }
@@ -272,7 +272,7 @@ async function registerVerify(request, env) {
   }
   if (inserted !== 1) return json({ error: "This passkey could not be added. Refresh and try again." }, 409);
 
-  const token = await createSession(env, request);
+  const token = await createSession(env, request, credential.id);
   return json({ ok: true, authenticated: true, passkeyCount: await passkeyCount(env) }, 201, {
     "set-cookie": cookieHeader(token, env)
   });
@@ -379,7 +379,7 @@ async function loginVerify(request, env) {
     return json({ error: "Sign-in failed." }, 401);
   }
 
-  const token = await createSession(env, request);
+  const token = await createSession(env, request, row.id);
   return json({ ok: true, authenticated: true }, 200, { "set-cookie": cookieHeader(token, env) });
 }
 
@@ -423,12 +423,20 @@ async function credentialMutation(request, env, pathname) {
 
   if (request.method === "DELETE") {
     await bodyJson(request);
-    const deleted = await env.DB.prepare(
-      "DELETE FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1 RETURNING id"
-    ).bind(credentialId).first();
+    const results = await env.DB.batch([
+      env.DB.prepare(
+        "DELETE FROM session WHERE credential_id = ? AND EXISTS " +
+        "(SELECT 1 FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1)"
+      ).bind(credentialId, credentialId),
+      env.DB.prepare(
+        "DELETE FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1 RETURNING id"
+      ).bind(credentialId)
+    ]);
+    const deleted = Number(results?.[1]?.meta?.changes || 0) === 1;
     if (!deleted) {
-      const count = await passkeyCount(env);
-      return json({ error: count <= 1 ? "The last passkey cannot be deleted." : "Passkey not found." }, count <= 1 ? 409 : 404);
+      const exists = await env.DB.prepare("SELECT 1 AS found FROM passkey_credential WHERE id = ?").bind(credentialId).first();
+      if (!exists) return json({ error: "Passkey not found." }, 404);
+      return json({ error: "The last passkey cannot be deleted." }, 409);
     }
     return json({ ok: true, passkeyCount: await passkeyCount(env) });
   }
