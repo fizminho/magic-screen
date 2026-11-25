@@ -70,6 +70,35 @@ test("scheduled SEC refresh stores filing metadata and public facts without quot
   assert.ok(calls.prepared.some((item) => item.sql.includes("UPDATE job_run SET finished_at")));
 });
 
+test("scheduled SEC refresh backfills missing US CIKs from the SEC ticker directory", async () => {
+  const { DB, calls } = mockDb({ instruments: [{ id: 7, symbol: "AAPL", cik: "0000320193" }] });
+  const requested = [];
+  const originalPrepare = DB.prepare.bind(DB);
+  DB.prepare = (sql) => {
+    const statement = originalPrepare(sql);
+    if (sql.includes("i.cik IS NULL")) statement.all = async () => ({ results: [{ id: 9, symbol: "MSFT" }] });
+    return statement;
+  };
+  const fetcher = async (url) => {
+    requested.push(String(url));
+    if (String(url).includes("company_tickers.json")) {
+      return new Response(JSON.stringify({ 0: { cik_str: 789019, ticker: "MSFT", title: "Microsoft Corporation" } }), { status: 200 });
+    }
+    if (String(url).includes("/submissions/")) {
+      return new Response(JSON.stringify({ name: "Apple Inc.", filings: { recent: {
+        form: [], filingDate: [], accessionNumber: [], primaryDocument: []
+      } } }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ cik: 320193, entityName: "Apple Inc.", facts: { "us-gaap": {} } }), { status: 200 });
+  };
+  const result = await runSecRefresh({ DB, SEC_USER_AGENT: userAgent }, {
+    fetcher, now: Date.parse("2026-11-25T01:00:00Z")
+  });
+  assert.equal(result.cikResolved, 1);
+  assert.ok(requested.includes("https://www.sec.gov/files/company_tickers.json"));
+  assert.ok(calls.prepared.some((item) => item.sql.includes("UPDATE instrument SET cik=?") && item.values[0] === "0000789019"));
+});
+
 test("scheduled SEC refresh fails closed without a real contact User-Agent", async () => {
   const { DB } = mockDb();
   await assert.rejects(
