@@ -76,7 +76,7 @@ export async function handleEdgarToolsRequest(request, env, url) {
     let metricCount = 0;
     for (const company of report.companies) {
       if (!SYMBOL_RE.test(company?.symbol || "") || company.provider_status !== "supported" ||
-          typeof company.accession !== "string" || !/^\\d{10}-\\d{2}-\\d{6}$/.test(company.accession) ||
+          typeof company.accession !== "string" || !/^\d{10}-\d{2}-\d{6}$/.test(company.accession) ||
           !["10-K", "20-F", "40-F"].includes(company.form) || !Array.isArray(company.metrics) || company.metrics.length > 500) {
         return jsonResponse({ error: "Invalid normalized company record." }, 400);
       }
@@ -85,7 +85,7 @@ export async function handleEdgarToolsRequest(request, env, url) {
         const key = [metric.statement, metric.metric, metric.period_end, metric.period_type].join("|");
         if (!["income_statement", "balance_sheet", "cash_flow_statement"].includes(metric.statement) ||
             !/^[A-Za-z][A-Za-z0-9]*$/.test(metric.metric || "") ||
-            !/^\\d{4}-\\d{2}-\\d{2}$/.test(metric.period_end || "") ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(metric.period_end || "") ||
             !["duration", "instant"].includes(metric.period_type) ||
             (metric.statement === "balance_sheet") !== (metric.period_type === "instant") ||
             !Number.isFinite(metric.value) || (metric.currency !== null && !/^[A-Z]{3}$/.test(metric.currency || "")) ||
