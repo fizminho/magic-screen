@@ -62,8 +62,7 @@ jobs:
       - name: Run EdgarTools shadow extraction
         env:
           EDGAR_IDENTITY: "Magic Folio research support@binalah.co"
-          EDGARTOOLS_SYMBOLS: ${{ steps.resolve.outputs.symbols || '' }}
-          OUTPUT_PATH: edgartools-shadow.json
+                    OUTPUT_PATH: edgartools-shadow.json
         run: |
           if [ -f edgartools-symbols.txt ]; then
             export EDGARTOOLS_SYMBOLS="$(cat edgartools-symbols.txt)"
@@ -117,7 +116,7 @@ jobs:
           PY
       - name: Upload extraction report
         if: always()
-        uses: actions/upload-artifact@ea8e7e0a1e74b0a6e5e0f1f9c0a8a0a2f0b1c9a8
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: edgartools-shadow-${{ github.run_id }}
           path: |
