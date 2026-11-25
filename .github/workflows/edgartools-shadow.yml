@@ -1,0 +1,127 @@
+name: EdgarTools shadow extraction
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Optional comma-separated US ticker override. Leave blank to use active holdings and watchlist."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edgartools-shadow
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install pinned EdgarTools
+        run: python -m pip install --upgrade pip "edgartools==6.3.0"
+      - name: Resolve US holdings and watchlist
+        if: ${{ inputs.symbols == '' }}
+        env:
+          EDGARTOOLS_INGEST_URL: ${{ vars.EDGARTOOLS_INGEST_URL }}
+          UNIVERSE_SYNC_TOKEN: ${{ secrets.UNIVERSE_SYNC_TOKEN }}
+        run: |
+          test -n "$EDGARTOOLS_INGEST_URL" || { echo "::error::Set repository variable EDGARTOOLS_INGEST_URL to the full /api/fundamentals/edgartools/ingest URL."; exit 1; }
+          test -n "$UNIVERSE_SYNC_TOKEN" || { echo "::error::Set repository secret UNIVERSE_SYNC_TOKEN."; exit 1; }
+          BASE_URL="${EDGARTOOLS_INGEST_URL%/api/fundamentals/edgartools/ingest}"
+          curl --fail-with-body --silent --show-error --retry 3 --max-time 60 \
+            -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
+            "$BASE_URL/api/fundamentals/edgartools/universe" > edgartools-universe.json
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          data = json.loads(Path("edgartools-universe.json").read_text())
+          symbols = data.get("symbols")
+          if data.get("primary_provider") != "EdgarTools" or not isinstance(symbols, list) or not symbols:
+              raise SystemExit("No valid active US holdings/watchlist universe returned.")
+          if len(symbols) > 50 or len(symbols) != len(set(symbols)) or any(not re.fullmatch(r"[A-Z0-9.-]{1,15}", x) for x in symbols):
+              raise SystemExit("Invalid or oversized ticker universe.")
+          Path("edgartools-symbols.txt").write_text(",".join(symbols))
+          print(f"Resolved {len(symbols)} active US holdings/watchlist tickers.")
+          PY
+      - name: Select manual ticker override
+        if: ${{ inputs.symbols != '' }}
+        env:
+          SYMBOL_OVERRIDE: ${{ inputs.symbols }}
+        run: echo "$SYMBOL_OVERRIDE" > edgartools-symbols.txt
+      - name: Run EdgarTools shadow extraction
+        env:
+          EDGAR_IDENTITY: "Magic Folio research support@binalah.co"
+          EDGARTOOLS_SYMBOLS: ${{ steps.resolve.outputs.symbols || '' }}
+          OUTPUT_PATH: edgartools-shadow.json
+        run: |
+          if [ -f edgartools-symbols.txt ]; then
+            export EDGARTOOLS_SYMBOLS="$(cat edgartools-symbols.txt)"
+          fi
+          python scripts/edgartools_shadow.py
+      - name: Validate shadow report
+        run: |
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          report = json.loads(Path("edgartools-shadow.json").read_text())
+          companies = report.get("companies")
+          if report.get("primary_provider") != "EdgarTools" or report.get("production_data_modified") is not False:
+              raise SystemExit("Production immutability guardrail failed.")
+          if not isinstance(companies, list) or not companies or len(companies) > 50:
+              raise SystemExit("Invalid extraction company list.")
+          symbols = [x.get("symbol") for x in companies]
+          if len(symbols) != len(set(symbols)) or any(not isinstance(x, str) or not re.fullmatch(r"[A-Z0-9.-]{1,15}", x) for x in symbols):
+              raise SystemExit("Invalid or duplicate ticker.")
+          for item in companies:
+              if item.get("provider_status") not in {"supported", "unsupported_provider", "extraction_error"}:
+                  raise SystemExit(f"Invalid provider status for {item.get('symbol')}.")
+              if item.get("provider_status") == "supported":
+                  filing = item.get("filing") or {}
+                  if not filing.get("accession_number") or not filing.get("period_of_report"):
+                      raise SystemExit(f"Missing accession or period for {item['symbol']}.")
+          print(f"Validated {len(companies)} EdgarTools shadow records.")
+          PY
+      - name: Ingest raw evidence into D1
+        env:
+          EDGARTOOLS_INGEST_URL: ${{ vars.EDGARTOOLS_INGEST_URL }}
+          UNIVERSE_SYNC_TOKEN: ${{ secrets.UNIVERSE_SYNC_TOKEN }}
+        run: |
+          if [ -z "$EDGARTOOLS_INGEST_URL" ] || [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
+            echo "::warning::Ingestion settings missing; retaining artifact only."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+            -X POST -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
+            -H "Content-Type: application/json" --data-binary @edgartools-shadow.json \
+            "$EDGARTOOLS_INGEST_URL" > edgartools-ingest-response.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("edgartools-shadow.json").read_text())
+          response = json.loads(Path("edgartools-ingest-response.json").read_text())
+          expected = len(report["companies"])
+          if response.get("received") != expected or response.get("production_fundamentals_changed") is not False or response.get("rankings_changed") is not False:
+              raise SystemExit("D1 ingestion response failed immutable-shadow checks.")
+          print(f"Stored {response.get('ingested', 0)} filing-evidence records; production data and ranks unchanged.")
+          PY
+      - name: Upload extraction report
+        if: always()
+        uses: actions/upload-artifact@ea8e7e0a1e74b0a6e5e0f1f9c0a8a0a2f0b1c9a8
+        with:
+          name: edgartools-shadow-${{ github.run_id }}
+          path: |
+            edgartools-shadow.json
+            edgartools-ingest-response.json
+          if-no-files-found: warn
+          retention-days: 14
