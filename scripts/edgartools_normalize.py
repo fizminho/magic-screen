@@ -1,166 +1,113 @@
 #!/usr/bin/env python3
-"""Normalize EdgarTools statement rows to Magic Folio SEC CompanyFacts keys.
+"""Build stable, analytics-ready metrics from EdgarTools filing statements.
 
-Shadow-only: this module does not write to D1 or production fundamentals.
+The normalized output is isolated evidence. It is not a production fundamentals feed.
 """
 from __future__ import annotations
-
-import argparse
-import json
-import re
+import argparse, json, re
 from pathlib import Path
 from typing import Any
 
 PERIOD_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?: \((FY|Q[1-4])\))?$")
-
-# Keep these keys and tag aliases aligned with worker/lib/sec-companyfacts.mjs.
 METRIC_TAGS = {
-    "revenue": {"RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"},
-    "operatingIncome": {"OperatingIncomeLoss"},
-    "operatingExpenses": {"OperatingExpenses", "OperatingCostsAndExpenses", "CostsAndExpenses"},
-    "netIncome": {"NetIncomeLoss"},
-    "incomeTaxExpense": {"IncomeTaxExpenseBenefit"},
-    "interestExpense": {"InterestExpenseNonOperating", "InterestAndDebtExpense"},
-    "cashAndEquivalents": {"CashAndCashEquivalentsAtCarryingValue"},
-    "currentAssets": {"AssetsCurrent"},
-    "currentLiabilities": {"LiabilitiesCurrent"},
-    "currentDebt": {"LongTermDebtCurrent", "LongTermDebtAndFinanceLeaseObligationsCurrent", "ShortTermBorrowings"},
-    "longTermDebt": {"LongTermDebtNoncurrent", "LongTermDebtAndFinanceLeaseObligationsNoncurrent", "LongTermDebt"},
-    "accountsReceivable": {"AccountsReceivableNetCurrent"},
-    "inventory": {"InventoryNet"},
-    "propertyPlantEquipment": {"PropertyPlantAndEquipmentNet"},
-    "totalAssets": {"Assets"},
-    "totalLiabilities": {"Liabilities"},
+    "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"],
+    "operatingIncome": ["OperatingIncomeLoss"],
+    "operatingExpenses": ["OperatingExpenses", "OperatingCostsAndExpenses", "CostsAndExpenses"],
+    "netIncome": ["NetIncomeLoss"],
+    "incomeTaxExpense": ["IncomeTaxExpenseBenefit"],
+    "interestExpense": ["InterestExpenseNonOperating", "InterestAndDebtExpense"],
+    "cashAndEquivalents": ["CashAndCashEquivalentsAtCarryingValue"],
+    "currentAssets": ["AssetsCurrent"],
+    "currentLiabilities": ["LiabilitiesCurrent"],
+    "currentDebt": ["LongTermDebtCurrent", "LongTermDebtAndFinanceLeaseObligationsCurrent", "ShortTermBorrowings"],
+    "longTermDebt": ["LongTermDebtNoncurrent", "LongTermDebtAndFinanceLeaseObligationsNoncurrent", "LongTermDebt"],
+    "accountsReceivable": ["AccountsReceivableNetCurrent"],
+    "inventory": ["InventoryNet"],
+    "propertyPlantEquipment": ["PropertyPlantAndEquipmentNet"],
+    "totalAssets": ["Assets"],
+    "totalLiabilities": ["Liabilities"],
 }
 TAG_TO_METRIC = {tag: key for key, tags in METRIC_TAGS.items() for tag in tags}
-
+STATEMENT_PERIODS = {"income_statement": "duration", "cash_flow_statement": "duration", "balance_sheet": "instant"}
 
 def concept_tag(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    return value.rsplit("_", 1)[-1]
-
+    return value.rsplit("_", 1)[-1] if isinstance(value, str) else None
 
 def normalize_company(company: dict[str, Any]) -> dict[str, Any]:
-    statements: dict[str, Any] = {}
-    warnings: list[str] = []
+    filing = company.get("filing") or {}
+    records = []
+    warnings = []
     for statement_name, statement in (company.get("statements") or {}).items():
-        if not statement.get("available"):
-            statements[statement_name] = {"available": False, "periods": []}
+        period_type = STATEMENT_PERIODS.get(statement_name)
+        if not period_type or not statement.get("available"):
             continue
-
-        periods: dict[tuple[str, str], dict[str, Any]] = {}
         for row in statement.get("rows") or []:
             if row.get("abstract") or row.get("dimension") or row.get("is_breakdown"):
                 continue
             metric = TAG_TO_METRIC.get(concept_tag(row.get("concept")))
-            if not metric:
-                continue
-            # Cash flow statements contain both beginning and ending cash rows.
-            # Cash balance is mapped only from the balance sheet to avoid ambiguity.
-            if metric == "cashAndEquivalents" and statement_name != "balance_sheet":
+            if not metric or (metric == "cashAndEquivalents" and statement_name != "balance_sheet"):
                 continue
             for column, value in row.items():
                 match = PERIOD_RE.fullmatch(column)
                 if not match or not isinstance(value, (int, float)) or isinstance(value, bool):
                     continue
-                period_end, fiscal_label = match.groups()
-                period_type = "instant" if statement_name == "balance_sheet" else "duration"
-                key = (period_end, period_type)
-                period = periods.setdefault(key, {
-                    "period_end": period_end,
+                end, fiscal_label = match.groups()
+                records.append({
+                    "statement": statement_name,
+                    "metric": metric,
+                    "period_end": end,
                     "period_type": period_type,
                     "fiscal_label": fiscal_label,
-                    "metrics": {},
-                })
-                if metric in period["metrics"]:
-                    warnings.append(f"{statement_name}:{period_end}:{metric}: duplicate mapping skipped")
-                    continue
-                period["metrics"][metric] = {
                     "value": value,
-                    "unit": "USD",
+                    # EdgarTools dataframe values do not expose a reliable currency unit.
+                    # Never label foreign issuer values USD by assumption.
+                    "currency": None,
                     "source_concept": row.get("concept"),
                     "source_label": row.get("label"),
-                }
-
-        statements[statement_name] = {
-            "available": True,
-            "periods": sorted(periods.values(), key=lambda x: x["period_end"], reverse=True),
-        }
-
+                    "standard_concept": row.get("standard_concept"),
+                    "balance": row.get("balance"),
+                })
+    # Deterministic de-duplication: prefer rows with a canonical standard_concept.
+    selected = {}
+    for item in records:
+        key = (item["statement"], item["metric"], item["period_end"], item["period_type"])
+        previous = selected.get(key)
+        if previous is None or (not previous.get("standard_concept") and item.get("standard_concept")):
+            selected[key] = item
+        else:
+            warnings.append(f"duplicate:{key[0]}:{key[1]}:{key[2]}")
     return {
         "symbol": company.get("symbol"),
         "provider_status": company.get("provider_status"),
-        "filing": company.get("filing"),
-        "mapping_version": 1,
-        "mapping_basis": "SEC CompanyFacts canonical keys and US-GAAP tag aliases",
-        "statements": statements,
-        "warnings": warnings,
+        "accession": filing.get("accession_number"),
+        "form": filing.get("form"),
+        "filed_at": filing.get("filing_date"),
+        "fiscal_period": filing.get("period_of_report"),
+        "mapping_version": 2,
+        "metrics": sorted(selected.values(), key=lambda x: (x["period_end"], x["statement"], x["metric"]), reverse=True),
+        "warnings": sorted(set(warnings)),
     }
-
-
-def compare_companyfacts(normalized: dict[str, Any], sec_payload: dict[str, Any]) -> dict[str, Any]:
-    """Compare against the app's parsed /api/sec/companyfacts response shape."""
-    accession = (normalized.get("filing") or {}).get("accession_number")
-    sec_filing = next((x for x in sec_payload.get("facts", []) if x.get("accessionNumber") == accession), None)
-    if not sec_filing:
-        return {"status": "no_matching_accession", "accession": accession, "matched": 0, "mismatches": []}
-
-    comparisons = []
-    for statement in normalized.get("statements", {}).values():
-        for period in statement.get("periods", []):
-            for metric, item in period.get("metrics", {}).items():
-                sec_fact = (sec_filing.get("facts") or {}).get(metric)
-                if not sec_fact or sec_fact.get("end") != period["period_end"]:
-                    continue
-                sec_value = sec_fact.get("value")
-                comparisons.append({
-                    "metric": metric,
-                    "period_end": period["period_end"],
-                    "edgartools_value": item["value"],
-                    "sec_companyfacts_value": sec_value,
-                    "match": sec_value == item["value"],
-                })
-    mismatches = [x for x in comparisons if not x["match"]]
-    return {
-        "status": "compared",
-        "accession": accession,
-        "matched": len(comparisons),
-        "mismatch_count": len(mismatches),
-        "mismatches": mismatches,
-    }
-
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="edgartools-shadow.json")
     parser.add_argument("--output", default="edgartools-normalized.json")
-    parser.add_argument("--sec-companyfacts", help="Optional saved /api/sec/companyfacts response JSON")
     args = parser.parse_args()
-
     report = json.loads(Path(args.input).read_text(encoding="utf-8"))
-    normalized = {
-        "service": "Magic Folio EdgarTools normalized shadow evidence",
+    companies = [normalize_company(x) for x in report.get("companies", [])]
+    output = {
+        "service": "Magic Folio EdgarTools normalized analytics evidence",
+        "schema_version": 1,
+        "mapping_version": 2,
         "production_data_modified": False,
         "source_report_generated_at": report.get("generated_at"),
         "edgartools_version": report.get("edgartools_version"),
-        "companies": [normalize_company(x) for x in report.get("companies", [])],
+        "companies": companies,
     }
-    if args.sec_companyfacts:
-        sec_payload = json.loads(Path(args.sec_companyfacts).read_text(encoding="utf-8"))
-        for company in normalized["companies"]:
-            company["sec_companyfacts_comparison"] = compare_companyfacts(company, sec_payload)
-
-    Path(args.output).write_text(json.dumps(normalized, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    mapped = sum(
-        len(period["metrics"])
-        for company in normalized["companies"]
-        for statement in company["statements"].values()
-        for period in statement.get("periods", [])
-    )
-    print(f"Normalized {len(normalized['companies'])} companies; mapped {mapped} canonical SEC metrics.")
+    Path(args.output).write_text(json.dumps(output, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    count = sum(len(x["metrics"]) for x in companies)
+    print(f"Normalized {len(companies)} companies into {count} analytics metric records.")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
