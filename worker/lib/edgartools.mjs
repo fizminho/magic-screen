@@ -158,6 +158,13 @@ export async function handleEdgarToolsRequest(request, env, url) {
     return jsonResponse({ error: "Invalid or duplicate company evidence." }, 400);
   }
 
+  // D1 databases created by earlier Magic Folio deployments may have the
+  // richer accession_key schema, while fresh installs use the original
+  // accession schema from migration 0006. Support both without destructive
+  // schema changes or touching existing evidence.
+  const evidenceSchema = await env.DB.prepare("PRAGMA table_info(edgartools_filing_evidence)").all();
+  const usesAccessionKey = (evidenceSchema.results || []).some((column) => column.name === "accession_key");
+
   const now = new Date().toISOString();
   const statements = [];
   for (const item of companies) {
@@ -175,11 +182,22 @@ export async function handleEdgarToolsRequest(request, env, url) {
     ).bind(item.symbol, item.provider_status, accession, period, form, filedAt, version, report.generated_at,
       typeof item.error === "string" ? item.error.slice(0, 300) : null, now));
     if (item.provider_status === "supported") {
-      statements.push(env.DB.prepare(
-        "INSERT INTO edgartools_filing_evidence(symbol,accession,fiscal_period,form,filed_at,provider_version,generated_at,payload_json,ingested_at) " +
-        "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,accession) DO UPDATE SET fiscal_period=excluded.fiscal_period,form=excluded.form," +
-        "filed_at=excluded.filed_at,provider_version=excluded.provider_version,generated_at=excluded.generated_at,payload_json=excluded.payload_json,ingested_at=excluded.ingested_at"
-      ).bind(item.symbol, accession, period, form || "annual", filedAt, version, report.generated_at, JSON.stringify(item), now));
+      if (usesAccessionKey) {
+        statements.push(env.DB.prepare(
+          "INSERT INTO edgartools_filing_evidence(symbol,accession_key,market,cik,accession,fiscal_period,form,filed_at,reporting_currency,provider_status,provider,provider_version,generated_at,payload_json,ingested_at) " +
+          "VALUES(?,?,'US',?,?,?,?,?,NULL,?,'EdgarTools',?,?,?,?) ON CONFLICT(symbol,accession_key) DO UPDATE SET " +
+          "cik=excluded.cik,accession=excluded.accession,fiscal_period=excluded.fiscal_period,form=excluded.form,filed_at=excluded.filed_at," +
+          "provider_status=excluded.provider_status,provider_version=excluded.provider_version,generated_at=excluded.generated_at," +
+          "payload_json=excluded.payload_json,ingested_at=excluded.ingested_at"
+        ).bind(item.symbol, accession, filing.cik || item.cik || null, accession, period, form || "annual", filedAt,
+          item.provider_status, version, report.generated_at, JSON.stringify(item), now));
+      } else {
+        statements.push(env.DB.prepare(
+          "INSERT INTO edgartools_filing_evidence(symbol,accession,fiscal_period,form,filed_at,provider_version,generated_at,payload_json,ingested_at) " +
+          "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,accession) DO UPDATE SET fiscal_period=excluded.fiscal_period,form=excluded.form," +
+          "filed_at=excluded.filed_at,provider_version=excluded.provider_version,generated_at=excluded.generated_at,payload_json=excluded.payload_json,ingested_at=excluded.ingested_at"
+        ).bind(item.symbol, accession, period, form || "annual", filedAt, version, report.generated_at, JSON.stringify(item), now));
+      }
     }
   }
   for (let offset = 0; offset < statements.length; offset += 50) {
