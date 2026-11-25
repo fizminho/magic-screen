@@ -265,7 +265,7 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 
 - [x] `/api/quotes/latest`, `/api/quotes/snapshots`, `/api/holdings` and `/api/watchlist` routes require an owner session; writes/deletes also require exact Origin and JSON. The local D1 smoke test exercises holdings and watchlist upsert, list and delete.
 - [ ] Input validation on every route (symbol regex, market enum, numeric ranges). Public errors are generic (`publicErrorMessage` helper already exists).
-- [ ] Holdings import: paste CSV (`symbol,market,quantity,avg_cost`) parsed in the browser, sent as JSON.
+- [x] Holdings import: paste CSV (`symbol,market,quantity,avg_cost`) parsed and validated in the browser, then sent as JSON to the owner-only API. Existing positions are updated; omitted rows are not deleted. The API enforces a 20-position total cap. Fixture tests cover duplicate symbols, invalid markets, quantities, costs and batch size.
 
 ### E7. Tests (Node built-in runner, as the repo already does)
 - [ ] Unit tests: passkey flow with fixtures (challenge single-use and expiry, wrong origin, wrong RP ID, missing UV flag, counter regression, setup-token gate closes after first credential, cannot delete last credential), session hashing and expiry, market-window logic (including DST edge dates), Gemini output validator (drops unknown tickers/ids), alert dedupe, news dedupe/matching, CSV import parser.
