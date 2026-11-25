@@ -40,6 +40,9 @@ jobs:
       - name: Verify local D1 schema
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+      - name: Verify CIK and SEC cache schema
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT cik FROM instrument LIMIT 0; SELECT cik FROM sec_fetch_cache LIMIT 0; SELECT cik FROM sec_filing LIMIT 0;"
       - name: Verify SEC rate-limit kind is accepted by D1
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "INSERT INTO auth_attempt(ip_hash,window,kind,count) VALUES('ci-sec-rate-limit',strftime('%Y-%m-%dT%H','now'),'sec_fetch',1); DELETE FROM auth_attempt WHERE ip_hash='ci-sec-rate-limit';"
