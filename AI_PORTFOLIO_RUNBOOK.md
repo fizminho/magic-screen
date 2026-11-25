@@ -284,15 +284,15 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 
 Screens (mobile-first, one column): **Passkey sign-in / first-run setup · Dashboard** (totals per currency, day change, top movers, latest brief) · **Holdings** (list + add/edit/import CSV) · **Stock detail** (quote, news with impact tags, AI research brief) · **Insights** (daily brief, weekly recommendations, diversification summary by sector/market) · **Settings** (alert threshold, enable notifications, passkeys list/add/remove, export data, Shariah filter, sign out).
 
-- [ ] **F1.** `public/manifest.webmanifest`: name, short_name, `display: standalone`, `start_url: /`, theme/background colours, 192/512 PNG icons plus a maskable icon. Link it in `index.html`.
-- [ ] **F1b.** Update `index.html` title and meta description (they still describe the MFI/Shariah screener) and `package.json` name/description.
-- [ ] **F2.** `public/sw.js` (hand-written, ≤ ~80 lines, no Workbox): precache the app shell; **network-first for navigations; never cache `/api/*`**; handle `push` (show notification) and `notificationclick` (focus/open the deep link). Version the cache name and delete old caches on `activate`.
-- [ ] **F3.** Register the service worker only in production builds. Request notification permission **only after a user tap** (Settings → "Enable notifications"), then `pushManager.subscribe({userVisibleOnly: true, applicationServerKey})` and POST to `/api/push/subscribe`.
-- [ ] **F4.** iOS note in the UI: push works only after "Add to Home Screen" on a supported iOS version. Show an install hint when `display-mode` is not standalone on iOS.
-- [ ] **F5.** Offline: show last cached dashboard JSON (kept in memory/IndexedDB) with a clear "offline, as of …" banner. Do not queue writes in v1.
+- [x] **F1 (SVG icon).** Added `public/manifest.webmanifest`, `display: standalone`, `start_url: /`, theme/background colours and a scalable SVG icon with `any maskable` purpose. Linked manifest and icon in `index.html`. PNG icon variants remain a compatibility follow-up if Lighthouse/iOS testing requires them.
+- [x] **F1b.** Updated `index.html` title and meta description for Magic Folio and retained the current package metadata.
+- [x] **F2.** Added a hand-written service worker: app-shell precache, network-first navigation, runtime static-asset caching, explicit no-cache rule for `/api/*`, push display and notification-click navigation. Cache is versioned and old versions are removed on activate.
+- [x] **F3.** Service worker registration runs only in production. Settings requests notification permission only after a user tap, obtains the public VAPID key, subscribes with `userVisibleOnly` and posts the subscription to `/api/push/subscribe`. Added send-test and disable controls.
+- [x] **F4.** iOS install hint explains Share → Add to Home Screen and that push requires the installed app on supported iOS versions. The hint is hidden in standalone mode.
+- [x] **F5.** Last dashboard JSON is stored in IndexedDB after an authenticated fetch and shown with an offline timestamp banner. Cache is cleared when the owner session is signed out. No writes are queued offline.
 - [ ] **F6.** Keep the UI light: no UI kit, plain CSS with CSS variables, light/dark via `prefers-color-scheme`, inline SVG sparkline (no chart library). Hash-based routing (no router dependency).
-- [ ] **F7.** Every AI block shows: "AI-generated, may be wrong. Not investment advice", the model name, the generation time, and links to the cited news items.
-- [x] **F8 (partial).** CSP keeps `script-src 'self'`, `style-src 'self'` and allows only the optional `https://api.marketdata.app` origin in `connect-src`. Add `manifest-src 'self'` and `worker-src 'self'` when the PWA manifest/service worker are introduced.
+- [x] **F7.** Public research brief shows the AI-generated/uncertainty notice, not-investment-advice disclaimer, model name, generation time and official SEC source links.
+- [x] **F8.** CSP keeps self-hosted scripts/styles, allows only the optional `https://api.marketdata.app` browser connection, and explicitly permits same-origin manifest and service-worker resources.
 - [x] **F8b.** Sign-in uses the browser passkey prompt only, with no username/password fields and an explicit unsupported-browser message.
 - [ ] **F9.** Lighthouse PWA/installability check passes (installable, service worker, manifest, HTTPS). Bundle budget: JS ≤ 150 KB gzipped.
 
