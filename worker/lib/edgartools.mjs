@@ -1,0 +1,116 @@
+import { jsonResponse } from "./auth.mjs";
+
+const MAX_BODY_BYTES = 1_500_000;
+const MAX_COMPANIES = 50;
+const SYMBOL_RE = /^[A-Z0-9.-]{1,15}$/;
+
+async function authorized(request, env) {
+  const expected = env.UNIVERSE_SYNC_TOKEN;
+  const supplied = request.headers.get("authorization") || "";
+  if (typeof expected !== "string" || expected.length < 32 || !supplied.startsWith("Bearer ")) return false;
+  const actual = supplied.slice(7);
+  const encoder = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(actual)),
+    crypto.subtle.digest("SHA-256", encoder.encode(expected))
+  ]);
+  const left = new Uint8Array(a), right = new Uint8Array(b);
+  let diff = left.length ^ right.length;
+  for (let i = 0; i < left.length; i++) diff |= left[i] ^ right[i];
+  return diff === 0;
+}
+
+function validCompany(item) {
+  if (!item || typeof item !== "object" || !SYMBOL_RE.test(item.symbol || "")) return false;
+  if (!["supported", "unsupported_provider", "extraction_error"].includes(item.provider_status)) return false;
+  if (item.provider_status === "supported") {
+    const filing = item.filing || {};
+    const accession = filing.accession_number || filing.accession;
+    const period = filing.period_of_report || filing.period;
+    if (typeof accession !== "string" || !/^\d{10}-\d{2}-\d{6}$/.test(accession)) return false;
+    if (typeof period !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(period)) return false;
+    if (!item.statements || typeof item.statements !== "object") return false;
+  }
+  return true;
+}
+
+export async function handleEdgarToolsRequest(request, env, url) {
+  if (!await authorized(request, env)) return jsonResponse({ error: "Unauthorized provider request." }, 401);
+
+  if (request.method === "GET" && url.pathname === "/api/fundamentals/edgartools/universe") {
+    const rows = await env.DB.prepare(
+      "SELECT DISTINCT i.symbol FROM instrument i " +
+      "LEFT JOIN holding h ON h.instrument_id=i.id " +
+      "LEFT JOIN watchlist w ON w.instrument_id=i.id " +
+      "WHERE i.market='US' AND i.active=1 AND (h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) " +
+      "ORDER BY i.symbol LIMIT ?"
+    ).bind(MAX_COMPANIES).all();
+    const symbols = (rows.results || []).map((row) => row.symbol);
+    return jsonResponse({ market: "US", primary_provider: "EdgarTools", universe_source: "active_owner_holdings_and_watchlist", count: symbols.length, symbols });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/fundamentals/edgartools/status") {
+    const rows = await env.DB.prepare(
+      "SELECT symbol,provider_status AS providerStatus,accession,fiscal_period AS fiscalPeriod,form,filed_at AS filedAt,provider_version AS providerVersion,generated_at AS generatedAt,detail,updated_at AS updatedAt " +
+      "FROM edgartools_provider_status ORDER BY symbol LIMIT ?"
+    ).bind(MAX_COMPANIES).all();
+    return jsonResponse({ provider: "EdgarTools", production_fundamentals_changed: false, rankings_changed: false, companies: rows.results || [] });
+  }
+
+  if (request.method !== "POST" || url.pathname !== "/api/fundamentals/edgartools/ingest") {
+    return jsonResponse({ error: "Not found." }, 404);
+  }
+
+  const declaredLength = Number(request.headers.get("content-length") || 0);
+  if (declaredLength > MAX_BODY_BYTES) return jsonResponse({ error: "Payload too large." }, 413);
+  const raw = await request.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return jsonResponse({ error: "Payload too large." }, 413);
+
+  let report;
+  try { report = JSON.parse(raw); } catch { return jsonResponse({ error: "Invalid JSON report." }, 400); }
+  if (report?.primary_provider !== "EdgarTools" || report?.production_data_modified !== false ||
+      !Array.isArray(report.companies) || report.companies.length < 1 || report.companies.length > MAX_COMPANIES ||
+      typeof report.generated_at !== "string" || !Number.isFinite(Date.parse(report.generated_at))) {
+    return jsonResponse({ error: "Invalid EdgarTools report envelope." }, 400);
+  }
+  const companies = report.companies;
+  if (companies.some((item) => !validCompany(item)) ||
+      new Set(companies.map((item) => item.symbol)).size !== companies.length) {
+    return jsonResponse({ error: "Invalid or duplicate company evidence." }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const statements = [];
+  for (const item of companies) {
+    const filing = item.filing || {};
+    const accession = filing.accession_number || filing.accession || null;
+    const period = filing.period_of_report || filing.period || null;
+    const form = filing.form || null;
+    const filedAt = filing.filing_date || null;
+    const version = report.edgartools_version || null;
+    statements.push(env.DB.prepare(
+      "INSERT INTO edgartools_provider_status(symbol,provider_status,accession,fiscal_period,form,filed_at,provider_version,generated_at,detail,updated_at) " +
+      "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol) DO UPDATE SET provider_status=excluded.provider_status,accession=excluded.accession," +
+      "fiscal_period=excluded.fiscal_period,form=excluded.form,filed_at=excluded.filed_at,provider_version=excluded.provider_version," +
+      "generated_at=excluded.generated_at,detail=excluded.detail,updated_at=excluded.updated_at"
+    ).bind(item.symbol, item.provider_status, accession, period, form, filedAt, version, report.generated_at,
+      typeof item.error === "string" ? item.error.slice(0, 300) : null, now));
+    if (item.provider_status === "supported") {
+      statements.push(env.DB.prepare(
+        "INSERT INTO edgartools_filing_evidence(symbol,accession,fiscal_period,form,filed_at,provider_version,generated_at,payload_json,ingested_at) " +
+        "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,accession) DO UPDATE SET fiscal_period=excluded.fiscal_period,form=excluded.form," +
+        "filed_at=excluded.filed_at,provider_version=excluded.provider_version,generated_at=excluded.generated_at,payload_json=excluded.payload_json,ingested_at=excluded.ingested_at"
+      ).bind(item.symbol, accession, period, form || "annual", filedAt, version, report.generated_at, JSON.stringify(item), now));
+    }
+  }
+  for (let offset = 0; offset < statements.length; offset += 50) {
+    await env.DB.batch(statements.slice(offset, offset + 50));
+  }
+  return jsonResponse({
+    received: companies.length,
+    ingested: companies.filter((item) => item.provider_status === "supported").length,
+    unsupported_provider: companies.filter((item) => item.provider_status === "unsupported_provider").map((item) => item.symbol),
+    production_fundamentals_changed: false,
+    rankings_changed: false
+  });
+}
