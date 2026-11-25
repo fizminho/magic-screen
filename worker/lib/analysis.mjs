@@ -301,7 +301,7 @@ export async function handleAnalysisRequest(request, env, url) {
     if (request.method === "GET" && url.pathname === "/api/analysis/inbox") {
       const rows = await env.DB.prepare(
         "SELECT a.output_json AS outputJson,a.model,a.created_at AS createdAt " +
-        "FROM analysis a JOIN instrument i ON i.market='US' AND i.symbol=json_extract(a.output_json,'$.symbol') " +
+        "FROM analysis a JOIN instrument i ON i.market='US' AND i.active=1 AND i.symbol=json_extract(a.output_json,'$.symbol') " +
         "WHERE a.kind='brief' AND (EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
         "OR EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id)) " +
         "ORDER BY a.created_at DESC LIMIT 50"
