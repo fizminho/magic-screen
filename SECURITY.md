@@ -13,7 +13,7 @@ Magic Folio is a private, single-owner portfolio research application. Portfolio
 - D1 stores only SHA-256 session-token hashes. Sessions expire after 7 days idle or 30 days absolute. Last-seen writes are throttled to once per hour.
 - Auth endpoints require the exact configured Origin and JSON content type for state-changing requests. Challenges and failed-verification attempts are rate limited.
 - Credential counters are checked when authenticators provide a non-zero counter. Synced passkeys that report zero remain supported.
-- Do not delete the final passkey. Credential management endpoints must enforce that invariant when implemented.
+- Credential listing, renaming, deletion and sign-out-everywhere endpoints require an owner session. Deletion is atomic and refuses to remove the final passkey.
 
 ## Data and API boundaries
 
