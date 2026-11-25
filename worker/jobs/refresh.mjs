@@ -1,5 +1,6 @@
 import { parseSecSubmissions } from "../lib/sec.mjs";
 import { parseSecCompanyFacts } from "../lib/sec-companyfacts.mjs";
+import { dispatchFilingAlerts } from "../lib/alerts.mjs";
 
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
 const SEC_COMPANYFACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK";
@@ -90,6 +91,7 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
   let newFilingCount = 0;
   let factsUpdated = 0;
   let factsCached = 0;
+  let pushAlertsSent = 0;
   let failed = 0;
 
   try {
@@ -129,16 +131,18 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
       if (index < instruments.length - 1) await pause(SEC_PAUSE_MS);
     }
 
+    const pushResult = await dispatchFilingAlerts(env);
+    pushAlertsSent = pushResult.sent || 0;
     const status = failed > 0 ? (refreshed ? "partial" : "failed") : !instruments.length ? "skipped_no_data" : newFilingCount ? "success" : "skipped_no_new_data";
     const detail = JSON.stringify({
       instruments: instruments.length, refreshed, failed, filings: filingCount, newFilings: newFilingCount,
-      companyfactsUpdated: factsUpdated, companyfactsCached: factsCached,
+      companyfactsUpdated: factsUpdated, companyfactsCached: factsCached, pushAlertsSent,
       reason: instruments.length ? undefined : "no_owned_us_instruments_with_cik"
     }).slice(0, 1000);
     await env.DB.prepare(
       "UPDATE job_run SET finished_at=?,status=?,detail=? WHERE id=?"
     ).bind(new Date().toISOString(), status, detail, jobId).run();
-    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached };
+    return { status, instruments: instruments.length, refreshed, failed, filingCount, newFilingCount, factsUpdated, factsCached, pushAlertsSent };
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     await env.DB.prepare(
