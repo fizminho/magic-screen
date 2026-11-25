@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           cp .dev.vars.example .dev.vars
-          npx --yes wrangler@4 dev --local --ip 127.0.0.1 --port 8787 > /tmp/magic-folio-wrangler.log 2>&1 &
+          npx --yes wrangler@4 dev --local --ip 127.0.0.1 --port 8787 --var APP_ENV:development --var RP_ID:localhost --var RP_ORIGIN:http://localhost:8787 > /tmp/magic-folio-wrangler.log 2>&1 &
           worker_pid=$!
           trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
           health=""
