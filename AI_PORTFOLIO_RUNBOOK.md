@@ -253,7 +253,7 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 - [x] Deterministic portfolio risk metrics remain computed in code and displayed separately; they are not included in the AI prompt.
 
 ### E5. Web Push
-- [ ] Generate VAPID keys once with `npx web-push generate-vapid-keys` (do not add `web-push` as a dependency; it is Node-oriented). Store `VAPID_PRIVATE_KEY` as a secret; `VAPID_PUBLIC_KEY` and `VAPID_SUBJECT` (`mailto:`) as vars.
+- [ ] Owner setup remains required: generate VAPID keys once with `npx --yes web-push generate-vapid-keys` (do not add `web-push` as a Worker dependency). Store `VAPID_PRIVATE_KEY` as a Cloudflare secret; set `VAPID_PUBLIC_KEY` and a real `VAPID_SUBJECT` (`mailto:`) as vars. No keypair or private secret has been generated or configured by this implementation.
 - [x] Implemented with native WebCrypto (VAPID JWT ES256 + RFC 8291 `aes128gcm` payload encryption); no third-party runtime dependency. Design and protocol references are recorded in `docs/DATA_SOURCES.md`.
 - [x] Owner-session and exact-Origin routes: `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `POST /api/push/test`. Subscriptions are capped at five and endpoints are restricted to supported HTTPS push services.
 - [x] HTTP 404/410 responses delete the expired subscription row.
@@ -273,7 +273,7 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 - [x] Holdings and Bursa quote CSV parsers are covered for duplicate rows, malformed values, limits, timestamps and optional fields.
 - [x] SEC fixture tests cover filing-form filtering, CIK/accession binding, official archive URL construction, User-Agent gating, owner-session gating, per-IP throttling, six-hour cache hit/miss and cache invalidation when CIK changes.
 - [ ] Add cryptographic WebAuthn signature/counter-regression fixtures and run actual browser passkey registration/login on supported devices.
-- [ ] Add market-window/DST, Workers AI output validation, alert dedupe and SEC filing/news dedupe/matching tests.
+- [x] Workers AI output-schema validation and Web Push cryptography/endpoint validation tests are included. Market-window/DST, alert dedupe and SEC filing/news dedupe/matching tests remain pending.
 
 **Done when:** `node --experimental-strip-types --test worker/**/*.test.mjs` passes; `wrangler dev` serves `/api/health`; a passkey register → login → dashboard → manual analysis → test push flow works locally.
 
