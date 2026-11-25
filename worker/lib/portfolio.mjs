@@ -110,7 +110,8 @@ async function deactivateUnusedInstrument(env, market, symbol) {
     ).bind(market, symbol),
     env.DB.prepare(`DELETE FROM quote_latest WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol),
     env.DB.prepare(`DELETE FROM sec_filing WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol),
-    env.DB.prepare(`DELETE FROM sec_fetch_cache WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol)
+    env.DB.prepare(`DELETE FROM sec_fetch_cache WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol),
+    env.DB.prepare(`DELETE FROM sec_companyfacts_cache WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol)
   ]);
 }
 
