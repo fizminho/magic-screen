@@ -269,3 +269,27 @@ test("holdings API enforces a 20-position total while allowing updates at the ca
   assert.deepEqual(await updated.json(), { saved: 1 });
   assert.equal(updateCalls.batch, 1);
 });
+
+test("watchlist API enforces 50 total instruments while allowing updates", async () => {
+  const rows = Array.from({ length: 50 }, (_, index) => ({
+    market: "US", symbol: `T${index}`
+  }));
+  const { DB, calls } = fakeDb({ rows });
+  const rejected = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [{ symbol: "NEW", market: "US" }] })
+  }), { ...envConfig, DB }, "/api/watchlist");
+  assert.equal(rejected.status, 409);
+  assert.equal(calls.batch, 0);
+
+  const { DB: updateDb, calls: updateCalls } = fakeDb({ rows });
+  const updated = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [{ symbol: "T0", market: "US", note: "Updated note" }] })
+  }), { ...envConfig, DB: updateDb }, "/api/watchlist");
+  assert.equal(updated.status, 200);
+  assert.deepEqual(await updated.json(), { added: 1 });
+  assert.equal(updateCalls.batch, 1);
+});
