@@ -28,7 +28,6 @@ jobs:
         if: ${{ hashFiles('package-lock.json') == '' }}
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Commit lockfile to rebuild branch
-        if: ${{ hashFiles('package-lock.json') == '' }}
         shell: bash
         run: |
           set -euo pipefail
