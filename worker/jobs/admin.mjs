@@ -42,8 +42,8 @@ export async function handleAdminJobsRequest(request, env, url, ctx) {
 
     const task = (async () => {
       try {
-        if (body.job === "sec_refresh") await runSecRefresh(env);
-        else await runScheduledResearchBrief(env);
+        if (body.job === "sec_refresh") await runSecRefresh(env, { triggerType: "manual" });
+        else await runScheduledResearchBrief(env, { triggerType: "manual" });
       } catch (error) {
         console.error("Manual job failed:", error instanceof Error ? error.message.slice(0, 120) : "unknown");
       } finally {
