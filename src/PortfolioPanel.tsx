@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { fetchMarketDataQuotes } from "./providers/marketdata";
 import { parseManualQuotesCsv } from "./providers/manual-csv";
 import { parseHoldingsCsv } from "./providers/holdings-csv";
 import type { QuoteSnapshot } from "./providers/types";
@@ -145,7 +144,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [researchResult, setResearchResult] = useState<(ResearchResult & { symbol: string }) | null>(null);
   const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
   const [inboxLoading, setInboxLoading] = useState(true);
-  const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
   const [quantity, setQuantity] = useState("");
@@ -284,25 +282,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to send a test notification.");
     } finally { setPushBusy(false); }
-  }
-
-  function saveMarketToken() {
-    const token = marketToken.trim();
-    if (token.length < 12) {
-      onError("Enter a valid Market Data API token.");
-      return;
-    }
-    sessionStorage.setItem("magicfolio.marketdata.token", token);
-    setMarketToken(token);
-    onNotice("Market Data token saved in this browser tab only. It is not sent to Magic Folio.");
-    onError("");
-  }
-
-  function clearMarketToken() {
-    sessionStorage.removeItem("magicfolio.marketdata.token");
-    setMarketToken("");
-    onNotice("Market Data token cleared from this browser tab.");
-    onError("");
   }
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
@@ -501,16 +480,16 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   }
 
   async function refreshUsQuotes() {
-    if (!marketToken.trim()) { onError("Save your Market Data API token first."); return; }
     const symbols = [...new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol))];
     if (!symbols.length) { onError("Add at least one US holding or watchlist item before refreshing quotes."); return; }
     onError(""); onNotice(""); setBusy(true);
     try {
-      const authState = await api<{ authenticated: boolean }>("/api/auth/state");
-      if (!authState.authenticated) { sessionStorage.removeItem("magicfolio.marketdata.token"); setMarketToken(""); throw new Error("Your owner session expired. Sign in again before refreshing quotes."); }
-      const quotes = await fetchMarketDataQuotes(symbols, marketToken.trim());
-      const result = await saveQuoteBatches(quotes);
-      onNotice(`Saved ${result.saved} US quote snapshots. Data is at least 24 hours delayed. ${result.unmatched.length ? `Unmatched: ${result.unmatched.join(", ")}.` : ""}`);
+      const result = await api<{ saved: number; failed: number; symbols: number; failedSymbols: string[] }>("/api/quotes/refresh-us", {
+        method: "POST",
+        body: "{}"
+      });
+      onNotice(`Saved ${result.saved} of ${result.symbols} US quote snapshots from Yahoo Finance. ${result.failed ? `Unavailable: ${result.failedSymbols.join(", ")}.` : ""}`);
+      await refreshPortfolio();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to refresh US quotes.");
     } finally { setBusy(false); }
@@ -527,11 +506,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       onError(cause instanceof Error ? cause.message : "Unable to import Bursa CSV.");
     } finally { setBusy(false); }
   }
-
-  useEffect(() => {
-    const savedToken = sessionStorage.getItem("magicfolio.marketdata.token");
-    if (savedToken) setMarketToken(savedToken);
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -791,20 +765,13 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         </section>
 
         <section className="tool-card">
-          <span className="eyebrow">US QUOTES · FREE TIER</span>
-          <h3>Market Data connection</h3>
-          <p>Optional personal-use API. 100 credits/day, at least 24-hour delayed, one source IP at a time. Refresh from one device; other devices read the saved snapshot.</p>
-          <label className="field-label" htmlFor="marketdata-token">Market Data API token</label>
-          <input id="marketdata-token" className="text-field" type="password" autoComplete="off" value={marketToken}
-            onChange={(event) => setMarketToken(event.target.value)} placeholder="Paste your own API token" />
-          <div className="tool-actions">
-            <button className="button button-secondary" onClick={saveMarketToken} disabled={busy || !marketToken.trim()}>Save in this tab</button>
-            <button className="button button-quiet" onClick={clearMarketToken} disabled={busy || !marketToken}>Clear token</button>
-          </div>
-          <button className="button button-primary" onClick={refreshUsQuotes} disabled={busy || !marketToken.trim() || usCount === 0}>
-            {busy ? "Working…" : `Refresh US quotes (${usCount})`}
+          <span className="eyebrow">US QUOTES</span>
+          <h3>Refresh US market prices</h3>
+          <p>Fetches public Yahoo Finance chart data through the Worker and saves the latest available quote for your active US holdings and watchlist. No API token required. Availability and delay depend on the exchange and data source.</p>
+          <button className="button button-primary" onClick={refreshUsQuotes} disabled={busy || usCount === 0}>
+            {busy ? "Refreshing…" : `Refresh US quotes (${usCount})`}
           </button>
-          <p className="fine-print">The token stays in this browser tab's session storage. It is sent directly to MarketData.app and never to the Magic Folio Worker.</p>
+          <p className="fine-print">Existing saved prices are retained when a symbol cannot be refreshed. Quotes are indicative and may be delayed. Bursa Malaysia quotes remain manual CSV imports.</p>
         </section>
 
         <section className="tool-card">
