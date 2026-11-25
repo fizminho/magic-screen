@@ -175,6 +175,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
 
   function openInboxBrief(item: ResearchInboxItem) {
     setResearchResult({
+      symbol: item.brief.symbol,
       brief: item.brief,
       model: item.model,
       createdAt: item.createdAt,
