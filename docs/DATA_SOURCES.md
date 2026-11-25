@@ -48,6 +48,17 @@ References:
 - https://www.bursamalaysia.com/sites/5d809dcf39fba22790cad230/assets/6440f97839fba259236ba5ba/ISLA_Guidelines_V1.1_01_Apr_2023.pdf
 - https://www.bursamalaysia.com/sites/5d809dcf39fba22790cad230/assets/63ae56f15b711a799d692659/Information_Services_Licence_Agreement_Price_List_in_Ringgit_Malaysia__MYR_01012023.pdf
 
+## LLM analysis: Gemini API not approved for personal portfolio data
+
+**Do not integrate Gemini Free for this personal portfolio use case at this time.** Google's current Gemini API Additional Terms (effective 23 March 2026) state that Gemini API/AI Studio are for developers building for professional or business purposes, not consumer use. The unpaid quota also allows Google to use submitted prompts and generated responses to improve products and machine-learning technologies; human reviewers may read and process inputs/outputs. The terms explicitly say not to submit sensitive, confidential or personal information to unpaid services.
+
+Magic Folio is currently a private personal portfolio tool and its holdings, watchlist, allocation weights and activity are personal financial information. Do not send those values, ticker lists tied to the owner's portfolio, prompts, or generated analysis to Gemini Free. Removing names or quantities does not automatically make a private portfolio non-personal. Do not enable GEMINI_API_KEY, a Gemini model var, scheduled AI jobs, or client-side Gemini calls until a compliant use case/provider and data-handling basis are confirmed.
+
+The deterministic dashboard, concentration checks, daily-move thresholds and quote-quality warnings run locally in the Worker and remain the approved v1 analysis path. Any future model provider must be reviewed for consumer-use eligibility, input retention/training, human review, data residency, rate limits and pricing before implementation. Paid Gemini quota states prompts/responses are not used to improve Google's products, but it is not free and does not remove the need to check the service's use restrictions.
+
+References:
+- https://ai.google.dev/gemini-api/docs/terms
+- https://ai.google.dev/gemini-api/docs/pricing
 ## US filings: official SEC EDGAR
 
 **Approved source for US issuer filings and XBRL facts.**
