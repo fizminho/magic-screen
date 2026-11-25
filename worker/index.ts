@@ -19,6 +19,8 @@ import { handleSettingsRequest } from "./lib/settings.mjs";
 import { handleExportRequest } from "./lib/export.mjs";
 // @ts-ignore Scheduled job modules are covered by Node regression tests.
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
+// @ts-ignore Manual owner-only job controls are covered by Node regression tests.
+import { handleAdminJobsRequest } from "./jobs/admin.mjs";
 // @ts-ignore AI analysis route is covered by Node regression tests.
 import { handleAnalysisRequest, runScheduledResearchBrief } from "./lib/analysis.mjs";
 // @ts-ignore Web Push cryptography and routes are covered by Node regression tests.
@@ -40,7 +42,7 @@ interface Env {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     let response: Response;
 
@@ -65,6 +67,8 @@ export default {
       response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/inbox" || url.pathname === "/api/analysis/run") {
       response = await handleAnalysisRequest(request, env, url);
+    } else if (url.pathname === "/api/admin/jobs" || url.pathname === "/api/admin/jobs/run") {
+      response = await handleAdminJobsRequest(request, env, url, ctx);
     } else if (url.pathname.startsWith("/api/push/")) {
       response = await handlePushRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
