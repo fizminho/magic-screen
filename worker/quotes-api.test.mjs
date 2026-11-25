@@ -74,6 +74,7 @@ test("quote snapshots are validated and persisted in one D1 batch", async () => 
   assert.deepEqual(await response.json(), { saved: 1, unmatchedSymbols: [] });
   assert.equal(calls.batch, 1);
   assert.equal(calls.statements.length, 1);
+  assert.match(calls.statements[0].sql, /AND active = 1/);
 });
 
 test("quote snapshots reject invalid provider-market combinations before writing", async () => {
