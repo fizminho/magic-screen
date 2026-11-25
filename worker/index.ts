@@ -7,7 +7,9 @@ import { handleAuthRequest } from "./lib/auth.mjs";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  APP_ENV?: string;
   RP_ID?: string;
+  RP_NAME?: string;
   RP_ORIGIN?: string;
   SETUP_TOKEN?: string;
 }
