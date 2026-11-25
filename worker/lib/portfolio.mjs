@@ -60,6 +60,15 @@ async function upsertHoldings(request, env) {
   }
   if (!holdings.length) return jsonResponse({ saved: 0 });
 
+  const currentRows = await env.DB.prepare(
+    "SELECT i.market, i.symbol FROM holding h JOIN instrument i ON i.id = h.instrument_id"
+  ).all();
+  const existing = new Set((currentRows.results || []).map((row) => `${row.market}:${row.symbol}`));
+  const additional = holdings.filter((holding) => !existing.has(`${holding.market}:${holding.symbol}`)).length;
+  if (existing.size + additional > MAX_HOLDINGS) {
+    return jsonResponse({ error: "Magic Folio supports up to 20 holdings. Update or remove an existing position first." }, 409);
+  }
+
   const now = new Date().toISOString();
   const statements = holdings.flatMap((holding) => {
     const currency = holding.market === "US" ? "USD" : "MYR";
