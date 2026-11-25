@@ -107,7 +107,7 @@ jobs:
           test "$last_key_status" = "409"
           jq -e '.error == "The last passkey cannot be deleted."' /tmp/last-passkey-response.json >/dev/null
           # Exercise real D1 holdings upsert, list and delete using the remaining owner session.
-          holdings_status="$(curl --silent --output /tmp/holdings-put.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X PUT http://localhost:8787/api/holdings -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"holdings":[{"symbol":"AAPL","market":"US","quantity":2,"avgCost":100},{"symbol":"1155","market":"MY","quantity":50,"avgCost":6.2}]}')"
+          holdings_status="$(curl --silent --output /tmp/holdings-put.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X PUT http://localhost:8787/api/holdings -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"holdings":[{"symbol":"AAPL","market":"US","quantity":2,"avgCost":100,"cik":"320193"},{"symbol":"1155","market":"MY","quantity":50,"avgCost":6.2}]}')"
           test "$holdings_status" = "200"
           jq -e '.saved == 2' /tmp/holdings-put.json >/dev/null
           holdings_get_status="$(curl --silent --output /tmp/holdings-get.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/holdings -H "Cookie: magicfolio_session=$backup_token")"
@@ -126,6 +126,18 @@ jobs:
           holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
           test "$holding_delete_status" = "200"
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
+          sec_fetched_at="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          npx --yes wrangler@4 d1 execute magic-screen-db --local --command "
+            INSERT INTO sec_fetch_cache(instrument_id,cik,fetched_at,company_name,filing_count)
+              SELECT id,'0000320193','$sec_fetched_at','Apple Inc.',1 FROM instrument WHERE market='US' AND symbol='AAPL';
+            INSERT INTO sec_filing(accession_number,cik,instrument_id,form,title,summary,filing_date,report_date,primary_document,url,fetched_at)
+              SELECT '0000320193-26-000001','0000320193',id,'10-Q','AAPL 10-Q','Quarterly report.','2026-11-24','2026-09-30','aapl.htm','https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/aapl.htm','$sec_fetched_at'
+              FROM instrument WHERE market='US' AND symbol='AAPL';
+          "
+          sec_filing_remaining="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM sec_filing WHERE cik='0000320193';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
+          sec_cache_remaining="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM sec_fetch_cache WHERE cik='0000320193';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
+          test "$sec_filing_remaining" = "0"
+          test "$sec_cache_remaining" = "0"
           removed_quote_count="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
           test "$removed_quote_count" = "0"
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
