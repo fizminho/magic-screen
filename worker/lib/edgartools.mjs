@@ -36,6 +36,7 @@ function validCompany(item) {
 
 export async function handleEdgarToolsRequest(request, env, url) {
   if (!await authorized(request, env)) return jsonResponse({ error: "Unauthorized provider request." }, 401);
+  try {
 
   if (request.method === "GET" && url.pathname === "/api/fundamentals/edgartools/universe") {
     const rows = await env.DB.prepare(
@@ -191,4 +192,9 @@ export async function handleEdgarToolsRequest(request, env, url) {
     production_fundamentals_changed: false,
     rankings_changed: false
   });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "unknown_error";
+    console.error("EdgarTools ingestion failed:", detail.slice(0, 300));
+    return jsonResponse({ error: "EdgarTools ingestion failed.", detail: detail.slice(0, 300) }, 500);
+  }
 }
