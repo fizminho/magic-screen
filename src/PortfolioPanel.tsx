@@ -103,6 +103,13 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
+function decodePushApplicationKey(value: string): Uint8Array {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
 function formatMoney(value: number | null, currency: "USD" | "MYR") {
   if (value === null || !Number.isFinite(value)) return "No quote";
   return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 4 }).format(value);
@@ -139,6 +146,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdingsCsv, setHoldingsCsv] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [pushState, setPushState] = useState<"checking" | "unsupported" | "not-configured" | "not-subscribed" | "subscribed">("checking");
+  const [pushBusy, setPushBusy] = useState(false);
 
   async function refreshHoldings() {
     const result = await api<{ holdings: Holding[] }>("/api/holdings");
@@ -164,11 +173,84 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   }
 
   useEffect(() => {
+    let cancelled = false;
+    async function inspectPush() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        if (!cancelled) setPushState("unsupported");
+        return;
+      }
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        if (!cancelled) setPushState("unsupported");
+        return;
+      }
+      const config = await api<{ enabled: boolean; publicKey: string | null }>("/api/push/config");
+      if (!config.enabled || !config.publicKey) {
+        if (!cancelled) setPushState("not-configured");
+        return;
+      }
+      const subscription = await registration.pushManager.getSubscription();
+      if (!cancelled) setPushState(subscription ? "subscribed" : "not-subscribed");
+    }
+    inspectPush().catch(() => { if (!cancelled) setPushState("not-configured"); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     setMarketToken(sessionStorage.getItem("magicfolio.marketdata.token") || "");
     refreshPortfolio()
       .catch((cause) => onError(cause instanceof Error ? cause.message : "Unable to load portfolio data."))
       .finally(() => setLoading(false));
   }, []);
+
+  async function enablePushNotifications() {
+    onError(""); onNotice(""); setPushBusy(true);
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) throw new Error("Install Magic Folio from its HTTPS website before enabling notifications.");
+      const config = await api<{ enabled: boolean; publicKey: string | null }>("/api/push/config");
+      if (!config.enabled || !config.publicKey) throw new Error("Push notifications are not configured on the server yet.");
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Notification permission was not granted. Check this site's browser settings.");
+      const existing = await registration.pushManager.getSubscription();
+      const subscription = existing || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodePushApplicationKey(config.publicKey) as BufferSource
+      });
+      await api("/api/push/subscribe", { method: "POST", body: JSON.stringify(subscription.toJSON()) });
+      setPushState("subscribed");
+      onNotice("Push notifications enabled on this device.");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to enable push notifications.");
+    } finally { setPushBusy(false); }
+  }
+
+  async function disablePushNotifications() {
+    onError(""); onNotice(""); setPushBusy(true);
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      const subscription = await registration?.pushManager.getSubscription();
+      if (subscription) {
+        await api("/api/push/subscribe", { method: "DELETE", body: JSON.stringify({ endpoint: subscription.endpoint }) });
+        await subscription.unsubscribe();
+      }
+      setPushState("not-subscribed");
+      onNotice("Push notifications disabled on this device.");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to disable push notifications.");
+    } finally { setPushBusy(false); }
+  }
+
+  async function sendTestPush() {
+    onError(""); onNotice(""); setPushBusy(true);
+    try {
+      const result = await api<{ sent: number; removed: number }>("/api/push/test", { method: "POST", body: "{}" });
+      onNotice(result.sent ? "Test notification sent. Check this device." : "No active push subscription received the test.");
+      if (result.removed) setPushState("not-subscribed");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to send a test notification.");
+    } finally { setPushBusy(false); }
+  }
 
   function saveMarketToken() {
     const token = marketToken.trim();
@@ -622,6 +704,22 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             {busy ? "Working…" : `Refresh US quotes (${usCount})`}
           </button>
           <p className="fine-print">The token stays in this browser tab's session storage. It is sent directly to MarketData.app and never to the Magic Folio Worker.</p>
+        </section>
+
+        <section className="tool-card">
+          <span className="eyebrow">PUSH NOTIFICATIONS</span>
+          <h3>Alerts on this device</h3>
+          {pushState === "checking" ? <p>Checking notification support…</p> :
+            pushState === "unsupported" ? <p>Install the app from its HTTPS website on a supported browser to enable push notifications.</p> :
+            pushState === "not-configured" ? <p>Push is not configured on the server yet. The notification controls will activate after VAPID setup.</p> :
+            pushState === "subscribed" ? <p>This device is subscribed. You can send a test notification or remove this device.</p> :
+            <p>Enable notifications only when you want them. Your browser will ask for permission after you tap the button.</p>}
+          <div className="tool-actions">
+            <button className="button button-secondary" type="button" onClick={enablePushNotifications} disabled={pushBusy || pushState === "checking" || pushState === "unsupported" || pushState === "not-configured" || pushState === "subscribed"}>Enable on this device</button>
+            <button className="button button-quiet" type="button" onClick={sendTestPush} disabled={pushBusy || pushState !== "subscribed"}>Send test</button>
+            <button className="button button-quiet" type="button" onClick={disablePushNotifications} disabled={pushBusy || pushState !== "subscribed"}>Disable</button>
+          </div>
+          <p className="fine-print">Push is currently a delivery channel for test and supported alerts. Permission is never requested automatically.</p>
         </section>
 
         <section className="tool-card">
