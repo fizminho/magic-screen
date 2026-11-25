@@ -13,6 +13,8 @@ import { handleDashboardRequest } from "./lib/dashboard.mjs";
 import { handleSecRequest } from "./lib/sec.mjs";
 // @ts-ignore The JavaScript settings module is exercised by Node regression tests.
 import { handleSettingsRequest } from "./lib/settings.mjs";
+// @ts-ignore The JavaScript export module is exercised by Node regression tests.
+import { handleExportRequest } from "./lib/export.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -49,6 +51,8 @@ export default {
       response = await handleSecRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
       response = await handleSettingsRequest(request, env, url.pathname);
+    } else if (url.pathname === "/api/export") {
+      response = await handleExportRequest(request, env, url);
     } else if (url.pathname === "/api/dashboard") {
       response = await handleDashboardRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/") || url.pathname === "/api/watchlist" || url.pathname.startsWith("/api/watchlist/")) {
