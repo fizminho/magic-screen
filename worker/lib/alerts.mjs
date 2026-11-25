@@ -1,6 +1,6 @@
 import { sendPushToSubscription } from "./push.mjs";
 
-const MAX_ALERTS_PER_RUN = 2;
+const MAX_ALERTS_PER_RUN = 1;
 
 function validAlert(alert) {
   return alert && typeof alert.dedupeKey === "string" && alert.dedupeKey.length > 0 &&
@@ -117,4 +117,34 @@ export async function dispatchFilingAlerts(env, fetcher = fetch) {
     if (result.status === "daily_limit") break;
   }
   return { sent, processed, candidates: candidates.results?.length || 0 };
+}
+
+export async function dispatchHoldingMoveAlerts(env, now = Date.now(), fetcher = fetch) {
+  if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.VAPID_SUBJECT) {
+    return { sent: 0, status: "push_not_configured" };
+  }
+  const setting = await env.DB.prepare(
+    "SELECT value FROM setting WHERE key='alert_move_pct'"
+  ).first();
+  const threshold = Math.max(1, Math.min(20, Number(setting?.value) || 4));
+  const cutoff = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const candidate = await env.DB.prepare(
+    "SELECT i.symbol,q.change_pct AS changePct FROM instrument i " +
+    "JOIN holding h ON h.instrument_id=i.id " +
+    "JOIN quote_latest q ON q.instrument_id=i.id " +
+    "WHERE i.market IN ('US','MY') AND i.active=1 AND q.status='ok' " +
+    "AND q.change_pct IS NOT NULL AND abs(q.change_pct)>=? AND q.as_of>=? " +
+    "ORDER BY abs(q.change_pct) DESC LIMIT 1"
+  ).bind(threshold, cutoff).first();
+  if (!candidate) return { sent: 0, status: "no_matching_holding" };
+  const change = Number(candidate.changePct);
+  const sign = change > 0 ? "+" : "";
+  const dateKey = new Date(now).toISOString().slice(0, 10);
+  return dispatchAlert(env, {
+    dedupeKey: `move:${candidate.symbol}:${dateKey}`,
+    kind: "move",
+    title: `${candidate.symbol} price alert`,
+    body: `${sign}${change.toFixed(1)}% versus previous close. Review your holding.`,
+    url: `/#/holding/${encodeURIComponent(candidate.symbol)}`
+  }, fetcher);
 }
