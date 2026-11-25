@@ -75,3 +75,30 @@ test("filing and holding alert evaluators fail closed when VAPID is not configur
   assert.deepEqual(await dispatchHoldingMoveAlerts({ DB }), { sent: 0, status: "push_not_configured" });
   assert.equal(calls.length, 0);
 });
+
+test("holding move alert converts the percentage setting to the stored quote ratio", async () => {
+  const calls = [];
+  const DB = {
+    prepare(sql) {
+      const statement = {
+        values: [],
+        bind(...values) { this.values = values; return this; },
+        async first() {
+          calls.push({ sql, values: this.values });
+          if (sql.includes("alert_move_pct")) return { value: "4" };
+          if (sql.includes("SELECT i.symbol,i.market,q.change_pct")) {
+            return { symbol: "AAPL", market: "US", changePct: 0.05 };
+          }
+          if (sql.includes("SELECT dedupe_key")) return null;
+          return null;
+        },
+        async all() { return { results: [] }; }
+      };
+      return statement;
+    }
+  };
+  const result = await dispatchHoldingMoveAlerts({ DB, ...vapid }, Date.parse("2026-11-25T01:00:00Z"));
+  assert.equal(result.status, "no_subscriptions");
+  const query = calls.find((call) => call.sql.includes("SELECT i.symbol,i.market,q.change_pct"));
+  assert.equal(query.values[0], 0.04);
+});
