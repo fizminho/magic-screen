@@ -63,9 +63,12 @@ function cookieHeader(token, env, maxAge = SESSION_SECONDS) {
 }
 
 function getRp(env, request) {
-  const origin = env.RP_ORIGIN || new URL(request.url).origin;
-  const rpId = env.RP_ID || new URL(origin).hostname;
-  if (new URL(origin).hostname !== rpId) throw new Error("invalid_rp_configuration");
+  const requestOrigin = new URL(request.url).origin;
+  const origin = env.RP_ORIGIN || (env.APP_ENV === "production" ? "" : requestOrigin);
+  const rpId = env.RP_ID || (env.APP_ENV === "production" ? "" : new URL(origin || requestOrigin).hostname);
+  if (!origin || !rpId || new URL(origin).hostname !== rpId) throw new Error("invalid_rp_configuration");
+  if (env.APP_ENV === "production" && new URL(origin).protocol !== "https:") throw new Error("invalid_rp_configuration");
+  if (env.APP_ENV !== "production" && (new URL(origin).hostname !== "localhost" || new URL(origin).protocol !== "http:")) throw new Error("invalid_rp_configuration");
   return { origin, rpId };
 }
 
@@ -100,7 +103,7 @@ async function authorizeRegistration(request, env) {
   const count = await passkeyCount(env);
   const session = await sessionFor(request, env);
   if (count > 0 && session) return { count, session, setup: false };
-  if (count === 0 && env.SETUP_TOKEN && env.SETUP_TOKEN.length >= 32) {
+  if (count === 0 && env.SETUP_TOKEN && env.SETUP_TOKEN.length >= 43) {
     const supplied = request.headers.get("x-setup-token") || "";
     if (supplied.length >= 24 && supplied.length <= 256 &&
         constantTimeEqual(await sha256Hex(supplied), await sha256Hex(env.SETUP_TOKEN))) {
@@ -211,8 +214,15 @@ async function registerVerify(request, env) {
     return json({ error: "Passkey registration could not be verified." }, 400);
   }
 
+  const registrationFlags = decodeBase64urlBytes(payload?.response?.authenticatorData);
+  const flags = registrationFlags?.[32] ?? 0;
+  if (!registrationFlags || registrationFlags.length < 37 || !(flags & 0x01) || !(flags & 0x04)) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Passkey registration requires user presence and verification." }, 400);
+  }
+
   const credential = verified.credential;
-  if (!credential?.id || !credential.publicKey || !credential.algorithm) {
+  if (!credential?.id || credential.id !== payload.id || !credential.publicKey || !credential.algorithm) {
     return json({ error: "Passkey registration could not be verified." }, 400);
   }
   const algorithm = credential.algorithm === "ES256" ? -7 : credential.algorithm === "RS256" ? -257 : null;
@@ -254,11 +264,20 @@ async function registerVerify(request, env) {
   });
 }
 
+function decodeBase64urlBytes(encoded) {
+  try {
+    if (typeof encoded !== "string" || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+    const raw = atob(padded);
+    return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+  } catch { return null; }
+}
+
 function decodeBase64urlText(encoded) {
   try {
-    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
-    const raw = atob(normalized);
-    return new TextDecoder().decode(Uint8Array.from(raw, (character) => character.charCodeAt(0)));
+    const bytes = decodeBase64urlBytes(encoded);
+    return bytes ? new TextDecoder().decode(bytes) : null;
   } catch { return null; }
 }
 
