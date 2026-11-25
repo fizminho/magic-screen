@@ -125,7 +125,7 @@ function formatCachedFiling(row, symbol, cik) {
   };
 }
 
-async function readCachedFilings(env, instrumentId, symbol, cik) {
+async function readCachedFilings(env, instrumentId, symbol, cik, cutoff) {
   const cache = await env.DB.prepare(
     "SELECT cik, fetched_at, company_name FROM sec_fetch_cache WHERE instrument_id=?"
   ).bind(instrumentId).first();
@@ -137,9 +137,9 @@ async function readCachedFilings(env, instrumentId, symbol, cik) {
   const rows = await env.DB.prepare(
     "SELECT form, title, summary, filing_date AS filingDate, report_date AS reportDate, " +
     "accession_number AS accessionNumber, primary_document AS primaryDocument, " +
-    "fetched_at AS fetchedAt, url FROM sec_filing WHERE instrument_id=? AND cik=? " +
+    "fetched_at AS fetchedAt, url FROM sec_filing WHERE instrument_id=? AND cik=? AND filing_date>=? " +
     "ORDER BY filing_date DESC LIMIT 20"
-  ).bind(instrumentId, cik).all();
+  ).bind(instrumentId, cik, cutoff).all();
   return {
     companyName: cache.company_name || cache.companyName,
     filings: (rows.results || []).map((row) => formatCachedFiling(row, symbol, cik)),
@@ -191,7 +191,10 @@ export async function handleSecRequest(request, env, url, fetcher = fetch) {
     if (!instrument) return jsonResponse({ error: "Add this US ticker to holdings or watchlist first." }, 404);
     if (!instrument.cik) return jsonResponse({ error: "Add the 10-digit SEC CIK to this instrument first." }, 409);
 
-    const cached = await readCachedFilings(env, instrument.id, symbol, instrument.cik);
+    const retentionCutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await env.DB.prepare("DELETE FROM sec_filing WHERE instrument_id=? AND filing_date < ?")
+      .bind(instrument.id, retentionCutoff).run();
+    const cached = await readCachedFilings(env, instrument.id, symbol, instrument.cik, retentionCutoff);
     if (cached) {
       return jsonResponse({
         symbol, cik: instrument.cik, companyName: cached.companyName || symbol,
