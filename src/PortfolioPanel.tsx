@@ -228,7 +228,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
 
   const usCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol)).size;
   const myCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "MY").map((item) => item.symbol)).size;
-  const editingExisting = holdings.some((item) => item.market === market && item.symbol === symbol.trim().toUpperCase());
   const existingHolding = holdings.some((item) =>
     item.market === market && item.symbol === symbol.trim().toUpperCase()
   );
