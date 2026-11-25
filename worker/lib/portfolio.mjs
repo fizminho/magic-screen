@@ -14,9 +14,9 @@ const SEC_TICKER_DIRECTORY = "https://www.sec.gov/files/company_tickers.json";
 
 function hasSecContact(value) {
   return typeof value === "string" && value.length >= 12 && value.length <= 200 &&
-    value.includes("@") && /[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i.test(value) &&
-    !/@(?:example\\.(?:com|org|net)|invalid)$/i.test(value) &&
-    !/(?:your-email|yourname|test@)/i.test(value) && !/[\\r\\n]/.test(value);
+    value.includes("@") && /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) &&
+    !/@(?:example\.(?:com|org|net)|invalid)$/i.test(value) &&
+    !/(?:your-email|yourname|test@)/i.test(value) && !/[\r\n]/.test(value);
 }
 
 // Resolve missing US CIKs in one SEC directory request per add/import operation.
