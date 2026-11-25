@@ -52,6 +52,7 @@ The destructive workflow has **not** been executed. It will remain blocked until
 - Added Dependabot npm minor/patch grouping and a safe `.dev.vars.example`; fixed `.gitignore` to allow that example file.
 - Rewrote README, SECURITY and setup documentation for the new product.
 - Expanded deployment path filters to include HTML, CSS (under `src/**`), package metadata and Vite config.
-- Outstanding: generate/commit `package-lock.json`, switch workflows from `npm install` to `npm ci`, inspect actual audit/outdated output, verify secret history and enable repository security settings.
+- [x] Generated and committed `package-lock.json` (lockfile v3) using a branch-scoped GitHub Actions workflow; build, preflight and deployment workflows now use `npm ci`.
+- Outstanding: inspect actual audit/outdated output, verify secret history and enable repository security settings.
 - Outstanding: delete the Cloudflare `MFI_SESSION_COOKIE` secret only after the new Worker has been deployed successfully.
 - No production D1 reset or Cloudflare secret deletion has been performed.
