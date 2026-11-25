@@ -68,3 +68,14 @@ A4 production D1 export, A5 live table inventory, and A6 local install/build/tes
 - Backup and inventory are stored in a one-day GitHub Actions artifact. Treat the backup as sensitive production data and move it to secure storage promptly.
 - Workflow file commit: `ff319f603ca35e280d53da1adcebc14d6ca66e4c`.
 - Workflow execution status: not yet verified at the time this log entry was written. A4/A5/A6 remain incomplete until the Actions run and artifact are inspected.
+
+## Phase A workflow execution findings
+
+- Workflow created at `.github/workflows/phase-a-preflight.yml` and reuses the existing deployment credential references; no new token or secret value was added to the repository.
+- The baseline job completed successfully on run [45524812051](https://github.com/fizminho/magic-screen/actions/runs/45524812051): dependency installation, `npm run build`, and `node --experimental-strip-types --test worker/*.test.mjs` all passed.
+- The production snapshot job failed at the D1 export endpoint with Cloudflare error 10000. The configured account ID was accepted and the existing token was present, but it lacks the permission required for export.
+- Cloudflare D1 documentation states that D1 export requires the **D1 Write** token permission because export temporarily locks the database. This is a platform requirement, not a GitHub secret-name issue.
+- No backup artifact was created; no live schema inventory was captured. A4/A5 remain incomplete.
+- The workflow was tightened so normal pushes do not trigger a production export. It now runs on manual dispatch only after explicit `YES`, or on a push to this working branch whose commit message contains `[phase-a-run]`.
+- Next owner action: add D1 Write to the existing Cloudflare API token (scoped to the correct account/narrowest available resource scope), then trigger the workflow explicitly. If broadening the existing deployment token is not acceptable, use a separate short-lived D1 Write token.
+- No remote D1 data was changed, no migrations were applied, and no production secrets were deleted.
