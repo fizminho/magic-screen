@@ -343,7 +343,7 @@ async function loginVerify(request, env) {
     }, expected);
     await env.DB.prepare(
       "UPDATE passkey_credential SET counter = ?, last_used_at = ? WHERE id = ?"
-    ).bind(Math.max(Number(row.counter), Number(verified.authenticator?.counter || 0)), nowIso(), row.id).run();
+    ).bind(Math.max(Number(row.counter), Number(verified.counter || 0)), nowIso(), row.id).run();
   } catch {
     await recordAttempt(request, env, "verify_fail", 5);
     return json({ error: "Sign-in failed." }, 401);
