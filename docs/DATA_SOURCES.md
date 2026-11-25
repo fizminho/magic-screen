@@ -83,6 +83,22 @@ References:
 
 The SEC `User-Agent` contact value must be configured by the owner before SEC requests are enabled. It must include the app name and the owner's real contact email. Do not use a placeholder or invent a contact email. The API stays disabled when this variable is missing.
 
+## Web Push delivery
+
+**Implemented using native Worker WebCrypto; no runtime push library dependency.**
+
+- VAPID authorization uses ES256 and a 12-hour audience-bound JWT.
+- Payload encryption follows the Web Push `aes128gcm` content encoding (RFC 8291).
+- The VAPID private key is a Cloudflare Worker secret; the public key and `mailto:` subject are public Worker variables.
+- Push endpoints are restricted to HTTPS FCM, Apple, Mozilla and Windows Notification Services hosts to avoid turning the Worker into a general-purpose outbound fetch proxy.
+- A maximum of five owner subscriptions is stored. HTTP 404/410 responses remove stale subscriptions.
+- Test payloads contain no holdings, quantities, cost basis or P/L values.
+
+References:
+- https://www.rfc-editor.org/rfc/rfc8291
+- https://www.rfc-editor.org/rfc/rfc8292
+- https://developer.mozilla.org/en-US/docs/Web/API/Push_API
+
 ## News and issuer announcements
 
 No general publisher-news RSS scraper is approved for the app. The Star RSS page describes personal, non-commercial RSS use, but its broader terms restrict online reuse and prohibit use of its content in AI/RAG without permission. The Edge and Bernama also impose restrictions on copying, storing or republishing their content. Do not ingest those feeds into D1 or send their content to any AI model without written permission.
