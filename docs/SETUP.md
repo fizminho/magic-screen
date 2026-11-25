@@ -42,7 +42,7 @@ The setup token is a one-time bootstrap gate, not a login password. Normal sign-
 If all passkeys are lost, use the secured Cloudflare account to set a new temporary `SETUP_TOKEN`, then clear only the passkey and session records:
 
 ```bash
-npx wrangler d1 execute magic-screen-db --remote --command "DELETE FROM passkey_credential; DELETE FROM session;"
+npx wrangler d1 execute magic-screen-db --remote --command "DELETE FROM session; DELETE FROM passkey_credential;"
 ```
 
 Register a new passkey, add a second recovery passkey, and remove the temporary token. This recovery does not delete portfolio holdings. Never run a full D1 reset for routine passkey recovery.
