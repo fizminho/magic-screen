@@ -41,7 +41,7 @@ npm run cf:dev
 
 The setup token is a one-time bootstrap gate, not a login password. Normal sign-in always uses the browser passkey prompt.
 
-For SEC EDGAR filing lookup, configure the Worker variable `SEC_USER_AGENT` with an application name and your real contact email, for example `Magic Folio/0.1 (contact: you@example.com)`. Do not use the placeholder address. SEC lookups remain disabled until this value is valid.
+For SEC EDGAR filing lookup, configure the Worker variable `SEC_USER_AGENT` with an application name and your real contact email, for example `Magic Folio/0.1 (contact: you@example.com)`. Do not use the placeholder address. SEC lookups remain disabled until this value is valid. Add the company's 1–10 digit CIK to its US holding or watchlist item (the app stores it as a 10-digit string). You can find the CIK through [SEC EDGAR company search](https://www.sec.gov/edgar/search/). The owner-only lookup returns recent filing metadata and links to the original SEC documents; it does not copy filing bodies. The endpoint is limited to five lookups per hour.
 
 ## Market data
 
