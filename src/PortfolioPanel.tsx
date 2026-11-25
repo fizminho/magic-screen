@@ -373,6 +373,11 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <span>Largest: {item?.largestPosition ? `${item.largestPosition.symbol} · ${item.largestPosition.weightPct}%` : "—"}</span>
                   <span>Top 3: {item?.topThreeConcentrationPct === null || item?.topThreeConcentrationPct === undefined ? "—" : `${item.topThreeConcentrationPct}%`}</span>
                 </div>
+                {item?.largestPosition && item.largestPosition.weightPct > settings.maxPositionPct && (
+                  <p className="risk-warning" role="status">
+                    Concentration alert: {item.largestPosition.symbol} is above your {settings.maxPositionPct}% position limit
+                  </p>
+                )}
                 {item?.sectorWeights.slice(0, 3).map((sector) => (
                   <div className="sector-weight" key={sector.sector}><span>{sector.sector}</span><b>{sector.weightPct}%</b></div>
                 ))}
