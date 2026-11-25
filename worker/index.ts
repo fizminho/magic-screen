@@ -25,6 +25,8 @@ import { handleAnalysisRequest, runScheduledResearchBrief } from "./lib/analysis
 import { handlePushRequest } from "./lib/push.mjs";
 // @ts-ignore Scheduled job history is covered by Node regression tests.
 import { handleJobRunsRequest } from "./lib/jobs.mjs";
+// @ts-ignore Owner-only manual job controls are covered by Worker regression tests.
+import { handleAdminJobsRequest } from "./jobs/admin.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -42,7 +44,7 @@ interface Env {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     let response: Response;
 
@@ -69,6 +71,8 @@ export default {
       response = await handleAnalysisRequest(request, env, url);
     } else if (url.pathname === "/api/jobs/recent") {
       response = await handleJobRunsRequest(request, env, url);
+    } else if (url.pathname === "/api/admin/jobs" || url.pathname === "/api/admin/jobs/run") {
+      response = await handleAdminJobsRequest(request, env, url, ctx);
     } else if (url.pathname.startsWith("/api/push/")) {
       response = await handlePushRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
@@ -95,18 +99,35 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const task = controller.cron === "0 1 * * 2-6"
+    const isRefresh = controller.cron === "0 1 * * 2-6";
+    const isHousekeeping = controller.cron === "0 2 * * 6";
+    if (!isRefresh && !isHousekeeping) return;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const lockValue = new Date(now.getTime() + 30 * 60 * 1000).toISOString() + "|" + crypto.randomUUID();
+    const acquired = await env.DB.prepare(
+      "INSERT INTO setting(key,value) VALUES('manual_job_lock',?) " +
+      "ON CONFLICT(key) DO UPDATE SET value=excluded.value " +
+      "WHERE substr(setting.value,1,24) < ? RETURNING value"
+    ).bind(lockValue, nowIso).first();
+    if (!acquired) {
+      console.log("Scheduled task skipped because another job holds the execution lock.");
+      return;
+    }
+
+    const task = isRefresh
       ? runSecRefresh(env).then(async (refreshResult: unknown) => {
           // Generate briefs only after fresh SEC data has been persisted.
           const briefResult = await runScheduledResearchBrief(env);
           return { refresh: refreshResult, brief: briefResult };
         })
-      : controller.cron === "0 2 * * 6"
-        ? runWeeklyHousekeeping(env)
-        : Promise.resolve({ status: "ignored_unknown_cron" });
+      : runWeeklyHousekeeping(env);
     ctx.waitUntil(task.catch((error: unknown) => {
       const code = error instanceof Error ? error.message : "unknown";
       console.error("Scheduled task failed:", controller.cron, code.slice(0, 120));
+    }).finally(async () => {
+      await env.DB.prepare("DELETE FROM setting WHERE key='manual_job_lock' AND value=?").bind(lockValue).run();
     }));
   }
 };

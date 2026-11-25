@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { client as webauthnClient } from "@passwordless-id/webauthn";
 import PortfolioPanel from "./PortfolioPanel";
+import JobsPanel from "./JobsPanel";
 import { clearDashboardSnapshot } from "./offline-dashboard";
 
 const SETUP_TOKEN_MIN_LENGTH = 32;
@@ -250,6 +251,7 @@ export default function App() {
           </section>
         )}
         {auth?.authenticated && supported && <PortfolioPanel onError={setError} onNotice={setNotice} />}
+        {auth?.authenticated && supported && <JobsPanel onError={setError} onNotice={setNotice} />}
         {error && <p className="feedback feedback-error" role="alert">{error}</p>}
         {notice && <p className="feedback feedback-success" role="status">{notice}</p>}
       </main>
