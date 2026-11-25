@@ -275,8 +275,9 @@ async function registerVerify(request, env) {
 
 function decodeBase64urlBytes(encoded) {
   try {
-    if (typeof encoded !== "string" || !/^[A-Za-z0-9_-]+$/.test(encoded)) return null;
-    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    if (typeof encoded !== "string" || !/^[A-Za-z0-9_-]+={0,2}$/.test(encoded)) return null;
+    const unpadded = encoded.replace(/=+$/, "");
+    const normalized = unpadded.replace(/-/g, "+").replace(/_/g, "/");
     const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
     const raw = atob(padded);
     return Uint8Array.from(raw, (character) => character.charCodeAt(0));
