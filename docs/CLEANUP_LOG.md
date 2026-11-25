@@ -53,3 +53,7 @@ No production secret was deleted, no remote D1 data was changed, no existing bra
 
 ### Phase A remaining
 A4 production D1 export, A5 live table inventory, and A6 local install/build/test baseline remain blocked on an execution environment with Node.js/Wrangler and authorized Cloudflare credentials. Do not proceed to destructive phases C/D until those gates pass.
+
+
+- Added backup-*.sql to .gitignore before any backup is created, as required by A4.
+- Added exact local commands for A1/A4/A5/A6 to docs/BLOCKERS.md. No backup file has been created by this session.
