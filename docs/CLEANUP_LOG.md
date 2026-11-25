@@ -119,3 +119,18 @@ Preflight run `45528932617` on commit `89a5e20ee781d4486368da71846eacec65410e0b`
 - Checks the credential ID and raw ID match each other and the ID embedded in authenticator attested data.
 - Checks the attested data's user-presence and user-verification flags and matches the public-key algorithm.
 - Full build, audit, regression, local D1 reset, Worker auth smoke and Wrangler dry-run all passed.
+
+
+## Passkey, portfolio and data-provider implementation
+
+- Added passkey-only registration/login with a 256-bit temporary bootstrap token, single-use 32-byte challenges, exact RP/origin/host validation, user-presence and user-verification checks, authenticator credential-ID binding, cross-origin ceremony rejection and signature-counter verification.
+- Sessions are random bearer tokens stored only as SHA-256 hashes, bound to the authenticating passkey, with 7-day idle and 30-day absolute expiry. Removing a passkey revokes sessions created by that credential; the last credential cannot be removed. Added sign out everywhere.
+- Added owner-only passkey inventory/rename/remove/recovery UI and a warning until at least two passkeys are registered.
+- Added owner-only holdings and watchlist APIs/UI, 20-position and 50-watchlist limits, CSV holdings import, quote snapshot read/write endpoints and cleanup of quote snapshots when an instrument is no longer in holdings/watchlist.
+- Rejected Yahoo Finance scraping, FMP free display, and unverified Alpha Vantage use. The provider decision is documented in `docs/DATA_SOURCES.md`.
+- Added optional browser-only MarketData.app delayed US quote adapter. It uses the documented delayed-quotes endpoint, 100-credit/day free tier, 50-symbol request chunks, 8-second timeout, one transient retry, no retry on 429, and no Worker proxy. The token is kept in browser session storage only and is never sent to D1 or the Worker.
+- Added a strict Bursa manual quote CSV parser and holdings CSV parser. Both validate rows, duplicates, numeric ranges, timestamps and import size.
+- Added owner-authenticated `GET /api/quotes/latest` and `POST /api/quotes/snapshots`; quote rows are stored only against active owner instruments.
+- CSP now permits only `https://api.marketdata.app` as an additional browser connection origin; scripts and styles remain self-hosted with no inline allowance.
+- CI passed on branch commit `c84c002a41af21091de23e796693595e008eac9c`: locked install, production build, full dependency audit (0 vulnerabilities), Node regression suite, fresh local D1 migrations/schema checks, destructive reset exercise against local D1 only, Worker auth/portfolio/quote smoke tests, and Wrangler dry-run. No production D1 reset or deployment occurred.
+- Outstanding: SEC EDGAR filing adapter and CIK mapping, scheduled jobs, Gemini, push notifications, PWA, full dashboard/insights screens, device-level passkey tests, GitHub repository security settings and Git-history secret review.
