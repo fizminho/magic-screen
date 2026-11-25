@@ -19,7 +19,7 @@ The normal deployment workflow applies pending migrations and deploys. It does *
 - Legacy MFI endpoints, provider session-cookie usage, runtime DDL and old screener UI have been removed from the rebuild branch.
 - New D1 portfolio schema and migrations are in place.
 - Passkey bootstrap, login, session handling, credential management, recovery documentation and security headers are implemented.
-- Owner-only quote snapshot, holdings and watchlist APIs are implemented. `PortfolioPanel` supports position entry/removal, US delayed-quote refresh with a tab-scoped Market Data token, and Bursa CSV quote import. The token is sent directly to MarketData.app, not to the Worker. Watchlist UI is now integrated with the owner-only API; settings/dashboard/export routes are still pending.
+- Owner-only quote snapshot, holdings and watchlist APIs are implemented. `PortfolioPanel` supports position entry/removal, holdings CSV import, US delayed-quote refresh with a tab-scoped Market Data token, Bursa CSV quote import and watchlist management. The token is sent directly to MarketData.app, not to the Worker. Watchlist UI is now integrated with the owner-only API; settings/dashboard/export routes are still pending.
 - CI run `45528932617` passed after the final WebAuthn credential-ID/algorithm binding and cross-origin checks: build, full dependency audit, regression tests, fresh local D1 migrations, local destructive-reset exercise, Worker auth smoke tests and Wrangler dry-run.
 - No production deployment, production reset, or Cloudflare secret deletion has been performed.
 
