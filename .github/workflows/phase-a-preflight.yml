@@ -100,6 +100,16 @@ jobs:
           last_key_status="$(curl --silent --output /tmp/last-passkey-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/auth/credentials/ci-passkey-revoke-backup -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
           test "$last_key_status" = "409"
           jq -e '.error == "The last passkey cannot be deleted."' /tmp/last-passkey-response.json >/dev/null
+          # Exercise real D1 holdings upsert, list and delete using the remaining owner session.
+          holdings_status="$(curl --silent --output /tmp/holdings-put.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X PUT http://localhost:8787/api/holdings -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"holdings":[{"symbol":"AAPL","market":"US","quantity":2,"avgCost":100},{"symbol":"1155","market":"MY","quantity":50,"avgCost":6.2}]}')"
+          test "$holdings_status" = "200"
+          jq -e '.saved == 2' /tmp/holdings-put.json >/dev/null
+          holdings_get_status="$(curl --silent --output /tmp/holdings-get.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/holdings -H "Cookie: magicfolio_session=$backup_token")"
+          test "$holdings_get_status" = "200"
+          jq -e '.holdings | length == 2' /tmp/holdings-get.json >/dev/null
+          holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
+          test "$holding_delete_status" = "200"
+          jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
       - name: Validate Wrangler bundling and assets without deploying
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 deploy --dry-run
