@@ -14,6 +14,7 @@ test("normalizes delayed quote payload and derives previous close", () => {
   };
   const [quote] = parseMarketDataQuotes(payload, ["aapl"], now);
   assert.equal(quote.symbol, "AAPL");
+  assert.equal(quote.market, "US");
   assert.equal(quote.price, 101.25);
   assert.equal(quote.prevClose, 100);
   assert.equal(quote.changePct, 0.0125);
@@ -94,4 +95,15 @@ test("invalid tickers and empty tokens are rejected before network access", asyn
   await assert.rejects(fetchMarketDataQuotes(["AAPL/"], "test-token-123456", fakeFetch), /invalid/);
   await assert.rejects(fetchMarketDataQuotes(["AAPL"], "", fakeFetch), /API token/);
   assert.equal(calls, 0);
+});
+
+test("provider factory exposes the US quote-provider contract", async () => {
+  const { createMarketDataProvider } = await import("../src/providers/marketdata.ts");
+  const provider = createMarketDataProvider("test-token-123456", async () => new Response(JSON.stringify({
+    s: "ok", symbol: ["AAPL"], last: [10], change: [1], changepct: [0.1],
+    updated: [Math.floor(Date.now() / 1000)]
+  }), { status: 200 }));
+  assert.equal(provider.id, "marketdata.app");
+  assert.equal(provider.market, "US");
+  assert.equal((await provider.getQuotes(["AAPL"]))[0].price, 10);
 });
