@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   baseline:
-    name: Install, build and regression tests
+    name: Install, build, audit and regression tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -19,9 +19,13 @@ jobs:
       - uses: actions/setup-node@49933ea5288ca8ca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-      - name: Install dependencies (baseline; lockfile not yet present)
+      - name: Install dependencies (lockfile generation is still outstanding)
         run: npm install --no-audit --no-fund
       - name: Build
         run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Run complete Node regression suite
         run: node --experimental-strip-types --test worker/*.test.mjs
+      - name: Validate Wrangler bundling and assets without deploying
+        run: npx --yes wrangler@4 deploy --dry-run
