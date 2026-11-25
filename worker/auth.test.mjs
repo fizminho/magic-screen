@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { base64url, constantTimeEqual, parseCookies, sha256Hex, handleAuthRequest, decodeClientChallenge } from "./lib/auth.mjs";
+import { base64url, constantTimeEqual, parseCookies, sha256Hex, handleAuthRequest, decodeClientChallenge, decodeBase64urlBytes } from "./lib/auth.mjs";
 
 test("base64url encodes without padding and uses URL-safe alphabet", () => {
   assert.equal(base64url(new Uint8Array([251, 255, 239])), "-__v");
@@ -106,4 +106,10 @@ test("sign out everywhere requires an owner session", async () => {
     body: "{}"
   }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/logout-all");
   assert.equal(response.status, 401);
+});
+
+test("authenticator data decoder accepts padded and unpadded base64url", () => {
+  assert.deepEqual([...decodeBase64urlBytes("AQI=")], [1, 2]);
+  assert.deepEqual([...decodeBase64urlBytes("AQI")], [1, 2]);
+  assert.equal(decodeBase64urlBytes("%%%"), null);
 });
