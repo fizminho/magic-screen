@@ -273,7 +273,7 @@ async function registerVerify(request, env) {
   });
 }
 
-function decodeBase64urlBytes(encoded) {
+export function decodeBase64urlBytes(encoded) {
   try {
     if (typeof encoded !== "string" || !/^[A-Za-z0-9_-]+={0,2}$/.test(encoded)) return null;
     const unpadded = encoded.replace(/=+$/, "");
