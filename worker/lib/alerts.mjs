@@ -29,6 +29,11 @@ export async function dispatchAlert(env, alert, fetcher = fetch) {
   ).bind(alert.dedupeKey).first();
   if (existing) return { status: "duplicate", sent: 0 };
 
+  const subscriptions = await env.DB.prepare(
+    "SELECT endpoint,p256dh,auth FROM push_subscription ORDER BY created_at DESC LIMIT 5"
+  ).all();
+  if (!(subscriptions.results || []).length) return { status: "no_subscriptions", sent: 0 };
+
   const setting = await env.DB.prepare(
     "SELECT value FROM setting WHERE key='max_pushes_per_day'"
   ).first();
@@ -48,11 +53,6 @@ export async function dispatchAlert(env, alert, fetcher = fetch) {
     await releaseQuota(env, quotaKey);
     return { status: "duplicate", sent: 0 };
   }
-
-  const subscriptions = await env.DB.prepare(
-    "SELECT endpoint,p256dh,auth FROM push_subscription ORDER BY created_at DESC LIMIT 5"
-  ).all();
-  if (!(subscriptions.results || []).length) return { status: "no_subscriptions", sent: 0 };
 
   let sent = 0;
   const statements = [];
@@ -76,7 +76,13 @@ export async function dispatchAlert(env, alert, fetcher = fetch) {
     }
   }
 
-  if (statements.length) await env.DB.batch(statements);
+  try {
+    if (statements.length) await env.DB.batch(statements);
+  } catch {
+    await env.DB.prepare("DELETE FROM alert_log WHERE dedupe_key=?").bind(alert.dedupeKey).run();
+    await releaseQuota(env, quotaKey);
+    return { status: "delivery_failed", sent: 0 };
+  }
   if (!sent) {
     await env.DB.prepare("DELETE FROM alert_log WHERE dedupe_key=?").bind(alert.dedupeKey).run();
     await releaseQuota(env, quotaKey);
