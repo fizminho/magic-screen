@@ -10,9 +10,9 @@ const MAX_HOLDINGS = 20;
 const MAX_QUANTITY = 1_000_000_000_000;
 const MAX_AVG_COST = 1_000_000_000_000;
 
-function normalizeCik(value, market) {
+function normalizeCik(value, market, errorCode = "invalid_holding") {
   if (value === null || value === undefined || value === "") return null;
-  if (market !== "US" || typeof value !== "string" || !/^[0-9]{1,10}$/.test(value)) throw new Error("invalid_holding");
+  if (market !== "US" || typeof value !== "string" || !/^[0-9]{1,10}$/.test(value)) throw new Error(errorCode);
   return value.padStart(10, "0");
 }
 
@@ -154,7 +154,7 @@ function validateWatchlistItem(value) {
   }
   if (!["US", "MY"].includes(market)) throw new Error("invalid_watchlist_item");
   if (note !== null && (typeof note !== "string" || note.length > 500)) throw new Error("invalid_watchlist_item");
-  const normalizedCik = normalizeCik(cik, market);
+  const normalizedCik = normalizeCik(cik, market, "invalid_watchlist_item");
   return { symbol, market, note, cik: normalizedCik };
 }
 
