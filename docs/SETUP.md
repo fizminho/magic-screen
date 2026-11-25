@@ -41,6 +41,8 @@ npm run cf:dev
 
 The setup token is a one-time bootstrap gate, not a login password. Normal sign-in always uses the browser passkey prompt.
 
+For SEC EDGAR filing lookup, configure the Worker variable `SEC_USER_AGENT` with an application name and your real contact email, for example `Magic Folio/0.1 (contact: you@example.com)`. Do not use the placeholder address. SEC lookups remain disabled until this value is valid.
+
 ## Market data
 
 MarketData.app is optional. The owner must create their own account and API token. The free tier has 100 credits/day, at least 24-hour delayed US quotes and a one-IP-at-a-time restriction. The token is entered after passkey sign-in and stored only in the current browser tab's session storage. It is sent directly to MarketData.app, never to the Worker or D1. Refresh quotes from one device/IP at a time; other devices read the private quote snapshots from D1.
