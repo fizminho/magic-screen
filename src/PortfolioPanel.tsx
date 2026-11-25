@@ -232,6 +232,9 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const existingHolding = holdings.some((item) =>
     item.market === market && item.symbol === symbol.trim().toUpperCase()
   );
+  const existingWatchlistItem = watchlist.some((item) =>
+    item.market === watchMarket && item.symbol === watchSymbol.trim().toUpperCase()
+  );
 
   return (
     <section className="portfolio-panel">
@@ -289,7 +292,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           <label>Market<select value={watchMarket} onChange={(event) => setWatchMarket(event.target.value as "US" | "MY")}><option value="US">United States</option><option value="MY">Bursa Malaysia</option></select></label>
           <label>Symbol<input value={watchSymbol} onChange={(event) => setWatchSymbol(event.target.value.toUpperCase())} maxLength={15} placeholder={watchMarket === "US" ? "MSFT" : "1155"} required /></label>
           <label className="watch-note">Note<input value={watchNote} onChange={(event) => setWatchNote(event.target.value)} maxLength={500} placeholder="Optional reminder" /></label>
-          <button className="button button-secondary" type="submit" disabled={busy || watchlist.length >= 50}>Add to watchlist</button>
+          <button className="button button-secondary" type="submit" disabled={busy || (watchlist.length >= 50 && !existingWatchlistItem)}>Add to watchlist</button>
         </form>
       </section>
 
