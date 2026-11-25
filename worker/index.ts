@@ -12,7 +12,7 @@ import { handleDashboardRequest } from "./lib/dashboard.mjs";
 // @ts-ignore The JavaScript SEC module is exercised by Node regression tests.
 import { handleSecRequest } from "./lib/sec.mjs";
 // @ts-ignore The JavaScript SEC company-facts module is covered by its Node regression tests.
-import { handleCompanyFactsRequest } from "./lib/companyfacts.mjs";
+import { handleSecCompanyFactsRequest } from "./lib/sec-companyfacts.mjs";
 // @ts-ignore The JavaScript settings module is exercised by Node regression tests.
 import { handleSettingsRequest } from "./lib/settings.mjs";
 // @ts-ignore The JavaScript export module is exercised by Node regression tests.
@@ -53,7 +53,7 @@ export default {
     } else if (url.pathname === "/api/sec/filings") {
       response = await handleSecRequest(request, env, url);
     } else if (url.pathname === "/api/sec/companyfacts") {
-      response = await handleCompanyFactsRequest(request, env, url);
+      response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
       response = await handleSettingsRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/export") {
