@@ -316,16 +316,53 @@ export async function handleAnalysisRequest(request, env, url) {
       return jsonResponse({ briefs });
     }
 
+    if (request.method === "GET" && url.pathname === "/api/analysis/briefs") {
+      const rows = await env.DB.prepare(
+        "SELECT a.output_json AS outputJson,a.created_at AS createdAt " +
+        "FROM analysis a JOIN instrument i ON i.market='US' AND i.symbol=json_extract(a.output_json,'$.symbol') " +
+        "WHERE a.kind='brief' AND (EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
+        "OR EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id)) " +
+        "ORDER BY a.created_at DESC LIMIT 100"
+      ).all();
+      const briefs = (rows.results || []).map((row) => {
+        try {
+          const brief = JSON.parse(row.outputJson);
+          if (!validSymbol(brief?.symbol)) return null;
+          return { symbol: brief.symbol, brief, createdAt: row.createdAt };
+        } catch { return null; }
+      }).filter(Boolean);
+      return jsonResponse({ briefs });
+    }
+
     if (request.method === "GET" && url.pathname === "/api/analysis/latest") {
       const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
       if (!validSymbol(symbol)) return jsonResponse({ error: "Provide a valid US ticker symbol." }, 400);
-      const rows = await env.DB.prepare(
-        "SELECT output_json AS outputJson,created_at AS createdAt FROM analysis WHERE kind='brief' ORDER BY created_at DESC LIMIT 20"
-      ).all();
-      const match = (rows.results || []).map((row) => {
-        try { return { ...JSON.parse(row.outputJson), createdAt: row.createdAt }; } catch { return null; }
-      }).find((row) => row?.symbol === symbol);
-      return jsonResponse({ brief: match || null });
+      const instrument = await env.DB.prepare(
+        "SELECT id FROM instrument WHERE market='US' AND symbol=? AND active=1 " +
+        "AND (EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=instrument.id) " +
+        "OR EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=instrument.id))"
+      ).bind(symbol).first();
+      if (!instrument) return jsonResponse({ brief: null });
+      const row = await env.DB.prepare(
+        "SELECT output_json AS outputJson,created_at AS createdAt,model FROM analysis " +
+        "WHERE kind='brief' AND json_extract(output_json,'$.symbol')=? ORDER BY created_at DESC LIMIT 1"
+      ).bind(symbol).first();
+      if (!row) return jsonResponse({ brief: null });
+      try {
+        const brief = JSON.parse(row.outputJson);
+        const [factsRow, filingRows] = await Promise.all([
+          env.DB.prepare("SELECT facts_json AS factsJson FROM sec_companyfacts_cache WHERE instrument_id=?")
+            .bind(instrument.id).first(),
+          env.DB.prepare(
+            "SELECT accession_number AS accessionNumber,form,title,filing_date AS filingDate,url " +
+            "FROM sec_filing WHERE instrument_id=? ORDER BY filing_date DESC LIMIT 20"
+          ).bind(instrument.id).all()
+        ]);
+        let facts = [];
+        try { facts = JSON.parse(factsRow?.factsJson || "{}").facts || []; } catch { facts = []; }
+        const sources = mapSources(brief.source_accessions, filingRows.results || [], facts, "0");
+        return jsonResponse({ brief, model: row.model || MODEL, createdAt: row.createdAt, cached: true, sources });
+      } catch { return jsonResponse({ brief: null }); }
     }
 
     if (request.method !== "POST" || url.pathname !== "/api/analysis/run") {
