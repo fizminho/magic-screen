@@ -120,7 +120,7 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 | S7 | App will now hold personal holdings + a quota-limited API key, but current design has **no auth** | Add single-owner **passkey** auth (Phase E1) |
 | S8 | Dependabot limited to weekly, 5 PRs | Keep, but group minor/patch updates |
 | S9 | No secret scanning guard | Enable GitHub secret scanning + push protection (Settings → Code security) and add `.dev.vars.example` |
-| S10 | Unknown live tables from the retired SEC pipeline | Dropped in Phase D after backup |
+| S10 | Unknown live tables from the retired SEC pipeline | Dropped by the owner-approved one-time reset script, which enumerates actual user tables at cutover |
 
 - [ ] **B1.** `npm outdated` and `npm audit` (full output to `docs/CLEANUP_LOG.md`). Do not assert a CVE you did not see in the audit output.
 - [ ] **B2.** (PRs are closed later, in H8.) For each open Dependabot PR from A3: read the diff; if it is a **security fix or a patch/minor bump with green CI**, apply the same version change on the cleanup branch (`npm install pkg@version`). Majors: apply only if the build and tests pass; otherwise note as deferred.
@@ -162,7 +162,7 @@ Use Wrangler migrations (`migrations/` folder, tracked in `d1_migrations` table)
 - [x] **D-3.** Create `migrations/0002_portfolio_schema.sql` (Appendix A).
 - [ ] **D-4.** Test locally: `npx wrangler d1 migrations apply magic-screen-db --local`, then `--local --command "SELECT name FROM sqlite_master"`.
 - [x] **D-5.** Normal deployments apply pending migrations immediately before `wrangler deploy`. The one-time destructive reset is separate and manual: `.github/workflows/reset-production-d1.yml` requires the exact confirmation `DROP-ALL-LEGACY-DATA`, refuses to run while legacy MFI code remains, drops every user table, applies migrations, and deploys the replacement Worker. Do not run it until the new Worker is complete.
-- [ ] **D-6.** After the first deploy, re-run the A5 inventory. Only new-schema tables + `d1_migrations` should remain; if the old Worker recreated a legacy table in the gap, add a follow-up migration `0004_drop_stragglers.sql`.
+- [ ] **D-6.** After the cutover, verify that only the new-schema tables + `d1_migrations` remain. The reset workflow performs a post-migration inventory; inspect its log and resolve any unexpected object before declaring cutover complete.
 
 `migrations/0001_drop_legacy.sql`:
 
@@ -173,8 +173,6 @@ DROP TABLE IF EXISTS mfi_screening_meta;
 DROP TABLE IF EXISTS refresh_log;
 DROP TABLE IF EXISTS stock_snapshot;
 DROP TABLE IF EXISTS stock_master;
--- Legacy SEC/EdgarTools tables discovered in step A5: add one line per table below.
--- DROP TABLE IF EXISTS <name_from_inventory>;
 ```
 
 **Done when:** local migrations apply cleanly from empty; the one-time production cutover completes successfully after the replacement Worker is ready; `d1_migrations` lists the applied migration versions.
@@ -320,7 +318,7 @@ Screens (mobile-first, one column): **Passkey sign-in / first-run setup · Dashb
 - [ ] **H8.** After the cleanup PR is merged and the live checks pass, **close all remaining open PRs** with a link to it: loop over the numbers in `/tmp/open-prs.json` (re-list first):
   `gh pr close <n> --comment "Superseded by <cleanup PR URL>. Relevant security bumps were applied there."`
   Do not delete branches. Confirm `gh pr list --state open` is empty (Dependabot may open new ones; leave those).
-- [ ] **H9.** Rollback plan documented: redeploy previous commit with `wrangler rollback`; restore data from the A4 backup only if a migration must be reverted (`wrangler d1 execute --file backup.sql` into a **new** database, then repoint the binding).
+- [ ] **H9.** Rollback plan documented: redeploy a compatible Worker version if needed. Because the owner explicitly waived backup and old-data migration, legacy D1 rows cannot be restored. Do not roll back to a Worker version that expects the retired schema after the clean reset; use a forward-fix migration instead.
 
 ---
 
