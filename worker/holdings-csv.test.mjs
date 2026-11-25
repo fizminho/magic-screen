@@ -50,3 +50,16 @@ test("holdings CSV accepts an optional US CIK and rejects CIK on Bursa rows", ()
     "symbol,market,quantity,avg_cost,cik\n1155,MY,2,6.4,123456\n"
   ), /CIK must be/);
 });
+
+test("holdings CSV accepts optional US CIK and rejects CIK on MY rows", () => {
+  const [row] = parseHoldingsCsv(
+    "symbol,market,quantity,avg_cost,cik\nAAPL,US,2,100,320193\n"
+  );
+  assert.equal(row.cik, "320193");
+  assert.throws(() => parseHoldingsCsv(
+    "symbol,market,quantity,avg_cost,cik\n1155,MY,100,6.2,320193\n"
+  ), /CIK must be/);
+  assert.throws(() => parseHoldingsCsv(
+    "symbol,market,quantity,avg_cost,cik\nAAPL,US,2,100,12345678901\n"
+  ), /CIK must be/);
+});
