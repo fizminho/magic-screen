@@ -317,7 +317,7 @@ export function decodeClientChallenge(encoded, expectedType = "webauthn.create")
     const raw = atob(normalized);
     const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder().decode(bytes));
-    return parsed?.type === expectedType ? parsed.challenge : null;
+    return parsed?.type === expectedType && parsed.crossOrigin !== true ? parsed.challenge : null;
   } catch {
     return null;
   }
