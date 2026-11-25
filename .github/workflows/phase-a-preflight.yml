@@ -166,14 +166,14 @@ jobs:
           export_json_status="$(curl --silent --output /tmp/export.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/export?format=json -H "Cookie: magicfolio_session=$backup_token")"
           echo "JSON export HTTP status: $export_json_status"
           test "$export_json_status" = "200"
-          jq -e '.holdings | length == 2' /tmp/export.json >/dev/null
+          jq -e '.holdings | length == 1 and .[0].symbol == "1155"' /tmp/export.json >/dev/null
           jq -e '.watchlist | length == 1' /tmp/export.json >/dev/null
           export_csv_status="$(curl --silent --output /tmp/export.csv --dump-header /tmp/export-headers --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/export?format=csv -H "Cookie: magicfolio_session=$backup_token")"
           echo "CSV export HTTP status: $export_csv_status"
           test "$export_csv_status" = "200"
           grep -qi '^content-type: text/csv' /tmp/export-headers
           grep -q '^record_type,symbol,market' /tmp/export.csv
-          grep -q 'AAPL' /tmp/export.csv
+          grep -q '1155' /tmp/export.csv
           watchlist_delete_status="$(curl --silent --output /tmp/watchlist-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/watchlist/US/MSFT -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
           echo "watchlist delete HTTP status: $watchlist_delete_status"
           cat /tmp/watchlist-delete.json
