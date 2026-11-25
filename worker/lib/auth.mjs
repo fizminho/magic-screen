@@ -237,6 +237,7 @@ async function registerVerify(request, env) {
     return json({ error: "Passkey registration could not be verified." }, 400);
   }
   const transports = Array.isArray(credential.transports) ? JSON.stringify(credential.transports) : null;
+  const backedUp = Boolean(flags & 0x10) ? 1 : 0;
   const now = nowIso();
   let inserted = 0;
 
@@ -248,14 +249,14 @@ async function registerVerify(request, env) {
         "SELECT ?,?,?,?,?,?,?,?,NULL WHERE (SELECT value FROM setting WHERE key='owner_user_handle') = ? " +
         "AND NOT EXISTS (SELECT 1 FROM passkey_credential)"
       ).bind(credential.id, credential.publicKey, algorithm, Number(verified.authenticator?.counter || 0),
-        transports, verified.synced ? 1 : 0, "Primary passkey", now, ownerId)
+        transports, backedUp, "Primary passkey", now, ownerId)
     ]);
     inserted = Number(results?.[1]?.meta?.changes || 0);
   } else {
     const result = await env.DB.prepare(
       "INSERT OR IGNORE INTO passkey_credential(id,public_key,algorithm,counter,transports,backed_up,name,created_at,last_used_at) VALUES(?,?,?,?,?,?,?,?,NULL)"
     ).bind(credential.id, credential.publicKey, algorithm, Number(verified.authenticator?.counter || 0),
-      transports, verified.synced ? 1 : 0, "Passkey", now).run();
+      transports, backedUp, "Passkey", now).run();
     inserted = Number(result?.meta?.changes || 0);
   }
   if (inserted !== 1) return json({ error: "This passkey could not be added. Refresh and try again." }, 409);
