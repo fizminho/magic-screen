@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { base64url, constantTimeEqual, parseCookies, sha256Hex, handleAuthRequest } from "./lib/auth.mjs";
+import { base64url, constantTimeEqual, parseCookies, sha256Hex, handleAuthRequest, decodeClientChallenge } from "./lib/auth.mjs";
 
 test("base64url encodes without padding and uses URL-safe alphabet", () => {
   assert.equal(base64url(new Uint8Array([251, 255, 239])), "-__v");
@@ -61,4 +61,14 @@ test("auth mutations reject JSON lookalike media types", async () => {
     body: "{}"
   }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/verify");
   assert.equal(response.status, 415);
+});
+
+test("challenge parser binds registration and login to different ceremony types", () => {
+  const encode = (value) => base64url(new TextEncoder().encode(JSON.stringify(value)));
+  const registration = encode({ type: "webauthn.create", challenge: "registration-challenge" });
+  const login = encode({ type: "webauthn.get", challenge: "login-challenge" });
+  assert.equal(decodeClientChallenge(registration), "registration-challenge");
+  assert.equal(decodeClientChallenge(login), null);
+  assert.equal(decodeClientChallenge(login, "webauthn.get"), "login-challenge");
+  assert.equal(decodeClientChallenge("not-valid"), null);
 });
