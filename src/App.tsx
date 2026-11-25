@@ -179,7 +179,7 @@ export default function App() {
             <div className={`recovery-note ${auth.passkeyCount < 2 ? "recovery-warning" : "recovery-ready"}`}>
               {auth.passkeyCount < 2
                 ? "Recovery is not ready yet. Add a second passkey on another device before removing the setup token."
-                : "Recovery ready. You have more than one passkey registered."}
+                : "Recovery ready. You have more than one passkey registered. Delete the temporary SETUP_TOKEN secret in Cloudflare now."}
             </div>
             <div className="session-card">
               <div><b>Passkey recovery</b><span>Register a passkey on another device in case your primary device is lost.</span></div>
@@ -194,7 +194,7 @@ export default function App() {
                       value={credentialNames[item.id] ?? item.name}
                       onChange={(event) => setCredentialNames((current) => ({ ...current, [item.id]: event.target.value }))} />
                     <span>Added {new Date(item.createdAt).toLocaleDateString()} · {item.lastUsedAt ? `Last used ${new Date(item.lastUsedAt).toLocaleDateString()}` : "Not used yet"}</span>
-                    <span>{item.backedUp ? "Backed up by authenticator" : "Device backup not reported"}</span>
+                    <span>{item.backedUp ? "Backed up by authenticator" : "Not currently backed up"}</span>
                   </div>
                   <div className="credential-actions">
                     <button className="button button-small" onClick={() => saveCredentialName(item.id)} disabled={busy || !(credentialNames[item.id] || "").trim()}>Save</button>
