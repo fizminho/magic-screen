@@ -20,8 +20,8 @@ binding = "AI"
 [vars]
 APP_ENV = "production"
 RP_NAME = "Magic Folio"
-RP_ID = "magicfolio.binalah.com"
-RP_ORIGIN = "https://magicfolio.binalah.com"
+RP_ID = "investlah.binalah.com"
+RP_ORIGIN = "https://investlah.binalah.com"
 # Set a descriptive SEC User-Agent with a real contact email before enabling filings.
 # SEC_USER_AGENT = "Magic Folio/0.1 (contact: your-real-email@domain.com)"
 # Set the public VAPID values after generating a key pair. Keep the private key in Worker secrets only.
