@@ -90,6 +90,8 @@ jobs:
                       raise SystemExit(f"Missing accession or period for {item['symbol']}.")
           print(f"Validated {len(companies)} EdgarTools shadow records.")
           PY
+      - name: Normalize statements to SEC CompanyFacts keys
+        run: python scripts/edgartools_normalize.py --input edgartools-shadow.json --output edgartools-normalized.json
       - name: Ingest raw evidence into D1
         if: ${{ !inputs.symbols }}
         env:
@@ -121,6 +123,7 @@ jobs:
           name: edgartools-shadow-${{ github.run_id }}
           path: |
             edgartools-shadow.json
+            edgartools-normalized.json
             edgartools-ingest-response.json
           if-no-files-found: warn
           retention-days: 14
