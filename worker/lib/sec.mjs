@@ -121,17 +121,17 @@ function formatCachedFiling(row, symbol, cik) {
 
 async function readCachedFilings(env, instrumentId, symbol, cik) {
   const cache = await env.DB.prepare(
-    "SELECT fetched_at AS fetchedAt, company_name AS companyName FROM sec_fetch_cache WHERE instrument_id=?"
+    "SELECT cik, fetched_at AS fetchedAt, company_name AS companyName FROM sec_fetch_cache WHERE instrument_id=?"
   ).bind(instrumentId).first();
-  if (!cache || !Number.isFinite(Date.parse(cache.fetchedAt)) ||
+  if (!cache || cache.cik !== cik || !Number.isFinite(Date.parse(cache.fetchedAt)) ||
       Date.now() - Date.parse(cache.fetchedAt) >= CACHE_SECONDS * 1000) return null;
 
   const rows = await env.DB.prepare(
     "SELECT form, title, summary, filing_date AS filingDate, report_date AS reportDate, " +
     "accession_number AS accessionNumber, primary_document AS primaryDocument, " +
-    "fetched_at AS fetchedAt, url FROM sec_filing WHERE instrument_id=? " +
+    "fetched_at AS fetchedAt, url FROM sec_filing WHERE instrument_id=? AND cik=? " +
     "ORDER BY filing_date DESC LIMIT 20"
-  ).bind(instrumentId).all();
+  ).bind(instrumentId, cik).all();
   return {
     companyName: cache.companyName,
     filings: (rows.results || []).map((row) => formatCachedFiling(row, symbol, cik)),
@@ -142,23 +142,23 @@ async function readCachedFilings(env, instrumentId, symbol, cik) {
 async function storeFilings(env, instrumentId, symbol, cik, companyName, filings, fetchedAt) {
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const statements = [
-    env.DB.prepare("DELETE FROM sec_filing WHERE instrument_id=? AND filing_date < ?")
-      .bind(instrumentId, cutoff),
+    env.DB.prepare("DELETE FROM sec_filing WHERE instrument_id=? AND (filing_date < ? OR cik<>?)")
+      .bind(instrumentId, cutoff, cik),
     ...filings.map((filing) => env.DB.prepare(
-      "INSERT INTO sec_filing(accession_number,instrument_id,form,title,summary,filing_date,report_date,primary_document,url,fetched_at) " +
-      "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(accession_number) DO UPDATE SET " +
-      "instrument_id=excluded.instrument_id,form=excluded.form,title=excluded.title,summary=excluded.summary, " +
+      "INSERT INTO sec_filing(accession_number,cik,instrument_id,form,title,summary,filing_date,report_date,primary_document,url,fetched_at) " +
+      "VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(accession_number) DO UPDATE SET " +
+      "cik=excluded.cik,instrument_id=excluded.instrument_id,form=excluded.form,title=excluded.title,summary=excluded.summary, " +
       "filing_date=excluded.filing_date,report_date=excluded.report_date,primary_document=excluded.primary_document, " +
       "url=excluded.url,fetched_at=excluded.fetched_at"
     ).bind(
-      filing.accessionNumber, instrumentId, filing.form, filing.title, filing.summary,
+      filing.accessionNumber, cik, instrumentId, filing.form, filing.title, filing.summary,
       filing.filingDate, filing.reportDate, filing.primaryDocument, filing.url, fetchedAt
     )),
     env.DB.prepare(
-      "INSERT INTO sec_fetch_cache(instrument_id,fetched_at,company_name,filing_count) VALUES(?,?,?,?) " +
-      "ON CONFLICT(instrument_id) DO UPDATE SET fetched_at=excluded.fetched_at, " +
+      "INSERT INTO sec_fetch_cache(instrument_id,cik,fetched_at,company_name,filing_count) VALUES(?,?,?,?,?) " +
+      "ON CONFLICT(instrument_id) DO UPDATE SET cik=excluded.cik,fetched_at=excluded.fetched_at, " +
       "company_name=excluded.company_name,filing_count=excluded.filing_count"
-    ).bind(instrumentId, fetchedAt, companyName, filings.length)
+    ).bind(instrumentId, cik, fetchedAt, companyName, filings.length)
   ];
   await env.DB.batch(statements);
 }
