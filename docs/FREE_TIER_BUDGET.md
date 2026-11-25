@@ -44,7 +44,7 @@ Google documents rate limits as model- and project-specific, across requests per
 - D1 limits: https://developers.cloudflare.com/d1/platform/limits/ (last updated 2026-11-20)
 - D1 pricing: https://developers.cloudflare.com/d1/platform/pricing/ (last updated 2026-10-30)
 - D1 Free daily limit enforcement: https://developers.cloudflare.com/changelog/post/2026-09-01-d1-free-tier-limit-enforcement/
-- Gemini rate limits: https://ai.google.dev/gemini-api/docs/rate-limits (redirects to AI Studio rate-limit documentation)
+- Gemini rate limits: https://developers.cloudflare.com/workers-ai/platform/pricing/\n- https://developers.cloudflare.com/workers-ai/platform/data-usage/\n- https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/ (redirects to AI Studio rate-limit documentation)
 - Gemini pricing / Free-tier data handling: https://ai.google.dev/gemini-api/docs/pricing/
 
 ## Still requires owner-account verification
