@@ -27,6 +27,12 @@ test("research brief validator rejects missing summary and invalid confidence", 
   }, allowed, "AAPL"), null);
 });
 
+test("research brief validator rejects explicit trading directives", () => {
+  assert.equal(validateResearchBrief({
+    company_summary: "You should buy the stock.", confidence: "high"
+  }, allowed, "AAPL"), null);
+});
+
 test("research brief validator bounds model-controlled strings and list sizes", () => {
   const brief = validateResearchBrief({
     company_summary: "x".repeat(1000),
