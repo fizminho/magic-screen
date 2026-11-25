@@ -20,7 +20,7 @@ The normal deployment workflow applies pending migrations and deploys. It does *
 - New D1 portfolio schema and migrations are in place.
 - Passkey bootstrap, login, session handling, credential management, recovery documentation and security headers are implemented.
 - Owner-only quote snapshot, holdings, watchlist, dashboard and SEC EDGAR submissions APIs are implemented. SEC filing metadata is cached in D1 for six hours and retained for 30 days; only official SEC links are stored. Dashboard values, daily changes and concentration metrics are calculated separately for USD and MYR, avoiding a misleading cross-currency total. `PortfolioPanel` supports position entry/removal, holdings CSV import, US delayed-quote refresh with a tab-scoped Market Data token, Bursa CSV quote import and watchlist management. The token is sent directly to MarketData.app, not to the Worker. Watchlist UI is integrated with the owner-only API; settings and export routes are still pending.
-- CI run `45528932617` passed after the final WebAuthn credential-ID/algorithm binding and cross-origin checks: build, full dependency audit, regression tests, fresh local D1 migrations, local destructive-reset exercise, Worker auth smoke tests and Wrangler dry-run.
+- CI run `45532292009` passed on commit `65ab97cb16668293ab442241ec640508f4e79740`: locked install, production build, full dependency audit, regression tests, fresh local D1 migrations and SEC schema checks, local destructive-reset exercise, Worker auth/portfolio/quote smoke tests and Wrangler dry-run.
 - No production deployment, production reset, or Cloudflare secret deletion has been performed.
 
 ## Remaining production gates
