@@ -309,6 +309,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     if (!symbols.length) { onError("Add at least one US holding or watchlist item before refreshing quotes."); return; }
     onError(""); onNotice(""); setBusy(true);
     try {
+      const authState = await api<{ authenticated: boolean }>("/api/auth/state");
+      if (!authState.authenticated) { sessionStorage.removeItem("magicfolio.marketdata.token"); setMarketToken(""); throw new Error("Your owner session expired. Sign in again before refreshing quotes."); }
       const quotes = await fetchMarketDataQuotes(symbols, marketToken.trim());
       const result = await saveQuoteBatches(quotes);
       onNotice(`Saved ${result.saved} US quote snapshots. Data is at least 24 hours delayed. ${result.unmatched.length ? `Unmatched: ${result.unmatched.join(", ")}.` : ""}`);
