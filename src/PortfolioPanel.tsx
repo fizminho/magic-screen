@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { fetchMarketDataQuotes } from "./providers/marketdata";
 import { parseManualQuotesCsv } from "./providers/manual-csv";
+import { parseHoldingsCsv } from "./providers/holdings-csv";
 import type { QuoteSnapshot } from "./providers/types";
 
 type Holding = {
@@ -74,6 +75,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [avgCost, setAvgCost] = useState("");
   const [notes, setNotes] = useState("");
   const [manualCsv, setManualCsv] = useState("");
+  const [holdingsCsv, setHoldingsCsv] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -150,6 +152,21 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       onNotice(`${item.symbol} removed from holdings.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to remove holding.");
+    } finally { setBusy(false); }
+  }
+
+  async function importHoldingsCsv() {
+    onError(""); onNotice(""); setBusy(true);
+    try {
+      const rows = parseHoldingsCsv(holdingsCsv);
+      const result = await api<{ saved: number }>("/api/holdings", {
+        method: "PUT", body: JSON.stringify({ holdings: rows })
+      });
+      setHoldingsCsv("");
+      await refreshHoldings();
+      onNotice(`Imported ${result.saved} positions. Existing positions were updated; omitted holdings were left unchanged.`);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to import holdings CSV.");
     } finally { setBusy(false); }
   }
 
@@ -307,6 +324,17 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             <label className="field-wide">Notes<input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} placeholder="Optional private note" /></label>
             <button className="button button-primary field-wide" type="submit" disabled={busy || (holdings.length >= 20 && !existingHolding)}>Save holding</button>
           </form>
+        </section>
+
+        <section className="tool-card tool-wide">
+          <span className="eyebrow">BULK IMPORT</span>
+          <h3>Import holdings CSV</h3>
+          <p>Paste up to 20 rows using <code>symbol,market,quantity,avg_cost</code>. Use <code>US</code> or <code>MY</code>. Existing positions are updated; rows omitted from the file are not deleted.</p>
+          <textarea className="csv-field" rows={5} value={holdingsCsv} onChange={(event) => setHoldingsCsv(event.target.value)}
+            placeholder={"symbol,market,quantity,avg_cost\nAAPL,US,10,185.50\n1155,MY,500,6.42"} />
+          <button className="button button-secondary" onClick={importHoldingsCsv} disabled={busy || !holdingsCsv.trim()}>
+            {busy ? "Importing…" : "Import holdings"}
+          </button>
         </section>
 
         <section className="tool-card">
