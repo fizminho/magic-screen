@@ -1,8 +1,9 @@
 import { server as webauthn } from "@passwordless-id/webauthn";
 
-const COOKIE = "__Host-magicfolio_session";
+const COOKIE_PROD = "__Host-session";
+const COOKIE_LOCAL = "magicfolio_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
-const CHALLENGE_SECONDS = 5 * 60;
+const CHALLENGE_SECONDS = 120;
 const MAX_BODY_BYTES = 32 * 1024;
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), {
@@ -53,8 +54,11 @@ async function bodyJson(request) {
   return JSON.parse(raw || "{}");
 }
 
-function cookieHeader(token, maxAge = SESSION_SECONDS) {
-  return `${COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
+function cookieName(env) { return env.APP_ENV === "production" ? COOKIE_PROD : COOKIE_LOCAL; }
+
+function cookieHeader(token, env, maxAge = SESSION_SECONDS) {
+  const secure = env.APP_ENV === "production" ? "; Secure" : "";
+  return `${cookieName(env)}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly${secure}; SameSite=Strict`;
 }
 
 function getRp(env, request) {
@@ -70,15 +74,19 @@ function checkOrigin(request, env) {
 }
 
 async function sessionFor(request, env) {
-  const token = parseCookies(request.headers.get("cookie") || "")[COOKIE];
+  const token = parseCookies(request.headers.get("cookie") || "")[cookieName(env)];
   if (!token || token.length < 32 || token.length > 256) return null;
   const tokenHash = await sha256Hex(token);
+  const idleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const row = await env.DB.prepare(
-    "SELECT token_hash, expires_at FROM session WHERE token_hash = ? AND expires_at > ?"
-  ).bind(tokenHash, nowIso()).first();
+    "SELECT token_hash, expires_at, last_seen_at FROM session WHERE token_hash = ? AND expires_at > ? AND last_seen_at > ?"
+  ).bind(tokenHash, nowIso(), idleCutoff).first();
   if (!row) return null;
-  await env.DB.prepare("UPDATE session SET last_seen_at = ? WHERE token_hash = ?")
-    .bind(nowIso(), tokenHash).run();
+  const refreshAfter = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  if (row.last_seen_at < refreshAfter) {
+    await env.DB.prepare("UPDATE session SET last_seen_at = ? WHERE token_hash = ?")
+      .bind(nowIso(), tokenHash).run();
+  }
   return { tokenHash, expiresAt: row.expires_at };
 }
 
@@ -109,7 +117,10 @@ async function ownerHandle(env) {
 async function recordAttempt(request, env, kind, limit) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const ipHash = await sha256Hex(`${env.RP_ID || "local"}:${ip}`);
-  const window = new Date().toISOString().slice(0, 13);
+  const current = new Date();
+  const window = kind === "verify_fail"
+    ? current.toISOString().slice(0, 16).replace(/:\\d{2}$/, (minute) => `:${String(Math.floor(Number(minute.slice(1)) / 15) * 15).padStart(2, "0")}`)
+    : current.toISOString().slice(0, 13);
   await env.DB.prepare(
     "INSERT INTO auth_attempt(ip_hash, window, kind, count) VALUES(?,?,?,1) " +
     "ON CONFLICT(ip_hash, window, kind) DO UPDATE SET count = count + 1"
@@ -121,7 +132,7 @@ async function recordAttempt(request, env, kind, limit) {
 }
 
 async function issueChallenge(env, purpose) {
-  const challenge = webauthn.randomChallenge();
+  const challenge = base64url(crypto.getRandomValues(new Uint8Array(32)));
   await env.DB.prepare(
     "INSERT INTO auth_challenge(challenge, purpose, expires_at) VALUES(?,?,?)"
   ).bind(challenge, purpose, addSeconds(CHALLENGE_SECONDS)).run();
@@ -161,7 +172,7 @@ async function handleState(request, env) {
 
 async function registerOptions(request, env) {
   checkOrigin(request, env);
-  await recordAttempt(request, env, "options", 20);
+  await recordAttempt(request, env, "options", 10);
   await authorizeRegistration(request, env);
   const challenge = await issueChallenge(env, "register");
   const proposedOwnerHandle = await ownerHandle(env);
@@ -231,7 +242,7 @@ async function registerVerify(request, env) {
 
   const token = await createSession(env, request);
   return json({ ok: true, authenticated: true, passkeyCount: await passkeyCount(env) }, 201, {
-    "set-cookie": cookieHeader(token)
+    "set-cookie": cookieHeader(token, env)
   });
 }
 
@@ -249,35 +260,35 @@ function decodeClientChallenge(encoded) {
 
 async function loginOptions(request, env) {
   checkOrigin(request, env);
-  await recordAttempt(request, env, "options", 20);
-  const rows = await env.DB.prepare("SELECT id, transports FROM passkey_credential ORDER BY created_at").all();
+  await recordAttempt(request, env, "options", 10);
+  const rows = await env.DB.prepare("SELECT id FROM passkey_credential ORDER BY created_at").all();
   if (!rows.results?.length) return json({ error: "No passkey is registered yet." }, 403);
   const challenge = await issueChallenge(env, "login");
   return json({
     challenge,
     rpId: getRp(env, request).rpId,
-    allowCredentials: rows.results.map((row) => ({
-      id: row.id,
-      transports: row.transports ? JSON.parse(row.transports) : []
-    }))
+    allowCredentials: []
   });
 }
 
 async function loginVerify(request, env) {
   checkOrigin(request, env);
   const payload = await bodyJson(request);
+  const challenge = decodeClientChallenge(payload?.response?.clientDataJSON);
+  if (!await consumeChallenge(env, challenge, "login")) return json({ error: "Sign-in expired. Try again." }, 400);
   const credentialId = payload?.id;
-  if (typeof credentialId !== "string" || credentialId.length > 1024) return json({ error: "Sign-in failed." }, 401);
+  if (typeof credentialId !== "string" || credentialId.length > 1024) {
+    await recordAttempt(request, env, "verify_fail", 5);
+    return json({ error: "Sign-in failed." }, 401);
+  }
   const row = await env.DB.prepare(
     "SELECT id, public_key, algorithm, counter FROM passkey_credential WHERE id = ?"
   ).bind(credentialId).first();
   if (!row) {
-    await recordAttempt(request, env, "verify_fail", 10);
+    await recordAttempt(request, env, "verify_fail", 5);
     return json({ error: "Sign-in failed." }, 401);
   }
 
-  const challenge = decodeClientChallenge(payload?.response?.clientDataJSON);
-  if (!await consumeChallenge(env, challenge, "login")) return json({ error: "Sign-in expired. Try again." }, 400);
   const { origin, rpId } = getRp(env, request);
   try {
     const expected = { challenge, origin, domain: rpId, userVerified: true };
@@ -292,19 +303,19 @@ async function loginVerify(request, env) {
       "UPDATE passkey_credential SET counter = ?, last_used_at = ? WHERE id = ?"
     ).bind(Math.max(Number(row.counter), Number(verified.authenticator?.counter || 0)), nowIso(), row.id).run();
   } catch {
-    await recordAttempt(request, env, "verify_fail", 10);
+    await recordAttempt(request, env, "verify_fail", 5);
     return json({ error: "Sign-in failed." }, 401);
   }
 
   const token = await createSession(env, request);
-  return json({ ok: true, authenticated: true }, 200, { "set-cookie": cookieHeader(token) });
+  return json({ ok: true, authenticated: true }, 200, { "set-cookie": cookieHeader(token, env) });
 }
 
 async function logout(request, env) {
   checkOrigin(request, env);
   const session = await sessionFor(request, env);
   if (session) await env.DB.prepare("DELETE FROM session WHERE token_hash = ?").bind(session.tokenHash).run();
-  return json({ ok: true }, 200, { "set-cookie": cookieHeader("", 0) });
+  return json({ ok: true }, 200, { "set-cookie": cookieHeader("", env, 0) });
 }
 
 export async function handleAuthRequest(request, env, pathname) {
