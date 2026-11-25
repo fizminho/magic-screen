@@ -237,4 +237,5 @@ test("research inbox requires owner session and returns only owned instruments",
   assert.equal(body.briefs[0].brief.symbol, "AAPL");
   assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /EXISTS \(SELECT 1 FROM holding/);
   assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /EXISTS \(SELECT 1 FROM watchlist/);
+  assert.match(queries.find((sql) => sql.includes("FROM analysis a JOIN instrument")), /i\.active=1/);
 });
