@@ -3,15 +3,20 @@ import { client as webauthnClient } from "@passwordless-id/webauthn";
 
 type AuthState = { registered: boolean; authenticated: boolean; passkeyCount: number; needsSetup: boolean };
 type RegistrationOptions = { challenge: string; user: { id: string; name: string; displayName: string }; rpId: string };
-type LoginOptions = { challenge: string; rpId: string; allowCredentials: Array<{ id: string; transports: string[] }> };
+type WebAuthnTransport = "ble" | "hybrid" | "internal" | "nfc" | "usb" | "smart-card";
+type LoginOptions = { challenge: string; rpId: string; allowCredentials: Array<{ id: string; transports: WebAuthnTransport[] }> };
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...init, credentials: "same-origin",
     headers: { "content-type": "application/json", ...(init.headers || {}) }
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Request failed. Please try again.");
+  const payload: unknown = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload &&
+      typeof payload.error === "string" ? payload.error : "Request failed. Please try again.";
+    throw new Error(message);
+  }
   return payload as T;
 }
 const post = (body = "{}", headers: Record<string, string> = {}): RequestInit => ({ method: "POST", body, headers });
@@ -36,7 +41,8 @@ export default function App() {
     if (isFirst && setupToken.trim().length < 24) { setError("Enter the one-time setup key."); return; }
     setBusy(true);
     try {
-      const headers = isFirst ? { "x-setup-token": setupToken.trim() } : {};
+      const headers: Record<string, string> = {};
+      if (isFirst) headers["x-setup-token"] = setupToken.trim();
       const options = await api<RegistrationOptions>("/api/auth/register/options", post("{}", headers));
       const registration = await webauthnClient.register({
         user: options.user, challenge: options.challenge, userVerification: "required",
