@@ -63,10 +63,14 @@ while (( ${#remaining[@]} > 0 )); do
 done
 
 echo "Tables scheduled for removal: ${#drop_order[@]}"
+drop_sql=""
 for table in "${drop_order[@]}"; do
-  echo "Dropping table: $table"
-  npx --yes wrangler@4 d1 execute "$DB_NAME" "$D1_SCOPE" --command "DROP TABLE IF EXISTS \"$table\";"
+  echo "Scheduling drop: $table"
+  drop_sql+="DROP TABLE IF EXISTS \"$table\";"
 done
+if [[ -n "$drop_sql" ]]; then
+  npx --yes wrangler@4 d1 execute "$DB_NAME" "$D1_SCOPE" --command "$drop_sql"
+fi
 
 echo "Applying clean Magic Folio schema..."
 npx --yes wrangler@4 d1 migrations apply "$DB_NAME" "$D1_SCOPE"
