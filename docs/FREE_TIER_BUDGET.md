@@ -31,7 +31,7 @@ Selected model for the first fixture-tested prototype:
 
 - Model ID: `@cf/zai-org/glm-4.7-flash`
 - Available on Workers Free according to Cloudflare's November 2026 model availability update
-- Model catalogue marks it as zero-data-retention
+- Cloudflare's standard inference data-usage policy provides zero retention after processing
 - Cache by deterministic public-input hash and stop on quota/capacity errors
 - Enforce a conservative daily neuron budget server-side and surface a clear quota-exhausted state
 
@@ -55,6 +55,7 @@ Cloudflare's Workers AI data-usage commitment states that standard inference inp
 - Workers AI pricing and free allocation: https://developers.cloudflare.com/workers-ai/platform/pricing/
 - Workers AI data usage and zero-retention commitment: https://developers.cloudflare.com/workers-ai/platform/data-usage/
 - GLM-4.7-Flash model details: https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/
+- GLM-4.7-Flash model card and MIT licence: https://huggingface.co/zai-org/GLM-4.7-Flash
 - Workers AI model availability update (2026-11-05): https://developers.cloudflare.com/changelog/post/2026-11-05-planned-model-deprecations/
 - MarketData plan and API terms: https://www.marketdata.app/
 - SEC EDGAR developer resources: https://www.sec.gov/edgar/sec-api-documentation
