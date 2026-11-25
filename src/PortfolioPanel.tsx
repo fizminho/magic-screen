@@ -184,6 +184,37 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setBusy(false); }
   }
 
+  async function downloadExport(format: "json" | "csv") {
+    onError(""); onNotice(""); setBusy(true);
+    try {
+      const response = await fetch(`/api/export?format=${format}`, {
+        method: "GET",
+        credentials: "same-origin",
+        headers: { accept: format === "csv" ? "text/csv" : "application/json" }
+      });
+      if (!response.ok) {
+        const payload: unknown = await response.json().catch(() => ({}));
+        const message = payload && typeof payload === "object" && "error" in payload &&
+          typeof payload.error === "string" ? payload.error : "Unable to export portfolio data.";
+        if (response.status === 401) sessionStorage.removeItem("magicfolio.marketdata.token");
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `magic-folio-${new Date().toISOString().slice(0, 10)}.${format}`;
+      link.hidden = true;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      onNotice(`Portfolio ${format.toUpperCase()} export downloaded.`);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to export portfolio data.");
+    } finally { setBusy(false); }
+  }
+
   async function addHolding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onError(""); onNotice(""); setBusy(true);
@@ -518,6 +549,17 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             {busy ? "Working…" : `Refresh US quotes (${usCount})`}
           </button>
           <p className="fine-print">The token stays in this browser tab's session storage. It is sent directly to MarketData.app and never to the Magic Folio Worker.</p>
+        </section>
+
+        <section className="tool-card">
+          <span className="eyebrow">DATA PORTABILITY</span>
+          <h3>Export your data</h3>
+          <p>Download a private copy of your holdings, watchlist and portfolio settings. Exports require your active passkey session.</p>
+          <div className="tool-actions">
+            <button className="button button-secondary" type="button" onClick={() => downloadExport("json")} disabled={busy}>Download JSON</button>
+            <button className="button button-quiet" type="button" onClick={() => downloadExport("csv")} disabled={busy}>Download CSV</button>
+          </div>
+          <p className="fine-print">CSV is spreadsheet-safe. Quote snapshots and SEC filing metadata are not included in this export.</p>
         </section>
 
         <section className="tool-card">
