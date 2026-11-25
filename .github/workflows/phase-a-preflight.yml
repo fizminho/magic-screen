@@ -58,7 +58,14 @@ jobs:
         run: |
           set -euo pipefail
           cp .dev.vars.example .dev.vars
-          npx --yes wrangler@4 dev --local --ip 127.0.0.1 --port 8787 --var APP_ENV:development --var RP_ID:localhost --var RP_ORIGIN:http://localhost:8787 > /tmp/magic-folio-wrangler.log 2>&1 &
+          # Keep production RP settings in wrangler.toml; use a generated local-only
+          # config for this smoke test so localhost origin checks are valid.
+          sed \
+            -e 's/^APP_ENV = "production"$/APP_ENV = "development"/' \
+            -e 's/^RP_ID = "investlah.binalah.com"$/RP_ID = "localhost"/' \
+            -e 's#^RP_ORIGIN = "https://investlah.binalah.com"$#RP_ORIGIN = "http://localhost:8787"#' \
+            wrangler.toml > wrangler.ci.toml
+          npx --yes wrangler@4 dev --config wrangler.ci.toml --local --ip 127.0.0.1 --port 8787 > /tmp/magic-folio-wrangler.log 2>&1 &
           worker_pid=$!
           trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
           health=""
