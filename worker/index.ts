@@ -11,6 +11,8 @@ import { handlePortfolioRequest } from "./lib/portfolio.mjs";
 import { handleDashboardRequest } from "./lib/dashboard.mjs";
 // @ts-ignore The JavaScript SEC module is exercised by Node regression tests.
 import { handleSecRequest } from "./lib/sec.mjs";
+// @ts-ignore The JavaScript settings module is exercised by Node regression tests.
+import { handleSettingsRequest } from "./lib/settings.mjs";
 
 interface Env {
   ASSETS: Fetcher;
