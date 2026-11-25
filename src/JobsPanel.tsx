@@ -19,8 +19,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: "same-origin",
     headers: { "content-type": "application/json", ...(init?.headers || {}) }
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "Request failed.");
+  const payload: unknown = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload && typeof payload === "object" && "error" in payload &&
+      typeof payload.error === "string" ? payload.error : "Request failed.";
+    throw new Error(message);
+  }
   return payload as T;
 }
 
