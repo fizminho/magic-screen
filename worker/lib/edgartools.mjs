@@ -70,12 +70,16 @@ export async function handleEdgarToolsRequest(request, env, url) {
   try { report = JSON.parse(raw); } catch { return jsonResponse({ error: "Invalid JSON report." }, 400); }
   if (report?.primary_provider !== "EdgarTools" || report?.production_data_modified !== false ||
       !Array.isArray(report.companies) || report.companies.length < 1 || report.companies.length > MAX_COMPANIES ||
+      !Array.isArray(report.symbols) || report.symbols.length !== report.companies.length ||
+      new Set(report.symbols).size !== report.symbols.length ||
       typeof report.generated_at !== "string" || !Number.isFinite(Date.parse(report.generated_at))) {
     return jsonResponse({ error: "Invalid EdgarTools report envelope." }, 400);
   }
   const companies = report.companies;
   if (companies.some((item) => !validCompany(item)) ||
-      new Set(companies.map((item) => item.symbol)).size !== companies.length) {
+      new Set(companies.map((item) => item.symbol)).size !== companies.length ||
+      report.symbols.some((symbol) => !SYMBOL_RE.test(symbol)) ||
+      [...report.symbols].sort().join(",") !== companies.map((item) => item.symbol).sort().join(",")) {
     return jsonResponse({ error: "Invalid or duplicate company evidence." }, 400);
   }
 
@@ -92,7 +96,7 @@ export async function handleEdgarToolsRequest(request, env, url) {
       "INSERT INTO edgartools_provider_status(symbol,provider_status,accession,fiscal_period,form,filed_at,provider_version,generated_at,detail,updated_at) " +
       "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol) DO UPDATE SET provider_status=excluded.provider_status,accession=excluded.accession," +
       "fiscal_period=excluded.fiscal_period,form=excluded.form,filed_at=excluded.filed_at,provider_version=excluded.provider_version," +
-      "generated_at=excluded.generated_at,detail=excluded.detail,updated_at=excluded.updated_at"
+      "generated_at=excluded.generated_at,detail=excluded.detail,updated_at=excluded.updated_at WHERE excluded.generated_at>=edgartools_provider_status.generated_at"
     ).bind(item.symbol, item.provider_status, accession, period, form, filedAt, version, report.generated_at,
       typeof item.error === "string" ? item.error.slice(0, 300) : null, now));
     if (item.provider_status === "supported") {
