@@ -76,6 +76,22 @@ test("Yahoo chart quote parser preserves quote timestamp and calculates fraction
   assert.equal(quote.status, "ok");
 });
 
+test("Yahoo chart quote parser maps Bursa prices to MYR while preserving the app symbol", () => {
+  const now = Date.parse("2026-11-25T04:00:00.000Z");
+  const quote = parseYahooChartQuote({
+    chart: { result: [{
+      meta: { regularMarketPrice: 6.42, previousClose: 6.3, regularMarketTime: Math.floor(now / 1000) - 60 },
+      indicators: { quote: [{ close: [6.2, 6.3, 6.42] }] }
+    }] }
+  }, "1155", now, "MY");
+  assert.equal(quote.symbol, "1155");
+  assert.equal(quote.market, "MY");
+  assert.equal(quote.currency, "MYR");
+  assert.equal(quote.price, 6.42);
+  assert.equal(quote.prevClose, 6.3);
+  assert.equal(quote.provider, "yahoo-finance");
+});
+
 test("Yahoo chart quote parser rejects empty or future quote payloads", () => {
   assert.throws(() => parseYahooChartQuote({ chart: { result: [] } }, "AAPL"));
   const future = Math.floor(Date.now() / 1000) + 3600;
