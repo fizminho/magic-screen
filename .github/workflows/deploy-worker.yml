@@ -6,6 +6,10 @@ on:
     paths:
       - "worker/**"
       - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "vite.config.ts"
       - "migrations/**"
       - "wrangler.toml"
       - ".github/workflows/deploy-worker.yml"
@@ -31,15 +35,11 @@ jobs:
         with:
           node-version: 22
       - name: Verify Cloudflare deployment credentials
+        shell: bash
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Missing GitHub secret CLOUDFLARE_API_TOKEN."
-            exit 1
-          fi
-          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::Missing GitHub variable or secret CLOUDFLARE_ACCOUNT_ID."
-            exit 1
-          fi
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build application and Worker
