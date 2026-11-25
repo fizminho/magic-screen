@@ -4,7 +4,7 @@ function round(value) {
   return Math.round(value * 100) / 100;
 }
 
-export function calculateDashboard(rows) {
+export function calculateDashboard(rows, maxPositionPct = 25) {
   const holdings = Array.isArray(rows) ? rows : [];
   const totalCount = holdings.length;
   const counts = {
@@ -67,8 +67,39 @@ export function calculateDashboard(rows) {
     };
   });
 
+  const riskFlags = [];
+  for (const item of markets) {
+    if (!item.holdingsCount) continue;
+    if (item.largestPosition && item.largestPosition.weightPct > maxPositionPct) {
+      riskFlags.push({
+        market: item.market,
+        severity: "warning",
+        code: "position_concentration",
+        message: `${item.largestPosition.symbol} is ${item.largestPosition.weightPct}% of the ${item.market} portfolio, above your ${maxPositionPct}% limit.`
+      });
+    }
+    if (item.staleQuoteCount > 0) {
+      riskFlags.push({
+        market: item.market,
+        severity: "caution",
+        code: "stale_quotes",
+        message: `${item.staleQuoteCount} ${item.market} position(s) use stale prices.`
+      });
+    }
+    if (item.unavailableQuoteCount > 0) {
+      riskFlags.push({
+        market: item.market,
+        severity: "caution",
+        code: "missing_quotes",
+        message: `${item.unavailableQuoteCount} ${item.market} position(s) have no usable quote.`
+      });
+    }
+  }
+
   return {
     calculatedAt: new Date().toISOString(),
+    thresholds: { maxPositionPct },
+    riskFlags,
     holdingsCount: totalCount,
     marketCountSplit: {
       US: { count: counts.US, pct: totalCount ? round((counts.US / totalCount) * 100) : 0 },
@@ -89,13 +120,19 @@ export async function handleDashboardRequest(request, env, pathname) {
   try {
     const session = await getOwnerSession(request, env);
     if (!session) return jsonResponse({ error: "Sign in required." }, 401);
-    const result = await env.DB.prepare(
+    const [result, setting] = await Promise.all([
+      env.DB.prepare(
       "SELECT i.symbol, i.market, i.sector, h.quantity, q.price, q.prev_close AS prevClose, q.as_of AS quoteAsOf, " +
       "COALESCE(q.status, 'unavailable') AS quoteStatus " +
       "FROM holding h JOIN instrument i ON i.id = h.instrument_id " +
       "LEFT JOIN quote_latest q ON q.instrument_id = i.id ORDER BY i.market, i.symbol"
-    ).all();
-    return jsonResponse(calculateDashboard(result.results || []));
+      ).all(),
+      env.DB.prepare("SELECT value FROM setting WHERE key='max_position_pct'").first()
+    ]);
+    const configuredLimit = Number(setting?.value);
+    const maxPositionPct = Number.isFinite(configuredLimit) && configuredLimit >= 5 && configuredLimit <= 50
+      ? configuredLimit : 25;
+    return jsonResponse(calculateDashboard(result.results || [], maxPositionPct));
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     console.error("Dashboard request failed:", message);
