@@ -48,7 +48,7 @@ test("auth endpoints do not allow method confusion", async () => {
     method: "GET"
   }), {}, "/api/auth/login/verify");
   assert.equal(response.status, 405);
-  assert.equal(response.headers.get("allow"), "GET, POST");
+  assert.equal(response.headers.get("allow"), "GET, POST, PATCH, DELETE");
 });
 
 test("auth mutations reject JSON lookalike media types", async () => {
