@@ -178,6 +178,7 @@ async function handleState(request, env) {
 
 async function registerOptions(request, env) {
   checkOrigin(request, env);
+  await bodyJson(request);
   await recordAttempt(request, env, "options", 10);
   await authorizeRegistration(request, env);
   const challenge = await issueChallenge(env, "register");
@@ -296,6 +297,7 @@ export function decodeClientChallenge(encoded, expectedType = "webauthn.create")
 
 async function loginOptions(request, env) {
   checkOrigin(request, env);
+  await bodyJson(request);
   await recordAttempt(request, env, "options", 10);
   const rows = await env.DB.prepare("SELECT id FROM passkey_credential ORDER BY created_at").all();
   if (!rows.results?.length) return json({ error: "No passkey is registered yet." }, 403);
@@ -392,6 +394,7 @@ async function credentialMutation(request, env, pathname) {
   }
 
   if (request.method === "DELETE") {
+    await bodyJson(request);
     const deleted = await env.DB.prepare(
       "DELETE FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1 RETURNING id"
     ).bind(credentialId).first();
@@ -407,6 +410,7 @@ async function credentialMutation(request, env, pathname) {
 
 async function logoutAll(request, env) {
   checkOrigin(request, env);
+  await bodyJson(request);
   const session = await sessionFor(request, env);
   if (!session) return json({ error: "Sign in required." }, 401);
   await env.DB.prepare("DELETE FROM session").run();
@@ -415,6 +419,7 @@ async function logoutAll(request, env) {
 
 async function logout(request, env) {
   checkOrigin(request, env);
+  await bodyJson(request);
   const session = await sessionFor(request, env);
   if (session) await env.DB.prepare("DELETE FROM session WHERE token_hash = ?").bind(session.tokenHash).run();
   return json({ ok: true }, 200, { "set-cookie": cookieHeader("", env, 0) });
