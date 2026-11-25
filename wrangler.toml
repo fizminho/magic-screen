@@ -12,6 +12,7 @@ not_found_handling = "single-page-application"
 binding = "DB"
 database_name = "magic-screen-db"
 database_id = "f77997dc-42a3-49dd-8f56-28592df550ae"
+migrations_dir = "migrations"
 
 [vars]
 APP_ENV = "production"
