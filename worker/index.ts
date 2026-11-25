@@ -5,6 +5,8 @@ import { withSecurityHeaders } from "./security.mjs";
 import { handleAuthRequest } from "./lib/auth.mjs";
 // @ts-ignore The JavaScript quote module is exercised by Node regression tests.
 import { handleQuoteRequest } from "./lib/quotes.mjs";
+// @ts-ignore The JavaScript portfolio module is exercised by Node regression tests.
+import { handlePortfolioRequest } from "./lib/portfolio.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -36,6 +38,8 @@ export default {
       response = await handleAuthRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/quotes/")) {
       response = await handleQuoteRequest(request, env, url.pathname);
+    } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/")) {
+      response = await handlePortfolioRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/")) {
       response = new Response(JSON.stringify({ error: "Not found." }), {
         status: 404,
