@@ -6,76 +6,35 @@
 - Repository: `fizminho/magic-screen`
 - Default branch: `main`
 - Base commit inspected: `b02d67c1ffdbf2d0ea50142c4e8f5bb3808e9244`
-- Working branch created: `chore/ai-portfolio-rebuild`
-- Open pull requests: none returned by the GitHub open-PR search.
-- Existing branches: numerous historical feature, cleanup, fix, and Dependabot branches; none named `chore/ai-portfolio-rebuild` before this run.
-- Repository permissions: read/write/admin confirmed by GitHub connection.
-- Baseline status: not run. This GitHub connection can inspect and commit repository content, but it does not provide a shell, Node.js runtime, or Wrangler execution environment.
-- D1 backup: NOT performed. No Cloudflare account/D1 execution connection is available in this session. No remote database changes or destructive migrations will be attempted until a verified export exists.
-- Live D1 inventory: NOT performed for the same reason. Legacy SEC/EdgarTools table names remain unknown and must not be guessed.
+- Working branch: `chore/ai-portfolio-rebuild`
+- Open pull requests: none found during triage.
+- Baseline run `45524812051`: dependency installation, `npm run build`, and Node regression tests passed.
+- Production D1 backup/export: intentionally skipped by explicit owner decision. No backup artifact was created.
+- Live D1 inventory: not required for the reset design. The one-time script discovers actual table names from `sqlite_master` immediately before dropping them; it does not hard-code unknown retired SEC table names.
+- No production D1 changes have been made.
 
-## Initial findings from `main`
+## Initial repository findings
 
-1. `package-lock.json` is absent from the repository tree.
-2. Build workflow uses `npm install`, and its production audit step is advisory (`continue-on-error: true`).
-3. GitHub Actions use mutable tags (`actions/checkout@v4`, `actions/setup-node@v4`).
-4. No open PRs were found at triage, so there are no open Dependabot PR diffs to port or close.
-5. `wrangler.toml` has the existing D1 database binding but no `migrations_dir`.
-6. `worker/index.ts` still exposes unauthenticated `GET /api/mfi/screen`, `GET /api/stocks`, and `GET /api/pipeline/status`; it performs runtime DDL and can use `MFI_SESSION_COOKIE`.
-7. `worker/security.mjs` still permits inline styles and does not yet include the PWA manifest/worker CSP directives.
-8. `.gitignore` already excludes `.dev.vars`, `.dev.vars.*`, and `.env*`, but does not yet exclude `backup-*.sql`.
-9. `package.json` currently has React 18, Vite 6, TypeScript 5.6, Wrangler 4, and lucide-react. Dependency health has not been audited because npm cannot be run here.
-10. The existing README and SECURITY.md still describe the old MFI/Shariah product.
+1. `package-lock.json` is absent; workflows still use `npm install`.
+2. Existing build workflow's production audit was advisory (`continue-on-error: true`).
+3. Some existing GitHub Actions originally used mutable version tags.
+4. No open PRs were found at triage.
+5. The D1 binding targets the existing database `magic-screen-db`; `migrations_dir = "migrations"` is now configured.
+6. The old Worker still contains unauthenticated MFI routes and runtime DDL at the time of this log update. These must be removed before the reset workflow is allowed to run.
+7. Existing security headers still require the planned PWA/CSP review.
+8. The repository already ignores local environment files; `backup-*.sql` is also ignored.
 
-## Gate / blocker
+## Owner-approved clean rebuild
 
-Phase A is intentionally incomplete. Required next actions in an environment with repository checkout + Node.js + Wrangler + authorized Cloudflare credentials:
+The owner explicitly confirmed that the existing `magic-screen-db` may be emptied completely, including all MFI and legacy data. The plan therefore does not include backup or data migration.
 
-1. Run `git status`, `git log --oneline -20`, and `git branch -a`; record the exact local checkout state.
-2. Export production D1 to `backup-YYYY-MM-DD.sql` and verify the file exists and is non-empty. Add `backup-*.sql` to `.gitignore`.
-3. Query `sqlite_master` on remote D1 and append the exact table inventory here.
-4. Run `npm install`, `npm run build`, and `node --experimental-strip-types --test worker/*.test.mjs`; record results.
-5. Only after the backup and inventory are verified may destructive migration planning continue.
+Implemented on `chore/ai-portfolio-rebuild`:
 
-No production secret was deleted, no remote D1 data was changed, no existing branch was deleted, and no pull request was closed.
+- `migrations/0001_drop_legacy.sql`: defensive drops for known legacy MFI tables.
+- `migrations/0002_portfolio_schema.sql`: new Magic Folio schema from Runbook Appendix A.
+- `scripts/reset-production-d1.sh`: enumerates real production user tables from `sqlite_master`, drops them safely by quoted identifier, then applies the clean migrations. It does not export or read row contents.
+- `.github/workflows/reset-production-d1.yml`: manual, exact-string confirmation gate; checks that old MFI Worker routes/secrets are no longer referenced before reset; applies schema and deploys replacement Worker.
+- `wrangler.toml`: configured `migrations_dir = "migrations"`.
+- `.github/workflows/deploy-worker.yml`: ordinary deployments apply pending migrations but never blanket-drop tables.
 
-
-## Phase A follow-up: repository/API checks and public limits
-
-- GitHub API confirms default branch main; its latest commit at inspection is b02d67c1ffdbf2d0ea50142c4e8f5bb3808e9244.
-- The first 20 commit records were inspected; this is not a substitute for the requested local git log --oneline -20 command output.
-- GitHub API confirms zero open PRs at the time of this check. There were therefore no open Dependabot PR diffs to port or classify.
-- The working branch exists and is based on the inspected main commit.
-- git status and a complete local git branch -a remain unverified because no shell checkout is available.
-- Public Cloudflare/Gemini documentation limits are recorded in docs/FREE_TIER_BUDGET.md. Exact Gemini project quotas and current account D1 metrics remain owner-account checks.
-- Licence/reference findings from the runbook's reference scan are recorded in docs/REFERENCES.md; no external code was copied.
-- A key product privacy consideration was added to the budget notes: Google documents Free-tier Gemini content may be used to improve products. The owner must accept this before sending portfolio context to Gemini.
-
-### Phase A remaining
-A4 production D1 export, A5 live table inventory, and A6 local install/build/test baseline remain blocked on an execution environment with Node.js/Wrangler and authorized Cloudflare credentials. Do not proceed to destructive phases C/D until those gates pass.
-
-
-- Added backup-*.sql to .gitignore before any backup is created, as required by A4.
-- Added exact local commands for A1/A4/A5/A6 to docs/BLOCKERS.md. No backup file has been created by this session.
-
-
-## Phase A automation added
-
-- Added `.github/workflows/phase-a-preflight.yml` on `chore/ai-portfolio-rebuild`.
-- Reuses the exact Cloudflare credential references already present in `.github/workflows/deploy-worker.yml`: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (repository variable preferred, secret fallback).
-- The workflow is read-only against production D1: export, verify non-empty file, and inventory `sqlite_master`. It separately runs npm install, build, and Node regression tests.
-- The workflow does not deploy, run migrations, write to D1, delete secrets, or change Worker production configuration.
-- Backup and inventory are stored in a one-day GitHub Actions artifact. Treat the backup as sensitive production data and move it to secure storage promptly.
-- Workflow file commit: `ff319f603ca35e280d53da1adcebc14d6ca66e4c`.
-- Workflow execution status: not yet verified at the time this log entry was written. A4/A5/A6 remain incomplete until the Actions run and artifact are inspected.
-
-## Phase A workflow execution findings
-
-- Workflow created at `.github/workflows/phase-a-preflight.yml` and reuses the existing deployment credential references; no new token or secret value was added to the repository.
-- The baseline job completed successfully on run [45524812051](https://github.com/fizminho/magic-screen/actions/runs/45524812051): dependency installation, `npm run build`, and `node --experimental-strip-types --test worker/*.test.mjs` all passed.
-- The production snapshot job failed at the D1 export endpoint with Cloudflare error 10000. The configured account ID was accepted and the existing token was present, but it lacks the permission required for export.
-- Cloudflare D1 documentation states that D1 export requires the **D1 Write** token permission because export temporarily locks the database. This is a platform requirement, not a GitHub secret-name issue.
-- No backup artifact was created; no live schema inventory was captured. A4/A5 remain incomplete.
-- The workflow was tightened so normal pushes do not trigger a production export. It now runs on manual dispatch only after explicit `YES`, or on a push to this working branch whose commit message contains `[phase-a-run]`.
-- Next owner action: add D1 Write to the existing Cloudflare API token (scoped to the correct account/narrowest available resource scope), then trigger the workflow explicitly. If broadening the existing deployment token is not acceptable, use a separate short-lived D1 Write token.
-- No remote D1 data was changed, no migrations were applied, and no production secrets were deleted.
+The destructive workflow has **not** been executed. It will remain blocked until the replacement Worker is complete and legacy routes are removed. No Cloudflare token was changed and no secret was deleted.
