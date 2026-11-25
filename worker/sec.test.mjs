@@ -5,6 +5,7 @@ import { handleSecRequest, parseSecSubmissions } from "./lib/sec.mjs";
 const origin = "https://folio.example";
 const cookie = `__Host-session=${"s".repeat(43)}`;
 const userAgent = "Magic Folio/0.1 (contact: owner@example.com)";
+const envConfig = { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: origin };
 
 function fakeDb({
   cik = "0000320193",
@@ -91,7 +92,7 @@ test("SEC filings endpoint requires owner authentication", async () => {
   const { DB } = fakeDb({ authenticated: false });
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => { throw new Error("must not fetch"); }
   );
@@ -102,7 +103,7 @@ test("SEC filings endpoint fails closed without a real contact User-Agent", asyn
   const { DB } = fakeDb();
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: "Magic Folio/0.1" },
+    { ...envConfig, DB, SEC_USER_AGENT: "Magic Folio/0.1" },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => { throw new Error("must not fetch"); }
   );
@@ -146,7 +147,7 @@ test("SEC lookup is rate-limited and handles SEC upstream throttling", async () 
   const limitedDb = fakeDb({ count: 6 }).DB;
   const limited = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB: limitedDb, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB: limitedDb, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => { throw new Error("must not fetch"); }
   );
