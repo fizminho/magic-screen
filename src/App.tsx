@@ -232,7 +232,7 @@ export default function App() {
           </section>
         )}
         {auth?.authenticated && supported && <PortfolioPanel onError={setError} onNotice={setNotice} />}
-        {error && <p className="feedback feedback-error" role="alert">{error}</p>
+        {error && <p className="feedback feedback-error" role="alert">{error}</p>}
         {notice && <p className="feedback feedback-success" role="status">{notice}</p>}
       </main>
       <footer className="content"><span>MAGIC FOLIO</span><span>Research and education only. Not investment advice.</span></footer>
