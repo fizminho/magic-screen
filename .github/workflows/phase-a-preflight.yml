@@ -1,6 +1,9 @@
 name: Phase A - Production D1 backup and baseline
 
 on:
+  push:
+    branches:
+      - chore/ai-portfolio-rebuild
   workflow_dispatch:
     inputs:
       confirm_production_read:
@@ -23,7 +26,7 @@ concurrency:
 jobs:
   production-snapshot:
     name: Backup and inventory production D1
-    if: inputs.confirm_production_read == 'YES'
+    if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[phase-a-run]')) || (github.event_name == 'workflow_dispatch' && inputs.confirm_production_read == 'YES')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
