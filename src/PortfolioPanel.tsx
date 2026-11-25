@@ -99,7 +99,9 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (response.status === 401) sessionStorage.removeItem("magicfolio.marketdata.token");
     const message = payload && typeof payload === "object" && "error" in payload &&
       typeof payload.error === "string" ? payload.error : "Request failed. Please try again.";
-    throw new Error(message);
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
   return payload as T;
 }
@@ -178,6 +180,12 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       setOfflineSnapshotAt(null);
       saveDashboardSnapshot(snapshot).catch(() => undefined);
     } catch (cause) {
+      const status = cause instanceof Error ? (cause as Error & { status?: number }).status : undefined;
+      if (status === 401) {
+        setDashboard(null);
+        setOfflineSnapshotAt(null);
+        throw cause;
+      }
       if (cause instanceof TypeError || !navigator.onLine) {
         const cached = await readDashboardSnapshot<Dashboard>().catch(() => null);
         if (cached) {
