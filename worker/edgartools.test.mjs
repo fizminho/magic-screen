@@ -51,6 +51,7 @@ test("EdgarTools ingestion stores raw evidence and explicitly leaves production 
     edgartools_version: "6.3.0",
     primary_provider: "EdgarTools",
     production_data_modified: false,
+    symbols: ["AAPL"],
     companies: [{
       symbol: "AAPL", provider_status: "supported",
       filing: { accession_number: "0000320193-26-000101", period_of_report: "2026-09-30", form: "10-K", filing_date: "2026-11-01" },
@@ -71,7 +72,7 @@ test("EdgarTools ingestion stores raw evidence and explicitly leaves production 
 
 test("EdgarTools ingestion rejects invalid accession and production-mutating reports", async () => {
   const { DB } = mockDb();
-  const base = { generated_at: "2026-11-25T02:00:00.000Z", primary_provider: "EdgarTools", production_data_modified: false, companies: [{
+  const base = { generated_at: "2026-11-25T02:00:00.000Z", primary_provider: "EdgarTools", production_data_modified: false, symbols: ["AAPL"], companies: [{
     symbol: "AAPL", provider_status: "supported", filing: { accession_number: "bad", period_of_report: "2026-09-30" }, statements: {}
   }] };
   const badAccession = await handleEdgarToolsRequest(request("/api/fundamentals/edgartools/ingest", { method: "POST", body: base }), { DB, UNIVERSE_SYNC_TOKEN: token }, new URL("https://folio.example/api/fundamentals/edgartools/ingest"));
