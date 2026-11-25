@@ -268,8 +268,11 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 - [x] Holdings import: paste CSV (`symbol,market,quantity,avg_cost`) parsed and validated in the browser, then sent as JSON to the owner-only API. Existing positions are updated; omitted rows are not deleted. The API enforces a 20-position total cap. Fixture tests cover duplicate symbols, invalid markets, quantities, costs and batch size.
 
 ### E7. Tests (Node built-in runner, as the repo already does)
-- [ ] Unit tests: passkey flow with fixtures (challenge single-use and expiry, wrong origin, wrong RP ID, missing UV flag, counter regression, setup-token gate closes after first credential, cannot delete last credential), session hashing and expiry, market-window logic (including DST edge dates), Gemini output validator (drops unknown tickers/ids), alert dedupe, news dedupe/matching, CSV import parser.
-- [ ] Gemini and quote providers are tested against fixtures, never live.
+- [x] Auth/security regression tests cover challenge decoding and cross-origin rejection, exact origin/host, RP configuration, authenticator credential-ID binding, padded base64url, content-type enforcement, credential removal/session revocation and last-passkey protection. Local D1 smoke test covers setup/login route gates, session-bound credential deletion and sign-out.
+- [x] Quote provider fixture tests cover MarketData parsing, delayed/stale/unavailable states, batching, 429 handling and transient retry. Quote API tests cover owner-session gating, write-origin validation, provider/market validation and unmatched symbols.
+- [x] Holdings and Bursa quote CSV parsers are covered for duplicate rows, malformed values, limits, timestamps and optional fields.
+- [ ] Add cryptographic WebAuthn signature/counter-regression fixtures and run actual browser passkey registration/login on supported devices.
+- [ ] Add market-window/DST, Gemini output validation, alert dedupe and SEC filing/news dedupe/matching tests.
 
 **Done when:** `node --experimental-strip-types --test worker/**/*.test.mjs` passes; `wrangler dev` serves `/api/health`; a passkey register → login → dashboard → manual analysis → test push flow works locally.
 
@@ -287,8 +290,8 @@ Screens (mobile-first, one column): **Passkey sign-in / first-run setup · Dashb
 - [ ] **F5.** Offline: show last cached dashboard JSON (kept in memory/IndexedDB) with a clear "offline, as of …" banner. Do not queue writes in v1.
 - [ ] **F6.** Keep the UI light: no UI kit, plain CSS with CSS variables, light/dark via `prefers-color-scheme`, inline SVG sparkline (no chart library). Hash-based routing (no router dependency).
 - [ ] **F7.** Every AI block shows: "AI-generated, may be wrong. Not investment advice", the model name, the generation time, and links to the cited news items.
-- [ ] **F8.** Update CSP in `security.mjs`: keep `script-src 'self'`, `connect-src 'self'`, add `manifest-src 'self'` and `worker-src 'self'`; drop `'unsafe-inline'` for styles if possible (S6).
-- [ ] **F8b.** Sign-in screen uses the browser passkey prompt only (no username or password fields). If WebAuthn is unavailable, show a clear unsupported-browser message.
+- [x] **F8 (partial).** CSP keeps `script-src 'self'`, `style-src 'self'` and allows only the optional `https://api.marketdata.app` origin in `connect-src`. Add `manifest-src 'self'` and `worker-src 'self'` when the PWA manifest/service worker are introduced.
+- [x] **F8b.** Sign-in uses the browser passkey prompt only, with no username/password fields and an explicit unsupported-browser message.
 - [ ] **F9.** Lighthouse PWA/installability check passes (installable, service worker, manifest, HTTPS). Bundle budget: JS ≤ 150 KB gzipped.
 
 **Done when:** the app installs from Chrome on Android and from Safari on iOS (Home Screen), works offline for the last dashboard, and a test push arrives with the app closed.
