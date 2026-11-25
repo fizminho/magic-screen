@@ -145,14 +145,14 @@ jobs:
             local output=""
             local attempt=1
             while (( attempt <= 3 )); do
-              if output="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "$sql" 2>&1)"; then
+              if output="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "$sql" 2>&1)"; then
                 echo "$label cleanup result:"
-                echo "$output"
-                [[ "$output" == *'"clean"'* ]] || {
-                  echo "::error::$label cache cleanup did not return clean."
-                  return 1
-                }
-                return 0
+                echo "$output" | jq .
+                if echo "$output" | jq -e '.. | objects | select(.status? == "clean")' >/dev/null; then
+                  return 0
+                fi
+                echo "::error::$label cache cleanup did not return clean."
+                return 1
               fi
               echo "::warning::$label cleanup query failed on attempt $attempt:"
               echo "$output"
