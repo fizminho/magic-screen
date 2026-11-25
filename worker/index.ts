@@ -49,6 +49,8 @@ export default {
       response = await handleQuoteRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/sec/filings") {
       response = await handleSecRequest(request, env, url);
+    } else if (url.pathname === "/api/sec/companyfacts") {
+      response = await handleCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
       response = await handleSettingsRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/export") {
