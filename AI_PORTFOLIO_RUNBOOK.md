@@ -271,6 +271,7 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 - [x] Auth/security regression tests cover challenge decoding and cross-origin rejection, exact origin/host, RP configuration, authenticator credential-ID binding, padded base64url, content-type enforcement, credential removal/session revocation and last-passkey protection. Local D1 smoke test covers setup/login route gates, session-bound credential deletion and sign-out.
 - [x] Quote provider fixture tests cover MarketData parsing, delayed/stale/unavailable states, batching, 429 handling and transient retry. Quote API tests cover owner-session gating, write-origin validation, provider/market validation and unmatched symbols.
 - [x] Holdings and Bursa quote CSV parsers are covered for duplicate rows, malformed values, limits, timestamps and optional fields.
+- [x] SEC fixture tests cover filing-form filtering, CIK/accession binding, official archive URL construction, User-Agent gating, owner-session gating, per-IP throttling, six-hour cache hit/miss and cache invalidation when CIK changes.
 - [ ] Add cryptographic WebAuthn signature/counter-regression fixtures and run actual browser passkey registration/login on supported devices.
 - [ ] Add market-window/DST, Gemini output validation, alert dedupe and SEC filing/news dedupe/matching tests.
 
