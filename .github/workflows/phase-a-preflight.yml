@@ -1,12 +1,6 @@
 name: Phase A - Production D1 backup and baseline
 
 on:
-  push:
-    branches:
-      - chore/ai-portfolio-rebuild
-    paths:
-      - .github/workflows/phase-a-preflight.yml
-      - docs/BLOCKERS.md
   workflow_dispatch:
     inputs:
       confirm_production_read:
@@ -29,7 +23,7 @@ concurrency:
 jobs:
   production-snapshot:
     name: Backup and inventory production D1
-    if: github.event_name == 'push' || inputs.confirm_production_read == 'YES'
+    if: inputs.confirm_production_read == 'YES'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -61,7 +55,7 @@ jobs:
           test -s "./$backup_file"
           echo "file=$backup_file" >> "$GITHUB_OUTPUT"
           echo "backup_ok=true" >> "$GITHUB_OUTPUT"
-          echo "Production D1 export completed; backup file is non-empty."
+          echo "Production D1 export completed; backup file is non-empty. The export may temporarily make the database unavailable while it runs."
           echo "Backup filename: $backup_file"
           echo "Backup size: $(wc -c < "$backup_file") bytes"
 
