@@ -331,7 +331,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                 <div className="market-metric-title"><b>{marketCode === "US" ? "United States" : "Bursa Malaysia"}</b><span>{item?.quoteCoveragePct ?? 0}% quote coverage</span></div>
                 <strong>{item ? formatMoney(item.marketValue, marketCode === "US" ? "USD" : "MYR") : "—"}</strong>
                 <div className={`dashboard-day-change ${(item?.dayChangeValue ?? 0) >= 0 ? "quote-positive" : "quote-negative"}`}>
-                  Day move: {item ? `${item.dayChangeValue >= 0 ? "+" : ""}${formatMoney(item.dayChangeValue, item.currency)}${item.dayChangePct === null ? "" : ` · ${item.dayChangePct >= 0 ? "+" : ""}${item.dayChangePct}%`}` : "—"}
+                  Day move: {item && item.dayChangePct !== null ? `${item.dayChangeValue >= 0 ? "+" : ""}${formatMoney(item.dayChangeValue, item.currency)} · ${item.dayChangePct >= 0 ? "+" : ""}${item.dayChangePct}%` : "—"}
                 </div>
                 <div className="market-metric-details">
                   <span>Largest: {item?.largestPosition ? `${item.largestPosition.symbol} · ${item.largestPosition.weightPct}%` : "—"}</span>
