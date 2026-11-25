@@ -226,8 +226,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setBusy(false); }
   }
 
-  const usCount = holdings.filter((item) => item.market === "US").length;
-  const myCount = holdings.filter((item) => item.market === "MY").length;
+  const usCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol)).size;
+  const myCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "MY").map((item) => item.symbol)).size;
   const editingExisting = holdings.some((item) => item.market === market && item.symbol === symbol.trim().toUpperCase());
   const existingHolding = holdings.some((item) =>
     item.market === market && item.symbol === symbol.trim().toUpperCase()
@@ -330,11 +330,11 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         <section className="tool-card tool-wide">
           <span className="eyebrow">BURSA MALAYSIA · MANUAL IMPORT</span>
           <h3>Import Bursa quote CSV</h3>
-          <p>First add your Bursa holdings above. Then paste a CSV using this header: <code>symbol,price,asOf,prevClose</code>. The final column is optional. Use the actual quote timestamp and MYR price.</p>
+          <p>First add your Bursa holdings or watchlist items above. Then paste a CSV using this header: <code>symbol,price,asOf,prevClose</code>. The final column is optional. Use the actual quote timestamp and MYR price.</p>
           <textarea className="csv-field" rows={5} value={manualCsv} onChange={(event) => setManualCsv(event.target.value)}
             placeholder={"symbol,price,asOf,prevClose\n1155,6.42,2026-11-24T08:00:00+08:00,6.30"} />
           <button className="button button-secondary" onClick={importBursaCsv} disabled={busy || !manualCsv.trim() || myCount === 0}>
-            {busy ? "Importing…" : `Import Bursa quotes (${myCount} holdings)`}
+            {busy ? "Importing…" : `Import Bursa quotes (${myCount} symbols)`}
           </button>
           <p className="fine-print">No Bursa website scraping or unofficial API. Quotes are private and tagged with their import timestamp.</p>
         </section>
