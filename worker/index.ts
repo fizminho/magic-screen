@@ -99,24 +99,35 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    const now = new Date().toISOString();
-    const lock = await env.DB.prepare("SELECT value FROM setting WHERE key = ?").bind("manual_job_lock").first();
-    if (typeof lock?.value === "string" && lock.value.slice(0, 24) > now) {
-      console.log("Scheduled task skipped because a manual job is active.");
+    const isRefresh = controller.cron === "0 1 * * 2-6";
+    const isHousekeeping = controller.cron === "0 2 * * 6";
+    if (!isRefresh && !isHousekeeping) return;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const lockValue = new Date(now.getTime() + 30 * 60 * 1000).toISOString() + "|" + crypto.randomUUID();
+    const acquired = await env.DB.prepare(
+      "INSERT INTO setting(key,value) VALUES('manual_job_lock',?) " +
+      "ON CONFLICT(key) DO UPDATE SET value=excluded.value " +
+      "WHERE substr(setting.value,1,24) < ? RETURNING value"
+    ).bind(lockValue, nowIso).first();
+    if (!acquired) {
+      console.log("Scheduled task skipped because another job holds the execution lock.");
       return;
     }
-    const task = controller.cron === "0 1 * * 2-6"
+
+    const task = isRefresh
       ? runSecRefresh(env).then(async (refreshResult: unknown) => {
           // Generate briefs only after fresh SEC data has been persisted.
           const briefResult = await runScheduledResearchBrief(env);
           return { refresh: refreshResult, brief: briefResult };
         })
-      : controller.cron === "0 2 * * 6"
-        ? runWeeklyHousekeeping(env)
-        : Promise.resolve({ status: "ignored_unknown_cron" });
+      : runWeeklyHousekeeping(env);
     ctx.waitUntil(task.catch((error: unknown) => {
       const code = error instanceof Error ? error.message : "unknown";
       console.error("Scheduled task failed:", controller.cron, code.slice(0, 120));
+    }).finally(async () => {
+      await env.DB.prepare("DELETE FROM setting WHERE key='manual_job_lock' AND value=?").bind(lockValue).run();
     }));
   }
 };
