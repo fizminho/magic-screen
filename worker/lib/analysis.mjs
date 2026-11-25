@@ -34,6 +34,10 @@ export function validateResearchBrief(value, allowedAccessions, symbol) {
   const companySummary = boundedText(value.company_summary);
   const confidence = ["low", "medium", "high"].includes(value.confidence) ? value.confidence : null;
   if (!companySummary || !confidence) return null;
+  const allText = [companySummary, ...boundedList(value.financial_strengths),
+    ...boundedList(value.financial_risks), ...boundedList(value.filing_signals),
+    ...boundedList(value.unknowns)].join(" ");
+  if (/\\b(?:buy|sell|hold)\\s+(?:the\\s+)?(?:stock|shares|position)\\b|\\btarget price\\b|\\bguaranteed returns?\\b/i.test(allText)) return null;
   const sourceAccessions = Array.isArray(value.source_accessions)
     ? [...new Set(value.source_accessions.filter((item) =>
       typeof item === "string" && allowedAccessions.has(item)
@@ -178,16 +182,27 @@ export async function handleAnalysisRequest(request, env, url) {
       try { return jsonResponse({ brief: JSON.parse(cached.outputJson), cached: true }); } catch { /* regenerate */ }
     }
 
-    const dayStart = new Date().toISOString().slice(0, 10) + "T00:00:00.000Z";
-    const count = await env.DB.prepare(
-      "SELECT COUNT(*) AS count FROM analysis WHERE kind='brief' AND created_at>=?"
-    ).bind(dayStart).first();
-    if (Number(count?.count || 0) >= DAILY_LIMIT) {
+    const dayKey = new Date().toISOString().slice(0, 10);
+    const quotaKey = `ai_daily_${dayKey}`;
+    const reservation = await env.DB.prepare(
+      "INSERT INTO setting(key,value) VALUES(?, '1') " +
+      "ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1 " +
+      "WHERE CAST(value AS INTEGER) < ? RETURNING value"
+    ).bind(quotaKey, DAILY_LIMIT).first();
+    if (!reservation) {
       return jsonResponse({ error: "Daily research brief limit reached. Try again after 00:00 UTC." }, 429);
     }
 
-    const prompt = buildPrompt(symbol, facts, filings);
-    const brief = await generateBrief(env, prompt, allowedAccessions, symbol);
+    let brief;
+    try {
+      const prompt = buildPrompt(symbol, facts, filings);
+      brief = await generateBrief(env, prompt, allowedAccessions, symbol);
+    } catch (error) {
+      await env.DB.prepare(
+        "UPDATE setting SET value=CAST(value AS INTEGER)-1 WHERE key=? AND CAST(value AS INTEGER)>0"
+      ).bind(quotaKey).run();
+      throw error;
+    }
     const createdAt = new Date().toISOString();
     await env.DB.prepare(
       "INSERT INTO analysis(kind,market,model,input_hash,output_json,created_at) VALUES('brief','US',?,?,?,?) " +
