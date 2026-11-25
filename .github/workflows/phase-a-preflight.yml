@@ -149,11 +149,17 @@ jobs:
             local label="$1"
             local sql="$2"
             local output=""
+            local stderr_file="/tmp/wrangler-d1-cleanup.stderr"
             local attempt=1
             while (( attempt <= 3 )); do
-              if output="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "$sql" 2>&1)"; then
+              : > "$stderr_file"
+              if output="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "$sql" 2>"$stderr_file")"; then
                 echo "$label cleanup result:"
-                echo "$output" | jq .
+                if ! echo "$output" | jq .; then
+                  echo "::error::$label cleanup returned invalid JSON."
+                  cat "$stderr_file"
+                  return 1
+                fi
                 if echo "$output" | jq -e '.. | objects | select(.status? == "clean")' >/dev/null; then
                   return 0
                 fi
@@ -161,6 +167,7 @@ jobs:
                 return 1
               fi
               echo "::warning::$label cleanup query failed on attempt $attempt:"
+              cat "$stderr_file"
               echo "$output"
               sleep 1
               ((attempt += 1))
