@@ -282,7 +282,7 @@ function decodeBase64urlText(encoded) {
   } catch { return null; }
 }
 
-function decodeClientChallenge(encoded, expectedType = "webauthn.create") {
+export function decodeClientChallenge(encoded, expectedType = "webauthn.create") {
   try {
     const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
     const raw = atob(normalized);
