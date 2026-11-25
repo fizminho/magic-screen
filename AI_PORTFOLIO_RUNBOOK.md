@@ -255,7 +255,7 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 ### E5. Web Push
 - [ ] Owner setup remains required: generate VAPID keys once with `npx --yes web-push generate-vapid-keys` (do not add `web-push` as a Worker dependency). Store `VAPID_PRIVATE_KEY` as a Cloudflare secret; set `VAPID_PUBLIC_KEY` and a real `VAPID_SUBJECT` (`mailto:`) as vars. No keypair or private secret has been generated or configured by this implementation.
 - [x] Implemented with native WebCrypto (VAPID JWT ES256 + RFC 8291 `aes128gcm` payload encryption); no third-party runtime dependency. Design and protocol references are recorded in `docs/DATA_SOURCES.md`.
-- [x] Owner-session and exact-Origin routes: `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `POST /api/push/test`. Subscriptions are capped at five and endpoints are restricted to supported HTTPS push services.
+- [x] Owner-session and exact-Origin routes: `GET /api/push/config` (public VAPID key only), `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `POST /api/push/test`. Subscriptions are capped at five and endpoints are restricted to supported HTTPS push services.
 - [x] HTTP 404/410 responses delete the expired subscription row.
 - [ ] Alert types: (1) holding moves ≥ `alert_move_pct` (default 4%) vs previous close; (2) a public filing signal the approved research rules classify as high impact; (3) morning brief ready. Dedupe with `alert_log.dedupe_key` (e.g. `move:AAPL:2026-11-25`). Max 8 pushes/day (setting).
 - [ ] Payload is short (title + 1 line + deep link `/#/holding/AAPL`). No quantities or P/L amounts in push text.
