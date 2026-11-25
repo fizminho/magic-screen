@@ -77,6 +77,25 @@ test("quote snapshots are validated and persisted in one D1 batch", async () => 
   assert.match(calls.statements[0].sql, /AND active = 1/);
 });
 
+test("Yahoo Finance Bursa snapshots are accepted and stored as MYR quotes", async () => {
+  const { DB, calls } = fakeDb();
+  const quote = {
+    symbol: "1155", market: "MY", price: 6.42, prevClose: 6.3, changePct: (6.42 - 6.3) / 6.3,
+    asOf: new Date().toISOString(), currency: "MYR", provider: "yahoo-finance", status: "ok"
+  };
+  const response = await handleQuoteRequest(new Request(`${origin}/api/quotes/snapshots`, {
+    method: "POST",
+    headers: { origin, "content-type": "application/json", cookie: sessionCookie },
+    body: JSON.stringify({ quotes: [quote] })
+  }), { ...envConfig, DB }, "/api/quotes/snapshots");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { saved: 1, unmatchedSymbols: [] });
+  assert.equal(calls.batch, 1);
+  assert.equal(calls.statements[0].values[4], "yahoo-finance");
+  assert.equal(calls.statements[0].values[6], "MY");
+  assert.equal(calls.statements[0].values[7], "1155");
+});
+
 test("quote snapshots reject invalid provider-market combinations before writing", async () => {
   const { DB, calls } = fakeDb();
   const quote = {
