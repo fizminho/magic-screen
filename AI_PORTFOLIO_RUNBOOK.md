@@ -235,11 +235,11 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 | `0 1 * * 2-6` | Refresh SEC submissions for owned US tickers; evaluate filing alerts and prepare the daily brief after the previous US session |
 | `0 2 * * 6` | Weekly recommendations + housekeeping (prune unpinned filing metadata > 30 days, expired `alert_log`, old `job_run`, expired challenges and rate-limit windows) |
 
-- [ ] US quote refresh is manual from the owner's browser because the approved free provider enforces a single source IP and 24-hour delay. Bursa quotes are manual/CSV. Do not schedule quote-provider requests from Cloudflare Workers.
-- [ ] Implement `scheduled(controller, env, ctx)` switching on `controller.cron`.
+- [x] US quote refresh remains manual from the owner's browser because the approved free provider enforces a single source IP and 24-hour delay. Bursa quotes remain manual/CSV. No quote-provider requests run from Cloudflare Workers.
+- [x] Implement `scheduled(controller, env, ctx)` switching on the two UTC cron expressions. The SEC refresh is capped at 12 owned US instruments with a valid CIK (24 SEC requests maximum), sequential 550 ms spacing, bounded retries, filing metadata + companyfacts cache, and one `job_run` record. Weekly housekeeping prunes expired filings, caches, alerts, jobs, challenges and rate-limit windows.
 - [ ] Skip weekends/public holidays gracefully: if there are no new filings or usable quote snapshots, skip the brief and log `skipped_no_new_data`. Do not hardcode holiday lists.
-- [ ] Each job writes one `job_run` row (start, end, status, short detail). Use `ctx.waitUntil` only for fire-and-forget tails.
-- [ ] Use `env.DB.batch([...])` for multi-row writes. Stay under ~40 subrequests and ~50 D1 queries per invocation.
+- [x] Each scheduled job writes one `job_run` row (start, end, status, bounded detail). `ctx.waitUntil` is used only to hand off the scheduled task.
+- [x] Multi-row filing writes and weekly cleanup use `env.DB.batch([...])`. The SEC job is bounded to 12 instruments and designed to stay below ~40 D1 statements per invocation.
 
 ### E4. Cloudflare Workers AI research brief
 - [x] Provider decision: Gemini API is rejected for this personal consumer app. Current Gemini API terms restrict the service to professional/business use rather than consumer use; the Free Tier may use prompts/responses to improve Google products and allow human review. Do not send portfolio data to Gemini.
