@@ -3,6 +3,7 @@ import { fetchMarketDataQuotes } from "./providers/marketdata";
 import { parseManualQuotesCsv } from "./providers/manual-csv";
 import { parseHoldingsCsv } from "./providers/holdings-csv";
 import type { QuoteSnapshot } from "./providers/types";
+import { readDashboardSnapshot, saveDashboardSnapshot } from "./offline-dashboard";
 
 type Holding = {
   symbol: string;
@@ -146,6 +147,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdingsCsv, setHoldingsCsv] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<string | null>(null);
   const [pushState, setPushState] = useState<"checking" | "unsupported" | "not-configured" | "not-subscribed" | "subscribed">("checking");
   const [pushBusy, setPushBusy] = useState(false);
 
@@ -160,7 +162,22 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   }
 
   async function refreshDashboard() {
-    setDashboard(await api<Dashboard>("/api/dashboard"));
+    try {
+      const snapshot = await api<Dashboard>("/api/dashboard");
+      setDashboard(snapshot);
+      setOfflineSnapshotAt(null);
+      saveDashboardSnapshot(snapshot).catch(() => undefined);
+    } catch (cause) {
+      if (cause instanceof TypeError || !navigator.onLine) {
+        const cached = await readDashboardSnapshot<Dashboard>().catch(() => null);
+        if (cached) {
+          setDashboard(cached.data);
+          setOfflineSnapshotAt(cached.savedAt);
+          return;
+        }
+      }
+      throw cause;
+    }
   }
 
   async function refreshSettings() {
@@ -196,6 +213,20 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const handleOffline = () => {
+      if (dashboard) setOfflineSnapshotAt((current) => current || new Date().toISOString());
+    };
+    const handleOnline = () => {
+      refreshDashboard().catch(() => undefined);
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [dashboard]);
   useEffect(() => {
     setMarketToken(sessionStorage.getItem("magicfolio.marketdata.token") || "");
     refreshPortfolio()
@@ -505,6 +536,11 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         <span className="holding-count">{holdings.length} / 20</span>
       </div>
 
+      {offlineSnapshotAt && (
+        <div className="offline-banner" role="status">
+          Offline. Showing the last saved dashboard from {formatDate(offlineSnapshotAt)}. Changes and live quotes are paused.
+        </div>
+      )}
       <div className="dashboard-summary">
         <div className="dashboard-overview">
           <div className="metric-tile"><span>POSITIONS</span><strong>{dashboard?.holdingsCount ?? "—"}</strong></div>
