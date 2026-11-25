@@ -122,15 +122,15 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 | S9 | No secret scanning guard | Enable GitHub secret scanning + push protection (Settings → Code security) and add `.dev.vars.example` |
 | S10 | Unknown live tables from the retired SEC pipeline | Dropped by the owner-approved one-time reset script, which enumerates actual user tables at cutover |
 
-- [ ] **B1.** `npm outdated` and `npm audit` (full output to `docs/CLEANUP_LOG.md`). Do not assert a CVE you did not see in the audit output.
+- [ ] **B1.** Run `npm outdated` and `npm audit` on the branch; capture actual output in `docs/CLEANUP_LOG.md`. The branch preflight workflow now runs the production audit. Do not assert a CVE not present in output.
 - [ ] **B2.** (PRs are closed later, in H8.) For each open Dependabot PR from A3: read the diff; if it is a **security fix or a patch/minor bump with green CI**, apply the same version change on the cleanup branch (`npm install pkg@version`). Majors: apply only if the build and tests pass; otherwise note as deferred.
 - [ ] **B3.** `npm audit fix` (no `--force`). If high/critical remain, upgrade the direct dependency manually; if impossible, record the advisory ID and a mitigation.
-- [ ] **B4.** Commit `package-lock.json`. Update `.github/workflows/*.yml`: `npm ci`, audit blocking (S2), SHA-pinned actions (S3), keep `permissions: contents: read`.
-- [ ] **B5.** Update `.github/dependabot.yml`: add `groups` for minor+patch npm updates; keep github-actions ecosystem.
-- [ ] **B6.** Add `.dev.vars.example` (names only, no values) and confirm `.gitignore` covers `.dev.vars*`, `.env*`, `backup-*.sql`.
+- [ ] **B4.** Generate and commit `package-lock.json`, then switch workflows to `npm ci`. The audit is now blocking and build/deploy workflow actions are SHA-pinned. Lockfile generation remains outstanding because no npm runtime is available in this GitHub-only editing session.
+- [x] **B5.** `.github/dependabot.yml` groups minor and patch npm updates and retains the GitHub Actions ecosystem.
+- [x] **B6.** Added `.dev.vars.example` with names/placeholders only; `.gitignore` ignores local secrets while explicitly allowing the example file, `.env*`, and `backup-*.sql`.
 - [ ] **B7.** Verify no secrets in history: `git log -p | grep -iE "(api[_-]?key|secret|cookie|token)\s*[:=]"` and review hits manually.
 - [ ] **B8.** Do **not** close PRs yet. Closure happens in H8, after the cleanup PR exists and is merged, so each closing comment can link to it.
-- [ ] **B9.** Enable repo settings via `gh`/UI where possible: secret scanning + push protection, Dependabot alerts, branch protection on `main` requiring the Build check.
+- [ ] **B9.** Enable secret scanning + push protection, Dependabot alerts and branch protection on `main` requiring Build. Repository security settings have not been changed or verified.
 
 **Done when:** `npm ci && npm run build` passes from a clean checkout; `npm audit --omit=dev --audit-level=high` exits 0 (or each remaining advisory is documented); every security-relevant bump from the open PRs is listed in `docs/CLEANUP_LOG.md` as applied or deferred.
 
@@ -140,14 +140,14 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 
 Delete (git history preserves them):
 
-- [ ] **C1.** `worker/shariah-screening.mjs`, `worker/shariah-screening.test.mjs`
-- [ ] **C2.** `worker/universe-membership.mjs`, `worker/universe-membership.test.mjs`
-- [ ] **C3.** All MFI code in `worker/index.ts` (`syncMagicFormulaUniverse`, `/api/mfi/screen`, `/api/stocks`, `/api/pipeline/status`, `ensureSchema`, `ensureMembershipSchema`).
-- [ ] **C4.** Docs: `docs/MAGIC_FORMULA_INTEGRATION.md`, `docs/PROVIDER_ACCESS_POLICY.md`, `docs/STOCK_UNIVERSE.md`, `docs/US_MFI_MASTERPLAN.md`. Rewrite `README.md`, `SECURITY.md`, `docs/SETUP.md` in Phase H.
-- [ ] **C5.** Frontend: strip `src/App.tsx` to a shell (it is 20 KB of MFI/Shariah/Investing Paths UI). Keep `worker/security.mjs` (headers helper) and its test; update the CSP in Phase F/G.
-- [ ] **C6.** Remove `db/schema.sql` (replaced by `migrations/`).
-- [ ] **C7.** Remove the Cloudflare Worker secret: `npx wrangler secret delete MFI_SESSION_COOKIE`.
-- [ ] **C8.** Remove `lucide-react` if icons are replaced with inline SVG (saves a dependency).
+- [x] **C1.** Deleted `worker/shariah-screening.mjs` and its test.
+- [x] **C2.** Deleted `worker/universe-membership.mjs` and its test.
+- [x] **C3.** Replaced `worker/index.ts` with a minimal health/static-assets Worker. Legacy routes, provider cookie usage and request-time DDL are gone.
+- [x] **C4.** Deleted the four retired MFI/Shariah docs and rewrote `README.md`, `SECURITY.md` and `docs/SETUP.md` for Magic Folio.
+- [x] **C5.** Replaced the legacy frontend with a clean Magic Folio shell. Kept the response security helper and updated CSP to disallow inline styles.
+- [x] **C6.** Deleted `db/schema.sql`; tracked migrations are the schema source.
+- [ ] **C7.** Remove the retired Cloudflare Worker secret only after the replacement Worker has been deployed successfully. The secret is not referenced by the branch, but production deployment has not happened yet.
+- [x] **C8.** Removed unused `lucide-react` dependency from `package.json`.
 
 **Done when:** `grep -ri "magicformula\|MFI_\|musaffa\|halalscreener\|investing paths" --exclude-dir=node_modules --exclude-dir=.git .` returns nothing except `docs/CLEANUP_LOG.md`.
 
