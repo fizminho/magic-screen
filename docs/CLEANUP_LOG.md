@@ -145,3 +145,11 @@ Preflight run `45528932617` on commit `89a5e20ee781d4486368da71846eacec65410e0b`
 - SEC cache misses are limited to five upstream lookups per source IP per hour. Cached responses do not consume the upstream lookup allowance.
 - Added fixture tests for filing filtering, accession/CIK binding, archive URL construction, owner-session gating, missing contact header, cache hit/miss and upstream throttling.
 - Outstanding: automatic ticker-to-CIK lookup, companyfacts/fundamentals, scheduled SEC refresh and SEC filing alert rules.
+
+
+### Latest full preflight
+
+- GitHub Actions run `45532292009` passed on commit `65ab97cb16668293ab442241ec640508f4e79740`.
+- Passed: `npm ci`, Vite/TypeScript build, full `npm audit --audit-level=high`, complete Node regression suite, fresh local D1 migrations, explicit CIK/SEC-cache schema checks, SEC rate-limit constraint check, local destructive reset exercise, Worker auth/portfolio/quote smoke tests and Wrangler dry-run.
+- The local destructive reset exercised all current migrations and the smoke test verified quote snapshots are stored and removed when the last holding/watchlist reference is removed.
+- No production D1 reset, production deployment or Cloudflare secret deletion was performed.
