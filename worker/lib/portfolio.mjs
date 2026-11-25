@@ -111,12 +111,113 @@ async function deleteHolding(request, env, pathname) {
   return jsonResponse({ deleted: true, market, symbol });
 }
 
+
+const MAX_WATCHLIST_ITEMS = 20;
+
+function validateWatchlistItem(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_watchlist_item");
+  const { symbol, market, note = null } = value;
+  if (typeof symbol !== "string" || symbol !== symbol.trim().toUpperCase() || !SYMBOL_PATTERN.test(symbol)) {
+    throw new Error("invalid_watchlist_item");
+  }
+  if (!["US", "MY"].includes(market)) throw new Error("invalid_watchlist_item");
+  if (note !== null && (typeof note !== "string" || note.length > 500)) throw new Error("invalid_watchlist_item");
+  return { symbol, market, note };
+}
+
+async function listWatchlist(request, env) {
+  const session = await getOwnerSession(request, env);
+  if (!session) return jsonResponse({ error: "Sign in required." }, 401);
+  const rows = await env.DB.prepare(
+    "SELECT i.symbol, i.market, i.name, i.currency, i.sector, w.note, w.added_at AS addedAt, " +
+    "q.price, q.prev_close AS prevClose, q.change_pct AS changePct, q.as_of AS quoteAsOf, " +
+    "q.provider AS quoteProvider, COALESCE(q.status, 'unavailable') AS quoteStatus " +
+    "FROM watchlist w JOIN instrument i ON i.id = w.instrument_id " +
+    "LEFT JOIN quote_latest q ON q.instrument_id = i.id " +
+    "ORDER BY i.market, i.symbol"
+  ).all();
+  return jsonResponse({ items: rows.results || [] });
+}
+
+async function addWatchlistItems(request, env) {
+  assertRequestOrigin(request, env);
+  const session = await getOwnerSession(request, env);
+  if (!session) return jsonResponse({ error: "Sign in required." }, 401);
+  const payload = await readJsonBody(request);
+  if (!Array.isArray(payload?.items) || payload.items.length > MAX_WATCHLIST_ITEMS) {
+    return jsonResponse({ error: "Provide up to 20 watchlist items per request." }, 400);
+  }
+
+  const items = payload.items.map(validateWatchlistItem);
+  const seen = new Set();
+  for (const item of items) {
+    const key = `${item.market}:${item.symbol}`;
+    if (seen.has(key)) return jsonResponse({ error: "Duplicate watchlist items are not allowed." }, 400);
+    seen.add(key);
+  }
+  if (!items.length) return jsonResponse({ added: 0 });
+
+  const now = new Date().toISOString();
+  const statements = items.flatMap((item) => {
+    const currency = item.market === "US" ? "USD" : "MYR";
+    return [
+      env.DB.prepare(
+        "INSERT INTO instrument(symbol,market,quote_symbol,name,currency) VALUES(?,?,?,?,?) " +
+        "ON CONFLICT(market,symbol) DO UPDATE SET active=1"
+      ).bind(item.symbol, item.market, item.symbol, item.symbol, currency),
+      env.DB.prepare(
+        "INSERT INTO watchlist(instrument_id,note,added_at) " +
+        "SELECT id,?,? FROM instrument WHERE market=? AND symbol=? " +
+        "ON CONFLICT(instrument_id) DO UPDATE SET note=excluded.note"
+      ).bind(item.note, now, item.market, item.symbol)
+    ];
+  });
+
+  const results = await env.DB.batch(statements);
+  const added = items.filter((_, index) => Number(results[index * 2 + 1]?.meta?.changes || 0) === 1).length;
+  return jsonResponse({ added });
+}
+
+async function deleteWatchlistItem(request, env, pathname) {
+  assertRequestOrigin(request, env);
+  const session = await getOwnerSession(request, env);
+  if (!session) return jsonResponse({ error: "Sign in required." }, 401);
+  await readJsonBody(request);
+
+  const parts = pathname.split("/");
+  if (parts.length !== 5) return jsonResponse({ error: "Invalid watchlist item." }, 400);
+  let market;
+  let symbol;
+  try {
+    market = decodeURIComponent(parts[3]);
+    symbol = decodeURIComponent(parts[4]);
+  } catch {
+    return jsonResponse({ error: "Invalid watchlist item." }, 400);
+  }
+  symbol = symbol.toUpperCase();
+  if (!["US", "MY"].includes(market) || !SYMBOL_PATTERN.test(symbol)) {
+    return jsonResponse({ error: "Invalid watchlist item." }, 400);
+  }
+
+  const deleted = await env.DB.prepare(
+    "DELETE FROM watchlist WHERE instrument_id = " +
+    "(SELECT id FROM instrument WHERE market = ? AND symbol = ?) RETURNING instrument_id"
+  ).bind(market, symbol).first();
+  if (!deleted) return jsonResponse({ error: "Watchlist item not found." }, 404);
+  return jsonResponse({ deleted: true, market, symbol });
+}
+
 export async function handlePortfolioRequest(request, env, pathname) {
   try {
     if (pathname === "/api/holdings" && request.method === "GET") return await listHoldings(request, env);
     if (pathname === "/api/holdings" && request.method === "PUT") return await upsertHoldings(request, env);
     if (pathname.startsWith("/api/holdings/") && request.method === "DELETE") {
       return await deleteHolding(request, env, pathname);
+    }
+    if (pathname === "/api/watchlist" && request.method === "GET") return await listWatchlist(request, env);
+    if (pathname === "/api/watchlist" && request.method === "POST") return await addWatchlistItems(request, env);
+    if (pathname.startsWith("/api/watchlist/") && request.method === "DELETE") {
+      return await deleteWatchlistItem(request, env, pathname);
     }
     return jsonResponse({ error: "Not found." }, 404);
   } catch (error) {
@@ -125,6 +226,7 @@ export async function handlePortfolioRequest(request, env, pathname) {
     if (message === "body_too_large") return jsonResponse({ error: "Request too large." }, 413);
     if (message === "json_required") return jsonResponse({ error: "Content-Type must be application/json." }, 415);
     if (message === "invalid_holding") return jsonResponse({ error: "One or more holdings are invalid." }, 400);
+    if (message === "invalid_watchlist_item") return jsonResponse({ error: "One or more watchlist items are invalid." }, 400);
     console.error("Portfolio API request failed:", message);
     return jsonResponse({ error: "Portfolio request failed." }, 400);
   }
