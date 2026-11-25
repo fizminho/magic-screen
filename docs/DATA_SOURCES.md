@@ -4,7 +4,7 @@
 
 | Component | Version | Licence | Use | Notes |
 |---|---:|---|---|---|
-| `@passwordless-id/webauthn` | 2.4.1 | MIT | Browser passkey ceremony and Worker-side WebAuthn response verification | Documents Cloudflare Workers/WebCrypto support. Server verifies challenge, origin, RP ID hash, user verification and authentication signatures. We additionally check registration user-presence flags and discoverable user handle. No private key or biometric data is stored by this app. |
+| `@passwordless-id/webauthn` | 2.4.1 | MIT | Browser passkey ceremony and Worker-side WebAuthn response verification | Documents Cloudflare Workers/WebCrypto support. Server verifies challenge, origin, RP ID hash, user verification and authentication signatures. We additionally check registration user-presence flags, raw credential ID against the attested credential ID, algorithm consistency, cross-origin client data and the discoverable user handle. No private key or biometric data is stored by this app. |
 
 References:
 - https://github.com/passwordless-id/webauthn
