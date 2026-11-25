@@ -19,6 +19,19 @@ type Holding = {
   quoteStatus: "ok" | "stale" | "unavailable";
 };
 
+type WatchlistItem = {
+  symbol: string;
+  market: "US" | "MY";
+  name: string;
+  currency: "USD" | "MYR";
+  note: string | null;
+  addedAt: string;
+  price: number | null;
+  changePct: number | null;
+  quoteAsOf: string | null;
+  quoteStatus: "ok" | "stale" | "unavailable";
+};
+
 type Props = {
   onError: (message: string) => void;
   onNotice: (message: string) => void;
@@ -50,6 +63,10 @@ function formatDate(value: string | null) {
 
 export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [watchSymbol, setWatchSymbol] = useState("");
+  const [watchMarket, setWatchMarket] = useState<"US" | "MY">("US");
+  const [watchNote, setWatchNote] = useState("");
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -65,10 +82,15 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     setHoldings(result.holdings);
   }
 
+  async function refreshWatchlist() {
+    const result = await api<{ items: WatchlistItem[] }>("/api/watchlist");
+    setWatchlist(result.items);
+  }
+
   useEffect(() => {
     setMarketToken(sessionStorage.getItem("magicfolio.marketdata.token") || "");
-    refreshHoldings()
-      .catch((cause) => onError(cause instanceof Error ? cause.message : "Unable to load holdings."))
+    Promise.all([refreshHoldings(), refreshWatchlist()])
+      .catch((cause) => onError(cause instanceof Error ? cause.message : "Unable to load portfolio data."))
       .finally(() => setLoading(false));
   }, []);
 
@@ -131,6 +153,38 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setBusy(false); }
   }
 
+  async function addWatchlistItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onError(""); onNotice(""); setBusy(true);
+    try {
+      await api("/api/watchlist", {
+        method: "POST",
+        body: JSON.stringify({ items: [{
+          symbol: watchSymbol.trim().toUpperCase(), market: watchMarket, note: watchNote.trim() || null
+        }] })
+      });
+      setWatchSymbol(""); setWatchNote("");
+      await refreshWatchlist();
+      onNotice("Watchlist item saved.");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to save watchlist item.");
+    } finally { setBusy(false); }
+  }
+
+  async function removeWatchlistItem(item: WatchlistItem) {
+    if (!window.confirm(`Remove ${item.market}:${item.symbol} from watchlist?`)) return;
+    onError(""); onNotice(""); setBusy(true);
+    try {
+      await api(`/api/watchlist/${encodeURIComponent(item.market)}/${encodeURIComponent(item.symbol)}`, {
+        method: "DELETE", body: "{}"
+      });
+      await refreshWatchlist();
+      onNotice(`${item.symbol} removed from watchlist.`);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to remove watchlist item.");
+    } finally { setBusy(false); }
+  }
+
   async function saveQuoteBatches(quotes: QuoteSnapshot[]) {
     let saved = 0;
     const unmatched: string[] = [];
@@ -142,14 +196,14 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       saved += result.saved;
       unmatched.push(...result.unmatchedSymbols);
     }
-    await refreshHoldings();
+    await Promise.all([refreshHoldings(), refreshWatchlist()]);
     return { saved, unmatched };
   }
 
   async function refreshUsQuotes() {
     if (!marketToken.trim()) { onError("Save your Market Data API token first."); return; }
-    const symbols = holdings.filter((item) => item.market === "US").map((item) => item.symbol);
-    if (!symbols.length) { onError("Add at least one US holding before refreshing quotes."); return; }
+    const symbols = [...new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol))];
+    if (!symbols.length) { onError("Add at least one US holding or watchlist item before refreshing quotes."); return; }
     onError(""); onNotice(""); setBusy(true);
     try {
       const quotes = await fetchMarketDataQuotes(symbols, marketToken.trim());
@@ -166,7 +220,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       const quotes = parseManualQuotesCsv(manualCsv);
       const result = await saveQuoteBatches(quotes);
       setManualCsv("");
-      onNotice(`Imported ${result.saved} Bursa quote snapshots. ${result.unmatched.length ? `Add these as MY holdings first: ${result.unmatched.join(", ")}.` : ""}`);
+      onNotice(`Imported ${result.saved} Bursa quote snapshots. ${result.unmatched.length ? `Add these to your holdings or watchlist first: ${result.unmatched.join(", ")}.` : ""}`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to import Bursa CSV.");
     } finally { setBusy(false); }
@@ -206,6 +260,38 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           </tbody>
         </table>
       </div>
+
+      <section className="tool-card tool-wide watchlist-card">
+        <div className="watchlist-heading">
+          <div><span className="eyebrow">ON YOUR RADAR</span><h3>Watchlist</h3></div>
+          <span className="holding-count">{watchlist.length} tracked</span>
+        </div>
+        <div className="holdings-table-wrap">
+          <table className="holdings-table watchlist-table">
+            <thead><tr><th>Instrument</th><th>Latest quote</th><th>Source / as of</th><th>Note</th><th></th></tr></thead>
+            <tbody>
+              {loading ? <tr><td colSpan={5} className="empty-cell">Loading watchlist…</td></tr> :
+                watchlist.length === 0 ? <tr><td colSpan={5} className="empty-cell">Nothing on your watchlist yet.</td></tr> :
+                watchlist.map((item) => (
+                  <tr key={`${item.market}:${item.symbol}`}>
+                    <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
+                    <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
+                    <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
+                    <td>{item.note || " "}</td>
+                    <td><button className="button button-danger button-small" onClick={() => removeWatchlistItem(item)} disabled={busy}>Remove</button></td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+        <form className="watchlist-form" onSubmit={addWatchlistItem}>
+          <label>Market<select value={watchMarket} onChange={(event) => setWatchMarket(event.target.value as "US" | "MY")}><option value="US">United States</option><option value="MY">Bursa Malaysia</option></select></label>
+          <label>Symbol<input value={watchSymbol} onChange={(event) => setWatchSymbol(event.target.value.toUpperCase())} maxLength={15} placeholder={watchMarket === "US" ? "MSFT" : "1155"} required /></label>
+          <label className="watch-note">Note<input value={watchNote} onChange={(event) => setWatchNote(event.target.value)} maxLength={500} placeholder="Optional reminder" /></label>
+          <button className="button button-secondary" type="submit" disabled={busy || watchlist.length >= 50}>Add to watchlist</button>
+        </form>
+      </section>
 
       <div className="portfolio-tools">
         <section className="tool-card">
