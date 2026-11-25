@@ -37,13 +37,26 @@ async function withoutWebAuthnDebug<T>(operation: () => Promise<T>): Promise<T> 
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [credentialNames, setCredentialNames] = useState<Record<string, string>>({});
   const [setupToken, setSetupToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [supported, setSupported] = useState(true);
 
-  async function refreshState() { setAuth(await api<AuthState>("/api/auth/state")); }
+  async function refreshState() {
+    const next = await api<AuthState>("/api/auth/state");
+    setAuth(next);
+    if (next.authenticated) {
+      const result = await api<{ credentials: Credential[] }>("/api/auth/credentials");
+      setCredentials(result.credentials);
+      setCredentialNames(Object.fromEntries(result.credentials.map((item) => [item.id, item.name])));
+    } else {
+      setCredentials([]);
+      setCredentialNames({});
+    }
+  }
   useEffect(() => {
     setSupported(window.isSecureContext && typeof window.PublicKeyCredential !== "undefined" &&
       typeof navigator.credentials?.create === "function" && typeof navigator.credentials?.get === "function");
@@ -101,6 +114,43 @@ export default function App() {
     finally { setBusy(false); }
   }
 
+  async function saveCredentialName(id: string) {
+    setError(""); setNotice(""); setBusy(true);
+    try {
+      await api(`/api/auth/credentials/${encodeURIComponent(id)}`, {
+        method: "PATCH", body: JSON.stringify({ name: credentialNames[id] || "" })
+      });
+      await refreshState();
+      setNotice("Passkey name updated.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to rename passkey.");
+    } finally { setBusy(false); }
+  }
+
+  async function removeCredential(id: string) {
+    if (!window.confirm("Remove this passkey? You will no longer be able to sign in with it.")) return;
+    setError(""); setNotice(""); setBusy(true);
+    try {
+      await api(`/api/auth/credentials/${encodeURIComponent(id)}`, { method: "DELETE", body: "{}" });
+      await refreshState();
+      setNotice("Passkey removed.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to remove passkey.");
+    } finally { setBusy(false); }
+  }
+
+  async function logoutEverywhere() {
+    if (!window.confirm("Sign out all active sessions on every device?")) return;
+    setError(""); setNotice(""); setBusy(true);
+    try {
+      await api("/api/auth/logout-all", post());
+      await refreshState();
+      setNotice("All sessions have been signed out.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to sign out all sessions.");
+    } finally { setBusy(false); }
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -125,11 +175,37 @@ export default function App() {
             <span className="eyebrow"><span className="status-dot" /> OWNER SESSION ACTIVE</span>
             <h2>Welcome back.</h2>
             <p>Your workspace is protected by {auth.passkeyCount} registered {auth.passkeyCount === 1 ? "passkey" : "passkeys"}.</p>
-            <div className="session-card">
-              <div><b>Passkey recovery</b><span>Keep a second passkey on another device in case your primary device is lost.</span></div>
-              <button className="button button-secondary" onClick={() => registerPasskey(false)} disabled={busy}>{busy ? "Working…" : "Add recovery passkey"}</button>
+            <div className={`recovery-note ${auth.passkeyCount < 2 ? "recovery-warning" : "recovery-ready"}`}>
+              {auth.passkeyCount < 2
+                ? "Recovery is not ready yet. Add a second passkey on another device before removing the setup token."
+                : "Recovery ready. You have more than one passkey registered."}
             </div>
-            <button className="button button-quiet" onClick={logout} disabled={busy}>Sign out</button>
+            <div className="session-card">
+              <div><b>Passkey recovery</b><span>Register a passkey on another device in case your primary device is lost.</span></div>
+              <button className="button button-secondary" onClick={() => registerPasskey(false)} disabled={busy}>{busy ? "Working…" : "Add another passkey"}</button>
+            </div>
+            <div className="credential-list">
+              <div className="credential-heading"><b>Your passkeys</b><span>{credentials.length} registered</span></div>
+              {credentials.map((item) => (
+                <div className="credential-row" key={item.id}>
+                  <div className="credential-meta">
+                    <input className="credential-name" aria-label="Passkey name" maxLength={40}
+                      value={credentialNames[item.id] ?? item.name}
+                      onChange={(event) => setCredentialNames((current) => ({ ...current, [item.id]: event.target.value }))} />
+                    <span>Added {new Date(item.createdAt).toLocaleDateString()} · {item.lastUsedAt ? `Last used ${new Date(item.lastUsedAt).toLocaleDateString()}` : "Not used yet"}</span>
+                    <span>{item.backedUp ? "Backed up by authenticator" : "Device backup not reported"}</span>
+                  </div>
+                  <div className="credential-actions">
+                    <button className="button button-small" onClick={() => saveCredentialName(item.id)} disabled={busy || !(credentialNames[item.id] || "").trim()}>Save</button>
+                    <button className="button button-danger" onClick={() => removeCredential(item.id)} disabled={busy || credentials.length <= 1}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="session-actions">
+              <button className="button button-quiet" onClick={logout} disabled={busy}>Sign out</button>
+              <button className="button button-quiet" onClick={logoutEverywhere} disabled={busy}>Sign out everywhere</button>
+            </div>
           </section>
         ) : auth.needsSetup ? (
           <section className="auth-panel">
