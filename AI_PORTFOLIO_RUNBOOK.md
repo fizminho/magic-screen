@@ -232,11 +232,11 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 
 | Cron | Purpose |
 |---|---|
-| `0 1 * * 2-6` | Refresh SEC submissions for owned US tickers; evaluate filing alerts and prepare the daily brief after the previous US session |
+| `0 1 * * 2-6` | Refresh SEC submissions and companyfacts for owned US tickers, preparing fresh public data for research briefs after the previous US session |
 | `0 2 * * 6` | Weekly recommendations + housekeeping (prune unpinned filing metadata > 30 days, expired `alert_log`, old `job_run`, expired challenges and rate-limit windows) |
 
 - [x] US quote refresh remains manual from the owner's browser because the approved free provider enforces a single source IP and 24-hour delay. Bursa quotes remain manual/CSV. No quote-provider requests run from Cloudflare Workers.
-- [x] Implement `scheduled(controller, env, ctx)` switching on the two UTC cron expressions. The SEC refresh is capped at 12 owned US instruments with a valid CIK (24 SEC requests maximum), sequential 550 ms spacing, bounded retries, filing metadata + companyfacts cache, and one `job_run` record. Weekly housekeeping prunes expired filings, caches, alerts, jobs, challenges and rate-limit windows.
+- [x] Implement `scheduled(controller, env, ctx)` switching on the two UTC cron expressions. The SEC refresh is capped at 8 owned US instruments with a valid CIK (16 SEC requests maximum), sequential 550 ms spacing between every SEC request, bounded retries, filing metadata + companyfacts cache, and one `job_run` record. It records `skipped_no_new_data` when no filing was filed in the preceding UTC day; it does not hardcode exchange holidays. Weekly housekeeping prunes expired filings, caches, alerts, jobs, challenges and rate-limit windows.
 - [ ] Skip weekends/public holidays gracefully: if there are no new filings or usable quote snapshots, skip the brief and log `skipped_no_new_data`. Do not hardcode holiday lists.
 - [x] Each scheduled job writes one `job_run` row (start, end, status, bounded detail). `ctx.waitUntil` is used only to hand off the scheduled task.
 - [x] Multi-row filing writes and weekly cleanup use `env.DB.batch([...])`. The SEC job is bounded to 12 instruments and designed to stay below ~40 D1 statements per invocation.
@@ -245,12 +245,12 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 - [x] Provider decision: Gemini API is rejected for this personal consumer app. Current Gemini API terms restrict the service to professional/business use rather than consumer use; the Free Tier may use prompts/responses to improve Google products and allow human review. Do not send portfolio data to Gemini.
 - [x] Provider/model verified: use the Cloudflare Workers AI binding `env.AI.run()` with `@cf/zai-org/glm-4.7-flash`. Cloudflare lists this model as available on Workers Free; shared free allowance is 10,000 Neurons/day and resets at 00:00 UTC. On Workers Free, requests above the allowance fail instead of creating overage charges. No external model API key is required.
 - [x] Terms/licence review: Cloudflare documents zero data retention for standard inference and no use of Customer Content to train models; operational metadata may still be retained. The GLM-4.7-Flash model card identifies MIT licensing. Do not enable content logging, AI Gateway prompt logging or stateful inference.
-- [ ] **Input boundary:** send only public SEC companyfacts and public SEC filing metadata. Never send holding/watchlist status, quantities, average cost, notes, portfolio weights, account identifiers, provider tokens or personal settings. Do not send MarketData.app quote data to the model.
-- [ ] Analysis is a public-company research brief, not a personalized portfolio recommendation. No buy/sell command, target price or guaranteed return. Include uncertainty and data gaps.
-- [ ] Request structured JSON by prompt and validate it in code. If invalid, retry once with a short correction prompt; no retry on 429/quota/out-of-capacity errors. Render only plain text; never trust model HTML.
-- [ ] Output schema: `company_summary`, `financial_strengths`, `financial_risks`, `filing_signals`, `unknowns`, `confidence`, and `source_accessions`. Every source accession must exist in the SEC facts/filings supplied to the model; drop unknown citations.
-- [ ] Rate limit to 5 analyses/day per owner and cache by `input_hash` for 24 hours. Do not log raw prompts or model responses to application logs.
-- [ ] Deterministic portfolio risk metrics remain computed in code and displayed separately; they are not included in the AI prompt.
+- [x] **Input boundary:** the owner-only analysis endpoint loads only public SEC companyfacts and public SEC filing metadata. It never queries or sends holding/watchlist status, quantities, average cost, notes, portfolio weights, account identifiers, provider tokens, settings or MarketData.app quote data.
+- [x] Analysis is a public-company research brief, not a personalized portfolio recommendation. The prompt and validator reject explicit buy/sell/hold directives, target prices and guaranteed returns; the brief includes unknowns, confidence and a non-advice disclaimer.
+- [x] Request JSON by prompt, validate required fields and bound all strings/lists. Invalid output receives one correction attempt. No retry occurs for provider/quota errors. The frontend receives plain text fields only, never model HTML.
+- [x] Output schema: `company_summary`, `financial_strengths`, `financial_risks`, `filing_signals`, `unknowns`, `confidence`, and `source_accessions`. Source accessions are filtered against the SEC facts/filings supplied to the model; unknown citations are dropped.
+- [x] Rate limit to 5 uncached analyses/day using an atomic D1 quota reservation; cache by `input_hash` for 24 hours. Failed inference releases its reservation. Raw prompts and model responses are never written to application logs.
+- [x] Deterministic portfolio risk metrics remain computed in code and displayed separately; they are not included in the AI prompt.
 
 ### E5. Web Push
 - [ ] Generate VAPID keys once with `npx web-push generate-vapid-keys` (do not add `web-push` as a dependency; it is Node-oriented). Store `VAPID_PRIVATE_KEY` as a secret; `VAPID_PUBLIC_KEY` and `VAPID_SUBJECT` (`mailto:`) as vars.
