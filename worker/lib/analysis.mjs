@@ -195,6 +195,10 @@ export async function handleAnalysisRequest(request, env, url) {
     try { facts = JSON.parse(factsRow.factsJson); } catch {
       return jsonResponse({ error: "Cached SEC company facts are invalid. Refresh them first." }, 409);
     }
+    if (!facts || facts.symbol !== symbol || String(facts.cik).padStart(10, "0") !== instrument.cik ||
+        facts.taxonomy !== "us-gaap" || !Array.isArray(facts.facts)) {
+      return jsonResponse({ error: "Cached SEC company facts do not match this instrument. Refresh them first." }, 409);
+    }
     const filings = (filingRows.results || []).filter((item) =>
       typeof item.accessionNumber === "string" &&
       /^\d{10}-\d{2}-\d{6}$/.test(item.accessionNumber) &&
