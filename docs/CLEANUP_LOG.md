@@ -38,3 +38,20 @@ Implemented on `chore/ai-portfolio-rebuild`:
 - `.github/workflows/deploy-worker.yml`: ordinary deployments apply pending migrations but never blanket-drop tables.
 
 The destructive workflow has **not** been executed. It will remain blocked until the replacement Worker is complete and legacy routes are removed. No Cloudflare token was changed and no secret was deleted.
+
+
+## Phase B/C cleanup update
+
+- Replaced the MFI frontend with a minimal Magic Folio shell.
+- Removed all MFI routes, provider session-cookie usage, and runtime DDL from `worker/index.ts`.
+- Deleted legacy Shariah screening and universe-membership modules/tests, retired MFI docs, and `db/schema.sql`.
+- Replaced the old CSP with `style-src 'self'`; the app shell uses external stylesheet rules only.
+- Removed unused `lucide-react` dependency.
+- Pinned checkout/setup-node actions to immutable commit SHAs in build, preflight and deploy workflows.
+- Made the production dependency audit blocking.
+- Added Dependabot npm minor/patch grouping and a safe `.dev.vars.example`; fixed `.gitignore` to allow that example file.
+- Rewrote README, SECURITY and setup documentation for the new product.
+- Expanded deployment path filters to include HTML, CSS (under `src/**`), package metadata and Vite config.
+- Outstanding: generate/commit `package-lock.json`, switch workflows from `npm install` to `npm ci`, inspect actual audit/outdated output, verify secret history and enable repository security settings.
+- Outstanding: delete the Cloudflare `MFI_SESSION_COOKIE` secret only after the new Worker has been deployed successfully.
+- No production D1 reset or Cloudflare secret deletion has been performed.
