@@ -11,7 +11,7 @@ function mockDb({ instruments = [], cursor = "" } = {}) {
         bind(...values) { this.values = values; return this; },
         async all() {
           calls.all++;
-          if (!sql.includes("FROM instrument i")) return { results: [] };
+          if (!sql.includes("FROM instrument i") || sql.includes("i.cik IS NULL")) return { results: [] };
           const after = sql.includes("i.symbol > ?") ? String(this.values[0] || "") : "";
           const limit = Number(this.values[this.values.length - 1] || instruments.length);
           return { results: instruments.filter((item) => item.symbol > after).slice(0, limit) };
