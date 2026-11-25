@@ -1,0 +1,12 @@
+# Local Worker development only. Use non-production values.
+RP_ID=localhost
+RP_NAME=Magic Folio
+RP_ORIGIN=http://localhost:8787
+
+# Optional public VAPID key for Web Push. Never put the private key here.
+VAPID_PUBLIC_KEY=
+
+# Configure these as Worker secrets only when the matching feature is implemented.
+# SETUP_TOKEN=
+# VAPID_PRIVATE_KEY=
+# GEMINI_API_KEY=
