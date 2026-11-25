@@ -21,6 +21,13 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 const post = (body = "{}", headers: Record<string, string> = {}): RequestInit => ({ method: "POST", body, headers });
 
+function decodeCredentialId(value: string): ArrayBuffer {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0)).buffer;
+}
+
 async function withoutWebAuthnDebug<T>(operation: () => Promise<T>): Promise<T> {
   const original = console.debug;
   console.debug = () => undefined;
@@ -56,7 +63,10 @@ export default function App() {
         discoverable: "required", domain: options.rpId, attestation: false,
         customProperties: {
           rp: { id: options.rpId, name: options.rpName },
-          excludeCredentials: options.excludeCredentials
+          excludeCredentials: options.excludeCredentials.map((credential) => ({
+            ...credential,
+            id: decodeCredentialId(credential.id)
+          }))
         }
       }));
       await api("/api/auth/register/verify", post(JSON.stringify(registration), headers));
