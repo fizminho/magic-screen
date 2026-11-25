@@ -57,3 +57,14 @@ A4 production D1 export, A5 live table inventory, and A6 local install/build/tes
 
 - Added backup-*.sql to .gitignore before any backup is created, as required by A4.
 - Added exact local commands for A1/A4/A5/A6 to docs/BLOCKERS.md. No backup file has been created by this session.
+
+
+## Phase A automation added
+
+- Added `.github/workflows/phase-a-preflight.yml` on `chore/ai-portfolio-rebuild`.
+- Reuses the exact Cloudflare credential references already present in `.github/workflows/deploy-worker.yml`: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (repository variable preferred, secret fallback).
+- The workflow is read-only against production D1: export, verify non-empty file, and inventory `sqlite_master`. It separately runs npm install, build, and Node regression tests.
+- The workflow does not deploy, run migrations, write to D1, delete secrets, or change Worker production configuration.
+- Backup and inventory are stored in a one-day GitHub Actions artifact. Treat the backup as sensitive production data and move it to secure storage promptly.
+- Workflow file commit: `ff319f603ca35e280d53da1adcebc14d6ca66e4c`.
+- Workflow execution status: not yet verified at the time this log entry was written. A4/A5/A6 remain incomplete until the Actions run and artifact are inspected.
