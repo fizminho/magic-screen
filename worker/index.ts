@@ -25,6 +25,8 @@ import { handleAnalysisRequest, runScheduledResearchBrief } from "./lib/analysis
 import { handlePushRequest } from "./lib/push.mjs";
 // @ts-ignore Scheduled job history is covered by Node regression tests.
 import { handleJobRunsRequest } from "./lib/jobs.mjs";
+// @ts-ignore Owner-only manual job controls are covered by Worker regression tests.
+import { handleAdminJobsRequest } from "./jobs/admin.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -42,7 +44,7 @@ interface Env {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     let response: Response;
 
@@ -69,6 +71,8 @@ export default {
       response = await handleAnalysisRequest(request, env, url);
     } else if (url.pathname === "/api/jobs/recent") {
       response = await handleJobRunsRequest(request, env, url);
+    } else if (url.pathname === "/api/admin/jobs" || url.pathname === "/api/admin/jobs/run") {
+      response = await handleAdminJobsRequest(request, env, url, ctx);
     } else if (url.pathname.startsWith("/api/push/")) {
       response = await handlePushRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
@@ -95,6 +99,12 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const now = new Date().toISOString();
+    const lock = await env.DB.prepare("SELECT value FROM setting WHERE key = ?").bind("manual_job_lock").first();
+    if (typeof lock?.value === "string" && lock.value.slice(0, 24) > now) {
+      console.log("Scheduled task skipped because a manual job is active.");
+      return;
+    }
     const task = controller.cron === "0 1 * * 2-6"
       ? runSecRefresh(env).then(async (refreshResult: unknown) => {
           // Generate briefs only after fresh SEC data has been persisted.
