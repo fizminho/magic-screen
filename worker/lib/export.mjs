@@ -71,7 +71,16 @@ export async function handleExportRequest(request, env, url) {
       });
     }
 
-    return jsonResponse({ exportedAt, holdings, watchlist, settings });
+    const date = exportedAt.slice(0, 10);
+    return new Response(JSON.stringify({ exportedAt, holdings, watchlist, settings }, null, 2), {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": `attachment; filename="magic-folio-${date}.json"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     console.error("Export request failed:", message);
