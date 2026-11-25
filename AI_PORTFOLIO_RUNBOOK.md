@@ -254,9 +254,9 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 
 ### E5. Web Push
 - [ ] Generate VAPID keys once with `npx web-push generate-vapid-keys` (do not add `web-push` as a dependency; it is Node-oriented). Store `VAPID_PRIVATE_KEY` as a secret; `VAPID_PUBLIC_KEY` and `VAPID_SUBJECT` (`mailto:`) as vars.
-- [ ] Implement send with WebCrypto (VAPID JWT ES256 + RFC 8291 payload encryption) or one small Workers-compatible library; vet its maintenance and size first and record the choice in `docs/DATA_SOURCES.md`.
-- [ ] Routes: `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `POST /api/push/test`.
-- [ ] On HTTP 404/410 from the push service, delete that subscription row.
+- [x] Implemented with native WebCrypto (VAPID JWT ES256 + RFC 8291 `aes128gcm` payload encryption); no third-party runtime dependency. Design and protocol references are recorded in `docs/DATA_SOURCES.md`.
+- [x] Owner-session and exact-Origin routes: `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `POST /api/push/test`. Subscriptions are capped at five and endpoints are restricted to supported HTTPS push services.
+- [x] HTTP 404/410 responses delete the expired subscription row.
 - [ ] Alert types: (1) holding moves ≥ `alert_move_pct` (default 4%) vs previous close; (2) a public filing signal the approved research rules classify as high impact; (3) morning brief ready. Dedupe with `alert_log.dedupe_key` (e.g. `move:AAPL:2026-11-25`). Max 8 pushes/day (setting).
 - [ ] Payload is short (title + 1 line + deep link `/#/holding/AAPL`). No quantities or P/L amounts in push text.
 
