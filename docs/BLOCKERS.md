@@ -19,12 +19,12 @@ The normal deployment workflow applies pending migrations and deploys. It does *
 - Legacy MFI endpoints, provider session-cookie usage, runtime DDL and old screener UI have been removed from the rebuild branch.
 - New D1 portfolio schema and migrations are in place.
 - Passkey bootstrap, login, session handling, credential management, recovery documentation and security headers are implemented.
-- CI has passed build, dependency audit, regression tests, local D1 migration/schema checks, local destructive-reset exercise and Wrangler dry-run on an earlier passkey commit. Later auth hardening changes are running through CI again.
+- CI has passed build, full dependency audit, regression tests, fresh local D1 migration/schema checks, the foreign-key-aware local destructive-reset exercise, local Worker auth smoke tests and Wrangler dry-run on the passkey implementation. The latest additional script/deploy guard changes are being rechecked.
 - No production deployment, production reset, or Cloudflare secret deletion has been performed.
 
 ## Remaining production gates
 
-1. **Production RP hostname:** choose the final hostname and set uncommented `RP_ID` and `RP_ORIGIN` values in `wrangler.toml`. Passkeys are bound to this hostname; changing it later requires re-registration.
+1. **Production RP hostname:** choose the final hostname and set `RP_ID` and `RP_ORIGIN` under `[vars]` in `wrangler.toml`. The deploy and reset workflows now fail closed until `RP_ORIGIN` is exactly `https://` plus `RP_ID`. Passkeys are bound to this hostname; changing it later requires re-registration.
 2. **Bootstrap secret:** create a random 32-byte (or longer) `SETUP_TOKEN` and add it as a Cloudflare Worker secret before running the production cutover. The guarded workflow checks that the secret exists. After registering and testing at least two passkeys, delete it.
 3. **Cloudflare permissions:** ensure `CLOUDFLARE_API_TOKEN` can deploy the Worker, list Worker secrets and read/write the D1 database. The earlier D1 export permission issue is no longer relevant because backup/export was explicitly waived.
 4. **Device testing:** registration and login still need to be exercised on Android Chrome, iOS Safari, iOS Home Screen PWA and desktop Chrome/Edge using the final production hostname.
