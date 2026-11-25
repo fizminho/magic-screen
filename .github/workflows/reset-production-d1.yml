@@ -43,7 +43,7 @@ jobs:
           test -f migrations/0001_drop_legacy.sql
           test -f migrations/0002_portfolio_schema.sql
       - name: Install and build the replacement application
-        run: npm install --no-audit --no-fund && npm run build
+        run: npm ci --no-audit --no-fund && npm run build
       - name: Reset all production D1 user tables and apply clean schema
         run: bash scripts/reset-production-d1.sh
       - name: Deploy the replacement Worker and assets
