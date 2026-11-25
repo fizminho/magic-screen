@@ -65,17 +65,23 @@ function cookieHeader(token, env, maxAge = SESSION_SECONDS) {
 
 function getRp(env, request) {
   const requestOrigin = new URL(request.url).origin;
-  const origin = env.RP_ORIGIN || (env.APP_ENV === "production" ? "" : requestOrigin);
+  const configuredOrigin = env.RP_ORIGIN || (env.APP_ENV === "production" ? "" : requestOrigin);
+  const parsedOrigin = configuredOrigin ? new URL(configuredOrigin) : null;
+  const origin = parsedOrigin?.origin || "";
   const rpId = env.RP_ID || (env.APP_ENV === "production" ? "" : new URL(origin || requestOrigin).hostname);
-  if (!origin || !rpId || new URL(origin).hostname !== rpId) throw new Error("invalid_rp_configuration");
-  if (env.APP_ENV === "production" && new URL(origin).protocol !== "https:") throw new Error("invalid_rp_configuration");
-  if (env.APP_ENV !== "production" && (new URL(origin).hostname !== "localhost" || new URL(origin).protocol !== "http:")) throw new Error("invalid_rp_configuration");
+  if (!origin || !rpId || parsedOrigin.pathname !== "/" || parsedOrigin.search || parsedOrigin.hash || parsedOrigin.hostname !== rpId) {
+    throw new Error("invalid_rp_configuration");
+  }
+  if (env.APP_ENV === "production" && parsedOrigin.protocol !== "https:") throw new Error("invalid_rp_configuration");
+  if (env.APP_ENV !== "production" && (parsedOrigin.hostname !== "localhost" || parsedOrigin.protocol !== "http:")) {
+    throw new Error("invalid_rp_configuration");
+  }
   return { origin, rpId };
 }
 
 function checkOrigin(request, env) {
   const { origin } = getRp(env, request);
-  if (request.headers.get("origin") !== origin) throw new Error("origin_rejected");
+  if (new URL(request.url).origin !== origin || request.headers.get("origin") !== origin) throw new Error("origin_rejected");
 }
 
 async function sessionFor(request, env) {
@@ -387,7 +393,7 @@ async function credentialMutation(request, env, pathname) {
   if (request.method === "PATCH") {
     const payload = await bodyJson(request);
     const name = typeof payload?.name === "string" ? payload.name.trim() : "";
-    if (!name || name.length > 40) return json({ error: "Passkey name must be 1 to 40 characters." }, 400);
+    if (!name || name.length > 40 || /[\\u0000-\\u001f\\u007f]/.test(name)) return json({ error: "Passkey name must be 1 to 40 characters." }, 400);
     const result = await env.DB.prepare("UPDATE passkey_credential SET name = ? WHERE id = ?")
       .bind(name, credentialId).run();
     if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "Passkey not found." }, 404);
