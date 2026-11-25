@@ -40,6 +40,14 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - name: Verify production WebAuthn relying-party configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          RP_ID="$(sed -n 's/^RP_ID = "\([^"]*\)"/\1/p' wrangler.toml)"
+          RP_ORIGIN="$(sed -n 's/^RP_ORIGIN = "\([^"]*\)"/\1/p' wrangler.toml)"
+          test -n "$RP_ID" || { echo "::error::Set RP_ID in wrangler.toml before production deployment."; exit 1; }
+          test "$RP_ORIGIN" = "https://$RP_ID" || { echo "::error::Set RP_ORIGIN to the exact HTTPS origin matching RP_ID."; exit 1; }
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
       - name: Report available dependency updates
