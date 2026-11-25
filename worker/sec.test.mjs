@@ -15,7 +15,7 @@ function fakeDb({
   filings = [],
   instrument = undefined
 } = {}) {
-  const calls = { batch: 0, statements: [], queries: [] };
+  const calls = { batch: 0, statements: [], queries: [], prepared: [] };
   const DB = {
     prepare(sql) {
       const statement = {
@@ -43,6 +43,7 @@ function fakeDb({
         },
         async run() { return { meta: { changes: 1 } }; }
       };
+      calls.prepared.push(statement);
       return statement;
     },
     async batch(statements) {
@@ -189,6 +190,7 @@ test("fresh SEC filing metadata is served from D1 without an upstream request", 
   assert.equal(body.filings.length, 1);
   assert.equal(fetchCalls, 0);
   assert.equal(calls.batch, 0);
+  assert.ok(calls.prepared.some((statement) => statement.sql.includes("DELETE FROM sec_filing WHERE instrument_id=? AND filing_date < ?")));
 });
 
 test("SEC cache miss persists filing metadata and a six-hour cache marker", async () => {
