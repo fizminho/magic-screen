@@ -46,6 +46,34 @@ jobs:
           CONFIRM_PRODUCTION_RESET: DROP-ALL-LEGACY-DATA
           D1_SCOPE: --local
         run: bash scripts/reset-production-d1.sh
+      - name: Smoke-test Worker auth routes with local D1
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .dev.vars.example .dev.vars
+          npx --yes wrangler@4 dev --local --ip 127.0.0.1 --port 8787 > /tmp/magic-folio-wrangler.log 2>&1 &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          health=""
+          for attempt in {1..30}; do
+            health="$(curl --silent --show-error --fail --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/health 2>/dev/null || true)"
+            if [[ -n "$health" ]]; then break; fi
+            sleep 1
+          done
+          if [[ -z "$health" ]]; then
+            cat /tmp/magic-folio-wrangler.log
+            exit 1
+          fi
+          echo "$health" | jq -e '.ok == true and .service == "magic-folio"'
+          state="$(curl --silent --show-error --fail --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/auth/state)"
+          echo "$state" | jq -e '.needsSetup == true and .authenticated == false'
+          register_status="$(curl --silent --output /tmp/register-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/auth/register/options -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' --data '{}')"
+          test "$register_status" = "403"
+          login_status="$(curl --silent --output /tmp/login-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/auth/login/options -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' --data '{}')"
+          test "$login_status" = "403"
+          private_status="$(curl --silent --output /tmp/credentials-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/auth/credentials)"
+          test "$private_status" = "401"
       - name: Validate Wrangler bundling and assets without deploying
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 deploy --dry-run
