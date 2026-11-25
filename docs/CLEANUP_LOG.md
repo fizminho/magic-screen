@@ -153,3 +153,11 @@ Preflight run `45528932617` on commit `89a5e20ee781d4486368da71846eacec65410e0b`
 - Passed: `npm ci`, Vite/TypeScript build, full `npm audit --audit-level=high`, complete Node regression suite, fresh local D1 migrations, explicit CIK/SEC-cache schema checks, SEC rate-limit constraint check, local destructive reset exercise, Worker auth/portfolio/quote smoke tests and Wrangler dry-run.
 - The local destructive reset exercised all current migrations and the smoke test verified quote snapshots are stored and removed when the last holding/watchlist reference is removed.
 - No production D1 reset, production deployment or Cloudflare secret deletion was performed.
+
+
+### Dashboard and settings hardening
+
+- Added currency-separated dashboard summaries and rule-based concentration flags, with owner-configurable daily move and maximum-position thresholds.
+- Added owner-only settings read/update API and UI. Writes accept only the two supported numeric settings, enforce bounds, and reject inherited object keys such as `__proto__`.
+- MarketData refresh now checks the owner session before making an external provider request and clears the tab-scoped token on a 401/session expiry.
+- Latest CI run `45532710625` passed on commit `da345f317d5e0b3aa3d52ee8da9c3022cba28b31`: build, full audit, regression tests, local D1 migration/schema checks, local destructive reset, Worker smoke tests and Wrangler dry-run.
