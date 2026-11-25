@@ -80,11 +80,12 @@ async function refreshCompanyFacts(env, instrument, userAgent, fetcher, now) {
   return "updated";
 }
 
-export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } = {}) {
+export async function runSecRefresh(env, { fetcher = fetch, now = Date.now(), triggerType = "cron" } = {}) {
   const startedAt = new Date(now).toISOString();
   const inserted = await env.DB.prepare(
-    "INSERT INTO job_run(job,started_at,status,detail) VALUES('sec_refresh',?,'running','SEC refresh started')"
-  ).bind(startedAt).run();
+    "INSERT INTO job_run(job,started_at,status,detail) VALUES(?,?,'running',?)"
+  ).bind(triggerType === "manual" ? "manual_sec_refresh" : "sec_refresh", startedAt,
+      triggerType === "manual" ? "Manual SEC refresh started" : "SEC refresh started").run();
   const jobId = inserted.meta?.last_row_id;
   let refreshed = 0;
   let filingCount = 0;
