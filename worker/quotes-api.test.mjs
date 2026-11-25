@@ -63,7 +63,7 @@ test("quote snapshots are validated and persisted in one D1 batch", async () => 
   const { DB, calls } = fakeDb();
   const quote = {
     symbol: "AAPL", market: "US", price: 101, prevClose: 100, changePct: 0.01,
-    asOf: new Date().toISOString(), currency: "USD", provider: "marketdata.app", status: "ok"
+    asOf: new Date().toISOString(), currency: "USD", provider: "yahoo-finance", status: "ok"
   };
   const response = await handleQuoteRequest(new Request(`${origin}/api/quotes/snapshots`, {
     method: "POST",
@@ -81,7 +81,7 @@ test("quote snapshots reject invalid provider-market combinations before writing
   const { DB, calls } = fakeDb();
   const quote = {
     symbol: "1155", market: "MY", price: 6.2, prevClose: 6.1, changePct: 0.01,
-    asOf: new Date().toISOString(), currency: "MYR", provider: "marketdata.app", status: "ok"
+    asOf: new Date().toISOString(), currency: "MYR", provider: "yahoo-finance", status: "ok"
   };
   const response = await handleQuoteRequest(new Request(`${origin}/api/quotes/snapshots`, {
     method: "POST",
@@ -96,7 +96,7 @@ test("unmatched instruments are returned without pretending quotes were saved", 
   const { DB, calls } = fakeDb({ batchChanges: 0 });
   const quote = {
     symbol: "AAPL", market: "US", price: 101, prevClose: 100, changePct: 0.01,
-    asOf: new Date().toISOString(), currency: "USD", provider: "marketdata.app", status: "ok"
+    asOf: new Date().toISOString(), currency: "USD", provider: "yahoo-finance", status: "ok"
   };
   const response = await handleQuoteRequest(new Request(`${origin}/api/quotes/snapshots`, {
     method: "POST",
@@ -116,4 +116,35 @@ test("latest quote endpoint returns owner-only D1 rows", async () => {
   }), { ...envConfig, DB }, "/api/quotes/latest");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { quotes: [row] });
+});
+
+test("owner can refresh US quotes without a provider token and persist Yahoo snapshots", async () => {
+  const { DB, calls } = fakeDb({ quoteRows: [{ symbol: "AAPL" }] });
+  const asOf = Math.floor(Date.now() / 1000);
+  const fetcher = async () => new Response(JSON.stringify({
+    chart: { result: [{
+      meta: { regularMarketPrice: 210, previousClose: 200, regularMarketTime: asOf },
+      indicators: { quote: [{ close: [198, 200, 210] }] }
+    }] }
+  }), { status: 200, headers: { "content-type": "application/json" } });
+  const response = await handleQuoteRequest(new Request(`${origin}/api/quotes/refresh-us`, {
+    method: "POST",
+    headers: { origin, cookie: sessionCookie, "content-type": "application/json" },
+    body: "{}"
+  }), { ...envConfig, DB }, "/api/quotes/refresh-us", fetcher);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { saved: 1, failed: 0, symbols: 1, failedSymbols: [] });
+  assert.equal(calls.batch, 1);
+  assert.match(calls.statements[0].sql, /quote_latest/);
+  assert.equal(calls.statements[0].values[4], "yahoo-finance");
+});
+
+test("US quote refresh rejects unauthenticated requests", async () => {
+  const { DB, calls } = fakeDb();
+  DB.prepare = () => ({ bind() { return this; }, async first() { return null; } });
+  const response = await handleQuoteRequest(new Request(`${origin}/api/quotes/refresh-us`, {
+    method: "POST", headers: { origin, "content-type": "application/json" }, body: "{}"
+  }), { ...envConfig, DB }, "/api/quotes/refresh-us", async () => { throw new Error("must not fetch"); });
+  assert.equal(response.status, 401);
+  assert.equal(calls.batch, 0);
 });
