@@ -108,3 +108,14 @@ Latest full preflight `45528603689` on commit `e4f2d6e3f3ca6cc5ee442ee5842fd3be6
 - Wrangler deploy dry-run
 
 Still pending before production: real passkey ceremony on iOS Safari/PWA, Android Chrome/PWA and desktop Chrome/Edge; production RP variables and temporary setup secret; deployment; two real passkeys; then removal of `SETUP_TOKEN` and obsolete `MFI_SESSION_COOKIE`. No production D1 reset, Worker deployment or Cloudflare secret deletion has been performed.
+
+
+### Final auth-hardening CI
+
+Preflight run `45528932617` on commit `89a5e20ee781d4486368da71846eacec65410e0b` passed after the final WebAuthn binding checks:
+
+- Rejects `crossOrigin: true` in WebAuthn client data.
+- Binds the request URL host and `Origin` header to the configured RP origin.
+- Checks the credential ID and raw ID match each other and the ID embedded in authenticator attested data.
+- Checks the attested data's user-presence and user-verification flags and matches the public-key algorithm.
+- Full build, audit, regression, local D1 reset, Worker auth smoke and Wrangler dry-run all passed.
