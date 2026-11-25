@@ -81,3 +81,45 @@ test("EdgarTools ingestion rejects invalid accession and production-mutating rep
   const mutating = await handleEdgarToolsRequest(request("/api/fundamentals/edgartools/ingest", { method: "POST", body: base }), { DB, UNIVERSE_SYNC_TOKEN: token }, new URL("https://folio.example/api/fundamentals/edgartools/ingest"));
   assert.equal(mutating.status, 400);
 });
+
+test("normalized EdgarTools analytics ingestion stores metric records separately", async () => {
+  const { DB, calls } = mockDb();
+  const report = {
+    service: "Magic Folio EdgarTools normalized analytics evidence",
+    schema_version: 1,
+    mapping_version: 2,
+    production_data_modified: false,
+    source_report_generated_at: "2026-11-25T02:00:00.000Z",
+    companies: [{
+      symbol: "AAPL", provider_status: "supported",
+      accession: "0000320193-26-000101", form: "10-K", mapping_version: 2,
+      metrics: [
+        { statement: "income_statement", metric: "revenue", period_end: "2026-09-30", period_type: "duration", fiscal_label: "FY", value: 478834000000, currency: null, source_concept: "us-gaap_Revenue", source_label: "Revenue", standard_concept: "Revenue", balance: null },
+        { statement: "balance_sheet", metric: "totalAssets", period_end: "2026-09-30", period_type: "instant", fiscal_label: null, value: 404548000000, currency: null, source_concept: "us-gaap_Assets", source_label: "Total assets", standard_concept: "Assets", balance: "debit" }
+      ]
+    }]
+  };
+  const response = await handleEdgarToolsRequest(request("/api/fundamentals/edgartools/normalized", { method: "POST", body: report }), { DB, UNIVERSE_SYNC_TOKEN: token }, new URL("https://folio.example/api/fundamentals/edgartools/normalized"));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.metric_records, 2);
+  assert.equal(body.production_fundamentals_changed, false);
+  assert.equal(body.rankings_changed, false);
+  assert.ok(calls.batches[0].some((item) => item.sql.includes("INSERT INTO edgartools_normalized_metric")));
+});
+
+test("normalized EdgarTools ingestion rejects malformed accession and period values", async () => {
+  const { DB } = mockDb();
+  const report = {
+    service: "Magic Folio EdgarTools normalized analytics evidence",
+    schema_version: 1,
+    production_data_modified: false,
+    source_report_generated_at: "2026-11-25T02:00:00.000Z",
+    companies: [{
+      symbol: "AAPL", provider_status: "supported", accession: "bad", form: "10-K", mapping_version: 2,
+      metrics: [{ statement: "income_statement", metric: "revenue", period_end: "2026-09-30", period_type: "duration", value: 10, currency: null }]
+    }]
+  };
+  const response = await handleEdgarToolsRequest(request("/api/fundamentals/edgartools/normalized", { method: "POST", body: report }), { DB, UNIVERSE_SYNC_TOKEN: token }, new URL("https://folio.example/api/fundamentals/edgartools/normalized"));
+  assert.equal(response.status, 400);
+});
