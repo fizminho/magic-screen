@@ -72,3 +72,15 @@ Latest branch preflight on `97e85ba043f33a7b4c3a5c09da700306b76565a0` completed 
 - A TypeScript import typing error in the new Worker shell was found by CI and fixed with an explicit JS helper boundary. The subsequent preflight passed all checks.
 
 The latest passing preflight is linked from the repository Actions page. Earlier failures were caused by a typo in the pinned setup-node SHA and the TypeScript declaration boundary; both were corrected before the passing run.
+
+
+### Fresh D1 migration verification
+
+Preflight run `45527396444` on commit `9876af8cf8e696b17213092a80097e54197a9227` passed all steps:
+
+- Clean `npm ci`, TypeScript/Vite build, full dependency audit (0 vulnerabilities), regression suite.
+- Applied `0001_drop_legacy.sql` and `0002_portfolio_schema.sql` against a fresh local D1 database.
+- Queried `sqlite_master`; the expected tables were present: `auth_challenge`, `holding`, `instrument`, `job_run`, `news_instrument`, `news_item`, `passkey_credential`, `price_daily`, `push_subscription`, `quote_latest`, `session`, `setting`, `watchlist`, plus `d1_migrations`.
+- Wrangler dry-run confirmed the Worker bundle and `magic-screen-db` binding without contacting production.
+
+This validates the new schema from an empty local D1 database. It does not apply or alter production D1.
