@@ -20,6 +20,26 @@ type Holding = {
   quoteStatus: "ok" | "stale" | "unavailable";
 };
 
+type DashboardMarket = {
+  market: "US" | "MY";
+  currency: "USD" | "MYR";
+  holdingsCount: number;
+  pricedCount: number;
+  unavailableQuoteCount: number;
+  staleQuoteCount: number;
+  quoteCoveragePct: number;
+  marketValue: number;
+  largestPosition: { symbol: string; value: number; weightPct: number } | null;
+  topThreeConcentrationPct: number | null;
+  sectorWeights: Array<{ sector: string; value: number; weightPct: number }>;
+};
+type Dashboard = {
+  holdingsCount: number;
+  staleQuoteCount: number;
+  unavailableQuoteCount: number;
+  markets: DashboardMarket[];
+};
+
 type WatchlistItem = {
   symbol: string;
   market: "US" | "MY";
@@ -65,6 +85,7 @@ function formatDate(value: string | null) {
 
 export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [watchSymbol, setWatchSymbol] = useState("");
   const [watchMarket, setWatchMarket] = useState<"US" | "MY">("US");
@@ -90,9 +111,17 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     setWatchlist(result.items);
   }
 
+  async function refreshDashboard() {
+    setDashboard(await api<Dashboard>("/api/dashboard"));
+  }
+
+  async function refreshPortfolio() {
+    await Promise.all([refreshHoldings(), refreshWatchlist(), refreshDashboard()]);
+  }
+
   useEffect(() => {
     setMarketToken(sessionStorage.getItem("magicfolio.marketdata.token") || "");
-    Promise.all([refreshHoldings(), refreshWatchlist()])
+    refreshPortfolio()
       .catch((cause) => onError(cause instanceof Error ? cause.message : "Unable to load portfolio data."))
       .finally(() => setLoading(false));
   }, []);
@@ -135,7 +164,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         })
       });
       setSymbol(""); setQuantity(""); setAvgCost(""); setNotes("");
-      await refreshHoldings();
+      await refreshPortfolio();
       onNotice("Holding saved.");
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to save holding.");
@@ -149,7 +178,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       await api(`/api/holdings/${encodeURIComponent(item.market)}/${encodeURIComponent(item.symbol)}`, {
         method: "DELETE", body: "{}"
       });
-      await refreshHoldings();
+      await refreshPortfolio();
       onNotice(`${item.symbol} removed from holdings.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to remove holding.");
@@ -164,7 +193,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         method: "PUT", body: JSON.stringify({ holdings: rows })
       });
       setHoldingsCsv("");
-      await refreshHoldings();
+      await refreshPortfolio();
       onNotice(`Imported ${result.saved} positions. Existing positions were updated; omitted holdings were left unchanged.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to import holdings CSV.");
@@ -214,7 +243,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       saved += result.saved;
       unmatched.push(...result.unmatchedSymbols);
     }
-    await Promise.all([refreshHoldings(), refreshWatchlist()]);
+    await refreshPortfolio();
     return { saved, unmatched };
   }
 
@@ -258,6 +287,38 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       <div className="portfolio-heading">
         <div><span className="eyebrow">OWNER PORTFOLIO</span><h2>Your holdings</h2></div>
         <span className="holding-count">{holdings.length} / 20</span>
+      </div>
+
+      <div className="dashboard-summary">
+        <div className="dashboard-overview">
+          <div className="metric-tile"><span>POSITIONS</span><strong>{dashboard?.holdingsCount ?? "—"}</strong></div>
+          <div className="metric-tile"><span>STALE QUOTES</span><strong>{dashboard?.staleQuoteCount ?? "—"}</strong></div>
+          <div className="metric-tile"><span>NO QUOTE</span><strong>{dashboard?.unavailableQuoteCount ?? "—"}</strong></div>
+          <div className="market-counts">
+            <span>US {dashboard?.markets.find((item) => item.market === "US")?.holdingsCount ?? 0}</span>
+            <span>MY {dashboard?.markets.find((item) => item.market === "MY")?.holdingsCount ?? 0}</span>
+          </div>
+        </div>
+        <div className="market-metrics">
+          {(["US", "MY"] as const).map((marketCode) => {
+            const item = dashboard?.markets.find((marketItem) => marketItem.market === marketCode);
+            return (
+              <div className="market-metric-card" key={marketCode}>
+                <div className="market-metric-title"><b>{marketCode === "US" ? "United States" : "Bursa Malaysia"}</b><span>{item?.quoteCoveragePct ?? 0}% quote coverage</span></div>
+                <strong>{formatMoney(item?.marketValue ?? null, marketCode === "US" ? "USD" : "MYR")}</strong>
+                <div className="market-metric-details">
+                  <span>Largest: {item?.largestPosition ? `${item.largestPosition.symbol} · ${item.largestPosition.weightPct}%` : "—"}</span>
+                  <span>Top 3: {item?.topThreeConcentrationPct === null || item?.topThreeConcentrationPct === undefined ? "—" : `${item.topThreeConcentrationPct}%`}</span>
+                </div>
+                {item?.sectorWeights.slice(0, 3).map((sector) => (
+                  <div className="sector-weight" key={sector.sector}><span>{sector.sector}</span><b>{sector.weightPct}%</b></div>
+                ))}
+                <small>Indicative value · {item?.staleQuoteCount ?? 0} stale</small>
+              </div>
+            );
+          })}
+        </div>
+        <p className="dashboard-disclaimer">US and MY values are kept separate because they use different currencies. Metrics use available quotes, including stale prices where marked.</p>
       </div>
 
       <div className="holdings-table-wrap">
