@@ -37,7 +37,7 @@ function safeUserAgent(value) {
 
 function accessionMatchesCik(accession, cik) {
   return typeof accession === "string" && /^\d{10}-\d{2}-\d{6}$/.test(accession) &&
-    accession.slice(0, 10) === cik;
+    accession.slice(0, 10) === String(cik).padStart(10, "0");
 }
 
 function selectFactEntries(companyFacts, concept) {
