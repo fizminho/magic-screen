@@ -40,7 +40,7 @@ const facts = {
   cik: 320193, entityName: "Apple Inc.",
   facts: { "us-gaap": { Assets: { units: { USD: [
     { accn: "0000320193-26-000101", form: "10-Q", filed: "2026-11-24", end: "2026-09-30", val: 1000 }
-  ] } } }
+  ] } } } }
 };
 
 test("scheduled SEC refresh stores filing metadata and public facts without quote or holding data", async () => {
