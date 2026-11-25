@@ -164,9 +164,13 @@ async function registerOptions(request, env) {
   await recordAttempt(request, env, "options", 20);
   await authorizeRegistration(request, env);
   const challenge = await issueChallenge(env, "register");
+  const proposedOwnerHandle = await ownerHandle(env);
+  await env.DB.prepare("INSERT OR IGNORE INTO setting(key,value) VALUES('owner_user_handle',?)")
+    .bind(proposedOwnerHandle).run();
+  const userId = await ownerHandle(env);
   return json({
     challenge,
-    user: { id: await ownerHandle(env), name: "Magic Folio owner", displayName: "Magic Folio" },
+    user: { id: userId, name: "Magic Folio owner", displayName: "Magic Folio" },
     rpId: getRp(env, request).rpId
   });
 }
@@ -196,7 +200,9 @@ async function registerVerify(request, env) {
   if (!algorithm) return json({ error: "This passkey algorithm is not supported." }, 400);
 
   const ownerId = payload?.user?.id;
-  if (typeof ownerId !== "string" || ownerId.length < 16 || ownerId.length > 128) {
+  const storedOwner = await env.DB.prepare("SELECT value FROM setting WHERE key='owner_user_handle'").first();
+  if (typeof ownerId !== "string" || ownerId.length < 16 || ownerId.length > 128 ||
+      !storedOwner?.value || !constantTimeEqual(ownerId, storedOwner.value)) {
     return json({ error: "Passkey registration could not be verified." }, 400);
   }
   const transports = Array.isArray(credential.transports) ? JSON.stringify(credential.transports) : null;
