@@ -39,6 +39,44 @@ async function fetchJson(url, userAgent, fetcher) {
   return response.json();
 }
 
+async function backfillMissingCiks(env, userAgent, fetcher) {
+  const missing = await env.DB.prepare(
+    "SELECT i.id,i.symbol FROM instrument i LEFT JOIN holding h ON h.instrument_id=i.id " +
+    "LEFT JOIN watchlist w ON w.instrument_id=i.id WHERE i.market='US' AND i.active=1 " +
+    "AND i.cik IS NULL AND (h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) " +
+    "ORDER BY i.symbol LIMIT 100"
+  ).all();
+  const instruments = missing.results || [];
+  if (!instruments.length) return 0;
+
+  let payload;
+  try {
+    payload = await fetchJson(SEC_TICKER_DIRECTORY, userAgent, fetcher);
+  } catch (error) {
+    console.warn("SEC CIK directory lookup failed:", error instanceof Error ? error.message : "unknown");
+    return 0;
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return 0;
+  const byTicker = new Map();
+  for (const entry of Object.values(payload)) {
+    if (!entry || typeof entry !== "object" || typeof entry.ticker !== "string") continue;
+    const ticker = entry.ticker.trim().toUpperCase();
+    const cikNumber = Number(entry.cik_str);
+    if (!ticker || !Number.isInteger(cikNumber) || cikNumber <= 0 || cikNumber > 9_999_999_999) continue;
+    if (!byTicker.has(ticker)) byTicker.set(ticker, String(cikNumber).padStart(10, "0"));
+  }
+
+  let resolved = 0;
+  for (const instrument of instruments) {
+    const cik = byTicker.get(String(instrument.symbol).toUpperCase());
+    if (!cik) continue;
+    await env.DB.prepare("UPDATE instrument SET cik=? WHERE id=? AND cik IS NULL")
+      .bind(cik, instrument.id).run();
+    resolved++;
+  }
+  return resolved;
+}
+
 async function storeFilings(env, instrument, filings, companyName, fetchedAt) {
   const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const statements = [
