@@ -48,15 +48,22 @@ References:
 - https://www.bursamalaysia.com/sites/5d809dcf39fba22790cad230/assets/6440f97839fba259236ba5ba/ISLA_Guidelines_V1.1_01_Apr_2023.pdf
 - https://www.bursamalaysia.com/sites/5d809dcf39fba22790cad230/assets/63ae56f15b711a799d692659/Information_Services_Licence_Agreement_Price_List_in_Ringgit_Malaysia__MYR_01012023.pdf
 
-## LLM analysis: Gemini API not approved for personal portfolio data
+## AI research: Cloudflare Workers AI
 
-**Do not integrate Gemini Free for this personal portfolio use case at this time.** Google's current Gemini API Additional Terms (effective 23 March 2026) state that Gemini API/AI Studio are for developers building for professional or business purposes, not consumer use. The unpaid quota also allows Google to use submitted prompts and generated responses to improve products and machine-learning technologies; human reviewers may read and process inputs/outputs. The terms explicitly say not to submit sensitive, confidential or personal information to unpaid services.
+**Approved candidate for public-company research briefs only:** Cloudflare Workers AI with `@cf/zai-org/glm-4.7-flash`.
 
-Magic Folio is currently a private personal portfolio tool and its holdings, watchlist, allocation weights and activity are personal financial information. Do not send those values, ticker lists tied to the owner's portfolio, prompts, or generated analysis to Gemini Free. Removing names or quantities does not automatically make a private portfolio non-personal. Do not enable GEMINI_API_KEY, a Gemini model var, scheduled AI jobs, or client-side Gemini calls until a compliant use case/provider and data-handling basis are confirmed.
-
-The deterministic dashboard, concentration checks, daily-move thresholds and quote-quality warnings run locally in the Worker and remain the approved v1 analysis path. Any future model provider must be reviewed for consumer-use eligibility, input retention/training, human review, data residency, rate limits and pricing before implementation. Paid Gemini quota states prompts/responses are not used to improve Google's products, but it is not free and does not remove the need to check the service's use restrictions.
+- Workers AI is available on the Workers Free plan with a shared allowance of 10,000 Neurons/day; the allowance resets at 00:00 UTC. On Workers Free, requests beyond the allowance fail rather than incur overage charges. Re-check current pricing and model availability before release.
+- Cloudflare lists `@cf/zai-org/glm-4.7-flash` as available on Workers Free, Cloudflare-hosted, and zero-data-retention. The model card identifies its licence as MIT. No separate provider API key is needed; use the Worker `AI` binding.
+- Cloudflare's Workers AI data-usage commitment states that standard inference inputs/outputs are not retained after processing, are not used to train AI models, and are not made available to other Cloudflare customers. Cloudflare may retain operational metadata (for example model ID, timestamps, token/neuron counts, latency and normalized status/error codes). Do not enable content logging, AI Gateway prompt logging, or stateful inference features.
+- Gemini API Free is rejected for this private personal portfolio use case. Its Additional Terms effective 23 March 2026 frame API/AI Studio use as professional or business development, not consumer use. Unpaid quota content and responses may be used to improve Google products, and human reviewers may process them. The terms explicitly say not to submit sensitive, confidential or personal information.
+- AI input is restricted to public SEC companyfacts and public SEC filing metadata for the company explicitly selected for a research brief. Never send holding/watchlist membership, quantities, average cost, notes, portfolio weights, account identifiers, provider tokens, personal settings, or MarketData.app quotes.
+- The output is a public-company research brief, not personalized financial advice, a portfolio recommendation, or a buy/sell signal. Keep deterministic portfolio metrics local in the Worker and separate from model prompts.
 
 References:
+- https://developers.cloudflare.com/workers-ai/platform/pricing/
+- https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/
+- https://developers.cloudflare.com/workers-ai/platform/data-usage/
+- https://huggingface.co/zai-org/GLM-4.7-Flash
 - https://ai.google.dev/gemini-api/docs/terms
 - https://ai.google.dev/gemini-api/docs/pricing
 ## US filings: official SEC EDGAR
