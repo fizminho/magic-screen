@@ -134,9 +134,9 @@ jobs:
           holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
           test "$holding_delete_status" = "200"
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
-          sec_filing_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_filing WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;")"
-          sec_cache_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_fetch_cache WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;")"
-          quote_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL') THEN 'not-clean' ELSE 'clean' END AS status;")"
+          sec_filing_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_filing WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
+          sec_cache_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_fetch_cache WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
+          quote_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
           echo "$sec_filing_cleanup"
           echo "$sec_cache_cleanup"
           echo "$quote_cleanup"
