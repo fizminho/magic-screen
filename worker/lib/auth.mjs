@@ -353,6 +353,66 @@ async function loginVerify(request, env) {
   return json({ ok: true, authenticated: true }, 200, { "set-cookie": cookieHeader(token, env) });
 }
 
+
+async function credentialsList(request, env) {
+  const session = await sessionFor(request, env);
+  if (!session) return json({ error: "Sign in required." }, 401);
+  const rows = await env.DB.prepare(
+    "SELECT id, name, created_at, last_used_at, backed_up FROM passkey_credential ORDER BY created_at"
+  ).all();
+  return json({
+    credentials: (rows.results || []).map((row) => ({
+      id: row.id, name: row.name, createdAt: row.created_at,
+      lastUsedAt: row.last_used_at, backedUp: Boolean(row.backed_up)
+    })),
+    passkeyCount: (rows.results || []).length
+  });
+}
+
+async function credentialMutation(request, env, pathname) {
+  checkOrigin(request, env);
+  const session = await sessionFor(request, env);
+  if (!session) return json({ error: "Sign in required." }, 401);
+  const prefix = "/api/auth/credentials/";
+  let credentialId;
+  try { credentialId = decodeURIComponent(pathname.slice(prefix.length)); }
+  catch { return json({ error: "Invalid passkey." }, 400); }
+  if (!credentialId || credentialId.length > 1024 || credentialId.includes("/")) {
+    return json({ error: "Invalid passkey." }, 400);
+  }
+
+  if (request.method === "PATCH") {
+    const payload = await bodyJson(request);
+    const name = typeof payload?.name === "string" ? payload.name.trim() : "";
+    if (!name || name.length > 40) return json({ error: "Passkey name must be 1 to 40 characters." }, 400);
+    const result = await env.DB.prepare("UPDATE passkey_credential SET name = ? WHERE id = ?")
+      .bind(name, credentialId).run();
+    if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "Passkey not found." }, 404);
+    return json({ ok: true });
+  }
+
+  if (request.method === "DELETE") {
+    const deleted = await env.DB.prepare(
+      "DELETE FROM passkey_credential WHERE id = ? AND (SELECT COUNT(*) FROM passkey_credential) > 1 RETURNING id"
+    ).bind(credentialId).first();
+    if (!deleted) {
+      const count = await passkeyCount(env);
+      return json({ error: count <= 1 ? "The last passkey cannot be deleted." : "Passkey not found." }, count <= 1 ? 409 : 404);
+    }
+    return json({ ok: true, passkeyCount: await passkeyCount(env) });
+  }
+
+  return json({ error: "Method not allowed." }, 405, { allow: "PATCH, DELETE" });
+}
+
+async function logoutAll(request, env) {
+  checkOrigin(request, env);
+  const session = await sessionFor(request, env);
+  if (!session) return json({ error: "Sign in required." }, 401);
+  await env.DB.prepare("DELETE FROM session").run();
+  return json({ ok: true }, 200, { "set-cookie": cookieHeader("", env, 0) });
+}
+
 async function logout(request, env) {
   checkOrigin(request, env);
   const session = await sessionFor(request, env);
@@ -363,7 +423,12 @@ async function logout(request, env) {
 export async function handleAuthRequest(request, env, pathname) {
   try {
     if (pathname === "/api/auth/state" && request.method === "GET") return await handleState(request, env);
-    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "GET, POST" });
+    if (pathname === "/api/auth/credentials" && request.method === "GET") return await credentialsList(request, env);
+    if (pathname.startsWith("/api/auth/credentials/") && ["PATCH", "DELETE"].includes(request.method)) {
+      return await credentialMutation(request, env, pathname);
+    }
+    if (request.method === "POST" && pathname === "/api/auth/logout-all") return await logoutAll(request, env);
+    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "GET, POST, PATCH, DELETE" });
     if (pathname === "/api/auth/register/options") return await registerOptions(request, env);
     if (pathname === "/api/auth/register/verify") return await registerVerify(request, env);
     if (pathname === "/api/auth/login/options") return await loginOptions(request, env);
