@@ -2,7 +2,7 @@ import { getOwnerSession, jsonResponse } from "./auth.mjs";
 
 function csvCell(value) {
   let text = value === null || value === undefined ? "" : String(value);
-  if (/^[=+@-]/.test(text)) text = `'${text}`;
+  if (/^[\\s\\u0000-\\u001f]*[=+@-]/.test(text)) text = `'${text}`;
   if (/[",\r\n]/.test(text)) text = `"${text.replace(/"/g, '""')}"`;
   return text;
 }
