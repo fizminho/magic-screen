@@ -99,17 +99,19 @@ async function upsertHoldings(request, env) {
 }
 
 async function deactivateUnusedInstrument(env, market, symbol) {
-  await env.DB.prepare(
-    "UPDATE instrument AS i SET active=0 WHERE i.market=? AND i.symbol=? " +
+  const inactiveInstrument = "(SELECT i.id FROM instrument i WHERE i.market=? AND i.symbol=? AND i.active=0 " +
     "AND NOT EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
-    "AND NOT EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id)"
-  ).bind(market, symbol).run();
-  await env.DB.prepare(
-    "DELETE FROM quote_latest WHERE instrument_id = (" +
-    "SELECT i.id FROM instrument i WHERE i.market=? AND i.symbol=? AND i.active=0 " +
-    "AND NOT EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
-    "AND NOT EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id))"
-  ).bind(market, symbol).run();
+    "AND NOT EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id))";
+  await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE instrument AS i SET active=0 WHERE i.market=? AND i.symbol=? " +
+      "AND NOT EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
+      "AND NOT EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id)"
+    ).bind(market, symbol),
+    env.DB.prepare(`DELETE FROM quote_latest WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol),
+    env.DB.prepare(`DELETE FROM sec_filing WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol),
+    env.DB.prepare(`DELETE FROM sec_fetch_cache WHERE instrument_id = ${inactiveInstrument}`).bind(market, symbol)
+  ]);
 }
 
 async function deleteHolding(request, env, pathname) {
