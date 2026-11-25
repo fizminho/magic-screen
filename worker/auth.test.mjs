@@ -81,3 +81,29 @@ test("auth rejects a matching Origin header on a mismatched request host", async
   }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/options");
   assert.equal(response.status, 403);
 });
+
+test("passkey inventory is private without an owner session", async () => {
+  const response = await handleAuthRequest(new Request("https://folio.example/api/auth/credentials", {
+    method: "GET"
+  }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/credentials");
+  assert.equal(response.status, 401);
+});
+
+test("passkey mutations require both same-origin and an owner session", async () => {
+  const env = { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" };
+  const response = await handleAuthRequest(new Request("https://folio.example/api/auth/credentials/credential-id", {
+    method: "DELETE",
+    headers: { origin: "https://folio.example", "content-type": "application/json" },
+    body: "{}"
+  }), env, "/api/auth/credentials/credential-id");
+  assert.equal(response.status, 401);
+});
+
+test("sign out everywhere requires an owner session", async () => {
+  const response = await handleAuthRequest(new Request("https://folio.example/api/auth/logout-all", {
+    method: "POST",
+    headers: { origin: "https://folio.example", "content-type": "application/json" },
+    body: "{}"
+  }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/logout-all");
+  assert.equal(response.status, 401);
+});
