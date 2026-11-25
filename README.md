@@ -1,47 +1,35 @@
-# Magic Screen
+# Magic Folio
 
-A lightweight, personal US stock research app built around one workflow:
+Magic Folio is a private, single-owner portfolio research workspace for US and Bursa Malaysia equities.
 
-**MFI tickers → Musaffa + HalalScreener research → Shariah validation → manual Investing Paths ranking.**
+## Product principles
 
-## What it does
+- Portfolio tracking and research, not brokerage or auto-trading.
+- Passkey-only owner authentication. No password fallback.
+- Shariah status is a manually maintained field, not an automated screening verdict or religious ruling.
+- AI analysis receives only the minimum necessary portfolio context. Holding quantities and credentials must never be sent to an LLM.
+- Market data and news are source-labelled, timestamped and treated as untrusted input.
+- Free-tier-first architecture. Do not introduce paid services without explicit owner approval.
 
-- Gets the US candidate ticker universe from Magic Formula Investing (MFI).
-- Copies the current ticker list with a ready-to-use AI research prompt.
-- Accepts AI results as pasted JSON. No file upload or download.
-- Requires fresh Halal results from both Musaffa and HalalScreener before a ticker passes.
-- Flags missing, stale, doubtful or conflicting evidence for review.
-- Lets the owner record Investing Paths rank, Earnings Yield, Return on Capital, fiscal period, checked date and source URL manually.
-- Saves research records in this browser's local storage.
+## Current rebuild status
 
-## Daily workflow
+The legacy screener UI and public MFI Worker endpoints have been removed from the rebuild branch. The current frontend is a clean Magic Folio shell. Backend portfolio APIs, passkey authentication, data providers, push alerts and AI analysis are implemented in later runbook phases.
 
-1. Open the Shariah shortlist and refresh the MFI universe when needed.
-2. Tap **Copy tickers + AI prompt** and paste it into an AI assistant.
-3. Ask the assistant to return the requested JSON using permitted source access only.
-4. Copy the JSON response and paste it into Magic Screen.
-5. Review the source evidence and import the records.
-6. Manually check eligible tickers on Investing Paths and record the visible ranking details.
+The D1 schema is defined in `migrations/`. A one-time production reset is separately guarded by `.github/workflows/reset-production-d1.yml` and requires the exact manual confirmation `DROP-ALL-LEGACY-DATA`. It is not run by ordinary deployments.
 
-## Important boundaries
+## Development
 
-- The app has no user login, Gemini integration, LLM API key, or paid screening API.
-- The owner must configure the MFI session cookie once as a Cloudflare Worker secret. It is never sent to the browser.
-- AI access to Musaffa and HalalScreener must follow each provider's current terms. If AI/automated access is not permitted, the assistant must not access that source and should return No data for manual follow-up.
-- Investing Paths checks remain manual. No scraping, browser automation, bulk extraction or AI collection.
-- Shariah research is not a fatwa or investment advice. Verify evidence before relying on a result.
-- Records are local to the current browser and do not sync across devices. There is no file-based import/export.
-
-## Data and privacy
-
-No AI provider receives an API key from this app. The prompt is copied to the user's chosen AI assistant only after the user taps the copy button. Pasted results are stored locally in the browser. The app does not send Shariah records to a server.
+```bash
+npm install
+npm run dev
+npm run build
+node --experimental-strip-types --test worker/*.test.mjs
+```
 
 ## Deployment
 
-- React + TypeScript + Vite
-- Cloudflare Workers Static Assets
-- Cloudflare D1 for the MFI ticker cache
+GitHub Actions builds the app, applies pending non-destructive D1 migrations and deploys the Cloudflare Worker on changes merged to `main`. The one-time destructive reset must be run separately after the replacement Worker is complete and reviewed.
 
-See [setup](docs/SETUP.md), [MFI integration](docs/MAGIC_FORMULA_INTEGRATION.md), [provider access policy](docs/PROVIDER_ACCESS_POLICY.md), and [security](SECURITY.md).
+See [setup](docs/SETUP.md), [free-tier budget](docs/FREE_TIER_BUDGET.md), [references](docs/REFERENCES.md), and [security](SECURITY.md).
 
-Research tool only. Not investment advice.
+Research and education only. Not investment advice.
