@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { Buffer } from "node:buffer";
 import { validatePushSubscription, sendPushToSubscription } from "./lib/push.mjs";
 
 function b64url(bytes) {
@@ -30,9 +31,7 @@ async function makeVapidEnv() {
   );
   const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
   const publicKey = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
-  const encodedPrivateKey = jwk.d.replace(/-/g, "+").replace(/_/g, "/");
-  const paddedPrivateKey = encodedPrivateKey + "=".repeat((4 - encodedPrivateKey.length % 4) % 4);
-  const privateKey = Uint8Array.from(atob(paddedPrivateKey), c => c.charCodeAt(0));
+  const privateKey = new Uint8Array(Buffer.from(jwk.d, "base64url"));
   return {
     VAPID_PUBLIC_KEY: b64url(publicKey),
     VAPID_PRIVATE_KEY: b64url(privateKey),
