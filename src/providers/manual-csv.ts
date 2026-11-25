@@ -3,7 +3,7 @@ import type { QuoteSnapshot } from "./types";
 const MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000;
 const SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
 
-function parseCsv(text: string): string[][] {
+export function parseCsvRows(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -38,7 +38,7 @@ function parseCsv(text: string): string[][] {
  */
 export function parseManualQuotesCsv(csv: string, now = Date.now()): QuoteSnapshot[] {
   if (csv.length > 250_000) throw new Error("CSV is too large (maximum 250 KB).");
-  const rows = parseCsv(csv.replace(/^\uFEFF/, ""));
+  const rows = parseCsvRows(csv.replace(/^\uFEFF/, ""));
   if (rows.length < 2) throw new Error("CSV needs a header and at least one quote row.");
   if (rows.length > 501) throw new Error("CSV is limited to 500 quote rows per import.");
 
