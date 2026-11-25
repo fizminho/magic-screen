@@ -130,7 +130,7 @@ async function recordAttempt(request, env, kind, limit) {
   const ipHash = await sha256Hex(`${env.RP_ID || "local"}:${ip}`);
   const current = new Date();
   const window = kind === "verify_fail"
-    ? current.toISOString().slice(0, 16).replace(/:\\d{2}$/, (minute) => `:${String(Math.floor(Number(minute.slice(1)) / 15) * 15).padStart(2, "0")}`)
+    ? current.toISOString().slice(0, 14) + String(Math.floor(current.getUTCMinutes() / 15) * 15).padStart(2, "0")
     : current.toISOString().slice(0, 13);
   await env.DB.prepare(
     "INSERT INTO auth_attempt(ip_hash, window, kind, count) VALUES(?,?,?,1) " +
@@ -393,7 +393,7 @@ async function credentialMutation(request, env, pathname) {
   if (request.method === "PATCH") {
     const payload = await bodyJson(request);
     const name = typeof payload?.name === "string" ? payload.name.trim() : "";
-    if (!name || name.length > 40 || /[\\u0000-\\u001f\\u007f]/.test(name)) return json({ error: "Passkey name must be 1 to 40 characters." }, 400);
+    if (!name || name.length > 40 || [...name].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) return json({ error: "Passkey name must be 1 to 40 characters." }, 400);
     const result = await env.DB.prepare("UPDATE passkey_credential SET name = ? WHERE id = ?")
       .bind(name, credentialId).run();
     if (Number(result?.meta?.changes || 0) !== 1) return json({ error: "Passkey not found." }, 404);
