@@ -554,7 +554,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         <section className="tool-card">
           <span className="eyebrow">DATA PORTABILITY</span>
           <h3>Export your data</h3>
-          <p>Download a private copy of your holdings, watchlist and portfolio settings. Exports require your active passkey session.</p>
+          <p>JSON includes holdings, watchlist and portfolio settings. CSV contains positions and watchlist in a spreadsheet-friendly format. Exports require your active passkey session.</p>
           <div className="tool-actions">
             <button className="button button-secondary" type="button" onClick={() => downloadExport("json")} disabled={busy}>Download JSON</button>
             <button className="button button-quiet" type="button" onClick={() => downloadExport("csv")} disabled={busy}>Download CSV</button>
