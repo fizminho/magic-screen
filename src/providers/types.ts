@@ -1,6 +1,6 @@
 export type QuoteStatus = "ok" | "stale" | "unavailable";
 export type QuoteMarket = "US" | "MY";
-export type QuoteProviderId = "yahoo-finance" | "manual-csv";
+export type QuoteProviderId = "marketdata.app" | "yahoo-finance" | "manual-csv";
 
 export type QuoteSnapshot = {
   symbol: string;
