@@ -8,8 +8,8 @@
 - Passkey-only single-owner authentication using `@passwordless-id/webauthn`.
 - Optional MarketData.app Free Forever browser adapter for US delayed quotes.
 - Manual CSV imports for Bursa Malaysia quotes.
-- Cloudflare Workers AI is the selected future analysis provider. It uses the Worker AI binding and does not require an external API key. The Workers Free allocation is 10,000 Neurons/day; do not enable paid billing or prepaid credits without owner approval.
-- Official SEC EDGAR filings are the planned US filing source.
+- Cloudflare Workers AI uses the Worker AI binding and does not require an external API key. The Workers Free allocation is 10,000 Neurons/day; do not enable paid billing or prepaid credits without owner approval.
+- Official SEC EDGAR submissions and Company Facts are used for US public-company research.
 
 ## Local development
 
@@ -42,6 +42,15 @@ npm run cf:dev
 The setup token is a one-time bootstrap gate, not a login password. Normal sign-in always uses the browser passkey prompt.
 
 For SEC EDGAR filing lookup, configure the Worker variable `SEC_USER_AGENT` with an application name and your real contact email, for example `Magic Folio/0.1 (contact: you@example.com)`. Do not use the placeholder address. SEC lookups remain disabled until this value is valid. Add the company's 1–10 digit CIK to its US holding or watchlist item (the app stores it as a 10-digit string). You can find the CIK through [SEC EDGAR company search](https://www.sec.gov/edgar/search/). The owner-only lookup returns recent filing metadata and links to the original SEC documents; it does not copy filing bodies. The endpoint is limited to five lookups per hour.
+
+## Scheduled jobs and AI research briefs
+
+Two UTC cron triggers are configured in `wrangler.toml`:
+
+- `0 1 * * 2-6`: refresh SEC submissions and Company Facts for up to eight owned US instruments with a valid CIK. After the refresh completes, generate public-data-only research briefs for recent filers, up to five per day.
+- `0 2 * * 6`: weekly housekeeping for expired filing metadata, caches, alert records, job history, authentication challenges and rate-limit buckets.
+
+Each scheduled task writes a `job_run` record with its status and bounded detail. Brief generation shares the five uncached analyses/day quota with manual analysis and reuses the 24-hour input-hash cache. The AI prompt contains only public SEC Company Facts and filing metadata. It does not include holding quantities, average cost, notes, portfolio weights, watchlist state, account identifiers, credentials or quote data. If no recent filing or fresh Company Facts are available, the job records a skipped status and does not call Workers AI.
 
 ## Web Push notifications
 
