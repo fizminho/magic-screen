@@ -81,15 +81,6 @@ function getRp(env, request) {
 
 function checkOrigin(request, env) {
   const { origin } = getRp(env, request);
-  if (env.APP_ENV !== "production") {
-    console.log("Local origin check:", {
-      requestOrigin: new URL(request.url).origin,
-      headerOrigin: request.headers.get("origin"),
-      configuredOrigin: origin,
-      rpId: env.RP_ID,
-      appEnv: env.APP_ENV
-    });
-  }
   if (new URL(request.url).origin !== origin || request.headers.get("origin") !== origin) throw new Error("origin_rejected");
 }
 
