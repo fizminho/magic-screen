@@ -645,7 +645,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <tr key={`${item.market}:${item.symbol}`}>
                     <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
                     <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
-                    <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
+                    <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? quoteSourceLabel(item.quoteProvider) : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
                     <td>{item.note || " "}</td>
                     <td>{item.market === "US" && item.cik ? <div className="row-actions"><button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading || !!researchLoadingSymbol}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button><button className="button button-small button-secondary" onClick={() => loadResearchBrief(item)} disabled={secLoading || !!researchLoadingSymbol}>{researchLoadingSymbol === item.symbol ? "Researching…" : "Research"}</button></div> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                     <td><button className="button button-danger button-small" onClick={() => removeWatchlistItem(item)} disabled={busy}>Remove</button></td>
