@@ -147,10 +147,12 @@ jobs:
           echo "$sec_cache_cleanup"
           echo "$sec_facts_cleanup"
           echo "$quote_cleanup"
-          grep -q '"status": "clean"' <<< "$sec_filing_cleanup"
-          grep -q '"status": "clean"' <<< "$sec_cache_cleanup"
-          grep -q '"status": "clean"' <<< "$sec_facts_cleanup"
-          grep -q '"status": "clean"' <<< "$quote_cleanup"
+          for cleanup_result in "$sec_filing_cleanup" "$sec_cache_cleanup" "$sec_facts_cleanup" "$quote_cleanup"; do
+            [[ "$cleanup_result" == *'"clean"'* && "$cleanup_result" != *'"not-clean"'* ]] || {
+              echo "::error::An instrument cache cleanup check did not return clean."
+              exit 1
+            }
+          done
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
           test "$watchlist_status" = "200"
           jq -e '.added == 1' /tmp/watchlist-post.json >/dev/null
