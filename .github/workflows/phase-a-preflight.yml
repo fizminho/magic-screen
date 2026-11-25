@@ -145,64 +145,25 @@ jobs:
             exit 1
           fi
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
-          # Read the local D1 SQLite file directly. Wrangler's --json currently
-          # returns empty result arrays for these local SELECT queries.
-          python3 - <<'PY'
-          import pathlib
-          import sqlite3
-          import sys
-
-          root = pathlib.Path(".wrangler/state/v3/d1")
-          # Miniflare/Wrangler versions may use extensionless SQLite files.
-          # Inspect every regular file under the D1 state directory and let
-          # SQLite identify valid databases instead of relying on filenames.
-          candidates = list(root.rglob("*")) if root.exists() else []
-          candidates = [path for path in candidates if path.is_file()]
-          print(f"D1 state directory exists: {root.exists()}")
-          print(f"D1 files discovered: {[str(path) for path in candidates]}")
-          required = {"instrument", "sec_filing", "sec_fetch_cache", "sec_companyfacts_cache", "quote_latest"}
-          connection = None
-          selected = None
-          for path in candidates:
-              try:
-                  candidate = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-                  tables = {
-                      row[0] for row in candidate.execute(
-                          "SELECT name FROM sqlite_master WHERE type='table'"
-                      )
-                  }
-                  if required.issubset(tables):
-                      connection = candidate
-                      selected = path
-                      break
-                  candidate.close()
-              except sqlite3.Error:
-                  continue
-
-          if connection is None:
-              print("::error::Could not locate the local D1 SQLite database containing the expected schema.")
-              print("SQLite candidates:", [str(path) for path in candidates])
-              sys.exit(1)
-
-          print(f"Checking local D1 database: {selected}")
-          checks = {
-              "SEC filing": "SELECT COUNT(*) FROM sec_filing WHERE cik='0000320193'",
-              "SEC fetch": "SELECT COUNT(*) FROM sec_fetch_cache WHERE cik='0000320193'",
-              "SEC companyfacts": "SELECT COUNT(*) FROM sec_companyfacts_cache WHERE cik='0000320193'",
-              "Quote": "SELECT COUNT(*) FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL'",
+          # Verify cleanup through Wrangler's human-readable local D1 query output.
+          # Avoid --json here: Wrangler currently emits empty result arrays for
+          # local SELECT statements in this CI environment.
+          verify_d1_zero() {
+            local label="$1"
+            local sql="$2"
+            local expected="$3"
+            local output
+            output="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "$sql" 2>&1)"
+            printf '%s\\n' "$output"
+            if ! grep -Fq "$expected" <<<"$output"; then
+              echo "::error::$label cleanup verification failed; expected $expected in Wrangler output."
+              return 1
+            fi
           }
-          failed = False
-          for label, sql in checks.items():
-              remaining = connection.execute(sql).fetchone()[0]
-              print(f"{label} cache rows remaining: {remaining}")
-              if remaining != 0:
-                  print(f"::error::{label} cache cleanup left {remaining} matching row(s).")
-                  failed = True
-
-          connection.close()
-          if failed:
-              sys.exit(1)
-          PY
+          verify_d1_zero "SEC filing" "SELECT 'SEC_FILING=' || COUNT(*) AS result FROM sec_filing WHERE cik='0000320193';" "SEC_FILING=0"
+          verify_d1_zero "SEC fetch" "SELECT 'SEC_FETCH=' || COUNT(*) AS result FROM sec_fetch_cache WHERE cik='0000320193';" "SEC_FETCH=0"
+          verify_d1_zero "SEC companyfacts" "SELECT 'SEC_COMPANYFACTS=' || COUNT(*) AS result FROM sec_companyfacts_cache WHERE cik='0000320193';" "SEC_COMPANYFACTS=0"
+          verify_d1_zero "Quote" "SELECT 'AAPL_QUOTES=' || COUNT(*) AS result FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL';" "AAPL_QUOTES=0"
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
           echo "watchlist POST HTTP status: $watchlist_status"
           cat /tmp/watchlist-post.json
