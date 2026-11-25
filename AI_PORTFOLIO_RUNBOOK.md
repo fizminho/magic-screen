@@ -13,7 +13,7 @@
 
 1. Work on a branch `chore/ai-portfolio-rebuild`. Never push directly to `main`. Open one PR at the end (Phase H).
 2. **Never print, log, commit, or echo a secret** (Gemini key, VAPID private key, setup token, session cookies, Cloudflare token, old `MFI_SESSION_COOKIE`).
-3. **Irreversible actions need a backup first** (D1 export before any `DROP`). Closing PRs is reversible; deleting branches is not, so do NOT delete branches.
+3. **Production D1 reset is owner-authorized without backup.** The owner explicitly approved dropping all existing user tables and data in `magic-screen-db`; use only the guarded one-time cutover workflow. Closing PRs is reversible; deleting branches is not, so do NOT delete branches.
 4. Every phase ends with its verification commands. If one fails, fix it before moving on. If blocked after 2 attempts, stop and write the blocker in `docs/BLOCKERS.md`.
 5. Keep it **lightweight**: target ≤ 4 runtime npm dependencies in the frontend, ≤ 3 in the Worker. Prefer Web APIs (fetch, WebCrypto, Service Worker) over libraries.
 6. Everything must work on the **free tier**. If a design needs a paid feature, pick another design.
@@ -92,20 +92,16 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 
 ---
 
-## Phase A: Triage & backup
+## Phase A: Triage & baseline
 
 - [ ] **A1.** `git status`, `git log --oneline -20`, `git branch -a`. Record the default branch name.
 - [ ] **A2.** Create branch `chore/ai-portfolio-rebuild` from `main`.
 - [ ] **A3.** List open PRs: `gh pr list --state open --limit 200 --json number,title,author,headRefName,labels,url > /tmp/open-prs.json`. Save a human summary to `docs/CLEANUP_LOG.md` (number, title, author, kind: dependabot / feature / other).
-- [ ] **A4.** Back up the production D1 database **before touching it**:
-  `npx wrangler d1 export magic-screen-db --remote --output ./backup-$(date +%F).sql`
-  Keep the file OUT of git (add `backup-*.sql` to `.gitignore`).
-- [ ] **A5.** Inventory live tables (the old SEC/EdgarTools tables were retired from code but **never dropped**, and their names are not in this repo):
-  `npx wrangler d1 execute magic-screen-db --remote --command "SELECT name, type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY type, name;"`
-  Paste the result into `docs/CLEANUP_LOG.md`.
+- [x] **A4.** Production backup intentionally skipped under the owner's explicit decision to discard all existing D1 data. Do not export or migrate legacy rows.
+- [x] **A5.** Do not hard-code or manually inventory retired tables. The one-time reset script reads actual table names from `sqlite_master` immediately before dropping them.
 - [ ] **A6.** Capture a baseline: `npm install`, `npm run build`, `node --experimental-strip-types --test worker/*.test.mjs`. Record pass/fail.
 
-**Done when:** backup file exists, table inventory recorded, baseline recorded.
+**Done when:** baseline is recorded and the guarded reset script is ready. Production reset remains a final cutover action, not a Phase A action.
 
 ---
 
@@ -161,11 +157,11 @@ Delete (git history preserves them):
 
 Use Wrangler migrations (`migrations/` folder, tracked in `d1_migrations` table). Never DDL at runtime.
 
-- [ ] **D-1.** In `wrangler.toml` add `migrations_dir = "migrations"` under the `[[d1_databases]]` block.
-- [ ] **D-2.** Create `migrations/0001_drop_legacy.sql` (below). Then **append** one `DROP TABLE IF EXISTS` per extra legacy table found in A5 (anything that is not in the new schema, not `d1_migrations`, not `sqlite_*`, not `_cf_*`). Do not guess names.
-- [ ] **D-3.** Create `migrations/0002_portfolio_schema.sql` (Appendix A).
+- [x] **D-1.** In `wrangler.toml`, `migrations_dir = "migrations"` is configured under the `[[d1_databases]]` block.
+- [x] **D-2.** Create `migrations/0001_drop_legacy.sql` with defensive drops for known legacy MFI tables. The guarded reset script dynamically drops every actual user table, including unknown retired SEC/EdgarTools tables, so no legacy table names are guessed.
+- [x] **D-3.** Create `migrations/0002_portfolio_schema.sql` (Appendix A).
 - [ ] **D-4.** Test locally: `npx wrangler d1 migrations apply magic-screen-db --local`, then `--local --command "SELECT name FROM sqlite_master"`.
-- [ ] **D-5.** Do **not** apply to remote by hand yet. The live (old) Worker still creates and reads these tables at runtime (`CREATE TABLE IF NOT EXISTS` on cold start), so dropping them early either breaks it or gets them recreated empty. Remote migrations are applied by the deploy pipeline (G2) **immediately before** `wrangler deploy` of the new Worker, from the merged `main`. Re-confirm the A4 backup is still the latest good export first.
+- [x] **D-5.** Normal deployments apply pending migrations immediately before `wrangler deploy`. The one-time destructive reset is separate and manual: `.github/workflows/reset-production-d1.yml` requires the exact confirmation `DROP-ALL-LEGACY-DATA`, refuses to run while legacy MFI code remains, drops every user table, applies migrations, and deploys the replacement Worker. Do not run it until the new Worker is complete.
 - [ ] **D-6.** After the first deploy, re-run the A5 inventory. Only new-schema tables + `d1_migrations` should remain; if the old Worker recreated a legacy table in the gap, add a follow-up migration `0004_drop_stragglers.sql`.
 
 `migrations/0001_drop_legacy.sql`:
@@ -181,7 +177,7 @@ DROP TABLE IF EXISTS stock_master;
 -- DROP TABLE IF EXISTS <name_from_inventory>;
 ```
 
-**Done when:** local migrations apply cleanly from empty; after the first deploy the remote inventory matches expectation and `d1_migrations` lists 0001 and 0002 (and 0003 if candidates are seeded).
+**Done when:** local migrations apply cleanly from empty; the one-time production cutover completes successfully after the replacement Worker is ready; `d1_migrations` lists the applied migration versions.
 
 ---
 
