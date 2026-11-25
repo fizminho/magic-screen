@@ -250,6 +250,7 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 - [x] Request JSON by prompt, validate required fields and bound all strings/lists. Invalid output receives one correction attempt. No retry occurs for provider/quota errors. The frontend receives plain text fields only, never model HTML.
 - [x] Output schema: `company_summary`, `financial_strengths`, `financial_risks`, `filing_signals`, `unknowns`, `confidence`, and `source_accessions`. Source accessions are filtered against the SEC facts/filings supplied to the model; unknown citations are dropped.
 - [x] Rate limit to 5 uncached analyses/day using an atomic D1 quota reservation; cache by `input_hash` for 24 hours. Failed inference releases its reservation. Raw prompts and model responses are never written to application logs.
+- [x] Scheduled research briefs run immediately after the daily SEC refresh, only for owned US instruments with a filing in the previous 24 hours and fresh SEC Company Facts. They share the five-brief daily quota with manual analysis, reuse the same input-hash cache, write a separate `job_run` record, and send only public SEC facts/filing metadata to Workers AI. No extra cron trigger is added.
 - [x] Deterministic portfolio risk metrics remain computed in code and displayed separately; they are not included in the AI prompt.
 
 ### E5. Web Push
