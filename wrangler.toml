@@ -16,3 +16,7 @@ migrations_dir = "migrations"
 
 [vars]
 APP_ENV = "production"
+RP_NAME = "Magic Folio"
+# Set these to the final production hostname before enabling passkey registration.
+# RP_ID = "magic-screen.example.workers.dev"
+# RP_ORIGIN = "https://magic-screen.example.workers.dev"
