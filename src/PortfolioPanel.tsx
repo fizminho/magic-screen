@@ -50,16 +50,18 @@ type PortfolioSettings = {
   maxPositionPct: number;
 };
 
+type PublicResearchBrief = {
+  company_summary: string;
+  financial_strengths: string[];
+  financial_risks: string[];
+  filing_signals: string[];
+  unknowns: string[];
+  confidence: "low" | "medium" | "high";
+  source_accessions: string[];
+};
+
 type ResearchResult = {
-  brief: {
-    company_summary: string;
-    financial_strengths: string[];
-    financial_risks: string[];
-    filing_signals: string[];
-    unknowns: string[];
-    confidence: "low" | "medium" | "high";
-    source_accessions: string[];
-  };
+  brief: PublicResearchBrief;
   model: string;
   createdAt: string;
   cached: boolean;
