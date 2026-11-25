@@ -245,3 +245,27 @@ test("watchlist deletion returns 404 for an unknown item", async () => {
   }), { ...envConfig, DB }, "/api/watchlist/US/UNKNOWN");
   assert.equal(response.status, 404);
 });
+
+test("holdings API enforces a 20-position total while allowing updates at the cap", async () => {
+  const rows = Array.from({ length: 20 }, (_, index) => ({
+    market: "US", symbol: `T${index}`
+  }));
+  const { DB, calls } = fakeDb({ rows });
+  const rejected = await handlePortfolioRequest(new Request(`${origin}/api/holdings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ holdings: [{ symbol: "NEW", market: "US", quantity: 1 }] })
+  }), { ...envConfig, DB }, "/api/holdings");
+  assert.equal(rejected.status, 409);
+  assert.equal(calls.batch, 0);
+
+  const { DB: updateDb, calls: updateCalls } = fakeDb({ rows });
+  const updated = await handlePortfolioRequest(new Request(`${origin}/api/holdings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ holdings: [{ symbol: "T0", market: "US", quantity: 2 }] })
+  }), { ...envConfig, DB: updateDb }, "/api/holdings");
+  assert.equal(updated.status, 200);
+  assert.deepEqual(await updated.json(), { saved: 1 });
+  assert.equal(updateCalls.batch, 1);
+});
