@@ -51,8 +51,8 @@ test("export CSV escapes formula-leading user notes and quoted delimiters", () =
       note: "Watch, results\nsoon", addedAt: "2026-11-25" }
   ]);
   assert.match(csv, /^record_type,symbol,market/);
-  assert.match(csv, /holding,AAPL,US,Apple Inc\.,USD,2,100,0000320193,'/);
-  assert.match(csv, /watchlist,1155,MY,Maybank,MYR,,,,,"Watch, results\nsoon"/);
+  assert.match(csv, /holding,AAPL,US,Apple Inc\.,USD,2,100,0000320193,"'=HYPERLINK/);
+  assert.match(csv, /watchlist,1155,MY,Maybank,MYR,,,,"Watch, results\nsoon"/);
 });
 
 test("portfolio export requires an owner session", async () => {
