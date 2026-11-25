@@ -17,7 +17,7 @@ Magic Folio is a private, single-owner portfolio research application. Portfolio
 
 ## Data and API boundaries
 
-- Require an authenticated owner session for all portfolio, settings, export, push-subscription and AI-analysis endpoints. The current quote snapshot and holdings routes enforce the owner session; state-changing requests also enforce exact Origin and JSON.
+- Require an authenticated owner session for all portfolio, settings, export, push-subscription and AI-analysis endpoints. The current quote snapshot, holdings and watchlist routes enforce the owner session; state-changing requests also enforce exact Origin and JSON.
 - Keep authentication state and health endpoints minimal. Return generic public errors.
 - Store only hashed session tokens; never log challenge payloads, credential public keys or session tokens.
 - Never send holding quantities, cost basis, session tokens, passkey material, provider credentials or setup secrets to an LLM.
