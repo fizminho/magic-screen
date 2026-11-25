@@ -30,7 +30,9 @@ async function makeVapidEnv() {
   );
   const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
   const publicKey = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
-  const privateKey = Uint8Array.from(atob(jwk.d.replace(/-/g, "+").replace(/_/g, "/") + "=="), c => c.charCodeAt(0));
+  const encodedPrivateKey = jwk.d.replace(/-/g, "+").replace(/_/g, "/");
+  const paddedPrivateKey = encodedPrivateKey + "=".repeat((4 - encodedPrivateKey.length % 4) % 4);
+  const privateKey = Uint8Array.from(atob(paddedPrivateKey), c => c.charCodeAt(0));
   return {
     VAPID_PUBLIC_KEY: b64url(publicKey),
     VAPID_PRIVATE_KEY: b64url(privateKey),
