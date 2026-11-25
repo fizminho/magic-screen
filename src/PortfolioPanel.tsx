@@ -448,9 +448,9 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         <section className="tool-card tool-wide">
           <span className="eyebrow">BULK IMPORT</span>
           <h3>Import holdings CSV</h3>
-          <p>Paste up to 20 rows using <code>symbol,market,quantity,avg_cost</code>. Use <code>US</code> or <code>MY</code>. Existing positions are updated; rows omitted from the file are not deleted.</p>
+          <p>Paste up to 20 rows using <code>symbol,market,quantity,avg_cost[,cik]</code>. Use <code>US</code> or <code>MY</code>. CIK is optional and US-only. Existing positions are updated; rows omitted from the file are not deleted.</p>
           <textarea className="csv-field" rows={5} value={holdingsCsv} onChange={(event) => setHoldingsCsv(event.target.value)}
-            placeholder={"symbol,market,quantity,avg_cost\nAAPL,US,10,185.50\n1155,MY,500,6.42"} />
+            placeholder={"symbol,market,quantity,avg_cost\nAAPL,US,10,185.50,0000320193\n1155,MY,500,6.42,"} />
           <button className="button button-secondary" onClick={importHoldingsCsv} disabled={busy || !holdingsCsv.trim()}>
             {busy ? "Importing…" : "Import holdings"}
           </button>
