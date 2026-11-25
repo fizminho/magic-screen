@@ -33,7 +33,7 @@ for table in "${tables[@]}"; do
   [[ "$table" =~ ^[A-Za-z0-9_]+$ ]] || { echo "::error::Unexpected table identifier; refusing reset."; exit 1; }
   remaining["$table"]=1
   ddl="$(jq -r --arg table "$table" '.. | objects | select(.name? == $table) | .sql? // empty' /tmp/d1-tables.json | head -n 1)"
-  mapfile -t parents < <(printf '%s' "$ddl" | grep -oiE 'REFERENCES[[:space:]]+("[^"]+"|`[^`]+`|\\[[^]]+\\]|[A-Za-z0-9_]+)' | sed -E 's/^[Rr][Ee][Ff][Ee][Rr][Ee][Nn][Cc][Ee][Ss][[:space:]]+//; s/^["`\\[]//; s/["`\\]]$//' || true)
+  mapfile -t parents < <(printf '%s' "$ddl" | grep -oiE 'REFERENCES[[:space:]]+("[^"]+"|`[^`]+`|[A-Za-z0-9_]+)' | sed -E 's/^[Rr][Ee][Ff][Ee][Rr][Ee][Nn][Cc][Ee][Ss][[:space:]]+//; s/^["`]//; s/["`]$//' || true)
   dependencies["$table"]=" ${parents[*]:-} "
 done
 
@@ -44,6 +44,7 @@ while (( ${#remaining[@]} > 0 )); do
     [[ -v remaining["$table"] ]] || continue
     has_child=0
     for other in "${!remaining[@]}"; do
+      [[ "$other" == "$table" ]] && continue
       if [[ "${dependencies[$other]}" == *" $table "* ]]; then
         has_child=1
         break
@@ -59,7 +60,7 @@ while (( ${#remaining[@]} > 0 )); do
     exit 1
   fi
   drop_order+=("$candidate")
-  unset 'remaining[$candidate]'
+  unset "remaining[$candidate]"
 done
 
 echo "Tables scheduled for removal: ${#drop_order[@]}"
