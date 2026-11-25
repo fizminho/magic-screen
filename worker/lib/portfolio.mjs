@@ -1,0 +1,131 @@
+import {
+  getOwnerSession,
+  assertRequestOrigin,
+  readJsonBody,
+  jsonResponse
+} from "./auth.mjs";
+
+const SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
+const MAX_HOLDINGS = 20;
+const MAX_QUANTITY = 1_000_000_000_000;
+const MAX_AVG_COST = 1_000_000_000_000;
+
+function validateHolding(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_holding");
+  const { symbol, market, quantity, avgCost = null, notes = null } = value;
+  if (typeof symbol !== "string" || symbol !== symbol.trim().toUpperCase() || !SYMBOL_PATTERN.test(symbol)) {
+    throw new Error("invalid_holding");
+  }
+  if (!["US", "MY"].includes(market)) throw new Error("invalid_holding");
+  if (typeof quantity !== "number" || !Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_QUANTITY) {
+    throw new Error("invalid_holding");
+  }
+  if (avgCost !== null && (typeof avgCost !== "number" || !Number.isFinite(avgCost) || avgCost < 0 || avgCost > MAX_AVG_COST)) {
+    throw new Error("invalid_holding");
+  }
+  if (notes !== null && (typeof notes !== "string" || notes.length > 500)) throw new Error("invalid_holding");
+  return { symbol, market, quantity, avgCost, notes };
+}
+
+async function listHoldings(request, env) {
+  const session = await getOwnerSession(request, env);
+  if (!session) return jsonResponse({ error: "Sign in required." }, 401);
+  const rows = await env.DB.prepare(
+    "SELECT i.symbol, i.market, i.name, i.currency, i.sector, i.shariah_flag AS shariahFlag, " +
+    "h.quantity, h.avg_cost AS avgCost, h.notes, h.updated_at AS updatedAt, " +
+    "q.price, q.prev_close AS prevClose, q.change_pct AS changePct, q.as_of AS quoteAsOf, " +
+    "q.provider AS quoteProvider, COALESCE(q.status, 'unavailable') AS quoteStatus " +
+    "FROM holding h JOIN instrument i ON i.id = h.instrument_id " +
+    "LEFT JOIN quote_latest q ON q.instrument_id = i.id " +
+    "ORDER BY i.market, i.symbol"
+  ).all();
+  return jsonResponse({ holdings: rows.results || [] });
+}
+
+async function upsertHoldings(request, env) {
+  assertRequestOrigin(request, env);
+  const session = await getOwnerSession(request, env);
+  if (!session) return jsonResponse({ error: "Sign in required." }, 401);
+  const payload = await readJsonBody(request);
+  if (!Array.isArray(payload?.holdings) || payload.holdings.length > MAX_HOLDINGS) {
+    return jsonResponse({ error: "Provide up to 20 holdings per request." }, 400);
+  }
+
+  const holdings = payload.holdings.map(validateHolding);
+  const seen = new Set();
+  for (const holding of holdings) {
+    const key = `${holding.market}:${holding.symbol}`;
+    if (seen.has(key)) return jsonResponse({ error: "Duplicate holdings are not allowed." }, 400);
+    seen.add(key);
+  }
+  if (!holdings.length) return jsonResponse({ saved: 0 });
+
+  const now = new Date().toISOString();
+  const statements = holdings.flatMap((holding) => {
+    const currency = holding.market === "US" ? "USD" : "MYR";
+    return [
+      env.DB.prepare(
+        "INSERT INTO instrument(symbol,market,quote_symbol,name,currency) VALUES(?,?,?,?,?) " +
+        "ON CONFLICT(market,symbol) DO UPDATE SET active=1"
+      ).bind(holding.symbol, holding.market, holding.symbol, holding.symbol, currency),
+      env.DB.prepare(
+        "INSERT INTO holding(instrument_id,quantity,avg_cost,notes,updated_at) " +
+        "SELECT id,?,?,?,? FROM instrument WHERE market=? AND symbol=? " +
+        "ON CONFLICT(instrument_id) DO UPDATE SET quantity=excluded.quantity, " +
+        "avg_cost=excluded.avg_cost, notes=excluded.notes, updated_at=excluded.updated_at"
+      ).bind(holding.quantity, holding.avgCost, holding.notes, now, holding.market, holding.symbol)
+    ];
+  });
+
+  const results = await env.DB.batch(statements);
+  const saved = holdings.filter((_, index) => Number(results[index * 2 + 1]?.meta?.changes || 0) === 1).length;
+  return jsonResponse({ saved });
+}
+
+async function deleteHolding(request, env, pathname) {
+  assertRequestOrigin(request, env);
+  const session = await getOwnerSession(request, env);
+  if (!session) return jsonResponse({ error: "Sign in required." }, 401);
+  await readJsonBody(request);
+
+  const parts = pathname.split("/");
+  if (parts.length !== 5) return jsonResponse({ error: "Invalid holding." }, 400);
+  let market;
+  let symbol;
+  try {
+    market = decodeURIComponent(parts[3]);
+    symbol = decodeURIComponent(parts[4]);
+  } catch {
+    return jsonResponse({ error: "Invalid holding." }, 400);
+  }
+  symbol = symbol.toUpperCase();
+  if (!["US", "MY"].includes(market) || !SYMBOL_PATTERN.test(symbol)) {
+    return jsonResponse({ error: "Invalid holding." }, 400);
+  }
+
+  const deleted = await env.DB.prepare(
+    "DELETE FROM holding WHERE instrument_id = " +
+    "(SELECT id FROM instrument WHERE market = ? AND symbol = ?) RETURNING instrument_id"
+  ).bind(market, symbol).first();
+  if (!deleted) return jsonResponse({ error: "Holding not found." }, 404);
+  return jsonResponse({ deleted: true, market, symbol });
+}
+
+export async function handlePortfolioRequest(request, env, pathname) {
+  try {
+    if (pathname === "/api/holdings" && request.method === "GET") return await listHoldings(request, env);
+    if (pathname === "/api/holdings" && request.method === "PUT") return await upsertHoldings(request, env);
+    if (pathname.startsWith("/api/holdings/") && request.method === "DELETE") {
+      return await deleteHolding(request, env, pathname);
+    }
+    return jsonResponse({ error: "Not found." }, 404);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "origin_rejected") return jsonResponse({ error: "Request origin rejected." }, 403);
+    if (message === "body_too_large") return jsonResponse({ error: "Request too large." }, 413);
+    if (message === "json_required") return jsonResponse({ error: "Content-Type must be application/json." }, 415);
+    if (message === "invalid_holding") return jsonResponse({ error: "One or more holdings are invalid." }, 400);
+    console.error("Portfolio API request failed:", message);
+    return jsonResponse({ error: "Portfolio request failed." }, 400);
+  }
+}
