@@ -122,3 +122,14 @@ test("settings update persists both thresholds in one D1 batch", async () => {
     ["alert_move_pct", "6"], ["max_position_pct", "28"]
   ]);
 });
+
+test("settings reject inherited object property names", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handleSettingsRequest(new Request(`${origin}/api/settings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: '{"__proto__":5}'
+  }), { ...envConfig, DB }, "/api/settings");
+  assert.equal(response.status, 400);
+  assert.equal(calls.batch, 0);
+});
