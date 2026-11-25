@@ -62,7 +62,7 @@ jobs:
       - name: Run EdgarTools shadow extraction
         env:
           EDGAR_IDENTITY: "Magic Folio research support@binalah.co"
-                    OUTPUT_PATH: edgartools-shadow.json
+          OUTPUT_PATH: edgartools-shadow.json
         run: |
           if [ -f edgartools-symbols.txt ]; then
             export EDGARTOOLS_SYMBOLS="$(cat edgartools-symbols.txt)"
