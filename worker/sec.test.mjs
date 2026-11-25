@@ -6,12 +6,22 @@ const origin = "https://folio.example";
 const cookie = `__Host-session=${"s".repeat(43)}`;
 const userAgent = "Magic Folio/0.1 (contact: owner@example.com)";
 
-function fakeDb({ cik = "0000320193", count = 1, authenticated = true } = {}) {
+function fakeDb({
+  cik = "0000320193",
+  count = 1,
+  authenticated = true,
+  cache = null,
+  filings = []
+} = {}) {
+  const calls = { batch: 0, statements: [], queries: [] };
   const DB = {
     prepare(sql) {
-      return {
-        bind() { return this; },
+      const statement = {
+        sql,
+        values: [],
+        bind(...values) { this.values = values; return this; },
         async first() {
+          calls.queries.push({ sql, values: this.values });
           if (sql.includes("FROM session WHERE token_hash")) {
             return authenticated ? {
               token_hash: "session-hash",
@@ -21,14 +31,25 @@ function fakeDb({ cik = "0000320193", count = 1, authenticated = true } = {}) {
             } : null;
           }
           if (sql.includes("SELECT count FROM auth_attempt")) return { count };
-          if (sql.includes("SELECT cik FROM instrument")) return cik ? { cik } : null;
+          if (sql.includes("FROM instrument")) return cik ? { id: 7, cik } : null;
+          if (sql.includes("FROM sec_fetch_cache")) return cache;
           return null;
+        },
+        async all() {
+          calls.queries.push({ sql, values: this.values });
+          return { results: filings };
         },
         async run() { return { meta: { changes: 1 } }; }
       };
+      return statement;
+    },
+    async batch(statements) {
+      calls.batch++;
+      calls.statements.push(...statements);
+      return statements.map(() => ({ meta: { changes: 1 } }));
     }
   };
-  return { DB };
+  return { DB, calls };
 }
 
 function submissions(forms = ["10-Q", "8-K"], filingDates = ["2026-11-24", "2026-11-20"]) {
