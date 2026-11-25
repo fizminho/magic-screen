@@ -519,6 +519,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         body: JSON.stringify({ symbol: item.symbol })
       });
       setResearchResult({ ...result, symbol: item.symbol });
+      await refreshResearchInbox();
       onNotice(`Research brief ready for ${item.symbol}.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to generate the research brief.");
@@ -552,6 +553,10 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       onError(cause instanceof Error ? cause.message : "Unable to import Bursa CSV.");
     } finally { setBusy(false); }
   }
+
+  useEffect(() => {
+    void refreshResearchInbox();
+  }, []);
 
   const usCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol)).size;
   const myCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "MY").map((item) => item.symbol)).size;
