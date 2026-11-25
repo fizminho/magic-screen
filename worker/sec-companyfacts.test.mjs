@@ -150,8 +150,8 @@ test("SEC companyfacts endpoint fetches official data and stores compact normali
   assert.equal(body.facts.length, 2);
   assert.equal(requestedUrl, "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json");
   assert.equal(requestedAgent, userAgent);
-  assert.equal(calls.writes.length, 1);
-  assert.match(calls.writes[0].sql, /INSERT INTO sec_companyfacts_cache/);
+  assert.equal(calls.writes.filter((write) => write.sql.includes("INSERT INTO sec_companyfacts_cache")).length, 1);
+  assert.ok(calls.writes.some((write) => write.sql.includes("INSERT INTO auth_attempt")));
 });
 
 test("SEC companyfacts endpoint respects the shared SEC rate limit", async () => {
