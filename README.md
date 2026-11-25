@@ -33,7 +33,9 @@ node --experimental-strip-types --test worker/*.test.mjs
 
 ## Deployment
 
-GitHub Actions builds the app, applies pending non-destructive D1 migrations and deploys the Cloudflare Worker on changes merged to `main`. The one-time destructive reset must be run separately after the replacement Worker is complete, configured and reviewed.
+Cloudflare Workers Builds is the production deployment mechanism, linked directly to the GitHub `main` branch. Set its build/deploy command to `npm run cf:deploy`. That command builds the app, applies pending D1 migrations remotely through Wrangler, and then deploys the Worker and static assets. No Cloudflare deployment token or account ID is needed in GitHub Actions for this flow.
+
+GitHub Actions remains responsible for CI, regression tests and security checks. The one-time destructive D1 reset remains a separate, explicitly manual workflow and is never part of normal deployment.
 
 See [setup](docs/SETUP.md), [data sources](docs/DATA_SOURCES.md), [free-tier budget](docs/FREE_TIER_BUDGET.md), [references](docs/REFERENCES.md), and [security](SECURITY.md).
 
