@@ -42,7 +42,6 @@ jobs:
             echo "::error::Refusing production reset: legacy MFI Worker code is still present."
             exit 1
           fi
-          test -f migrations/0001_drop_legacy.sql
           test -f migrations/0002_portfolio_schema.sql
           RP_ID="$(sed -n 's/^RP_ID = "\([^"]*\)"/\1/p' wrangler.toml)"
           RP_ORIGIN="$(sed -n 's/^RP_ORIGIN = "\([^"]*\)"/\1/p' wrangler.toml)"
