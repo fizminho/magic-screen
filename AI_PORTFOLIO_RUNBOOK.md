@@ -99,7 +99,7 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 - [ ] **A3.** List open PRs: `gh pr list --state open --limit 200 --json number,title,author,headRefName,labels,url > /tmp/open-prs.json`. Save a human summary to `docs/CLEANUP_LOG.md` (number, title, author, kind: dependabot / feature / other).
 - [x] **A4.** Production backup intentionally skipped under the owner's explicit decision to discard all existing D1 data. Do not export or migrate legacy rows.
 - [x] **A5.** Do not hard-code or manually inventory retired tables. The one-time reset script reads actual table names from `sqlite_master` immediately before dropping them.
-- [ ] **A6.** Capture a baseline: `npm install`, `npm run build`, `node --experimental-strip-types --test worker/*.test.mjs`. Record pass/fail.
+- [x] **A6.** Clean-checkout baseline passed with `npm ci`, `npm run build`, `npm audit --audit-level=high`, Node regression tests, fresh local D1 migrations/schema verification and Wrangler dry-run.
 
 **Done when:** baseline is recorded and the guarded reset script is ready. Production reset remains a final cutover action, not a Phase A action.
 
@@ -160,7 +160,7 @@ Use Wrangler migrations (`migrations/` folder, tracked in `d1_migrations` table)
 - [x] **D-1.** In `wrangler.toml`, `migrations_dir = "migrations"` is configured under the `[[d1_databases]]` block.
 - [x] **D-2.** Create `migrations/0001_drop_legacy.sql` with defensive drops for known legacy MFI tables. The guarded reset script dynamically drops every actual user table, including unknown retired SEC/EdgarTools tables, so no legacy table names are guessed.
 - [x] **D-3.** Create `migrations/0002_portfolio_schema.sql` (Appendix A).
-- [ ] **D-4.** Test locally: `npx wrangler d1 migrations apply magic-screen-db --local`, then `--local --command "SELECT name FROM sqlite_master"`.
+- [x] **D-4.** CI applied both migrations to a fresh local D1 database and queried `sqlite_master`. The expected Magic Folio tables and `d1_migrations` were present.
 - [x] **D-5.** Normal deployments apply pending migrations immediately before `wrangler deploy`. The one-time destructive reset is separate and manual: `.github/workflows/reset-production-d1.yml` requires the exact confirmation `DROP-ALL-LEGACY-DATA`, refuses to run while legacy MFI code remains, drops every user table, applies migrations, and deploys the replacement Worker. Do not run it until the new Worker is complete.
 - [ ] **D-6.** After the cutover, verify that only the new-schema tables + `d1_migrations` remain. The reset workflow performs a post-migration inventory; inspect its log and resolve any unexpected object before declaring cutover complete.
 
