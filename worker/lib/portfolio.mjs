@@ -137,6 +137,7 @@ async function deleteHolding(request, env, pathname) {
 
 
 const MAX_WATCHLIST_ITEMS = 20;
+const MAX_WATCHLIST_TOTAL = 50;
 
 function validateWatchlistItem(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_watchlist_item");
@@ -180,6 +181,15 @@ async function addWatchlistItems(request, env) {
     seen.add(key);
   }
   if (!items.length) return jsonResponse({ added: 0 });
+
+  const currentRows = await env.DB.prepare(
+    "SELECT i.market, i.symbol FROM watchlist w JOIN instrument i ON i.id = w.instrument_id"
+  ).all();
+  const existing = new Set((currentRows.results || []).map((row) => `${row.market}:${row.symbol}`));
+  const additional = items.filter((item) => !existing.has(`${item.market}:${item.symbol}`)).length;
+  if (existing.size + additional > MAX_WATCHLIST_TOTAL) {
+    return jsonResponse({ error: "The watchlist is limited to 50 instruments. Remove an item before adding another." }, 409);
+  }
 
   const now = new Date().toISOString();
   const statements = items.flatMap((item) => {
