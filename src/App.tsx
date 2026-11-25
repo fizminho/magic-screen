@@ -3,6 +3,8 @@ import { client as webauthnClient } from "@passwordless-id/webauthn";
 import PortfolioPanel from "./PortfolioPanel";
 import { clearDashboardSnapshot } from "./offline-dashboard";
 
+const SETUP_TOKEN_MIN_LENGTH = 32;
+
 type AuthState = { registered: boolean; authenticated: boolean; passkeyCount: number; needsSetup: boolean };
 type PasskeyCredential = { id: string; name: string; createdAt: string; lastUsedAt: string | null; backedUp: boolean };
 type RegistrationOptions = { challenge: string; user: { id: string; name: string; displayName: string }; rpId: string; rpName: string; excludeCredentials: Array<{ id: string; type: "public-key" }> };
@@ -79,7 +81,7 @@ export default function App() {
 
   async function registerPasskey(isFirst: boolean) {
     setError(""); setNotice("");
-    if (isFirst && setupToken.trim().length < 43) { setError("Enter the one-time setup key."); return; }
+    if (isFirst && setupToken.trim().length < SETUP_TOKEN_MIN_LENGTH) { setError("Enter the one-time setup key."); return; }
     setBusy(true);
     try {
       const headers: Record<string, string> = {};
