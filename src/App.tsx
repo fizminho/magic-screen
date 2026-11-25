@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { client as webauthnClient } from "@passwordless-id/webauthn";
 
 type AuthState = { registered: boolean; authenticated: boolean; passkeyCount: number; needsSetup: boolean };
-type RegistrationOptions = { challenge: string; user: { id: string; name: string; displayName: string }; rpId: string };
+type RegistrationOptions = { challenge: string; user: { id: string; name: string; displayName: string }; rpId: string; rpName: string; excludeCredentials: Array<{ id: string; type: "public-key" }> };
 type WebAuthnTransport = "ble" | "hybrid" | "internal" | "nfc" | "usb" | "smart-card";
 type LoginOptions = { challenge: string; rpId: string; allowCredentials: Array<{ id: string; transports: WebAuthnTransport[] }> };
 
@@ -21,6 +21,13 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 const post = (body = "{}", headers: Record<string, string> = {}): RequestInit => ({ method: "POST", body, headers });
 
+async function withoutWebAuthnDebug<T>(operation: () => Promise<T>): Promise<T> {
+  const original = console.debug;
+  console.debug = () => undefined;
+  try { return await operation(); }
+  finally { console.debug = original; }
+}
+
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [setupToken, setSetupToken] = useState("");
@@ -38,16 +45,20 @@ export default function App() {
 
   async function registerPasskey(isFirst: boolean) {
     setError(""); setNotice("");
-    if (isFirst && setupToken.trim().length < 24) { setError("Enter the one-time setup key."); return; }
+    if (isFirst && setupToken.trim().length < 32) { setError("Enter the one-time setup key."); return; }
     setBusy(true);
     try {
       const headers: Record<string, string> = {};
       if (isFirst) headers["x-setup-token"] = setupToken.trim();
       const options = await api<RegistrationOptions>("/api/auth/register/options", post("{}", headers));
-      const registration = await webauthnClient.register({
+      const registration = await withoutWebAuthnDebug(() => webauthnClient.register({
         user: options.user, challenge: options.challenge, userVerification: "required",
-        discoverable: "required", domain: options.rpId, attestation: false
-      });
+        discoverable: "required", domain: options.rpId, attestation: false,
+        customProperties: {
+          rp: { id: options.rpId, name: options.rpName },
+          excludeCredentials: options.excludeCredentials
+        }
+      }));
       await api("/api/auth/register/verify", post(JSON.stringify(registration), headers));
       setSetupToken("");
       await refreshState();
@@ -61,10 +72,10 @@ export default function App() {
     setError(""); setNotice(""); setBusy(true);
     try {
       const options = await api<LoginOptions>("/api/auth/login/options", post());
-      const authentication = await webauthnClient.authenticate({
+      const authentication = await withoutWebAuthnDebug(() => webauthnClient.authenticate({
         challenge: options.challenge, allowCredentials: options.allowCredentials,
         userVerification: "required", domain: options.rpId
-      });
+      }));
       await api("/api/auth/login/verify", post(JSON.stringify(authentication)));
       await refreshState();
       setNotice("You're signed in.");
