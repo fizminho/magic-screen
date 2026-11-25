@@ -16,8 +16,6 @@ jobs:
       - uses: actions/setup-node@49933ea5288ca8ca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
-          cache: npm
-      # npm ci becomes mandatory once the lockfile is generated in the runner-backed step.
       - run: npm install --no-audit --no-fund
       - run: npm run build
       - name: Audit production dependencies (blocking)
