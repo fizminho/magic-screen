@@ -5,19 +5,47 @@
 - React + TypeScript + Vite frontend.
 - Cloudflare Worker with static assets.
 - Cloudflare D1 for owner portfolio data.
-- Passkey-only single-owner authentication.
+- Passkey-only single-owner authentication using `@passwordless-id/webauthn`.
 - Gemini free tier for constrained portfolio analysis, subject to current provider terms and quotas.
 - Official or terms-compliant market/news sources only.
 
 ## Local development
 
 ```bash
-npm install
+npm ci
 cp .dev.vars.example .dev.vars
+```
+
+Generate a long random local `SETUP_TOKEN` and set it in `.dev.vars`. Keep `RP_ID=localhost`, `RP_ORIGIN=http://localhost:8787` and `APP_ENV=development` for local testing. Never commit `.dev.vars`.
+
+Then run:
+
+```bash
 npm run dev
 ```
 
-Use local-only RP values from `.dev.vars.example`. Never put production credentials in local examples or commit `.dev.vars`.
+## First production passkey
+
+1. Confirm the final production hostname. Passkeys are bound to `RP_ID`; changing the hostname later requires re-registration.
+2. Configure `RP_ID` as the hostname only and `RP_ORIGIN` as the exact HTTPS origin in Worker vars.
+3. Generate a long random setup token and set it as the Cloudflare Worker secret named `SETUP_TOKEN`. Do not put it in `wrangler.toml`, GitHub vars or frontend code.
+4. Deploy the replacement Worker and verify `/api/health`.
+5. Open the site in a supported HTTPS browser and enter the setup token once to create the first passkey.
+6. Sign in and add a second passkey on a separate device.
+7. Delete the temporary Worker secret `SETUP_TOKEN` after confirming both passkeys work.
+8. Protect the Cloudflare account with strong 2FA or a passkey.
+
+The setup token is a one-time bootstrap gate, not a login password. Normal sign-in always uses the browser passkey prompt.
+
+## Passkey recovery
+
+If all passkeys are lost, use the secured Cloudflare account to set a new temporary `SETUP_TOKEN`, then clear only the passkey and session records:
+
+```bash
+npx wrangler d1 execute magic-screen-db --remote --command "DELETE FROM passkey_credential; DELETE FROM session;"
+```
+
+Register a new passkey, add a second recovery passkey, and remove the temporary token. This recovery does not delete portfolio holdings. Never run a full D1 reset for routine passkey recovery.
 
 ## Cloudflare deployment
 
@@ -34,4 +62,4 @@ Configure runtime credentials as Cloudflare Worker secrets only when the corresp
 
 ## Verification
 
-`npm run build`, `node --experimental-strip-types --test worker/*.test.mjs`, `npm audit --omit=dev --audit-level=high`, and `npx wrangler deploy --dry-run` are the expected pre-deployment checks. A successful CI run is not proof of a live deployment.
+`npm ci`, `npm run build`, `node --experimental-strip-types --test worker/*.test.mjs`, `npm audit --audit-level=high`, and `npx wrangler deploy --dry-run` are the expected pre-deployment checks. A successful CI run is not proof of a live deployment.
