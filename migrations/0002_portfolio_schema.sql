@@ -125,4 +125,5 @@ INSERT INTO setting(key,value) VALUES
   ('alert_move_pct','4'),
   ('max_pushes_per_day','8'),
   ('quote_cursor','0'),
+  ('sec_refresh_cursor',''),
   ('max_position_pct','25');
