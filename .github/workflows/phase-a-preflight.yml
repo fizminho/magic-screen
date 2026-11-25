@@ -131,7 +131,7 @@ jobs:
               SELECT '0000320193-26-000001','0000320193',id,'10-Q','AAPL 10-Q','Quarterly report.','2026-11-24','2026-09-30','aapl.htm','https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/aapl.htm','$sec_fetched_at'
               FROM instrument WHERE market='US' AND symbol='AAPL';
             INSERT INTO sec_companyfacts_cache(instrument_id,cik,fetched_at,facts_json)
-              SELECT id,'0000320193','$sec_fetched_at','{"companyName":"Apple Inc.","cik":"0000320193","metrics":{}}'
+              SELECT id,'0000320193','$sec_fetched_at','{}'
               FROM instrument WHERE market='US' AND symbol='AAPL';
           "
           holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
@@ -146,8 +146,9 @@ jobs:
           echo "$sec_facts_cleanup"
           echo "$quote_cleanup"
           grep -q '"status": "clean"' <<< "$sec_filing_cleanup"
-          grep -q "clean" <<< "$sec_cache_cleanup"
-          grep -q "clean" <<< "$quote_cleanup"
+          grep -q '"status": "clean"' <<< "$sec_cache_cleanup"
+          grep -q '"status": "clean"' <<< "$sec_facts_cleanup"
+          grep -q '"status": "clean"' <<< "$quote_cleanup"
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
           test "$watchlist_status" = "200"
           jq -e '.added == 1' /tmp/watchlist-post.json >/dev/null
