@@ -4,7 +4,7 @@ import { handleSecRequest, parseSecSubmissions } from "./lib/sec.mjs";
 
 const origin = "https://folio.example";
 const cookie = `__Host-session=${"s".repeat(43)}`;
-const userAgent = "Magic Folio/0.1 (contact: owner@example.com)";
+const userAgent = "Magic Folio/0.1 (contact: owner@binalah.co)";
 const envConfig = { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: origin };
 
 function fakeDb({
