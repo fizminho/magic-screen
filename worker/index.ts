@@ -3,6 +3,8 @@
 import { withSecurityHeaders } from "./security.mjs";
 // @ts-ignore The JavaScript auth module is exercised by Node regression tests.
 import { handleAuthRequest } from "./lib/auth.mjs";
+// @ts-ignore The JavaScript quote module is exercised by Node regression tests.
+import { handleQuoteRequest } from "./lib/quotes.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -32,6 +34,8 @@ export default {
       });
     } else if (url.pathname.startsWith("/api/auth/")) {
       response = await handleAuthRequest(request, env, url.pathname);
+    } else if (url.pathname.startsWith("/api/quotes/")) {
+      response = await handleQuoteRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/")) {
       response = new Response(JSON.stringify({ error: "Not found." }), {
         status: 404,
