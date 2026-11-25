@@ -84,3 +84,27 @@ Preflight run `45527396444` on commit `9876af8cf8e696b17213092a80097e54197a9227`
 - Wrangler dry-run confirmed the Worker bundle and `magic-screen-db` binding without contacting production.
 
 This validates the new schema from an empty local D1 database. It does not apply or alter production D1.
+
+
+## Passkey authentication implementation and verification
+
+- Selected and pinned `@passwordless-id/webauthn@2.4.1` (MIT); provenance is in `docs/DATA_SOURCES.md`.
+- Implemented first-run setup-token gate, discoverable passkey registration/login, strict RP/origin/host binding, challenge type/purpose/expiry/single-use checks, UP+UV checks, signature verification, user-handle binding and signature counter enforcement.
+- Implemented hashed sessions, `__Host-session` production cookie, local-only cookie name, 7-day idle / 30-day absolute expiry, hourly last-seen refresh, logout and sign-out-everywhere.
+- Implemented hashed-IP rate limits, JSON body/content-type/size checks, protected credential inventory, rename and atomic last-passkey deletion protection.
+- Added mobile-first passkey UI, setup flow, second-passkey prompt, credential list/rename/remove and sign-out controls.
+- Added tests for malformed JSON media types, missing/spoofed Origin, challenge ceremony type binding, protected credential inventory, mutation authorization and sign-out-everywhere authorization.
+- Corrected the authentication counter persistence to use the library's `AuthenticationInfo.counter` result (not the registration result shape).
+- Added a local Worker/D1 smoke test to CI. It checks health, first-run state, missing setup-token rejection, no-passkey login rejection and unauthenticated credential inventory rejection.
+
+Latest full preflight `45528603689` on commit `e4f2d6e3f3ca6cc5ee442ee5842fd3be64b01944` passed:
+- `npm ci`
+- TypeScript + Vite build
+- Full dependency audit (0 vulnerabilities)
+- Node regression suite
+- Fresh local D1 migration and schema inventory
+- Foreign-key-aware destructive reset routine against local D1 only
+- Wrangler Worker smoke test with local D1
+- Wrangler deploy dry-run
+
+Still pending before production: real passkey ceremony on iOS Safari/PWA, Android Chrome/PWA and desktop Chrome/Edge; production RP variables and temporary setup secret; deployment; two real passkeys; then removal of `SETUP_TOKEN` and obsolete `MFI_SESSION_COOKIE`. No production D1 reset, Worker deployment or Cloudflare secret deletion has been performed.
