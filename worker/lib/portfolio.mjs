@@ -10,9 +10,15 @@ const MAX_HOLDINGS = 20;
 const MAX_QUANTITY = 1_000_000_000_000;
 const MAX_AVG_COST = 1_000_000_000_000;
 
+function normalizeCik(value, market) {
+  if (value === null || value === undefined || value === "") return null;
+  if (market !== "US" || typeof value !== "string" || !/^[0-9]{1,10}$/.test(value)) throw new Error("invalid_holding");
+  return value.padStart(10, "0");
+}
+
 function validateHolding(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_holding");
-  const { symbol, market, quantity, avgCost = null, notes = null } = value;
+  const { symbol, market, quantity, avgCost = null, notes = null, cik = null } = value;
   if (typeof symbol !== "string" || symbol !== symbol.trim().toUpperCase() || !SYMBOL_PATTERN.test(symbol)) {
     throw new Error("invalid_holding");
   }
@@ -24,14 +30,15 @@ function validateHolding(value) {
     throw new Error("invalid_holding");
   }
   if (notes !== null && (typeof notes !== "string" || notes.length > 500)) throw new Error("invalid_holding");
-  return { symbol, market, quantity, avgCost, notes };
+  const normalizedCik = normalizeCik(cik, market);
+  return { symbol, market, quantity, avgCost, notes, cik: normalizedCik };
 }
 
 async function listHoldings(request, env) {
   const session = await getOwnerSession(request, env);
   if (!session) return jsonResponse({ error: "Sign in required." }, 401);
   const rows = await env.DB.prepare(
-    "SELECT i.symbol, i.market, i.name, i.currency, i.sector, i.shariah_flag AS shariahFlag, " +
+    "SELECT i.symbol, i.market, i.name, i.currency, i.cik, i.sector, i.shariah_flag AS shariahFlag, " +
     "h.quantity, h.avg_cost AS avgCost, h.notes, h.updated_at AS updatedAt, " +
     "q.price, q.prev_close AS prevClose, q.change_pct AS changePct, q.as_of AS quoteAsOf, " +
     "q.provider AS quoteProvider, COALESCE(q.status, 'unavailable') AS quoteStatus " +
@@ -74,9 +81,9 @@ async function upsertHoldings(request, env) {
     const currency = holding.market === "US" ? "USD" : "MYR";
     return [
       env.DB.prepare(
-        "INSERT INTO instrument(symbol,market,quote_symbol,name,currency) VALUES(?,?,?,?,?) " +
-        "ON CONFLICT(market,symbol) DO UPDATE SET active=1"
-      ).bind(holding.symbol, holding.market, holding.symbol, holding.symbol, currency),
+        "INSERT INTO instrument(symbol,market,quote_symbol,name,currency,cik) VALUES(?,?,?,?,?,?) " +
+        "ON CONFLICT(market,symbol) DO UPDATE SET active=1, cik=COALESCE(excluded.cik,instrument.cik)"
+      ).bind(holding.symbol, holding.market, holding.symbol, holding.symbol, currency, holding.cik),
       env.DB.prepare(
         "INSERT INTO holding(instrument_id,quantity,avg_cost,notes,updated_at) " +
         "SELECT id,?,?,?,? FROM instrument WHERE market=? AND symbol=? " +
@@ -141,20 +148,21 @@ const MAX_WATCHLIST_TOTAL = 50;
 
 function validateWatchlistItem(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_watchlist_item");
-  const { symbol, market, note = null } = value;
+  const { symbol, market, note = null, cik = null } = value;
   if (typeof symbol !== "string" || symbol !== symbol.trim().toUpperCase() || !SYMBOL_PATTERN.test(symbol)) {
     throw new Error("invalid_watchlist_item");
   }
   if (!["US", "MY"].includes(market)) throw new Error("invalid_watchlist_item");
   if (note !== null && (typeof note !== "string" || note.length > 500)) throw new Error("invalid_watchlist_item");
-  return { symbol, market, note };
+  const normalizedCik = normalizeCik(cik, market);
+  return { symbol, market, note, cik: normalizedCik };
 }
 
 async function listWatchlist(request, env) {
   const session = await getOwnerSession(request, env);
   if (!session) return jsonResponse({ error: "Sign in required." }, 401);
   const rows = await env.DB.prepare(
-    "SELECT i.symbol, i.market, i.name, i.currency, i.sector, w.note, w.added_at AS addedAt, " +
+    "SELECT i.symbol, i.market, i.name, i.currency, i.cik, i.sector, w.note, w.added_at AS addedAt, " +
     "q.price, q.prev_close AS prevClose, q.change_pct AS changePct, q.as_of AS quoteAsOf, " +
     "q.provider AS quoteProvider, COALESCE(q.status, 'unavailable') AS quoteStatus " +
     "FROM watchlist w JOIN instrument i ON i.id = w.instrument_id " +
@@ -196,9 +204,9 @@ async function addWatchlistItems(request, env) {
     const currency = item.market === "US" ? "USD" : "MYR";
     return [
       env.DB.prepare(
-        "INSERT INTO instrument(symbol,market,quote_symbol,name,currency) VALUES(?,?,?,?,?) " +
-        "ON CONFLICT(market,symbol) DO UPDATE SET active=1"
-      ).bind(item.symbol, item.market, item.symbol, item.symbol, currency),
+        "INSERT INTO instrument(symbol,market,quote_symbol,name,currency,cik) VALUES(?,?,?,?,?,?) " +
+        "ON CONFLICT(market,symbol) DO UPDATE SET active=1, cik=COALESCE(excluded.cik,instrument.cik)"
+      ).bind(item.symbol, item.market, item.symbol, item.symbol, currency, item.cik),
       env.DB.prepare(
         "INSERT INTO watchlist(instrument_id,note,added_at) " +
         "SELECT id,?,? FROM instrument WHERE market=? AND symbol=? " +
