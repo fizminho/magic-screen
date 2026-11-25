@@ -63,7 +63,7 @@ export default {
       response = await handleSecRequest(request, env, url);
     } else if (url.pathname === "/api/sec/companyfacts") {
       response = await handleSecCompanyFactsRequest(request, env, url);
-    } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/run") {
+    } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/inbox" || url.pathname === "/api/analysis/run") {
       response = await handleAnalysisRequest(request, env, url);
     } else if (url.pathname.startsWith("/api/push/")) {
       response = await handlePushRequest(request, env, url);
