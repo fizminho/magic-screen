@@ -33,6 +33,6 @@ The normal deployment workflow applies pending migrations and deploys. It does *
 6. **Secret history review:** scan Git history and review any credential-like matches. Remove the retired Cloudflare `MFI_SESSION_COOKIE` secret only after the replacement Worker is live and verified.
 7. **SEC filings:** on-demand owner-only SEC EDGAR filing metadata lookup and six-hour D1 cache are implemented. The owner must add a CIK to each US instrument and configure `SEC_USER_AGENT` with a real contact address. Automatic ticker-to-CIK resolution, companyfacts and scheduled refresh remain pending.
 8. **Optional quote account:** MarketData.app adapter is implemented but disabled until the owner creates an account and enters their own token. No provider token has been supplied or stored.
-9. **Remaining product phases:** scheduled jobs, Gemini analysis, Web Push, PWA and full dashboard/insights screens are not implemented yet. Do not perform the production reset until the replacement application is ready for the intended cutover.
+9. **Remaining product phases:** scheduled jobs, Cloudflare Workers AI public-data briefs, Web Push, PWA and full insights screens are not implemented yet. Do not perform the production reset until the replacement application is ready for the intended cutover.
 
 Do not manually run `scripts/reset-production-d1.sh` against production outside the guarded workflow.
