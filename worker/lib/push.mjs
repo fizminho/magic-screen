@@ -159,6 +159,12 @@ export async function sendPushToSubscription(env, subscription, payload, fetcher
 
 export async function handlePushRequest(request, env, url, fetcher = fetch) {
   try {
+    if (url.pathname === "/api/push/config" && request.method === "GET") {
+      return jsonResponse({
+        enabled: Boolean(env.VAPID_PUBLIC_KEY),
+        publicKey: env.VAPID_PUBLIC_KEY || null
+      });
+    }
     const session = await getOwnerSession(request, env);
     if (!session) return jsonResponse({ error: "Sign in required." }, 401);
     assertRequestOrigin(request, env);
