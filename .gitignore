@@ -18,3 +18,8 @@ __pycache__
 data/*.json
 dist-reports
 backup-*.sql
+
+# Generated PWA PNG assets (created by prebuild/predev)
+/public/icon-192.png
+/public/icon-512.png
+/public/apple-touch-icon.png
