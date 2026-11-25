@@ -40,6 +40,12 @@ jobs:
       - name: Verify local D1 schema
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+      - name: Exercise the destructive reset routine against local D1 only
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        env:
+          CONFIRM_PRODUCTION_RESET: DROP-ALL-LEGACY-DATA
+          D1_SCOPE: --local
+        run: bash scripts/reset-production-d1.sh
       - name: Validate Wrangler bundling and assets without deploying
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 deploy --dry-run
