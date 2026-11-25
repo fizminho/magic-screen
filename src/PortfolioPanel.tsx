@@ -372,6 +372,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       });
       setSymbol(""); setQuantity(""); setAvgCost(""); setNotes(""); setCik("");
       await refreshPortfolio();
+      await refreshResearchInbox();
       onNotice("Holding saved.");
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to save holding.");
@@ -386,6 +387,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         method: "DELETE", body: "{}"
       });
       await refreshPortfolio();
+      await refreshResearchInbox();
       onNotice(`${item.symbol} removed from holdings.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to remove holding.");
@@ -420,6 +422,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       });
       setWatchSymbol(""); setWatchNote(""); setWatchCik("");
       await refreshWatchlist();
+      await refreshResearchInbox();
       onNotice("Watchlist item saved.");
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to save watchlist item.");
@@ -434,6 +437,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         method: "DELETE", body: "{}"
       });
       await refreshWatchlist();
+      await refreshResearchInbox();
       onNotice(`${item.symbol} removed from watchlist.`);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "Unable to remove watchlist item.");
