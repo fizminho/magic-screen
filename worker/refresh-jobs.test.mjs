@@ -74,7 +74,7 @@ test("weekly housekeeping uses bounded retention windows", async () => {
   const result = await runWeeklyHousekeeping({ DB }, { now: Date.parse("2026-11-25T02:00:00Z") });
   assert.equal(result.status, "success");
   assert.equal(calls.batches.length, 1);
-  assert.equal(calls.batches[0].length, 7);
+  assert.equal(calls.batches[0].length, 8);
   assert.ok(calls.batches[0].some((item) => item.sql.includes("DELETE FROM sec_filing")));
   assert.ok(calls.batches[0].some((item) => item.sql.includes("DELETE FROM auth_challenge")));
 });
