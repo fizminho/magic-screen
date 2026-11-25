@@ -490,3 +490,10 @@ export async function handleAuthRequest(request, env, pathname) {
     return json({ error: "Authentication request failed." }, 400);
   }
 }
+
+
+// Shared owner-session primitives for other authenticated API modules.
+export const getOwnerSession = sessionFor;
+export const assertRequestOrigin = checkOrigin;
+export const readJsonBody = bodyJson;
+export const jsonResponse = json;
