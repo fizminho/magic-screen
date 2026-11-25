@@ -11,11 +11,12 @@ export type HoldingImportRow = {
   market: "US" | "MY";
   quantity: number;
   avgCost: number | null;
+  cik: string | null;
 };
 
 /**
  * Parse an owner-only holdings CSV.
- * Required columns: symbol,market,quantity,avg_cost.
+ * Required columns: symbol,market,quantity,avg_cost. Optional: cik for US instruments.
  * Existing positions are upserted; rows omitted from the file are not deleted.
  */
 export function parseHoldingsCsv(csv: string): HoldingImportRow[] {
@@ -29,6 +30,7 @@ export function parseHoldingsCsv(csv: string): HoldingImportRow[] {
   const marketIndex = headers.indexOf("market");
   const quantityIndex = headers.indexOf("quantity");
   const avgCostIndex = headers.indexOf("avg_cost");
+  const cikIndex = headers.indexOf("cik");
   if ([symbolIndex, marketIndex, quantityIndex, avgCostIndex].some((index) => index < 0)) {
     throw new Error("CSV headers must include symbol, market, quantity and avg_cost.");
   }
@@ -40,12 +42,15 @@ export function parseHoldingsCsv(csv: string): HoldingImportRow[] {
     const quantity = Number((row[quantityIndex] || "").trim());
     const avgCostRaw = (row[avgCostIndex] || "").trim();
     const avgCost = avgCostRaw ? Number(avgCostRaw) : null;
+    const cikRaw = cikIndex >= 0 ? (row[cikIndex] || "").trim() : "";
+    const cik = cikRaw || null;
 
     if (!SYMBOL_PATTERN.test(symbol)) throw new Error(`Row ${index + 2}: invalid ticker symbol.`);
     if (market !== "US" && market !== "MY") throw new Error(`Row ${index + 2}: market must be US or MY.`);
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_QUANTITY) {
       throw new Error(`Row ${index + 2}: quantity must be greater than zero.`);
     }
+    if (cik !== null && (market !== "US" || !/^[0-9]{1,10}$/.test(cik))) throw new Error(`Row ${index + 2}: CIK must be 1 to 10 digits and is only valid for US instruments.`);
     if (avgCost !== null && (!Number.isFinite(avgCost) || avgCost < 0 || avgCost > MAX_AVG_COST)) {
       throw new Error(`Row ${index + 2}: avg_cost must be zero or greater.`);
     }
@@ -53,6 +58,6 @@ export function parseHoldingsCsv(csv: string): HoldingImportRow[] {
     const key = `${market}:${symbol}`;
     if (seen.has(key)) throw new Error(`Row ${index + 2}: duplicate holding ${key}.`);
     seen.add(key);
-    return { symbol, market, quantity, avgCost };
+    return { symbol, market, quantity, avgCost, cik };
   });
 }
