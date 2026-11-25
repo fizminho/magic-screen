@@ -145,40 +145,61 @@ jobs:
             exit 1
           fi
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
-          check_local_cleanup() {
-            local label="$1"
-            local sql="$2"
-            local output=""
-            local json=""
-            local attempt=1
-            while (( attempt <= 3 )); do
-              if output="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "$sql" 2>&1)"; then
-                json="$(printf '%s\\n' "$output" | sed -n '/^\\[/,$p')"
-                echo "$label cleanup result:"
-                if [[ -z "$json" ]] || ! echo "$json" | jq .; then
-                  echo "::error::$label cleanup did not contain valid JSON output:"
-                  echo "$output"
-                  return 1
-                fi
-                remaining="$(echo "$json" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
-                if [[ "$remaining" == "0" ]]; then
-                  return 0
-                fi
-                echo "::error::$label cache cleanup still contains $remaining matching row(s)."
-                return 1
-              fi
-              echo "::warning::$label cleanup query failed on attempt $attempt:"
-              echo "$output"
-              sleep 1
-              ((attempt += 1))
-            done
-            echo "::error::$label cleanup query failed after 3 attempts."
-            return 1
+          # Read the local D1 SQLite file directly. Wrangler's --json currently
+          # returns empty result arrays for these local SELECT queries.
+          python3 - <<'PY'
+          import pathlib
+          import sqlite3
+          import sys
+
+          root = pathlib.Path(".wrangler/state/v3/d1")
+          candidates = [
+              path for path in root.rglob("*")
+              if path.is_file() and path.suffix in {".sqlite", ".sqlite3", ".db"}
+          ]
+          required = {"instrument", "sec_filing", "sec_fetch_cache", "sec_companyfacts_cache", "quote_latest"}
+          connection = None
+          selected = None
+          for path in candidates:
+              try:
+                  candidate = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+                  tables = {
+                      row[0] for row in candidate.execute(
+                          "SELECT name FROM sqlite_master WHERE type='table'"
+                      )
+                  }
+                  if required.issubset(tables):
+                      connection = candidate
+                      selected = path
+                      break
+                  candidate.close()
+              except sqlite3.Error:
+                  continue
+
+          if connection is None:
+              print("::error::Could not locate the local D1 SQLite database containing the expected schema.")
+              print("SQLite candidates:", [str(path) for path in candidates])
+              sys.exit(1)
+
+          print(f"Checking local D1 database: {selected}")
+          checks = {
+              "SEC filing": "SELECT COUNT(*) FROM sec_filing WHERE cik='0000320193'",
+              "SEC fetch": "SELECT COUNT(*) FROM sec_fetch_cache WHERE cik='0000320193'",
+              "SEC companyfacts": "SELECT COUNT(*) FROM sec_companyfacts_cache WHERE cik='0000320193'",
+              "Quote": "SELECT COUNT(*) FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL'",
           }
-          check_local_cleanup "SEC filing" "SELECT COUNT(*) AS remaining FROM sec_filing WHERE cik='0000320193';"
-          check_local_cleanup "SEC fetch" "SELECT COUNT(*) AS remaining FROM sec_fetch_cache WHERE cik='0000320193';"
-          check_local_cleanup "SEC companyfacts" "SELECT COUNT(*) AS remaining FROM sec_companyfacts_cache WHERE cik='0000320193';"
-          check_local_cleanup "Quote" "SELECT COUNT(*) AS remaining FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL';"
+          failed = False
+          for label, sql in checks.items():
+              remaining = connection.execute(sql).fetchone()[0]
+              print(f"{label} cache rows remaining: {remaining}")
+              if remaining != 0:
+                  print(f"::error::{label} cache cleanup left {remaining} matching row(s).")
+                  failed = True
+
+          connection.close()
+          if failed:
+              sys.exit(1)
+          PY
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
           echo "watchlist POST HTTP status: $watchlist_status"
           cat /tmp/watchlist-post.json
