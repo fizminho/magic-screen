@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { client as webauthnClient } from "@passwordless-id/webauthn";
+import PortfolioPanel from "./PortfolioPanel";
 
 type AuthState = { registered: boolean; authenticated: boolean; passkeyCount: number; needsSetup: boolean };
 type PasskeyCredential = { id: string; name: string; createdAt: string; lastUsedAt: string | null; backedUp: boolean };
@@ -56,6 +57,7 @@ export default function App() {
     } else {
       setCredentials([]);
       setCredentialNames({});
+      sessionStorage.removeItem("magicfolio.marketdata.token");
     }
   }
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function App() {
 
   async function logout() {
     setError(""); setNotice(""); setBusy(true);
-    try { await api("/api/auth/logout", post()); await refreshState(); setNotice("Signed out."); }
+    try { await api("/api/auth/logout", post()); sessionStorage.removeItem("magicfolio.marketdata.token"); await refreshState(); setNotice("Signed out."); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Sign-out failed."); }
     finally { setBusy(false); }
   }
@@ -145,6 +147,7 @@ export default function App() {
     setError(""); setNotice(""); setBusy(true);
     try {
       await api("/api/auth/logout-all", post());
+      sessionStorage.removeItem("magicfolio.marketdata.token");
       await refreshState();
       setNotice("All sessions have been signed out.");
     } catch (cause) {
@@ -228,7 +231,8 @@ export default function App() {
             <button className="button button-primary" onClick={login} disabled={busy}>{busy ? "Waiting for passkey…" : "Sign in with passkey"}</button>
           </section>
         )}
-        {error && <p className="feedback feedback-error" role="alert">{error}</p>}
+        {auth?.authenticated && supported && <PortfolioPanel onError={setError} onNotice={setNotice} />}
+        {error && <p className="feedback feedback-error" role="alert">{error}</p>
         {notice && <p className="feedback feedback-success" role="status">{notice}</p>}
       </main>
       <footer className="content"><span>MAGIC FOLIO</span><span>Research and education only. Not investment advice.</span></footer>
