@@ -24,7 +24,10 @@ RP_NAME = "Magic Folio"
 # RP_ID = "magic-screen.example.workers.dev"
 # RP_ORIGIN = "https://magic-screen.example.workers.dev"
 # Set a descriptive SEC User-Agent with a real contact email before enabling filings.
-# SEC_USER_AGENT = "Magic Folio/0.1 (contact: your-email@example.com)"
+# SEC_USER_AGENT = "Magic Folio/0.1 (contact: your-real-email@domain.com)"
+# Set the public VAPID values after generating a key pair. Keep the private key in Worker secrets only.
+# VAPID_PUBLIC_KEY = "base64url-public-key"
+# VAPID_SUBJECT = "mailto:your-real-email@domain.com"
 
 [triggers]
 crons = ["0 1 * * 2-6", "0 2 * * 6"]
