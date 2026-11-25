@@ -6,7 +6,7 @@ import {
 } from "./auth.mjs";
 
 const SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
-const MAX_SNAPSHOTS = 100;
+const MAX_SNAPSHOTS = 50;
 
 function validateSnapshot(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_quote");
@@ -56,7 +56,7 @@ async function saveSnapshots(request, env) {
   if (!session) return jsonResponse({ error: "Sign in required." }, 401);
   const payload = await readJsonBody(request);
   if (!Array.isArray(payload?.quotes) || payload.quotes.length > MAX_SNAPSHOTS) {
-    return jsonResponse({ error: "Provide up to 100 quote snapshots per request." }, 400);
+    return jsonResponse({ error: "Provide up to 50 quote snapshots per request." }, 400);
   }
 
   const seen = new Set();
