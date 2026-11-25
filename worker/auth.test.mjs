@@ -38,7 +38,7 @@ test("auth mutation rejects missing Origin before database access", async () => 
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "{}"
-  }), { RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/options");
+  }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/options");
   assert.equal(response.status, 403);
   assert.deepEqual(await response.json(), { error: "Request origin rejected." });
 });
