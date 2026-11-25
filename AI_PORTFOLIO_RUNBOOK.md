@@ -54,7 +54,7 @@ Second pass done. "Verified" means confirmed in a listing or README during this 
 | `klse-screener-py` (PyPI) | Scraper for the KLSE Screener site: fundamentals, announcements; self-imposed 2 s rate limit | Page read | Bursa trade data is **15-minute delayed**; announcements exist as a data type | Scraping a third-party site; Python |
 | `xlc/snipkey`, `po4yka/blog` | Passkey auth on Cloudflare Workers + D1 (SimpleWebAuthn; D1-backed sessions) | READMEs read | Architecture: credentials and sessions in D1 | Their frameworks |
 | `nealfennimore/passkeys` | Passkeys demo on Workers + KV + D1 | README states it is **not secure** | Storage layout only | Any code |
-| `@passwordless-id/webauthn`, `@simplewebauthn/server` | WebAuthn server libraries; the first is dependency-free and documents Cloudflare Workers support | Docs read | Candidate auth libraries (spike in E1) | Hand-rolling WebAuthn verification |
+| `@passwordless-id/webauthn@2.4.1` | MIT WebAuthn client/server library; official project docs advertise Cloudflare Workers/WebCrypto support | Project README, package metadata and docs reviewed; selected and pinned | Passkey browser ceremony + server verification | Hand-rolling WebAuthn verification; demo code copy |
 
 **Takeaways baked into this plan:** (1) one structured-JSON Gemini call per brief, no agent framework; (2) scheduled digest + push; (3) minimal data to the LLM; (4) the LLM may only pick from a candidate list we supply; (5) deterministic, rules-based risk checks computed in code (Ghostfolio-style) and passed to Gemini; (6) simulate and advise only; (7) data export so the owner is never locked in.
 
