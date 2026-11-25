@@ -43,6 +43,11 @@ type Dashboard = {
   markets: DashboardMarket[];
 };
 
+type PortfolioSettings = {
+  alertMovePct: number;
+  maxPositionPct: number;
+};
+
 type WatchlistItem = {
   symbol: string;
   market: "US" | "MY";
@@ -90,6 +95,7 @@ function formatDate(value: string | null) {
 export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [settings, setSettings] = useState<PortfolioSettings>({ alertMovePct: 4, maxPositionPct: 25 });
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [watchSymbol, setWatchSymbol] = useState("");
   const [watchMarket, setWatchMarket] = useState<"US" | "MY">("US");
@@ -126,8 +132,13 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     setDashboard(await api<Dashboard>("/api/dashboard"));
   }
 
+  async function refreshSettings() {
+    const result = await api<{ settings: PortfolioSettings }>("/api/settings");
+    setSettings(result.settings);
+  }
+
   async function refreshPortfolio() {
-    await Promise.all([refreshHoldings(), refreshWatchlist(), refreshDashboard()]);
+    await Promise.all([refreshHoldings(), refreshWatchlist(), refreshDashboard(), refreshSettings()]);
   }
 
   useEffect(() => {
@@ -154,6 +165,21 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     setMarketToken("");
     onNotice("Market Data token cleared from this browser tab.");
     onError("");
+  }
+
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onError(""); onNotice(""); setBusy(true);
+    try {
+      const result = await api<{ settings: PortfolioSettings }>("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings)
+      });
+      setSettings(result.settings);
+      onNotice("Portfolio settings saved.");
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to save settings.");
+    } finally { setBusy(false); }
   }
 
   async function addHolding(event: FormEvent<HTMLFormElement>) {
@@ -472,6 +498,19 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             {busy ? "Working…" : `Refresh US quotes (${usCount})`}
           </button>
           <p className="fine-print">The token stays in this browser tab's session storage. It is sent directly to MarketData.app and never to the Magic Folio Worker.</p>
+        </section>
+
+        <section className="tool-card">
+          <span className="eyebrow">RISK & ALERT SETTINGS</span>
+          <h3>Portfolio thresholds</h3>
+          <form className="holding-form" onSubmit={saveSettings}>
+            <label>Daily move alert (%)<input type="number" min="1" max="20" step="0.5" value={settings.alertMovePct}
+              onChange={(event) => setSettings((current) => ({ ...current, alertMovePct: Number(event.target.value) }))} required /></label>
+            <label>Maximum position size (%)<input type="number" min="5" max="50" step="1" value={settings.maxPositionPct}
+              onChange={(event) => setSettings((current) => ({ ...current, maxPositionPct: Number(event.target.value) }))} required /></label>
+            <button className="button button-secondary field-wide" type="submit" disabled={busy}>Save settings</button>
+          </form>
+          <p className="fine-print">Position size is used for rule-based concentration warnings. Daily move threshold is stored for the planned alert service; push notifications are not active yet.</p>
         </section>
 
         <section className="tool-card tool-wide">
