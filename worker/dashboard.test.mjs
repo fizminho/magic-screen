@@ -32,10 +32,10 @@ function fakeDb({ authenticated = true, rows = [] } = {}) {
 
 test("dashboard computes concentration and sector weights separately by currency", () => {
   const result = calculateDashboard([
-    { symbol: "AAPL", market: "US", sector: "Technology", quantity: 2, price: 100, quoteStatus: "ok" },
-    { symbol: "MSFT", market: "US", sector: "Technology", quantity: 1, price: 50, quoteStatus: "ok" },
-    { symbol: "KO", market: "US", sector: "Consumer Staples", quantity: 1, price: 50, quoteStatus: "stale" },
-    { symbol: "1155", market: "MY", sector: "Financials", quantity: 500, price: 6.42, quoteStatus: "ok" }
+    { symbol: "AAPL", market: "US", sector: "Technology", quantity: 2, price: 100, prevClose: 98, quoteStatus: "ok" },
+    { symbol: "MSFT", market: "US", sector: "Technology", quantity: 1, price: 50, prevClose: 50, quoteStatus: "ok" },
+    { symbol: "KO", market: "US", sector: "Consumer Staples", quantity: 1, price: 50, prevClose: 52, quoteStatus: "stale" },
+    { symbol: "1155", market: "MY", sector: "Financials", quantity: 500, price: 6.42, prevClose: 6.3, quoteStatus: "ok" }
   ]);
   assert.equal(result.holdingsCount, 4);
   assert.deepEqual(result.marketCountSplit, {
@@ -45,6 +45,8 @@ test("dashboard computes concentration and sector weights separately by currency
   const us = result.markets.find((item) => item.market === "US");
   const my = result.markets.find((item) => item.market === "MY");
   assert.equal(us.marketValue, 300);
+  assert.equal(us.dayChangeValue, 2);
+  assert.equal(us.dayChangePct, 0.67);
   assert.equal(us.currency, "USD");
   assert.equal(us.largestPosition.symbol, "AAPL");
   assert.equal(us.largestPosition.weightPct, 66.67);
@@ -52,6 +54,8 @@ test("dashboard computes concentration and sector weights separately by currency
   assert.equal(us.staleQuoteCount, 1);
   assert.equal(us.sectorWeights[0].sector, "Technology");
   assert.equal(my.marketValue, 3210);
+  assert.equal(my.dayChangeValue, 60);
+  assert.equal(my.dayChangePct, 1.9);
   assert.equal(my.currency, "MYR");
   assert.equal(result.staleQuoteCount, 1);
 });
