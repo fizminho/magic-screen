@@ -22,7 +22,7 @@ Magic Folio is a private, single-owner portfolio research application. Portfolio
 - Store only hashed session tokens; never log challenge payloads, credential public keys or session tokens.
 - Never send holding quantities, cost basis, session tokens, passkey material, provider credentials or setup secrets to an LLM.
 - Treat quote, news, RSS, SEC metadata and user-supplied text as untrusted data. Do not mirror SEC filing documents or send full filing text to an LLM.
-- Keep server-side API keys in Worker secrets, never in frontend bundles or Git. The optional MarketData.app token is owner-entered, stored only in this tab's `sessionStorage`, and sent directly to MarketData.app; it is never sent to the Worker or stored in D1.
+- Keep server-side API keys in Worker secrets, never in frontend bundles or Git. JSON/CSV exports are `no-store`; CSV cells are quoted and formula-leading values are prefixed to prevent spreadsheet formula injection. The optional MarketData.app token is owner-entered, stored only in this tab's `sessionStorage`, and sent directly to MarketData.app; it is never sent to the Worker or stored in D1.
 - Use parameterized D1 queries and schema migrations. Do not execute DDL at request time.
 
 ## Worker response protections
