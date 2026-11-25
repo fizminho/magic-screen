@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { handleEdgarToolsRequest } from "./lib/edgartools.mjs";
 
 const token = "test-provider-token-with-at-least-32-characters";
-function mockDb() {
+function mockDb(schemaColumns = []) {
   const calls = { batches: [], sql: [] };
   const DB = {
     prepare(sql) {
@@ -12,6 +12,7 @@ function mockDb() {
         sql, values: [],
         bind(...values) { this.values = values; return this; },
         async all() {
+          if (sql.includes("PRAGMA table_info(edgartools_filing_evidence)")) return { results: schemaColumns.map((name) => ({ name })) };
           if (sql.includes("FROM instrument i")) return { results: [{ symbol: "AAPL" }, { symbol: "MSFT" }] };
           if (sql.includes("FROM edgartools_provider_status")) return { results: [{ symbol: "AAPL", providerStatus: "supported" }] };
           return { results: [] };
@@ -68,6 +69,29 @@ test("EdgarTools ingestion stores raw evidence and explicitly leaves production 
   assert.equal(calls.batches.length, 1);
   assert.ok(calls.batches[0].some((item) => item.sql.includes("INSERT INTO edgartools_filing_evidence")));
   assert.ok(calls.batches[0].some((item) => item.sql.includes("INSERT INTO edgartools_provider_status")));
+});
+
+test("EdgarTools ingestion supports the deployed accession_key evidence schema", async () => {
+  const { DB, calls } = mockDb(["symbol", "accession_key", "market", "cik", "accession", "fiscal_period", "form", "filed_at", "reporting_currency", "provider_status", "provider", "provider_version", "generated_at", "payload_json", "ingested_at"]);
+  const report = {
+    generated_at: "2026-11-25T02:00:00.000Z",
+    edgartools_version: "6.3.0",
+    primary_provider: "EdgarTools",
+    production_data_modified: false,
+    symbols: ["AAPL"],
+    companies: [{
+      symbol: "AAPL", provider_status: "supported",
+      filing: { accession_number: "0000320193-26-000101", period_of_report: "2026-09-30", form: "10-K", filing_date: "2026-11-01", cik: "0000320193" },
+      statements: { income_statement: { rows: [] } }
+    }]
+  };
+  const response = await handleEdgarToolsRequest(request("/api/fundamentals/edgartools/ingest", { method: "POST", body: report }), { DB, UNIVERSE_SYNC_TOKEN: token }, new URL("https://folio.example/api/fundamentals/edgartools/ingest"));
+  assert.equal(response.status, 200);
+  const evidence = calls.batches[0].find((item) => item.sql.includes("INSERT INTO edgartools_filing_evidence"));
+  assert.ok(evidence.sql.includes("accession_key"));
+  assert.ok(evidence.sql.includes("ON CONFLICT(symbol,accession_key)"));
+  assert.equal(evidence.values[1], "0000320193-26-000101");
+  assert.equal(evidence.values[2], "0000320193");
 });
 
 test("EdgarTools ingestion rejects invalid accession and production-mutating reports", async () => {
