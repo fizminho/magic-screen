@@ -262,7 +262,7 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
           kind: "brief",
           title: `${item.symbol} research ready`,
           body: `New public SEC research brief is available for ${item.symbol}.`,
-          url: `/#/holding/${encodeURIComponent(item.symbol)}`
+          url: "/"
         });
         pushAlertsSent += pushResult.sent || 0;
       } catch {
