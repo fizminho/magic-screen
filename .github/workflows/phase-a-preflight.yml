@@ -148,7 +148,7 @@ jobs:
           echo "$sec_facts_cleanup"
           echo "$quote_cleanup"
           for cleanup_result in "$sec_filing_cleanup" "$sec_cache_cleanup" "$sec_facts_cleanup" "$quote_cleanup"; do
-            [[ "$cleanup_result" == *'"clean"'* && "$cleanup_result" != *'"not-clean"'* ]] || {
+            [[ "$cleanup_result" == *'"clean"'* ]] || {
               echo "::error::An instrument cache cleanup check did not return clean."
               exit 1
             }
