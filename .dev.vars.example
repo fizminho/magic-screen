@@ -12,7 +12,6 @@ VAPID_PUBLIC_KEY=
 
 # Configure these as Worker secrets only when the matching feature is implemented.
 # VAPID_PRIVATE_KEY=
-# GEMINI_API_KEY=
 
 # Replace with your real contact email before using SEC EDGAR APIs.
 SEC_USER_AGENT=
