@@ -130,15 +130,20 @@ jobs:
             INSERT INTO sec_filing(accession_number,cik,instrument_id,form,title,summary,filing_date,report_date,primary_document,url,fetched_at)
               SELECT '0000320193-26-000001','0000320193',id,'10-Q','AAPL 10-Q','Quarterly report.','2026-11-24','2026-09-30','aapl.htm','https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/aapl.htm','$sec_fetched_at'
               FROM instrument WHERE market='US' AND symbol='AAPL';
+            INSERT INTO sec_companyfacts_cache(instrument_id,cik,fetched_at,facts_json)
+              SELECT id,'0000320193','$sec_fetched_at','{"companyName":"Apple Inc.","cik":"0000320193","metrics":{}}'
+              FROM instrument WHERE market='US' AND symbol='AAPL';
           "
           holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
           test "$holding_delete_status" = "200"
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
           sec_filing_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_filing WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
           sec_cache_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_fetch_cache WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
+          sec_facts_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_companyfacts_cache WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
           quote_cleanup="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT CASE WHEN EXISTS(SELECT 1 FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL') THEN 'not-clean' ELSE 'clean' END AS status;" 2>&1)"
           echo "$sec_filing_cleanup"
           echo "$sec_cache_cleanup"
+          echo "$sec_facts_cleanup"
           echo "$quote_cleanup"
           grep -q '"status": "clean"' <<< "$sec_filing_cleanup"
           grep -q "clean" <<< "$sec_cache_cleanup"
