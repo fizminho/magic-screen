@@ -228,7 +228,7 @@ def main() -> int:
     if source.get("production_data_modified") is not False:
         raise SystemExit("Normalized report failed production immutability guardrail.")
     report = build_report(source)
-    Path(args.output).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    Path(args.output).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     summary = report["summary"]
     print(
         "EdgarTools quality assessment: "
