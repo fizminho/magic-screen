@@ -43,6 +43,18 @@ The setup token is a one-time bootstrap gate, not a login password. Normal sign-
 
 For SEC EDGAR filing lookup, configure the Worker variable `SEC_USER_AGENT` with an application name and your real contact email, for example `Magic Folio/0.1 (contact: you@example.com)`. Do not use the placeholder address. SEC lookups remain disabled until this value is valid. Add the company's 1–10 digit CIK to its US holding or watchlist item (the app stores it as a 10-digit string). You can find the CIK through [SEC EDGAR company search](https://www.sec.gov/edgar/search/). The owner-only lookup returns recent filing metadata and links to the original SEC documents; it does not copy filing bodies. The endpoint is limited to five lookups per hour.
 
+## Web Push notifications
+
+Web Push uses the Worker’s built-in WebCrypto implementation. No Node-only `web-push` package is included in the Worker bundle.
+
+1. Generate a P-256 VAPID key pair locally with `npx --yes web-push generate-vapid-keys`. Do not paste the private key into Git, a chat, or frontend configuration.
+2. Set the public key as `VAPID_PUBLIC_KEY` in the `[vars]` section of `wrangler.toml` and set `VAPID_SUBJECT` to a real `mailto:` contact.
+3. Store the private key only as a Worker secret: `npx wrangler secret put VAPID_PRIVATE_KEY`.
+4. Deploy, subscribe a supported browser, and use the authenticated `POST /api/push/test` endpoint to verify delivery.
+5. Keep the subscription private to the owner. The Worker accepts only HTTPS endpoints from supported browser push services and removes expired subscriptions when the service returns 404/410.
+
+Never store VAPID private keys in `.dev.vars.example`, GitHub artifacts, the browser, or D1.
+
 ## Market data
 
 MarketData.app is optional. The owner must create their own account and API token. The free tier has 100 credits/day, at least 24-hour delayed US quotes and a one-IP-at-a-time restriction. The token is entered after passkey sign-in and stored only in the current browser tab's session storage. It is sent directly to MarketData.app, never to the Worker or D1. Refresh quotes from one device/IP at a time; other devices read the private quote snapshots from D1.
