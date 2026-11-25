@@ -7,6 +7,8 @@ import { handleAuthRequest } from "./lib/auth.mjs";
 import { handleQuoteRequest } from "./lib/quotes.mjs";
 // @ts-ignore The JavaScript portfolio module is exercised by Node regression tests.
 import { handlePortfolioRequest } from "./lib/portfolio.mjs";
+// @ts-ignore The JavaScript dashboard module is exercised by Node regression tests.
+import { handleDashboardRequest } from "./lib/dashboard.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -38,6 +40,8 @@ export default {
       response = await handleAuthRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/quotes/")) {
       response = await handleQuoteRequest(request, env, url.pathname);
+    } else if (url.pathname === "/api/dashboard") {
+      response = await handleDashboardRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/") || url.pathname === "/api/watchlist" || url.pathname.startsWith("/api/watchlist/")) {
       response = await handlePortfolioRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/")) {
