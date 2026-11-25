@@ -42,7 +42,7 @@ jobs:
         run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
       - name: Verify CIK and SEC cache schema
         if: ${{ hashFiles('package-lock.json') != '' }}
-        run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT cik FROM instrument LIMIT 0; SELECT cik FROM sec_fetch_cache LIMIT 0; SELECT cik FROM sec_filing LIMIT 0;"
+        run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "SELECT cik FROM instrument LIMIT 0; SELECT cik FROM sec_fetch_cache LIMIT 0; SELECT cik FROM sec_filing LIMIT 0; SELECT facts_json FROM sec_companyfacts_cache LIMIT 0;"
       - name: Verify SEC rate-limit kind is accepted by D1
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 d1 execute magic-screen-db --local --command "INSERT INTO auth_attempt(ip_hash,window,kind,count) VALUES('ci-sec-rate-limit',strftime('%Y-%m-%dT%H','now'),'sec_fetch',1); DELETE FROM auth_attempt WHERE ip_hash='ci-sec-rate-limit';"
@@ -80,6 +80,8 @@ jobs:
           test "$login_status" = "403"
           private_status="$(curl --silent --output /tmp/credentials-response.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/auth/credentials)"
           test "$private_status" = "401"
+          sec_facts_private_status="$(curl --silent --output /tmp/sec-facts-private.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 'http://localhost:8787/api/sec/companyfacts?symbol=AAPL')"
+          test "$sec_facts_private_status" = "401"
           # Seed two synthetic owner passkeys and active sessions to verify that
           # deleting one passkey revokes only its own sessions and preserves the last passkey.
           target_token="$(openssl rand -hex 32)"
