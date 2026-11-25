@@ -29,7 +29,7 @@ Status: implemented as an isolated raw-evidence pipeline. It is not the producti
 5. Apply D1 migration `0006_edgartools_shadow.sql` through the normal Cloudflare deployment pipeline.
 6. Run **Actions → EdgarTools shadow extraction → Run workflow**.
 
-A manual ticker override can be used for a focused test. If the ingestion secret or URL is not configured, the run keeps the JSON artifact only and does not write D1.
+A manual ticker override can be used for a focused extraction test. That override can produce an artifact without resolving the live universe. Scheduled runs and normal full-universe runs require both the repository variable and token secret; if they are missing, universe discovery stops before extraction. The ingestion step also keeps a report artifact-only if its settings are absent.
 
 ## Review before any cutover
 
