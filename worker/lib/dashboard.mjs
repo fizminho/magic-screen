@@ -17,19 +17,27 @@ export function calculateDashboard(rows) {
     const priced = items.map((item) => {
       const price = Number(item.price);
       const quantity = Number(item.quantity);
+      const prevClose = Number(item.prevClose);
       const hasPrice = item.price !== null && item.price !== undefined &&
         Number.isFinite(price) && price > 0 && Number.isFinite(quantity) && quantity > 0;
+      const hasPrevious = hasPrice && item.prevClose !== null && item.prevClose !== undefined &&
+        Number.isFinite(prevClose) && prevClose > 0;
       return {
         symbol: item.symbol,
         sector: typeof item.sector === "string" && item.sector.trim() ? item.sector.trim() : "Unclassified",
         value: hasPrice ? quantity * price : 0,
+        dayChange: hasPrevious ? quantity * (price - prevClose) : 0,
+        previousValue: hasPrevious ? quantity * prevClose : 0,
         status: item.quoteStatus || "unavailable",
         asOf: item.quoteAsOf || null,
-        hasPrice
+        hasPrice,
+        hasPrevious
       };
     });
     const usable = priced.filter((item) => item.hasPrice);
     const totalValue = usable.reduce((sum, item) => sum + item.value, 0);
+    const previousValue = usable.reduce((sum, item) => sum + item.previousValue, 0);
+    const dayChangeValue = usable.reduce((sum, item) => sum + item.dayChange, 0);
     const ranked = [...usable].sort((a, b) => b.value - a.value);
     const largest = ranked[0];
     const topThreeValue = ranked.slice(0, 3).reduce((sum, item) => sum + item.value, 0);
@@ -45,6 +53,8 @@ export function calculateDashboard(rows) {
       staleQuoteCount: priced.filter((item) => item.status === "stale").length,
       quoteCoveragePct: items.length ? round((usable.length / items.length) * 100) : 0,
       marketValue: round(totalValue),
+      dayChangeValue: round(dayChangeValue),
+      dayChangePct: previousValue > 0 ? round((dayChangeValue / previousValue) * 100) : null,
       largestPosition: largest && totalValue > 0 ? {
         symbol: largest.symbol,
         value: round(largest.value),
@@ -80,7 +90,7 @@ export async function handleDashboardRequest(request, env, pathname) {
     const session = await getOwnerSession(request, env);
     if (!session) return jsonResponse({ error: "Sign in required." }, 401);
     const result = await env.DB.prepare(
-      "SELECT i.symbol, i.market, i.sector, h.quantity, q.price, q.as_of AS quoteAsOf, " +
+      "SELECT i.symbol, i.market, i.sector, h.quantity, q.price, q.prev_close AS prevClose, q.as_of AS quoteAsOf, " +
       "COALESCE(q.status, 'unavailable') AS quoteStatus " +
       "FROM holding h JOIN instrument i ON i.id = h.instrument_id " +
       "LEFT JOIN quote_latest q ON q.instrument_id = i.id ORDER BY i.market, i.symbol"
