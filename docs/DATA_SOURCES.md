@@ -149,3 +149,8 @@ References:
 - https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/
 - https://huggingface.co/zai-org/GLM-4.7-Flash
 - https://developers.cloudflare.com/workers-ai/changelog/product/workers-ai/
+
+
+## EdgarTools shadow extraction
+
+**Implemented as raw evidence only; not a production fundamentals source.** A pinned Python EdgarTools 6.3.0 GitHub Actions job extracts the latest annual 10-K, 20-F or 40-F statements for active US holdings and watchlist instruments. It stores accession-scoped raw statement evidence in D1 behind a machine-token-protected Worker endpoint. It does not calculate ratios, update production fundamentals, change eligibility or rankings, or feed Research Brief. SEC Submissions and Company Facts remain the Research Brief inputs until a separately reviewed provider cutover. See [EDGARTOOLS_SHADOW.md](EDGARTOOLS_SHADOW.md) for setup and guardrails.
