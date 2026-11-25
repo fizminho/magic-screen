@@ -103,11 +103,13 @@ jobs:
             exit 0
           fi
           NORMALIZED_URL="${EDGARTOOLS_INGEST_URL%/ingest}/normalized"
-          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+          HTTP_STATUS=$(curl --silent --show-error --retry 3 --max-time 120 \
             -X POST -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
             -H "Content-Type: application/json" --data-binary @edgartools-normalized.json \
-            "$NORMALIZED_URL" > edgartools-normalized-ingest-response.json
+            -o edgartools-normalized-ingest-response.json -w "%{http_code}" "$NORMALIZED_URL")
+          echo "Normalized metrics ingestion HTTP status: $HTTP_STATUS"
           cat edgartools-normalized-ingest-response.json
+          case "$HTTP_STATUS" in 2*) ;; *) echo "::error::Normalized metrics ingestion failed with HTTP $HTTP_STATUS"; exit 1 ;; esac
           python - <<'PY'
           import json
           from pathlib import Path
@@ -130,10 +132,13 @@ jobs:
             echo "::warning::Ingestion settings missing; retaining artifact only."
             exit 0
           fi
-          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+          HTTP_STATUS=$(curl --silent --show-error --retry 3 --max-time 120 \
             -X POST -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
             -H "Content-Type: application/json" --data-binary @edgartools-shadow.json \
-            "$EDGARTOOLS_INGEST_URL" > edgartools-ingest-response.json
+            -o edgartools-ingest-response.json -w "%{http_code}" "$EDGARTOOLS_INGEST_URL")
+          echo "Raw evidence ingestion HTTP status: $HTTP_STATUS"
+          cat edgartools-ingest-response.json
+          case "$HTTP_STATUS" in 2*) ;; *) echo "::error::Raw evidence ingestion failed with HTTP $HTTP_STATUS"; exit 1 ;; esac
           python - <<'PY'
           import json
           from pathlib import Path
