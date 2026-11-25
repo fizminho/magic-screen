@@ -52,7 +52,7 @@ export default function App() {
 
   async function registerPasskey(isFirst: boolean) {
     setError(""); setNotice("");
-    if (isFirst && setupToken.trim().length < 32) { setError("Enter the one-time setup key."); return; }
+    if (isFirst && setupToken.trim().length < 43) { setError("Enter the one-time setup key."); return; }
     setBusy(true);
     try {
       const headers: Record<string, string> = {};
