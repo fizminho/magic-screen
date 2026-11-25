@@ -153,10 +153,13 @@ jobs:
           import sys
 
           root = pathlib.Path(".wrangler/state/v3/d1")
-          candidates = [
-              path for path in root.rglob("*")
-              if path.is_file() and path.suffix in {".sqlite", ".sqlite3", ".db"}
-          ]
+          # Miniflare/Wrangler versions may use extensionless SQLite files.
+          # Inspect every regular file under the D1 state directory and let
+          # SQLite identify valid databases instead of relying on filenames.
+          candidates = list(root.rglob("*")) if root.exists() else []
+          candidates = [path for path in candidates if path.is_file()]
+          print(f"D1 state directory exists: {root.exists()}")
+          print(f"D1 files discovered: {[str(path) for path in candidates]}")
           required = {"instrument", "sec_filing", "sec_fetch_cache", "sec_companyfacts_cache", "quote_latest"}
           connection = None
           selected = None
