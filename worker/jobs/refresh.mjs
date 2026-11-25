@@ -172,7 +172,7 @@ export async function runWeeklyHousekeeping(env, { now = Date.now() } = {}) {
         .bind(cutoff90, jobId ?? -1),
       env.DB.prepare("DELETE FROM auth_challenge WHERE expires_at <= ?").bind(new Date(now).toISOString()),
       env.DB.prepare("DELETE FROM auth_attempt WHERE window < ?").bind(new Date(now - 86400000).toISOString().slice(0, 13)),
-      env.DB.prepare("DELETE FROM setting WHERE key LIKE 'ai_daily_%' AND substr(key,10,10) < ?")
+      env.DB.prepare("DELETE FROM setting WHERE (key LIKE 'ai_daily_%' OR key LIKE 'push_daily_%') AND substr(key,10,10) < ?")
         .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10))
     ]);
     const changes = results.reduce((sum, item) => sum + Number(item.meta?.changes || 0), 0);
