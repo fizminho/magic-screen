@@ -9,6 +9,8 @@ import { handleQuoteRequest } from "./lib/quotes.mjs";
 import { handlePortfolioRequest } from "./lib/portfolio.mjs";
 // @ts-ignore The JavaScript dashboard module is exercised by Node regression tests.
 import { handleDashboardRequest } from "./lib/dashboard.mjs";
+// @ts-ignore The JavaScript SEC module is exercised by Node regression tests.
+import { handleSecRequest } from "./lib/sec.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -18,6 +20,7 @@ interface Env {
   RP_NAME?: string;
   RP_ORIGIN?: string;
   SETUP_TOKEN?: string;
+  SEC_USER_AGENT?: string;
 }
 
 export default {
@@ -40,6 +43,8 @@ export default {
       response = await handleAuthRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/quotes/")) {
       response = await handleQuoteRequest(request, env, url.pathname);
+    } else if (url.pathname === "/api/sec/filings") {
+      response = await handleSecRequest(request, env, url);
     } else if (url.pathname === "/api/dashboard") {
       response = await handleDashboardRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/") || url.pathname === "/api/watchlist" || url.pathname.startsWith("/api/watchlist/")) {
