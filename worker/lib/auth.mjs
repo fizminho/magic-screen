@@ -47,6 +47,7 @@ export function constantTimeEqual(left, right) {
 }
 
 async function bodyJson(request) {
+  if (!(request.headers.get("content-type") || "").toLowerCase().startsWith("application/json")) throw new Error("json_required");
   const length = Number(request.headers.get("content-length") || 0);
   if (length > MAX_BODY_BYTES) throw new Error("body_too_large");
   const raw = await request.text();
@@ -246,13 +247,13 @@ async function registerVerify(request, env) {
   });
 }
 
-function decodeClientChallenge(encoded) {
+function decodeClientChallenge(encoded, expectedType = "webauthn.create") {
   try {
     const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
     const raw = atob(normalized);
     const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
     const parsed = JSON.parse(new TextDecoder().decode(bytes));
-    return parsed?.type === "webauthn.create" ? parsed.challenge : null;
+    return parsed?.type === expectedType ? parsed.challenge : null;
   } catch {
     return null;
   }
@@ -274,7 +275,7 @@ async function loginOptions(request, env) {
 async function loginVerify(request, env) {
   checkOrigin(request, env);
   const payload = await bodyJson(request);
-  const challenge = decodeClientChallenge(payload?.response?.clientDataJSON);
+  const challenge = decodeClientChallenge(payload?.response?.clientDataJSON, "webauthn.get");
   if (!await consumeChallenge(env, challenge, "login")) return json({ error: "Sign-in expired. Try again." }, 400);
   const credentialId = payload?.id;
   if (typeof credentialId !== "string" || credentialId.length > 1024) {
@@ -332,6 +333,7 @@ export async function handleAuthRequest(request, env, pathname) {
     const message = error instanceof Error ? error.message : "";
     if (message === "rate_limited") return json({ error: "Too many attempts. Try again later." }, 429);
     if (message === "body_too_large") return json({ error: "Request too large." }, 413);
+    if (message === "json_required") return json({ error: "Content-Type must be application/json." }, 415);
     if (message === "origin_rejected") return json({ error: "Request origin rejected." }, 403);
     if (message === "registration_not_authorized") return json({ error: "Registration is not authorized." }, 403);
     console.error("Passkey request failed:", message);
