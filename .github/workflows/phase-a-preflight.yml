@@ -22,12 +22,15 @@ jobs:
       - name: Install locked dependencies
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm ci --no-audit --no-fund
+      - name: Report available dependency updates
+        if: ${{ hashFiles('package-lock.json') != '' }}
+        run: npm outdated || true
       - name: Build
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm run build
       - name: Audit production dependencies
         if: ${{ hashFiles('package-lock.json') != '' }}
-        run: npm audit --omit=dev --audit-level=high
+        run: npm audit --audit-level=high
       - name: Run complete Node regression suite
         if: ${{ hashFiles('package-lock.json') != '' }}
         run: node --experimental-strip-types --test worker/*.test.mjs
