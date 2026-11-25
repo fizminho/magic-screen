@@ -1,67 +1,62 @@
 # Magic Screen setup
 
-## What is in this first build
+## Architecture
 
-- React + TypeScript screener UI, responsive for mobile and desktop.
+- React + TypeScript + Vite frontend.
 - Cloudflare Worker API and D1 cache.
-- 30 Bursa Malaysia and 30 US starter tickers. The initial universe is a curated starter list, not yet a dynamically discovered top-30-by-market-cap universe.
-- Weekday scheduled quote refresh, split by market.
-- Search, market switcher, sort and browser-session watchlist.
-- Conservative Shariah labels: all records start as **Unverified**.
-- No fabricated Magic Formula scores. Earnings Yield and Return on Capital remain blank until a reliable fundamentals source is integrated.
+- MFI is the only US ticker-universe source.
+- Shariah checks and manual Investing Paths observations stay in browser localStorage.
+- No user account, Gemini API, LLM API key, provider API or automated Investing Paths collection.
 
-## One-time Cloudflare setup
+## Cloudflare setup
 
-### 1. Create the D1 database
+1. Create or use the D1 database named `magic-screen-db`.
+2. Confirm its ID matches `wrangler.toml`.
+3. Configure the Worker secret `MFI_SESSION_COOKIE` with the owner's authenticated Magic Formula Investing session cookie.
+5. Connect the GitHub repository to Cloudflare Workers Builds.
 
-In the Cloudflare dashboard, open **Storage & databases → D1 SQL Database** and create a database named `magic-screen-db`.
+Build command:
 
-Copy its database ID. Replace `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.toml` with that ID. The repository is already configured to bind the database as `DB`.
+```bash
+npm run build
+```
 
-The Worker creates its tables and index automatically on the first API request or scheduled refresh. You do not need to run SQL manually.
+Deploy command:
 
-### 2. Connect GitHub for automatic deployment
+```bash
+npx wrangler deploy
+```
 
-In Cloudflare, open **Workers & Pages → Create application → Connect to Git**. Select GitHub, then choose `fizminho/magic-screen` and the `main` branch.
+A successful GitHub build or Wrangler dry-run is not proof of a live deployment. Verify the Worker and app after release.
 
-Use these build settings:
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Root directory: `/`
+## MFI workflow
 
-Save and deploy. Cloudflare Workers Builds can then build and deploy automatically whenever a commit is pushed to `main`. The Worker name in Cloudflare must remain `magic-screen`, matching `wrangler.toml`.
+The app reads the cached MFI ticker universe from `GET /api/stocks`. Use **Refresh MFI** to request a fresh screen. The Worker caches successful MFI results for six hours and applies a 15-minute cooldown to forced refreshes.
 
-## Automatic quote refresh
+See [MFI integration](MAGIC_FORMULA_INTEGRATION.md) for session setup and endpoint details.
 
-Two Cron Triggers run separate batches to stay within Cloudflare's per-invocation subrequest limits:
-- Bursa Malaysia: 22:17 UTC Sunday to Thursday (06:17 Malaysia time, Monday to Friday).
-- US equities: 22:47 UTC Monday to Friday (17:47 US Eastern during standard time, 18:47 during daylight time).
+## Shariah workflow
 
-The first quote adapter uses Yahoo Finance's chart endpoint for indicative quotes. The selected ticker universe is currently static; automatic universe discovery and Magic Formula re-ranking are future steps. This endpoint is unofficial and has no uptime or usage guarantee. Do not use it as an execution-price feed. Provider throttling or market holidays can result in partial updates. The scheduled refresh does not fetch financial statements.
+1. Copy the ticker list and AI prompt from the app.
+2. Paste into an AI assistant that can research the sources.
+3. The assistant must follow Musaffa and HalalScreener terms. If AI/automated access is not allowed, it must not access the source and must return No data.
+4. Copy the raw JSON response.
+5. Paste it into Magic Screen and validate.
+6. Check eligible tickers manually on Investing Paths and record rank, EY, ROC, fiscal period, date and source URL.
 
-## Shariah status and Magic Formula
+Both Musaffa and HalalScreener must show fresh Halal results. Doubtful, Not Halal, No data, stale or conflicting results do not pass. Source-specific statuses remain visible.
 
-The first release intentionally does not infer Shariah compliance from a company name, sector, or ticker.
+## Local storage
 
-For Bursa Malaysia, the Securities Commission Malaysia (SC) publishes the SAC list twice yearly. The latest general list available at project start is dated 29 May 2026. The SC also publishes status updates for newly listed companies. The SC dataset still needs to be mapped to Bursa tickers and imported before Malaysian rows can be labelled.
+Shariah and Investing Paths records are stored only in the current browser. They do not sync between devices or browsers. The app intentionally has no file upload/download workflow. Clearing browser data can remove the records.
 
-For US equities, Mizan publishes a free personal-use API covering 424 large-cap US companies and reports results under AAOIFI, Dow Jones Islamic, S&P Shariah and MSCI Islamic. Its documentation states that it is research output, not a fatwa, and that side-activity income is not yet checked. US API integration is a next step; until then, all US rows remain Unverified.
-
-References:
-- Malaysia: [SC SAC list](https://www.sc.com.my/development/icm/shariah-compliant-securities/list-of-shariah-compliant-securities) and [new-listing status updates](https://www.sc.com.my/development/icm/shariah-compliant-securities/shariah-status-for-companies-seeking-listing-on-bursa-malaysia-securities-berhad).
-- US: [Mizan API documentation](https://askmizan.com/api-docs).
-
-Magic Formula ranking requires Earnings Yield and Return on Capital calculated from consistent, current financial statements. Those fields are not guessed from quote data. A future fundamentals provider integration should record the provider, reporting period, currency and refresh timestamp for every value.
-
-## Local development
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-The frontend can run without D1, but the live API requires the Worker runtime and an initialised D1 database.
+The frontend can start without a live MFI session, but the Worker needs the D1 binding and `MFI_SESSION_COOKIE` for a fresh MFI screen.
 
-## Important
-
-This is an educational research tool, not investment advice. Prices can be delayed, incomplete or unavailable. Verify all information with the exchange, issuer filings and your broker before making investment decisions.
+Research tool only. Not investment advice.

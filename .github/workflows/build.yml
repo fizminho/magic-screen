@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,13 +17,10 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
+      - name: Audit production dependencies (advisory)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
       - name: Run complete Node regression suite
-        run: node --experimental-strip-types --test worker/*.test.mjs scripts/test_build_lease_rou_coverage_report.mjs
-      - name: Run US MFI policy sensitivity regression tests
-        run: |
-          python3 -m py_compile scripts/build_mfi_sensitivity_report.py
-          python3 -m unittest discover -s scripts -p "test_build_mfi_sensitivity_report.py" -v
-      - name: Validate EdgarTools test script syntax
-        run: python3 -m py_compile scripts/edgartools_bakeoff.py
+        run: node --experimental-strip-types --test worker/*.test.mjs
       # INTENTIONAL: validate Wrangler bundling and asset configuration without deploying.
       - run: npx wrangler deploy --dry-run

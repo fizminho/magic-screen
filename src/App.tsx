@@ -1,322 +1,149 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownUp, ArrowUpRight, Bell, ChevronDown, CircleHelp, Clock3, Database, Filter, Menu, RefreshCw, Search, ShieldCheck, Sparkles, TrendingUp, X } from "lucide-react";
-import { universe } from "./data/universe";
-import type { ApiResponse, Market, Stock } from "./types";
+import { Activity, Check, Clipboard, ClipboardPaste, RefreshCw, Search, ShieldCheck } from "lucide-react";
+// @ts-ignore — pure ESM screening logic is tested independently in Node.
+import { buildShortlist } from "../worker/shariah-screening.mjs";
 
-type Tab = "all" | "shariah" | "watchlist";
-type PipelineStatus = {last_quote_sync?:string|null;mfi_last_sync?:string|null;mfi_price_date?:string|null;mfi_quarter_date?:string|null;mfi_count?:number;sec?:{total?:number;calculated?:number;last_updated?:string|null;incomplete?:number;provider_error?:number;unmapped?:number;stale_market_cap?:number;stale_fiscal_period?:number;awaiting_market_cap?:number;awaiting_fundamentals?:number}};
-const dateTime = (value?:string|null) => value ? new Date(value).toLocaleString("en-MY",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Not available";
-const money = (value: number | null, currency: string) => value == null ? "—" : new Intl.NumberFormat("en-US", {style:"currency",currency,maximumFractionDigits:2}).format(value);
-const pct = (value: number | null) => value == null ? "—" : `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
-const ratioPct = (value: number | null) => value == null ? "—" : `${(value * 100).toFixed(2)}%`;
-const percentagePointDelta = (shadow: number | null, legacy: number | null) => shadow == null || legacy == null ? "—" : `${shadow >= legacy ? "+" : ""}${((shadow - legacy) * 100).toFixed(2)} pp`;
+type Stock = { symbol:string; company_name:string; market:string; price:number|null; market_cap:number|null; earnings_yield:number|null; return_on_capital:number|null; magic_formula_rank:number|null; universe_sources?:string[] };
+type Pipeline = { mfi_last_sync?:string|null; mfi_count?:number|null; mfi_price_date?:string|null; mfi_quarter_date?:string|null };
+type CheckRecord = Record<string,any>;
+type ManualData = { shariahChecks:CheckRecord[]; ipObservations:CheckRecord[] };
+type View = "all" | "eligible_validated" | "eligible_unvalidated" | "needs_review" | "excluded";
+const STORAGE_KEY="magic-screen:manual-shariah-v1";
+const MFI_URL="https://www.magicformulainvesting.com/Screening/StockScreening";
+const EMPTY:ManualData={shariahChecks:[],ipObservations:[]};
+const today=()=>new Date().toISOString().slice(0,10);
+const dateLabel=(value?:string|null)=>value?new Date(value).toLocaleString("en-MY",{dateStyle:"medium",timeStyle:"short"}):"Not synced";
+const pct=(value:any)=>value==null||value===""?"—":`${Number(value)}%`;
 
-type MfiPreviewRow = {symbol:string;company_name:string|null;market_cap:number|null;earnings_yield:number|null;return_on_capital:number|null;earnings_yield_rank:number|null;return_on_capital_rank:number|null;magic_formula_score:number|null;magic_formula_rank:number|null;ranking_eligible:boolean;exclusion_reasons:string[];review_flags:string[]};
-type MfiPreview = {as_of:string;minimum_eligible_cohort:number;summary:{universe:number;eligible:number;ranked:number;excluded:number;unsupported_provider?:number;filing_evidence_unavailable?:number;accounting_or_valuation_review?:number};rankings:MfiPreviewRow[];production_write:boolean;guardrail:string};
+export default function App(){
+ const [stocks,setStocks]=useState<Stock[]>([]);
+ const [pipeline,setPipeline]=useState<Pipeline|null>(null);
+ const [updatedAt,setUpdatedAt]=useState<string|null>(null);
+ const [loading,setLoading]=useState(false);
+ const [status,setStatus]=useState("Loading MFI universe…");
+ const [tab,setTab]=useState<"universe"|"shortlist">("shortlist");
+ const [query,setQuery]=useState("");
+ const [view,setView]=useState<View>("all");
+ const [manual,setManual]=useState<ManualData>(()=>{try{const v=JSON.parse(localStorage.getItem(STORAGE_KEY)||"null");return v&&Array.isArray(v.shariahChecks)&&Array.isArray(v.ipObservations)?v:EMPTY;}catch{return EMPTY;}});
+ const [pasteOpen,setPasteOpen]=useState(false);
+ const [jsonText,setJsonText]=useState("");
+ const [message,setMessage]=useState("");
+ const [promptText,setPromptText]=useState("");
+ const [promptOpen,setPromptOpen]=useState(false);
+ const [ipOpen,setIpOpen]=useState(false);
+ const [ipSymbol,setIpSymbol]=useState("");
+ const [ipFound,setIpFound]=useState(true);
+ const [ipRank,setIpRank]=useState("");
+ const [ipEy,setIpEy]=useState("");
+ const [ipRoc,setIpRoc]=useState("");
+ const [ipYear,setIpYear]=useState("");
+ const [ipPeriod,setIpPeriod]=useState("");
+ const [ipDate,setIpDate]=useState(today());
+ const [ipReference,setIpReference]=useState("");
 
-const MFI_SOURCE_URL = "https://www.magicformulainvesting.com/Screening/StockScreening";
-
-export default function App() {
-  const [market, setMarket] = useState<Market>("MY");
-  const [tab, setTab] = useState<Tab>("all");
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<"rank" | "name" | "change">("rank");
-  const [stocks, setStocks] = useState<Stock[]>([]);
-  const [marketUniverse, setMarketUniverse] = useState(universe);
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-  const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
-  const [mfiPreview,setMfiPreview]=useState<MfiPreview|null>(null);
-  const [mfiPreviewError,setMfiPreviewError]=useState("");
-  const [showMfiExcluded,setShowMfiExcluded]=useState(false);
-  const [showMfiReconciliation,setShowMfiReconciliation]=useState(false);
-
-  const [sourceStatus, setSourceStatus] = useState("Waiting for first sync");
-  const [loading, setLoading] = useState(false);
-  const [watchlist, setWatchlist] = useState<string[]>([]);
-  const [showInfo, setShowInfo] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
-  const [importToken, setImportToken] = useState("");
-  const [importStatus, setImportStatus] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [page, setPage] = useState(1);
-  const [mfiCount, setMfiCount] = useState(30);
-  const [minimumMarketCap, setMinimumMarketCap] = useState(50);
-  const [addOpen,setAddOpen]=useState(false);
-  const [addSymbol,setAddSymbol]=useState("");
-  const [addName,setAddName]=useState("");
-  const [addCap,setAddCap]=useState("");
-  const [addToken,setAddToken]=useState("");
-  const [addStatus,setAddStatus]=useState("");
-  const [adding,setAdding]=useState(false);
-  const [extensionOpen,setExtensionOpen]=useState(false);
-  const [extensionSymbol,setExtensionSymbol]=useState("HRB");
-  const [extensionToken,setExtensionToken]=useState("");
-  const [extensionStatus,setExtensionStatus]=useState("");
-  const [extensionResult,setExtensionResult]=useState<unknown>(null);
-  const [extensionBusy,setExtensionBusy]=useState(false);
-  const pageSize = 40;
-
-  async function load(forceMfiSync = false) {
-    setLoading(true);
-    let cachedStocksLoaded = false;
-    try {
-      // INTENTIONAL: normal loads read D1 cache only. Refresh failures must not hide cached rows.
-      const response = await fetch(`/api/stocks?market=${market}`);
-      if (!response.ok) throw new Error("Cached stock API unavailable");
-      const data = await response.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number;error?:string}};
-      setStocks(data.stocks ?? []);
-      cachedStocksLoaded = true;
-      setUpdatedAt(data.updatedAt);
-
-      let refreshMessage = "";
-      if (forceMfiSync) {
-        if (market === "US") {
-          try {
-            const syncResponse = await fetch("/api/mfi/screen?minimumMarketCap=" + minimumMarketCap + "&select30=" + (mfiCount === 30) + "&force=1");
-            const syncData = await syncResponse.json() as {error?:string};
-            if (!syncResponse.ok) throw new Error(syncData.error || "MFI refresh failed");
-          } catch (error) {
-            refreshMessage = " · Showing cached stocks; MFI refresh unavailable: " + (error instanceof Error ? error.message : "unknown error");
-          }
-        }
-        try {
-          const quoteResponse = await fetch(`/api/stocks?market=${market}&refresh=1`);
-          const quoteData = await quoteResponse.json() as ApiResponse & {refresh?:{updated:number;failed:number;remaining:number;error?:string}};
-          if (quoteData.stocks?.length) {
-            setStocks(quoteData.stocks);
-            setUpdatedAt(quoteData.updatedAt);
-          }
-          if (!quoteResponse.ok) throw new Error(quoteData.refresh?.error || "Quote refresh failed");
-          if (quoteData.refresh?.failed) refreshMessage += " · Quote refresh failed for " + quoteData.refresh.failed + " symbols";
-        } catch (error) {
-          refreshMessage += " · Cached quotes retained: " + (error instanceof Error ? error.message : "refresh unavailable");
-        }
-      }
-
-      if (market === "MY") {
-        const universeResponse = await fetch("/api/universe?market=MY");
-        if (universeResponse.ok) {
-          const master = await universeResponse.json() as { stocks?: Array<{symbol:string;company_name:string;currency:string;market:Market}> };
-          if (master.stocks?.length) setMarketUniverse(master.stocks.map(item => ({symbol:item.symbol,name:item.company_name,market:item.market,currency:item.currency})));
-        }
-      }
-      const pipelineResponse = await fetch("/api/pipeline/status?market=" + market);
-      if (pipelineResponse.ok) setPipeline(await pipelineResponse.json() as PipelineStatus);
-      let fundamentalsStatus = "";
-      if (market === "US") {
-        const fundamentalsResponse = await fetch("/api/fundamentals/status");
-        if (fundamentalsResponse.ok) {
-          const fundamentals = await fundamentalsResponse.json() as {calculated?:number;total?:number;unmapped?:number;incomplete?:number;stale_fiscal_period?:number;provider_error?:number;stale_market_cap?:number};
-          fundamentalsStatus = " · SEC fundamentals " + (fundamentals.calculated ?? 0) + "/" + (fundamentals.total ?? 0) + " ready";
-          if (fundamentals.unmapped) fundamentalsStatus += ", " + fundamentals.unmapped + " unmapped";
-          if (fundamentals.incomplete) fundamentalsStatus += ", " + fundamentals.incomplete + " incomplete";
-          if (fundamentals.stale_fiscal_period) fundamentalsStatus += ", " + fundamentals.stale_fiscal_period + " stale fiscal periods";
-          if (fundamentals.stale_market_cap) fundamentalsStatus += ", " + fundamentals.stale_market_cap + " valuation refresh pending";
-          if (fundamentals.provider_error) fundamentalsStatus += ", " + fundamentals.provider_error + " errors";
-        }
-      }
-      setSourceStatus((data.sourceStatus ?? "Showing cached data") + fundamentalsStatus + refreshMessage);
-    } catch (error) {
-      // INTENTIONAL: secondary request failures never clear a successfully loaded D1 cache.
-      if (!cachedStocksLoaded) setSourceStatus(error instanceof Error ? error.message : "Cached stock data unavailable");
-    } finally { setLoading(false); }
-  }
-  useEffect(() => { void load(); }, [market, mfiCount, minimumMarketCap]);
-  useEffect(()=>{
-    if(market!=="US"){setMfiPreview(null);setMfiPreviewError("");return;}
-    let cancelled=false;
-    fetch("/api/fundamentals/edgartools/ranking-preview/public")
-      .then(async response=>{const data=await response.json() as MfiPreview & {error?:string};if(!response.ok)throw new Error(data.error||"Shadow ranking unavailable");return data;})
-      .then(data=>{if(!cancelled){setMfiPreview(data);setMfiPreviewError("");}})
-      .catch(error=>{if(!cancelled)setMfiPreviewError(error instanceof Error?error.message:"Shadow ranking unavailable");});
-    return ()=>{cancelled=true;};
-  },[market]);
-
-  useEffect(() => { setPage(1); }, [market, tab, query, sort]);
-
-  const rows = useMemo(() => {
-    // US stocks come exclusively from the active Magic Formula API response.
-    // Do not merge the old bundled or SEC universe into the selected screener results.
-    const base: Stock[] = market === "US" ? stocks : marketUniverse.filter(x => x.market === market).map(x => stocks.find(s => s.symbol === x.symbol) ?? ({
-      symbol:x.symbol, market:x.market, company_name:x.name, currency:x.currency, price:null, change_percent:null,
-      market_cap:null, earnings_yield:null, return_on_capital:null, magic_formula_rank:null,
-      shariah_status:"unverified" as const, shariah_source:null, shariah_as_of:null, data_status:"awaiting_sync",
-      provider:null, updated_at:""
-    }));
-    return base.filter(s => (tab !== "shariah" || s.shariah_status === "compliant") && (tab !== "watchlist" || watchlist.includes(s.symbol)))
-      .filter(s => `${s.symbol} ${s.company_name}`.toLowerCase().includes(query.toLowerCase()))
-      .sort((a,b) => sort === "name" ? a.company_name.localeCompare(b.company_name) : sort === "change" ? (b.change_percent ?? -Infinity) - (a.change_percent ?? -Infinity) : (a.magic_formula_rank ?? 999) - (b.magic_formula_rank ?? 999));
-  }, [stocks, marketUniverse, market, tab, query, sort, watchlist]);
-
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
-  const available = stocks.filter(s => s.price != null).length;
-  const ranked = stocks.filter(s => s.magic_formula_rank != null).length;
-  const toggleWatch = (symbol: string) => setWatchlist(old => old.includes(symbol) ? old.filter(x=>x!==symbol) : [...old,symbol]);
-
-
-  async function runExtensionDiagnostic() {
-    if(!extensionToken.trim()){setExtensionStatus("Enter the UNIVERSE_SYNC_TOKEN configured in Cloudflare.");return;}
-    const symbol=extensionSymbol.trim().toUpperCase();
-    if(!/^[A-Z0-9.-]{1,15}$/.test(symbol)){setExtensionStatus("Enter a valid US ticker.");return;}
-    setExtensionBusy(true);setExtensionStatus("Reading the latest annual SEC filing...");setExtensionResult(null);
+ async function load(force=false){
+  setLoading(true);
+  let refreshError="";
+  try{
+   if(force){
     try{
-      const response=await fetch("/api/fundamentals/diagnose-extensions",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+extensionToken.trim()},body:JSON.stringify({symbol})});
-      const result=await response.json() as {error?:string};
-      if(!response.ok) throw new Error(result.error||"SEC extension diagnostic failed ("+response.status+").");
-      setExtensionResult(result);setExtensionStatus("Diagnostic complete. No fundamentals or rankings were changed.");
-    }catch(error){setExtensionStatus(error instanceof Error?error.message:"Diagnostic failed.");}
-    finally{setExtensionToken("");setExtensionBusy(false);}
-  }
-  function closeExtensionDiagnostic(){
-    setExtensionOpen(false);setExtensionToken("");setExtensionStatus("");setExtensionResult(null);
-  }
+     const sync=await fetch("/api/mfi/screen?minimumMarketCap=50&select30=true&force=1");
+     const result=await sync.json() as {error?:string};
+     if(!sync.ok) refreshError=result.error||"MFI refresh failed";
+    }catch(e){refreshError=e instanceof Error?e.message:"MFI refresh failed";}
+   }
+   const [stockResponse,pipelineResponse]=await Promise.all([
+    fetch("/api/stocks?market=US"),
+    fetch("/api/pipeline/status?market=US")
+   ]);
+   if(!stockResponse.ok) throw new Error("Unable to load the MFI candidate list");
+   const data=await stockResponse.json() as {stocks?:Stock[];updatedAt?:string|null};
+   setStocks((data.stocks||[]).filter((s:Stock)=>(s.universe_sources||[]).includes("Magic Formula Investing")));
+   setUpdatedAt(data.updatedAt||null);
+   if(pipelineResponse.ok)setPipeline(await pipelineResponse.json());
+   setStatus(refreshError?"Showing cached MFI candidates. Refresh unavailable: "+refreshError:force?"MFI candidate list refreshed.":"MFI candidate list loaded.");
+  }catch(e){setStatus(e instanceof Error?e.message:"Unable to load data.");}
+  finally{setLoading(false);}
+ }
+ useEffect(()=>{void load();},[]);
+ useEffect(()=>{try{localStorage.setItem(STORAGE_KEY,JSON.stringify(manual));}catch{setMessage("Browser storage is full or unavailable. Keep a copy of your research JSON.");}},[manual]);
 
-  async function importBursaFile(file: File) {
-    if (!importToken.trim()) { setImportStatus("Enter the UNIVERSE_SYNC_TOKEN you configured in Cloudflare."); return; }
-    setImporting(true); setImportStatus("Reading CSV...");
-    try {
-      const lines = (await file.text()).replace(/^\uFEFF/, "").split(/\r?\n/).filter(line=>line.trim());
-      const parseRow = (line:string) => {
-        const values:string[]=[]; let value="", quoted=false;
-        for(let i=0;i<line.length;i++) {
-          const ch=line[i];
-          if(ch === '"') { if(quoted && line[i+1] === '"') { value+='"'; i++; } else quoted=!quoted; }
-          else if(ch === "," && !quoted) { values.push(value.trim()); value=""; }
-          else value+=ch;
-        }
-        values.push(value.trim()); return values;
-      };
-      if(lines.length<2) throw new Error("CSV must contain a header and at least one company row.");
-      const headers=parseRow(lines[0]).map(x=>x.toLowerCase().replace(/[^a-z0-9]+/g," ").trim());
-      const find=(names:string[])=>headers.findIndex(h=>names.includes(h));
-      const symbolIndex=find(["symbol","ticker","stock code","stock number","code","stock no"]);
-      const nameIndex=find(["company name","name of company","company","name","issuer name"]);
-      const exchangeIndex=find(["exchange","market","listing market"]);
-      const sectorIndex=find(["sector","industry"]);
-      if(symbolIndex<0 || nameIndex<0) throw new Error("Could not identify the ticker/code and company-name columns in this CSV.");
-      const rows=lines.slice(1).map(line=>{
-        const values=parseRow(line);
-        return {symbol:values[symbolIndex]??"",company_name:values[nameIndex]??"",exchange:exchangeIndex>=0?values[exchangeIndex]:"Main Market",sector:sectorIndex>=0?values[sectorIndex]:"",listing_status:"active"};
-      }).filter(row=>row.symbol.trim() && row.company_name.trim());
-      if(!rows.length) throw new Error("No valid company rows found in the CSV.");
-      setImportStatus("Uploading "+rows.length.toLocaleString()+" companies...");
-      const response=await fetch("/api/universe/import-my",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+importToken.trim()},body:JSON.stringify({source:file.name,rows})});
-      const result=await response.json() as {imported?:number;error?:string};
-      if(!response.ok) throw new Error(result.error || "Import failed ("+response.status+").");
-      setImportStatus("Imported "+(result.imported ?? 0)+" Bursa listings. Reloading market data...");
-      await load();
-      setImportToken("");
-    } catch(error) { setImportStatus(error instanceof Error?error.message:"Import failed."); }
-    finally { setImporting(false); }
-  }
+ const universe=useMemo(()=>stocks.map(s=>({symbol:s.symbol,name:s.company_name})),[stocks]);
+ const shortlist=useMemo(()=>buildShortlist({
+  universe:{source_url:MFI_URL,retrieved_at:pipeline?.mfi_last_sync??updatedAt??null,snapshot:"current MFI candidate list",tickers:universe},
+  shariahChecks:manual.shariahChecks,ipObservations:manual.ipObservations,now:Date.now()
+ }),[universe,manual,pipeline?.mfi_last_sync,updatedAt]);
+ const rows=useMemo(()=>shortlist.rows.filter((r:any)=>{
+  if(view!=="all"&&tab==="shortlist"&&r.state!==view)return false;
+  const stock=stocks.find(s=>s.symbol===r.symbol);
+  return `${r.symbol} ${stock?.company_name||r.name||""}`.toLowerCase().includes(query.toLowerCase());
+ }),[shortlist,stocks,view,tab]);
+ const eligible=shortlist.summary.eligible_validated+shortlist.summary.eligible_unvalidated;
 
-  async function addUsStock() {
-    if (!addToken.trim()) { setAddStatus("Enter the UNIVERSE_SYNC_TOKEN you configured in Cloudflare."); return; }
-    if (!addSymbol.trim()) { setAddStatus("Enter a US ticker symbol."); return; }
-    setAdding(true); setAddStatus("Adding...");
-    try {
-      const body:{symbol:string;company_name?:string;market_cap_millions?:number}={symbol:addSymbol.trim()};
-      if (addName.trim()) body.company_name=addName.trim();
-      if (addCap.trim()) body.market_cap_millions=Number(addCap);
-      const response=await fetch("/api/universe/us/stocks",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+addToken.trim()},body:JSON.stringify(body)});
-      const result=await response.json() as {symbol?:string;status?:string;error?:string;sec_directory_match?:boolean;awaiting_market_cap?:boolean};
-      if(!response.ok) throw new Error(result.error || "Add failed ("+response.status+").");
-      setAddStatus((result.symbol??"Stock")+" "+(result.status==="already_active"?"is already in the universe.":"added to the universe.")+(result.sec_directory_match===false?" No SEC ticker match was found, so it will show as unsupported until a filing is mapped.":"")+(result.awaiting_market_cap?" Market cap is not set, so ranks stay withheld until one is available.":"")+" Published ranks are withheld until the new candidate is complete.");
-      setAddSymbol(""); setAddName(""); setAddCap("");
-      await load();
-    } catch(error) { setAddStatus(error instanceof Error?error.message:"Add failed."); }
-    finally { setAdding(false); }
-  }
-  async function removeUsStock(symbol:string) {
-    if (!addToken.trim()) { setAddOpen(true); setAddStatus("Enter the token, then use Remove again for "+symbol+"."); return; }
-    if (!window.confirm("Remove "+symbol+" from your frontend additions? It stays in the universe if Magic Formula Investing still returns it.")) return;
-    try {
-      const response=await fetch("/api/universe/us/stocks?symbol="+encodeURIComponent(symbol),{method:"DELETE",headers:{"authorization":"Bearer "+addToken.trim()}});
-      const result=await response.json() as {error?:string};
-      if(!response.ok) throw new Error(result.error || "Remove failed ("+response.status+").");
-      await load();
-    } catch(error) { setAddOpen(true); setAddStatus(error instanceof Error?error.message:"Remove failed."); }
-  }
-
-  return <div className="app-shell">
-    <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
-      <a className="brand" href="#"><span className="brand-mark"><TrendingUp size={19}/></span><span>magic<span className="brand-light">screen</span><small>INVESTMENT RESEARCH</small></span></a>
-      <div className="side-label">WORKSPACE</div>
-      <button className="side-link active" onClick={()=>{setTab("all");setMenuOpen(false);}}><Activity size={17}/> Screener <span className="side-dot"/></button>
-      <button className="side-link" onClick={()=>{setTab("watchlist");setMenuOpen(false);}}><Bell size={17}/> Watchlist <span className="side-count">{watchlist.length}</span></button>
-      <div className="side-label side-gap">MARKETS</div>
-      <button className={`side-link ${market==="MY"?"market-active":""}`} onClick={()=>{setMarket("MY");setMenuOpen(false);}}><span className="flag">🇲🇾</span> Bursa Malaysia</button>
-      <button className={`side-link ${market==="US"?"market-active":""}`} onClick={()=>{setMarket("US");setMenuOpen(false);}}><span className="flag">🇺🇸</span> United States</button>
-      <div className="sidebar-bottom">
-        <div className="status-card"><span className="status-icon"><Database size={15}/></span><div><b>Data pipeline</b><small>{sourceStatus}</small></div><span className={`pulse ${available ? "live":""}`}/></div>
-        <div className="profile"><div className="avatar">MS</div><div><b>Magic Screen</b><small>Personal workspace</small></div><ChevronDown size={15}/></div>
-      </div>
-    </aside>
-    {menuOpen && <button className="sidebar-backdrop" aria-label="Close navigation" onClick={()=>setMenuOpen(false)} />}
-    <main className="main">
-      <header className="topbar"><button className="menu-toggle" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)}>{menuOpen ? <X size={19}/> : <Menu size={19}/>}</button><div className="breadcrumb">Workspace <span>/</span> <b>Stock screener</b></div><div className="top-actions"><span className="market-pill">{market==="MY"?"🇲🇾 Bursa Malaysia":"🇺🇸 US Market"}</span><button className="icon-btn" title="About data" onClick={()=>setShowInfo(!showInfo)}><CircleHelp size={18}/></button><div className="avatar small-avatar">MS</div></div></header>
-      <section className="content">
-        <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> THE MARKET, WITH A METHOD</div><h1>Find quality businesses.<br/><em>Pay a sensible price.</em></h1><p className="intro">A focused stock screener built around the Magic Formula, with Shariah status kept transparent.</p></div><div className="heading-actions">{market==="MY" && <button className="import-btn" onClick={()=>{setImportOpen(true);setImportStatus("");}}><Database size={14}/> Import Bursa CSV</button>}{market==="US" && <><button className="import-btn" onClick={()=>{setAddOpen(true);setAddStatus("");}}><Database size={14}/> Add US stock</button><button className="import-btn" onClick={()=>{setExtensionOpen(true);setExtensionStatus("");setExtensionResult(null);}}><Database size={14}/> Inspect SEC tags</button><label className="mfi-control">Min cap ($M)<input type="number" min="50" max="5000000" step="10" value={minimumMarketCap} onChange={e=>setMinimumMarketCap(Math.max(50,Number(e.target.value)||50))}/></label><label className="mfi-control">Stocks<select value={mfiCount} onChange={e=>setMfiCount(Number(e.target.value))}><option value={30}>Top 30</option><option value={50}>Top 50</option></select></label></>}<button className="refresh-btn" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={15} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh data"}</button></div></div>
-
-        {extensionOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Inspect SEC extension facts"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">SEC EDGAR · READ ONLY</div><h3>Inspect custom XBRL tags</h3></div><button className="modal-close" onClick={closeExtensionDiagnostic} aria-label="Close diagnostic">×</button></div><p>Inspect issuer-specific financial facts in the latest annual filing. This diagnostic does not update D1, calculate ratios, or change rankings.</p><label className="token-label">US ticker<input value={extensionSymbol} onChange={e=>setExtensionSymbol(e.target.value.toUpperCase())} placeholder="e.g. HRB" autoComplete="off"/></label><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={extensionToken} onChange={e=>setExtensionToken(e.target.value)} placeholder="Cloudflare Worker secret" autoComplete="off"/></label><button className="refresh-btn" onClick={()=>void runExtensionDiagnostic()} disabled={extensionBusy}>{extensionBusy?"Inspecting...":"Inspect SEC filing"}</button>{extensionStatus && <div className="import-status">{extensionStatus}</div>}{extensionResult!=null && <pre className="extension-result">{JSON.stringify(extensionResult,null,2)}</pre>}<small className="import-security">The token is sent directly to your Worker for this request and cleared afterward. No Gemini API call is made.</small></div></div>}
-        {addOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Add US stock"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">UNITED STATES</div><h3>Add a stock to the universe</h3></div><button className="modal-close" onClick={()=>setAddOpen(false)} aria-label="Close add stock">×</button></div><p>Frontend additions are kept alongside Magic Formula Investing candidates. An MFI refresh never removes them. New stocks pass through the normal SEC evidence, review and ranking gates, and ranks are withheld until every candidate is complete.</p><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={addToken} onChange={e=>setAddToken(e.target.value)} placeholder="Paste your Cloudflare Worker secret" autoComplete="off"/></label><label className="token-label">Ticker<input value={addSymbol} onChange={e=>setAddSymbol(e.target.value.toUpperCase())} placeholder="e.g. AAPL or BRK-B" autoComplete="off"/></label><label className="token-label">Company name (optional)<input value={addName} onChange={e=>setAddName(e.target.value)} placeholder="Looked up from SEC if blank" autoComplete="off"/></label><label className="token-label">Market cap, $M (optional)<input type="number" min="1" value={addCap} onChange={e=>setAddCap(e.target.value)} placeholder="Needed before it can be ranked" autoComplete="off"/></label><button className="refresh-btn" onClick={()=>void addUsStock()} disabled={adding}>{adding?"Adding":"Add stock"}</button>{addStatus && <div className="import-status">{addStatus}</div>}<small className="import-security">The token is sent directly to your Worker for this request only. It is not saved in the browser.</small></div></div>}
-        {importOpen && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Import Bursa listings"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">BURSA MALAYSIA</div><h3>Import listed companies</h3></div><button className="modal-close" onClick={()=>setImportOpen(false)} aria-label="Close import">×</button></div><p>Upload the official Bursa company directory as a CSV file. The importer recognises common ticker and company-name column headings.</p><label className="token-label">UNIVERSE_SYNC_TOKEN<input type="password" value={importToken} onChange={e=>setImportToken(e.target.value)} placeholder="Paste your Cloudflare Worker secret" autoComplete="off"/></label><label className="csv-upload"><Database size={18}/><b>{importing?"Importing...":"Choose Bursa CSV file"}</b><small>CSV format only. Export the Bursa directory to CSV first.</small><input type="file" accept=".csv,text/csv" disabled={importing} onChange={e=>{const file=e.currentTarget.files?.[0];if(file)void importBursaFile(file);e.currentTarget.value="";}}/></label>{importStatus && <div className="import-status">{importStatus}</div>}<small className="import-security">The token is sent directly to your Worker for this request only. It is not saved in the browser.</small></div></div>}
-        {showInfo && <div className="info-banner"><ShieldCheck size={18}/><div><b>Data integrity comes first.</b><p>Prices, fundamentals and Shariah status are only shown when a source is available and verified. Unknown is not the same as compliant. US screening candidates are supplied by Magic Formula Investing. Bursa listings are loaded from the Bursa directory import. Yahoo Finance quotes are unofficial. Magic Formula metrics and Shariah classifications stay blank or unverified until reliable, dated financial and screening sources are connected.</p></div><button onClick={()=>setShowInfo(false)}>×</button></div>}
-        <div className="stats-grid">
-          <div className="stat-card"><div className="stat-top">UNIVERSE <span className="stat-icon"><Activity size={16}/></span></div><div className="stat-value">{rows.length}<small> stocks tracked</small></div><div className="stat-foot">Initial watch universe</div></div>
-          <div className="stat-card"><div className="stat-top">LIVE QUOTES <span className="stat-icon green"><TrendingUp size={16}/></span></div><div className="stat-value">{available}<small> / {rows.length}</small></div><div className="stat-foot">{available ? "Quotes received" : "Waiting for market data"}</div></div>
-          <div className="stat-card"><div className="stat-top">FORMULA RANKED <span className="stat-icon violet"><Sparkles size={16}/></span></div><div className="stat-value">{ranked}<small> stocks</small></div><div className="stat-foot">Needs verified fundamentals</div></div>
-          <div className="stat-card"><div className="stat-top">LAST UPDATED <span className="stat-icon"><Clock3 size={16}/></span></div><div className="stat-value time-value">{updatedAt ? new Date(updatedAt).toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"}) : "—"}</div><div className="stat-foot">{updatedAt ? new Date(updatedAt).toLocaleDateString("en-MY") : "No successful sync yet"}</div></div>
-        </div>
-        <div className="pipeline-meta">
-          {market==="US" ? <>
-            <div><span>MFI UNIVERSE SYNC</span><b>{dateTime(pipeline?.mfi_last_sync)}</b><small>{pipeline?.mfi_count ?? 0} candidates · Price date {pipeline?.mfi_price_date ?? "—"} · Quarter data {pipeline?.mfi_quarter_date ?? "—"}</small></div>
-            <div><span>SEC DATA LAST PROCESSED</span><b>{dateTime(pipeline?.sec?.last_updated)}</b><small>{pipeline?.sec?.calculated ?? 0}/{pipeline?.sec?.total ?? 0} current · {pipeline?.sec?.awaiting_market_cap ?? 0} awaiting market cap · {pipeline?.sec?.awaiting_fundamentals ?? 0} awaiting SEC · {pipeline?.sec?.incomplete ?? 0} incomplete · {pipeline?.sec?.stale_market_cap ?? 0} valuation refresh pending · {pipeline?.sec?.unmapped ?? 0} unmapped · {pipeline?.sec?.provider_error ?? 0} provider errors</small></div>
-          </> : <div><span>QUOTE CACHE</span><b>{dateTime(pipeline?.last_quote_sync)}</b><small>Latest stored Bursa quote timestamp</small></div>}
-        </div>
-
-        {market==="US" && <section className="mfi-preview-panel">
-          <div className="mfi-preview-head"><div><div className="eyebrow">EDGARTOOLS · SHADOW CALCULATION</div><h2>Magic Formula preview <span className="preview-pill">NOT PRODUCTION</span></h2><p>Read-only ranking from annual filing evidence. Candidate accounting inputs are not yet policy-approved.</p></div><div className="preview-updated">{mfiPreview ? dateTime(mfiPreview.as_of) : "Waiting for preview"}</div></div>
-          {mfiPreviewError ? <div className="preview-empty">Preview unavailable: {mfiPreviewError}</div> : !mfiPreview ? <div className="preview-empty">Loading shadow ranking…</div> : <>
-            <div className="preview-stats"><div><b>{mfiPreview.summary.universe}</b><span>Universe</span></div><div><b>{mfiPreview.summary.eligible}</b><span>Eligible</span></div><div><b>{mfiPreview.summary.ranked}</b><span>Ranked</span></div><div><b>{mfiPreview.summary.excluded}</b><span>Not ranked</span></div></div>
-            <p className="preview-cohort-note">{mfiPreview.summary.eligible} of {mfiPreview.summary.universe} companies pass the current evidence gates. {mfiPreview.summary.eligible < mfiPreview.minimum_eligible_cohort ? `The minimum cohort is ${mfiPreview.minimum_eligible_cohort}, so numeric ranks are withheld until at least ${mfiPreview.minimum_eligible_cohort} companies qualify.` : `Classic Magic Formula ranking uses the sum of EY and ROC ordinal ranks; lower combined scores rank higher.`} Coverage exclusions: {mfiPreview.summary.unsupported_provider ?? 0} provider-unsupported, {mfiPreview.summary.filing_evidence_unavailable ?? 0} awaiting filing evidence, {mfiPreview.summary.accounting_or_valuation_review ?? 0} accounting/valuation review. This is a read-only preview, not a production ranking.</p>
-            <div className="table-wrap"><table className="preview-table"><thead><tr><th>RANK</th><th>COMPANY</th><th>EY · SHADOW / LEGACY</th><th>ROC · SHADOW / LEGACY</th><th>EY RANK</th><th>ROC RANK</th><th>REVIEW FLAGS</th></tr></thead><tbody>
-              {mfiPreview.rankings.filter(row=>row.magic_formula_rank!==null).map(row=>{
-                const legacy=stocks.find(stock=>stock.market==="US" && stock.symbol===row.symbol);
-                const legacyEy=legacy?.earnings_yield ?? null;
-                const legacyRoc=legacy?.return_on_capital ?? null;
-                return <tr key={row.symbol}><td className="formula-score">#{row.magic_formula_rank}</td><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td><b>{ratioPct(row.earnings_yield)}</b><small className="preview-legacy-value" title={legacy?.fundamentals_status ? `Company Facts status: ${legacy.fundamentals_status}` : "No production Company Facts row"}>Legacy: {ratioPct(legacyEy)} · Δ {percentagePointDelta(row.earnings_yield,legacyEy)}</small></td><td><span title={row.return_on_capital!==null && row.return_on_capital>5?"Candidate ROC exceeds 500%. Review working capital, lease classification and net PP&E scope before relying on this value.": "Candidate ROC, not accounting-approved."}>{ratioPct(row.return_on_capital)}</span><small className="preview-legacy-value" title={legacy?.fundamentals_status ? `Company Facts status: ${legacy.fundamentals_status}` : "No production Company Facts row"}>Legacy: {ratioPct(legacyRoc)} · Δ {percentagePointDelta(row.return_on_capital,legacyRoc)}</small>{row.return_on_capital!==null && row.return_on_capital>5 && <small className="preview-warning">Outlier · verify denominator</small>}</td><td>{row.earnings_yield_rank?.toFixed(1)??"—"}</td><td>{row.return_on_capital_rank?.toFixed(1)??"—"}</td><td><span className="preview-warning" title={row.review_flags.join(", ") || "No review flags"}>{row.review_flags.length} flags · hover for details</span></td></tr>;
-              })}
-            </tbody></table></div>
-            <button className="import-btn mfi-excluded-toggle" onClick={()=>setShowMfiReconciliation(value=>!value)}>{showMfiReconciliation?"Hide":"Show"} full legacy comparison ({mfiPreview.summary.universe})</button>
-            {showMfiReconciliation && <div className="mfi-reconciliation">
-              <p className="preview-cohort-note">Every active MFI candidate is shown, not just ranked names. Legacy values come from the current Company Facts production lane; shadow values come from the accession-matched EdgarTools annual filing lane. Missing values are shown as unavailable, never treated as zero.</p>
-              <div className="table-wrap mfi-excluded-wrap"><table className="preview-table"><thead><tr><th>SYMBOL / STATUS</th><th>SHADOW EY</th><th>LEGACY EY</th><th>EY Δ</th><th>SHADOW ROC</th><th>LEGACY ROC</th><th>ROC Δ</th></tr></thead><tbody>
-                {mfiPreview.rankings.map(row=>{
-                  const legacy=stocks.find(stock=>stock.market==="US" && stock.symbol===row.symbol);
-                  return <tr key={row.symbol}><td><b>{row.symbol}</b><small className="preview-symbol">{row.magic_formula_rank!==null?`Rank #${row.magic_formula_rank}`:(row.ranking_eligible?"Eligible · awaiting rank":row.exclusion_reasons.join(" · ")||"Not ranked")} · {legacy?.fundamentals_status||"No legacy row"}</small></td><td>{ratioPct(row.earnings_yield)}</td><td>{ratioPct(legacy?.earnings_yield??null)}</td><td>{percentagePointDelta(row.earnings_yield,legacy?.earnings_yield??null)}</td><td>{ratioPct(row.return_on_capital)}</td><td>{ratioPct(legacy?.return_on_capital??null)}</td><td>{percentagePointDelta(row.return_on_capital,legacy?.return_on_capital??null)}</td></tr>;
-                })}
-              </tbody></table></div>
-            </div>}
-            <button className="import-btn mfi-excluded-toggle" onClick={()=>setShowMfiExcluded(value=>!value)}>{showMfiExcluded?"Hide":"Show"} excluded companies ({mfiPreview.summary.excluded})</button>
-            {showMfiExcluded && <div className="table-wrap mfi-excluded-wrap"><table className="preview-table"><thead><tr><th>COMPANY</th><th>WHY IT IS EXCLUDED</th></tr></thead><tbody>
-              {mfiPreview.rankings.filter(row=>row.magic_formula_rank===null).map(row=><tr key={row.symbol}><td><b>{row.company_name||row.symbol}</b><small className="preview-symbol">{row.symbol}</small></td><td><small className="mfi-exclusion-reasons">{row.ranking_eligible ? `Eligible, but ranks are withheld because the minimum cohort of ${mfiPreview.minimum_eligible_cohort} has not been met.` : row.exclusion_reasons.join(" · ") || "No reason returned"}</small></td></tr>)}
-            </tbody></table></div>}
-            <p className="preview-footnote">Legacy values are the current Company Facts production lane; shadow values use accession-bound EdgarTools annual evidence. Deltas are percentage points and are diagnostic only. They do not approve the shadow inputs or change production. Every ranked row with accounting flags remains review-required. Candidate ROC above 500% is highlighted as an outlier for denominator validation, not automatically rejected. Hover over each flag count to inspect the exact issues. Not-ranked reasons are screening guardrails, not accounting conclusions. {mfiPreview.guardrail} Production write: {String(mfiPreview.production_write)}.</p>
-          </>}
-        </section>}
-
-        <div className="section-title"><div><div className="eyebrow">DISCOVER OPPORTUNITIES</div><h2>{market==="MY"?"Bursa Malaysia":"US Equities"} <span className="sub-count">{rows.length} companies</span></h2></div><div className="method-tag"><Sparkles size={14}/> MAGIC FORMULA</div></div>
-        <div className="toolbar"><div className="tabs"><button className={tab==="all"?"selected":""} onClick={()=>setTab("all")}>All stocks</button><button className={tab==="shariah"?"selected":""} onClick={()=>setTab("shariah")}> <ShieldCheck size={14}/> Shariah verified</button><button className={tab==="watchlist"?"selected":""} onClick={()=>setTab("watchlist")}>Watchlist</button></div><div className="tools"><div className="searchbox"><Search size={15}/><input placeholder="Search company or ticker..." value={query} onChange={e=>setQuery(e.target.value)}/></div><button className="sort-btn" onClick={()=>setSort(s=>s==="rank"?"name":s==="name"?"change":"rank")}><ArrowDownUp size={14}/> Sort: {sort==="rank"?"Formula":sort==="name"?"Name":"Change"}</button></div></div>
-        <div className="table-wrap"><table><thead><tr><th className="rank-col">#</th><th>COMPANY</th><th>PRICE</th><th>MARKET CAP</th><th>DAY CHANGE</th><th>EARNINGS YIELD</th><th>RETURN ON CAPITAL</th><th>FORMULA RANK</th><th>SOURCE</th><th></th></tr></thead><tbody>
-          {pageRows.map((s,i)=><tr key={s.symbol}><td className="rank-cell">{s.magic_formula_rank ?? "—"}</td><td><div className="company-cell"><div className="ticker-icon">{s.symbol.replace(".KL","").slice(0,2)}</div><div><b>{s.company_name}</b><small>{s.symbol}</small>{s.market==="US" && (s.universe_sources??["Magic Formula Investing"]).includes("Magic Formula Investing") && <span className="intent-flag" title="Included in the Magic Formula Investing candidate universe; this is not a formula rank.">MFI CANDIDATE</span>}{s.market==="US" && (s.universe_sources??[]).includes("Frontend") && <span className="intent-flag" title="Added through the frontend. It stays active even if Magic Formula Investing no longer returns it.">ADDED{(s.universe_sources??[]).includes("Magic Formula Investing")?" + MFI":""}</span>}{s.market==="US" && (s.universe_sources??[]).includes("Frontend") && <button className="star-btn" title="Remove frontend addition" aria-label={"Remove "+s.symbol} onClick={()=>void removeUsStock(s.symbol)}>×</button>}{s.fundamentals_status==="stale_fiscal_period" && <span className="intent-flag stale" title="The latest annual SEC period available to this calculation is older than 550 days. Ratios and ranking are withheld until current facts are found.">STALE FACTS</span>}{(s.fundamentals_status==="negative_invested_capital" || s.fundamentals_status==="zero_invested_capital") && <span className="intent-flag stale" title={s.fundamentals_status==="negative_invested_capital"?"Reported current assets less current liabilities plus net PP&E is negative. ROC and ranking are intentionally withheld because this denominator is not meaningful for the standard formula.":"Reported current assets less current liabilities plus net PP&E is zero. ROC and ranking are intentionally withheld because division by zero is not meaningful."}>ROC REVIEW</span>}{s.fundamentals_missing_fields?.length ? <span className="intent-flag stale" title={"Not found in standard SEC Company Facts: "+s.fundamentals_missing_fields.join(", ")+". This does not mean the reported value is zero; the filing may use a custom tag or dimensional disclosure."}>FACTS MISSING</span> : null}{s.fundamentals_zero_fields?.length ? <span className="intent-flag" title={"Explicitly reported as zero in SEC Company Facts: "+s.fundamentals_zero_fields.join(", ")+". Zero is retained as reported, not treated as missing."}>ZERO FACT</span> : null}</div></div></td><td className="price-cell">{money(s.price,s.currency)}</td><td>{s.market_cap==null?"—":money(s.market_cap,s.currency)}</td><td className={s.change_percent==null?"muted":s.change_percent>=0?"positive":"negative"}>{pct(s.change_percent)}</td><td className="metric-cell"><span>{ratioPct(s.earnings_yield)}</span>{s.fiscal_period && <small className="metric-date">FY {s.fiscal_period}</small>}</td><td className="metric-cell"><span>{ratioPct(s.return_on_capital)}</span>{s.fiscal_period && <small className="metric-date">FY {s.fiscal_period}</small>}</td><td>{s.magic_formula_rank ? <span className="formula-score">#{s.magic_formula_rank}</span> : <span className="muted">Not ranked</span>}</td><td className="source-cell">{market==="US" ? ((s.universe_sources??["Magic Formula Investing"]).includes("Magic Formula Investing") ? <a href={MFI_SOURCE_URL} target="_blank" rel="noreferrer">Magic Formula Investing<span className="source-url">{MFI_SOURCE_URL}</span></a> : <span className="muted">Frontend addition</span>) : <span className="muted">Bursa directory import</span>}</td><td><button className={`star-btn ${watchlist.includes(s.symbol)?"starred":""}`} onClick={()=>toggleWatch(s.symbol)} aria-label="Toggle watchlist">★</button></td></tr>)}
-        </tbody></table>{rows.length===0 && <div className="empty-state"><Filter size={24}/><b>No stocks match this view</b><span>Try another search or switch tabs.</span></div>}</div>
-        <div className="table-footer"><span>Showing {rows.length ? (page-1)*pageSize+1 : 0}–{Math.min(page*pageSize,rows.length)} of {rows.length} companies</span><div className="pagination"><button disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</button><span>{page} / {pageCount}</span><button disabled={page>=pageCount} onClick={()=>setPage(p=>Math.min(pageCount,p+1))}>Next</button></div><span><i className="legend-dot"/> Data status: {available ? "Partial live data" : "Awaiting first sync"}</span></div>
-        <div className="method-note"><div className="method-note-icon"><CircleHelp size={17}/></div><div><b>How the Magic Formula works</b><p>Ranks businesses by a combination of Earnings Yield and Return on Capital. Earnings Yield is EBIT divided by Enterprise Value. Return on Capital is EBIT divided by net working capital plus net PP&E. Ratios use reported annual SEC facts and stay blank when required inputs are missing.</p></div><button onClick={()=>setShowInfo(true)}>Data methodology <ArrowUpRight size={14}/></button></div>
-        <footer><span>© 2026 Magic Screen</span><span>Research tool only · Not investment advice</span><span>Built for clarity <span className="footer-star">✳</span></span></footer>
-      </section>
-    </main>
-  </div>;
+ async function copyPrompt(){
+  const tickerList=universe.map(s=>({ticker:s.symbol,company_name:s.name}));
+  const prompt=[
+   "You are assisting with PERSONAL Shariah stock research. Research only the tickers supplied below.",
+   "For every ticker, check both Musaffa and HalalScreener only if their current terms permit AI or automated research access. If those terms do not permit it, do not access that source; return No data and explain that a manual check is required. Never bypass login, paywalls, CAPTCHAs, rate limits or access controls. Do not scrape or bulk-extract restricted pages.",
+   "Return exactly two shariahChecks records per ticker: source musaffa and source halalscreener. Use the exact displayed status: Halal, Doubtful, Not Halal, or No data. Include checked_at (YYYY-MM-DD), direct source URL in reference, methodology, latest financial period, non-compliant income %, interest-bearing debt %, interest-bearing assets %, evidence and limitations when available.",
+   "Never guess, infer or calculate a missing status or ratio. Use null for unavailable numeric/text fields. For a No data result where no source page can lawfully be accessed, reference may be null; otherwise provide the direct stock page URL. Do not substitute Mizan or any other provider. Do not research Investing Paths. I will check Investing Paths separately and enter those observations manually.",
+   "Return ONLY valid JSON, without Markdown fences or commentary. Use this exact structure:",
+   JSON.stringify({shariahChecks:[{symbol:"AAPL",source:"musaffa",status:"Halal",checked_at:"YYYY-MM-DD",reference:"https://...",methodology:null,financial_period:null,non_compliant_income_pct:null,interest_bearing_debt_pct:null,interest_bearing_assets_pct:null,evidence:null,limitations:null}],ipObservations:[]},null,2),
+   "Allowed source values: musaffa, halalscreener. Allowed status values: Halal, Doubtful, Not Halal, No data. Include one record per source per ticker, including No data. Do not include other tickers.",
+   "MFI ticker universe:",JSON.stringify(tickerList,null,2)
+  ].join("\n\n");
+  try{await navigator.clipboard.writeText(prompt);setMessage("Ticker list and AI prompt copied. Paste it into your AI assistant.");}
+  catch{setPromptText(prompt);setPromptOpen(true);}
+ }
+ function importJson(){
+  try{
+   const parsed=JSON.parse(jsonText);
+   if(!parsed||!Array.isArray(parsed.shariahChecks)||!Array.isArray(parsed.ipObservations))throw new Error("JSON must contain shariahChecks and ipObservations arrays.");
+   const allowed=new Set(universe.map(s=>s.symbol));
+   const allowedSources=new Set(["musaffa","halalscreener"]);
+   const allowedStatuses=new Set(["Halal","Doubtful","Not Halal","No data"]);
+   for(const item of parsed.shariahChecks){
+    if(!allowed.has(String(item.symbol||"").toUpperCase()))throw new Error("Unknown or non-MFI ticker: "+(item.symbol||"missing ticker"));
+    if(!allowedSources.has(item.source))throw new Error("Unsupported Shariah source for "+item.symbol);
+    if(!allowedStatuses.has(item.status))throw new Error("Unsupported status for "+item.symbol);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(item.checked_at||"")||Number.isNaN(Date.parse(item.checked_at)))throw new Error("Invalid checked_at date for "+item.symbol);
+    if(item.reference!=null&&(typeof item.reference!=="string"||!/^https?:\/\//i.test(item.reference)))throw new Error("Source reference must be a direct HTTP(S) URL for "+item.symbol);
+    if(item.status!=="No data"&&typeof item.reference!=="string")throw new Error("A direct source URL is required unless status is No data for "+item.symbol);
+   }
+   if(parsed.ipObservations.length)throw new Error("AI JSON must not contain Investing Paths observations. Record those manually in the app.");
+   const preview=buildShortlist({universe:{tickers:universe},shariahChecks:parsed.shariahChecks,ipObservations:[],now:Date.now()});
+   setManual({shariahChecks:parsed.shariahChecks,ipObservations:parsed.ipObservations});
+   setMessage(`Imported ${parsed.shariahChecks.length} provider checks. ${preview.ignored_invalid_shariah_records.length+preview.ignored_invalid_investing_paths_records.length} records need correction.`);
+   setPasteOpen(false);setJsonText("");
+  }catch(e){setMessage(e instanceof Error?e.message:"Invalid JSON.");}
+ }
+ function saveIp(){
+  if(!ipSymbol||!ipReference.trim()||!/^https?:\/\//i.test(ipReference)) {setMessage("Select a ticker and enter the Investing Paths page URL.");return;}
+  if(ipFound&&[ipRank,ipEy,ipRoc,ipYear,ipPeriod].every(v=>!v.trim())){setMessage("Enter at least one visible Investing Paths value.");return;}
+  if(ipRank&&(!Number.isInteger(Number(ipRank))||Number(ipRank)<1)){setMessage("Rank must be a positive whole number.");return;}
+  if(ipYear&&(!Number.isInteger(Number(ipYear))||Number(ipYear)<1990)){setMessage("Enter a valid fiscal year.");return;}
+  if([ipEy,ipRoc].some(v=>v.trim()&&!Number.isFinite(Number(v)))){setMessage("EY and ROC must be valid numbers.");return;}
+  const observation:CheckRecord={symbol:ipSymbol,collection_method:"manual",manually_verified:true,found:ipFound,checked_at:ipDate,source_reference:ipReference.trim()};
+  if(ipFound)Object.assign(observation,{rank:ipRank===""?null:Number(ipRank),earnings_yield:ipEy===""?null:Number(ipEy),return_on_capital:ipRoc===""?null:Number(ipRoc),fiscal_year:ipYear===""?null:Number(ipYear),fiscal_period:ipPeriod||null});
+  setManual(old=>({...old,ipObservations:[...old.ipObservations.filter(x=>String(x.symbol).toUpperCase()!==ipSymbol),observation]}));
+  setIpOpen(false);setMessage("Investing Paths manual observation saved in this browser.");
+ }
+ const selected=rows;
+ return <div className="app-shell"><main className="main"><header className="topbar"><div className="brand"><span className="brand-mark"><Activity size={18}/></span><span>MAGIC<span className="brand-light">SCREEN</span><small>PERSONAL RESEARCH</small></span></div><div className="top-actions"><span className="market-pill">US · MFI UNIVERSE</span><button className="refresh-btn compact" onClick={()=>void load(true)} disabled={loading}><RefreshCw size={14} className={loading?"spin":""}/>{loading?"Refreshing":"Refresh MFI"}</button></div></header>
+ <section className="content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> SHARIAH-FIRST INVESTING</div><h1>One universe.<br/><em>Two Shariah checks.</em></h1><p className="intro">MFI tickers, Musaffa + HalalScreener evidence, then manual Investing Paths validation.</p></div></div>
+ <div className="stats-grid"><div className="stat-card"><div className="stat-top">MFI TICKERS</div><div className="stat-value">{universe.length}</div><div className="stat-foot">Current US candidate universe</div></div><div className="stat-card"><div className="stat-top">HALAL · BOTH SOURCES</div><div className="stat-value">{eligible}</div><div className="stat-foot">Fresh Halal checks from both providers</div></div><div className="stat-card"><div className="stat-top">NEEDS REVIEW</div><div className="stat-value">{shortlist.summary.needs_review}</div><div className="stat-foot">Conflicting or unclear evidence</div></div><div className="stat-card"><div className="stat-top">MFI LAST SYNC</div><div className="stat-value time-value">{dateLabel(pipeline?.mfi_last_sync)}</div><div className="stat-foot">{status}</div></div></div>
+ <section className="shariah-panel"><div className="shariah-panel-head"><div><div className="eyebrow">RESEARCH WORKFLOW</div><h3>{tab==="shortlist"?"Shariah-first shortlist":"MFI candidate universe"}</h3><p>Only tickers returned by Magic Formula Investing are included. Both Shariah sources must show fresh Halal results before a ticker can pass.</p></div><div className="shariah-actions"><button className="import-btn" onClick={()=>void copyPrompt()}><Clipboard size={15}/> Copy tickers + AI prompt</button><button className="import-btn" onClick={()=>{setJsonText("");setPasteOpen(true);}}><ClipboardPaste size={15}/> Paste AI JSON</button><button className="import-btn" onClick={()=>{setIpSymbol(universe[0]?.symbol||"");setIpDate(today());setIpFound(true);setIpRank("");setIpEy("");setIpRoc("");setIpYear("");setIpPeriod("");setIpReference("");setIpOpen(true);}}>Investing Paths check</button></div></div>
+ <div className="shariah-summary"><div><b>{shortlist.summary.eligible_validated}</b><span>Eligible · IP checked</span></div><div><b>{shortlist.summary.eligible_unvalidated}</b><span>Eligible · IP not checked</span></div><div><b>{shortlist.summary.needs_review}</b><span>Needs review</span></div><div><b>{shortlist.summary.excluded}</b><span>Excluded / incomplete</span></div></div>
+ <div className="toolbar"><div className="tabs"><button className={tab==="shortlist"?"selected":""} onClick={()=>setTab("shortlist")}>Shariah shortlist</button><button className={tab==="universe"?"selected":""} onClick={()=>{setTab("universe");setView("all");}}>MFI universe</button></div><div className="tools"><div className="searchbox"><Search size={15}/><input placeholder="Search ticker or company…" value={query} onChange={e=>setQuery(e.target.value)}/></div>{tab==="shortlist"&&<select className="sort-btn" value={view} onChange={e=>setView(e.target.value as View)}><option value="all">All states</option><option value="eligible_validated">IP checked</option><option value="eligible_unvalidated">IP not checked</option><option value="needs_review">Needs review</option><option value="excluded">Excluded</option></select>}</div></div>
+ <div className="table-wrap"><table className="research-table"><thead><tr><th>TICKER</th><th>MUSAFFA</th><th>HALALSCREENER</th><th>DECISION</th><th>INVESTING PATHS</th></tr></thead><tbody>
+ {selected.map((row:any)=>{const s=stocks.find(x=>x.symbol===row.symbol);const ip=row.investing_paths;return <tr key={row.symbol}><td><div className="company-cell"><div className="ticker-icon">{row.symbol.slice(0,2)}</div><div><b>{s?.company_name||row.name||row.symbol}</b><small>{row.symbol}</small></div></div></td><td className="shariah-cell"><b>{row.shariah.per_source.musaffa.status}</b><small>{row.shariah.per_source.musaffa.reason||"Checked "+(manual.shariahChecks.find(x=>x.symbol===row.symbol&&x.source==="musaffa")?.checked_at||"—")}</small></td><td className="shariah-cell"><b>{row.shariah.per_source.halalscreener.status}</b><small>{row.shariah.per_source.halalscreener.reason||"Checked "+(manual.shariahChecks.find(x=>x.symbol===row.symbol&&x.source==="halalscreener")?.checked_at||"—")}</small></td><td><span className={"decision "+row.state}>{row.state.replaceAll("_"," ")}</span><small className="reason">{row.shariah.reasons.join(" · ")||"Both sources pass freshness and status checks"}</small></td><td className="shariah-cell">{ip.status==="verified"?<><b>Rank #{ip.rank??"—"}</b><small>EY {pct(ip.earnings_yield)} · ROC {pct(ip.return_on_capital)}</small><small>{[ip.fiscal_year,ip.fiscal_period].filter(Boolean).join(" ")||"Fiscal period not recorded"}</small><small>Checked {ip.checked_at}</small><a href={ip.source_reference} target="_blank" rel="noreferrer">Investing Paths source</a></>:ip.status==="not_found"?<><b>Not found</b><small>Checked {ip.checked_at}</small><a href={ip.source_reference} target="_blank" rel="noreferrer">Investing Paths source</a></>:<span className="muted">Not checked</span>}</td></tr>;})}
+ </tbody></table>{selected.length===0&&<div className="empty-state"><ShieldCheck size={24}/><b>No tickers in this view</b><span>Refresh the MFI universe or change the filter.</span></div>}</div>
+ <div className="table-footer"><span>{selected.length} of {universe.length} MFI tickers · Saved locally in this browser</span><span>Latest MFI sync: {dateLabel(pipeline?.mfi_last_sync)}</span></div></section>
+ <div className="method-note"><ShieldCheck size={18}/><div><b>Strict by design</b><p>Only current MFI tickers are considered. Missing, stale, doubtful or conflicting Shariah evidence never becomes eligible. Investing Paths observations are recorded manually. AI output is research input, not an automatic ruling.</p></div></div>
+ <footer><span>Personal research tool · Not investment advice</span><span>Musaffa + HalalScreener · Manual Investing Paths</span></footer></section>
+ {pasteOpen&&<div className="import-overlay" role="dialog" aria-modal="true"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">TEXT ONLY</div><h3>Paste AI research JSON</h3></div><button className="modal-close" onClick={()=>setPasteOpen(false)}>×</button></div><p>Paste the raw JSON from your AI assistant. Records are checked against the current MFI universe and provider/status rules.</p><textarea className="shariah-json" value={jsonText} onChange={e=>setJsonText(e.target.value)} placeholder='{"shariahChecks":[],"ipObservations":[]}' spellCheck={false}/><button className="refresh-btn" onClick={importJson} disabled={!jsonText.trim()}>Validate and import</button></div></div>}
+ {promptOpen&&<div className="import-overlay" role="dialog" aria-modal="true"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">COPY PROMPT</div><h3>AI research prompt</h3></div><button className="modal-close" onClick={()=>setPromptOpen(false)}>×</button></div><textarea className="shariah-json" value={promptText} readOnly/><button className="refresh-btn" onClick={()=>void navigator.clipboard.writeText(promptText)}>Copy prompt</button></div></div>}
+ {ipOpen&&<div className="import-overlay" role="dialog" aria-modal="true"><div className="import-dialog"><div className="import-dialog-head"><div><div className="eyebrow">MANUAL SOURCE CHECK</div><h3>Investing Paths observation</h3></div><button className="modal-close" onClick={()=>setIpOpen(false)}>×</button></div><div className="form-grid"><label>Ticker<select value={ipSymbol} onChange={e=>setIpSymbol(e.target.value)}>{universe.map(s=><option key={s.symbol} value={s.symbol}>{s.symbol} · {s.name}</option>)}</select></label><label>Checked date<input type="date" value={ipDate} onChange={e=>setIpDate(e.target.value)}/></label><label className="wide check-label"><input type="checkbox" checked={ipFound} onChange={e=>setIpFound(e.target.checked)}/> Ticker found in Investing Paths</label>{ipFound&&<><label>Rank<input type="number" min="1" step="1" value={ipRank} onChange={e=>setIpRank(e.target.value)}/></label><label>EY %<input type="number" step="any" value={ipEy} onChange={e=>setIpEy(e.target.value)}/></label><label>ROC %<input type="number" step="any" value={ipRoc} onChange={e=>setIpRoc(e.target.value)}/></label><label>Fiscal year<input type="number" min="1990" value={ipYear} onChange={e=>setIpYear(e.target.value)}/></label><label>Fiscal period<input value={ipPeriod} onChange={e=>setIpPeriod(e.target.value)} placeholder="e.g. FY ended 2026-06-30"/></label></>}<label className="wide">Investing Paths source URL<input value={ipReference} onChange={e=>setIpReference(e.target.value)} placeholder="https://investingpaths.com/…"/></label></div><button className="refresh-btn" onClick={saveIp}>Save manual observation</button></div></div>}
+ {message&&<div className="toast" role="status"><Check size={15}/>{message}<button onClick={()=>setMessage("")}>×</button></div>}
+ </main></div>;
 }
