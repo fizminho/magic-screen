@@ -10,7 +10,6 @@ References:
 - https://github.com/passwordless-id/webauthn
 - https://webauthn.passwordless.id/registration/
 - https://webauthn.passwordless.id/authentication/
-- Release 2.4.1: https://github.com/passwordless-id/webauthn/releases/tag/2.4.1
 
 The library is used as a dependency; no demo code was copied. Its browser client emits debug messages, so the app temporarily suppresses `console.debug` only while a passkey ceremony is running.
 
