@@ -1,3 +1,4 @@
+import { dispatchAlert } from "./alerts.mjs";
 import {
   getOwnerSession,
   assertRequestOrigin,
@@ -251,6 +252,22 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
       }
     }
 
+    let pushAlertsSent = 0;
+    if (generated > 0) {
+      try {
+        const pushResult = await dispatchAlert(env, {
+          dedupeKey: `brief-batch:${new Date(now).toISOString().slice(0, 10)}`,
+          kind: "brief",
+          title: "Magic Folio research ready",
+          body: `${generated} new public research brief${generated === 1 ? "" : "s"} available.`,
+          url: "/"
+        });
+        pushAlertsSent = pushResult.sent || 0;
+      } catch {
+        // Scheduled research remains successful if optional push delivery is unavailable.
+      }
+    }
+
     const status = !instruments.length ? "skipped_no_new_data"
       : failed && (generated || cachedCount) ? "partial"
       : failed ? "failed"
@@ -259,12 +276,12 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
       : generated || cachedCount ? "success"
       : "skipped_no_usable_data";
     const detail = JSON.stringify({
-      candidates: instruments.length, generated, cached: cachedCount, skipped, failed, quotaExhausted
+      candidates: instruments.length, generated, cached: cachedCount, skipped, failed, quotaExhausted, pushAlertsSent
     }).slice(0, 1000);
     await env.DB.prepare(
       "UPDATE job_run SET finished_at=?,status=?,detail=? WHERE id=?"
     ).bind(new Date().toISOString(), status, detail, jobId).run();
-    return { status, candidates: instruments.length, generated, cached: cachedCount, skipped, failed, quotaExhausted };
+    return { status, candidates: instruments.length, generated, cached: cachedCount, skipped, failed, quotaExhausted, pushAlertsSent };
   } catch (error) {
     const code = error instanceof Error ? error.message : "unknown";
     await env.DB.prepare(
