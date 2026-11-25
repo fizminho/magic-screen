@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { base64url, constantTimeEqual, parseCookies, sha256Hex, handleAuthRequest, decodeClientChallenge, decodeBase64urlBytes } from "./lib/auth.mjs";
+import { base64url, constantTimeEqual, parseCookies, sha256Hex, handleAuthRequest, decodeClientChallenge, decodeBase64urlBytes, extractAttestedCredentialId } from "./lib/auth.mjs";
 
 test("base64url encodes without padding and uses URL-safe alphabet", () => {
   assert.equal(base64url(new Uint8Array([251, 255, 239])), "-__v");
@@ -112,4 +112,15 @@ test("authenticator data decoder accepts padded and unpadded base64url", () => {
   assert.deepEqual([...decodeBase64urlBytes("AQI=")], [1, 2]);
   assert.deepEqual([...decodeBase64urlBytes("AQI")], [1, 2]);
   assert.equal(decodeBase64urlBytes("%%%"), null);
+});
+
+test("registration credential ID must be present in authenticator attested data", () => {
+  const authenticatorData = new Uint8Array(58);
+  authenticatorData[32] = 0x41; // user present + attested credential data
+  authenticatorData[53] = 0;
+  authenticatorData[54] = 3;
+  authenticatorData.set([1, 2, 3], 55);
+  assert.deepEqual([...extractAttestedCredentialId(base64url(authenticatorData))], [1, 2, 3]);
+  authenticatorData[32] = 0x01;
+  assert.equal(extractAttestedCredentialId(base64url(authenticatorData)), null);
 });
