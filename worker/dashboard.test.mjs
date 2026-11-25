@@ -6,7 +6,7 @@ const origin = "https://folio.example";
 const envConfig = { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: origin };
 const cookie = `__Host-session=${"s".repeat(43)}`;
 
-function fakeDb({ authenticated = true, rows = [] } = {}) {
+function fakeDb({ authenticated = true, rows = [], maxPositionPct = null } = {}) {
   const DB = {
     prepare(sql) {
       return {
@@ -20,6 +20,7 @@ function fakeDb({ authenticated = true, rows = [] } = {}) {
               last_seen_at: new Date().toISOString()
             } : null;
           }
+          if (sql.includes("FROM setting WHERE key")) return maxPositionPct === null ? null : { value: String(maxPositionPct) };
           return null;
         },
         async all() { return { results: rows }; },
@@ -100,4 +101,34 @@ test("dashboard endpoint returns calculated metrics for the owner", async () => 
   const result = await response.json();
   assert.equal(result.holdingsCount, 1);
   assert.equal(result.markets.find((item) => item.market === "US").marketValue, 200);
+});
+
+test("dashboard emits configurable concentration and quote-quality flags", () => {
+  const result = calculateDashboard([
+    { symbol: "AAPL", market: "US", quantity: 8, price: 100, prevClose: 100, quoteStatus: "ok" },
+    { symbol: "MSFT", market: "US", quantity: 2, price: 100, prevClose: 100, quoteStatus: "stale" },
+    { symbol: "NVDA", market: "US", quantity: 1, price: null, prevClose: null, quoteStatus: "unavailable" }
+  ], 50);
+  assert.equal(result.thresholds.maxPositionPct, 50);
+  assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
+  assert.ok(result.riskFlags.some((flag) => flag.code === "stale_quotes"));
+  assert.ok(result.riskFlags.some((flag) => flag.code === "missing_quotes"));
+  assert.ok(result.riskFlags.every((flag) => flag.market === "US"));
+});
+
+test("dashboard endpoint applies the owner's configured concentration threshold", async () => {
+  const { DB } = fakeDb({
+    maxPositionPct: 20,
+    rows: [
+      { symbol: "AAPL", market: "US", sector: "Technology", quantity: 8, price: 100, quoteStatus: "ok" },
+      { symbol: "MSFT", market: "US", sector: "Technology", quantity: 2, price: 100, quoteStatus: "ok" }
+    ]
+  });
+  const response = await handleDashboardRequest(
+    new Request(`${origin}/api/dashboard`, { headers: { cookie } }),
+    { ...envConfig, DB }, "/api/dashboard"
+  );
+  const result = await response.json();
+  assert.equal(result.thresholds.maxPositionPct, 20);
+  assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
 });
