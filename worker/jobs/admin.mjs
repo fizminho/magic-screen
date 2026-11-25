@@ -26,7 +26,7 @@ export async function handleAdminJobsRequest(request, env, url, ctx) {
     if (!body || !ALLOWED_JOBS.has(body.job)) return jsonResponse({ error: "Unsupported job." }, 400);
 
     const running = await env.DB.prepare(
-      "SELECT id FROM job_run WHERE status='running' AND job IN ('sec_refresh','scheduled_research_brief','weekly_housekeeping') LIMIT 1"
+      "SELECT id FROM job_run WHERE status='running' AND job IN ('sec_refresh','manual_sec_refresh','scheduled_research_brief','manual_research_brief','weekly_housekeeping') LIMIT 1"
     ).first();
     if (running) return jsonResponse({ error: "A scheduled job is already running." }, 409);
 
