@@ -129,6 +129,7 @@ async function recordAttempt(request, env, kind, limit) {
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const ipHash = await sha256Hex(`${env.RP_ID || "local"}:${ip}`);
   const current = new Date();
+  await env.DB.prepare("DELETE FROM auth_attempt WHERE window < ?").bind(current.toISOString().slice(0, 13)).run();
   const window = kind === "verify_fail"
     ? current.toISOString().slice(0, 14) + String(Math.floor(current.getUTCMinutes() / 15) * 15).padStart(2, "0")
     : current.toISOString().slice(0, 13);
@@ -164,6 +165,8 @@ async function createSession(env, request, credentialId) {
   const token = base64url(bytes);
   const tokenHash = await sha256Hex(token);
   const now = nowIso();
+  await env.DB.prepare("DELETE FROM session WHERE expires_at <= ? OR last_seen_at <= ?")
+    .bind(now, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).run();
   await env.DB.prepare(
     "INSERT INTO session(token_hash, credential_id, created_at, expires_at, last_seen_at, user_agent) VALUES(?,?,?,?,?,?)"
   ).bind(tokenHash, credentialId, now, addSeconds(SESSION_SECONDS), now,
