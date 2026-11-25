@@ -37,7 +37,7 @@ export function validateResearchBrief(value, allowedAccessions, symbol) {
   const allText = [companySummary, ...boundedList(value.financial_strengths),
     ...boundedList(value.financial_risks), ...boundedList(value.filing_signals),
     ...boundedList(value.unknowns)].join(" ");
-  if (/\\b(?:buy|sell|hold)\\s+(?:the\\s+)?(?:stock|shares|position)\\b|\\btarget price\\b|\\bguaranteed returns?\\b/i.test(allText)) return null;
+  if (/\b(?:buy|sell|hold)\s+(?:the\s+)?(?:stock|shares|position)\b|\btarget price\b|\bguaranteed returns?\b/i.test(allText)) return null;
   const sourceAccessions = Array.isArray(value.source_accessions)
     ? [...new Set(value.source_accessions.filter((item) =>
       typeof item === "string" && allowedAccessions.has(item)
