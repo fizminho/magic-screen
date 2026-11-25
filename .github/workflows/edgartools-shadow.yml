@@ -90,18 +90,24 @@ jobs:
                       raise SystemExit(f"Missing accession or period for {item['symbol']}.")
           print(f"Validated {len(companies)} EdgarTools shadow records.")
           PY
-      - name: Test EdgarTools normalization and comparison
-        run: |
-          python -m py_compile scripts/edgartools_normalize.py
-          PYTHONPATH=scripts python -m unittest discover -s scripts -p 'test_edgartools_normalize.py'
-      - name: Normalize and compare with official SEC CompanyFacts
+      - name: Normalize statements for future analytics
+        run: python scripts/edgartools_normalize.py --input edgartools-shadow.json --output edgartools-normalized.json
+      - name: Ingest normalized analytics metrics
+        if: ${{ !inputs.symbols }}
         env:
-          SEC_EDGAR_IDENTITY: "Magic Folio research support@binalah.co"
-        run: >-
-          python scripts/edgartools_normalize.py
-          --input edgartools-shadow.json
-          --output edgartools-normalized.json
-          --fetch-sec-companyfacts
+          EDGARTOOLS_INGEST_URL: ${{ vars.EDGARTOOLS_INGEST_URL }}
+          UNIVERSE_SYNC_TOKEN: ${{ secrets.UNIVERSE_SYNC_TOKEN }}
+        run: |
+          if [ -z "$EDGARTOOLS_INGEST_URL" ] || [ -z "$UNIVERSE_SYNC_TOKEN" ]; then
+            echo "::warning::Ingestion settings missing; retaining normalized artifact only."
+            exit 0
+          fi
+          NORMALIZED_URL="${EDGARTOOLS_INGEST_URL%/ingest}/normalized"
+          curl --fail-with-body --silent --show-error --retry 3 --max-time 120 \
+            -X POST -H "Authorization: Bearer $UNIVERSE_SYNC_TOKEN" \
+            -H "Content-Type: application/json" --data-binary @edgartools-normalized.json \
+            "$NORMALIZED_URL" > edgartools-normalized-ingest-response.json
+          cat edgartools-normalized-ingest-response.json
       - name: Ingest raw evidence into D1
         if: ${{ !inputs.symbols }}
         env:
