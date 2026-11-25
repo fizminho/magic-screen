@@ -86,6 +86,8 @@ type WatchlistItem = {
   quoteStatus: "ok" | "stale" | "unavailable";
 };
 
+type JobRun = { job: "sec_refresh" | "scheduled_research_brief" | "weekly_housekeeping"; startedAt: string; finishedAt: string | null; status: string; detail: string | null };
+
 type Props = {
   onError: (message: string) => void;
   onNotice: (message: string) => void;
@@ -162,6 +164,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<string | null>(null);
   const [pushState, setPushState] = useState<"checking" | "unsupported" | "not-configured" | "not-subscribed" | "subscribed">("checking");
   const [pushBusy, setPushBusy] = useState(false);
+  const [jobRuns, setJobRuns] = useState<JobRun[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
 
   async function refreshHoldings() {
     const result = await api<{ holdings: Holding[] }>("/api/holdings");
@@ -202,6 +206,16 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   async function refreshSettings() {
     const result = await api<{ settings: PortfolioSettings }>("/api/settings");
     setSettings(result.settings);
+  }
+
+  async function refreshJobRuns() {
+    setJobsLoading(true);
+    try {
+      const result = await api<{ runs: JobRun[] }>("/api/jobs/recent");
+      setJobRuns(result.runs);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to load scheduled job history.");
+    } finally { setJobsLoading(false); }
   }
 
   async function refreshResearchInbox() {
@@ -530,6 +544,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
 
     void loadPortfolio();
     void refreshResearchInbox();
+    void refreshJobRuns();
 
     return () => {
       active = false;
@@ -683,6 +698,44 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           <p className="fine-print">Metadata only. Filing documents open directly on sec.gov. SEC lookup requires a configured contact User-Agent and is limited to 5 requests per hour.</p>
         </section>
       )}
+
+      <section className="tool-card tool-wide research-inbox">
+        <div className="watchlist-heading">
+          <div><span className="eyebrow">AUTOMATION HEALTH</span><h3>Scheduled jobs</h3></div>
+          <button className="button button-small" type="button" onClick={refreshJobRuns} disabled={jobsLoading}>
+            {jobsLoading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+        {jobsLoading ? <p>Loading job history…</p> :
+          jobRuns.length === 0 ? <p>No scheduled job runs have been recorded yet.</p> :
+          <div className="research-inbox-list">
+            {jobRuns.map((run, index) => {
+              const labels: Record<JobRun["job"], string> = {
+                sec_refresh: "SEC data refresh",
+                scheduled_research_brief: "AI research briefs",
+                weekly_housekeeping: "Weekly housekeeping"
+              };
+              let detail = run.detail || "No run details.";
+              try {
+                const parsed = JSON.parse(detail) as Record<string, unknown>;
+                detail = Object.entries(parsed).map(([key, value]) => `${key}: ${String(value)}`).join(" · ");
+              } catch { /* Keep the stored error summary. */ }
+              return (
+                <article className="research-inbox-item" key={`${run.job}:${run.startedAt}:${index}`}>
+                  <div className="research-inbox-meta">
+                    <b>{labels[run.job]}</b>
+                    <span className={`confidence confidence-${run.status === "success" ? "high" : run.status === "running" ? "medium" : "low"}`}>{run.status.replaceAll("_", " ")}</span>
+                    <small>{formatDate(run.startedAt)}</small>
+                  </div>
+                  <p>{detail || "No additional details."}</p>
+                  {run.finishedAt && <small>Finished {formatDate(run.finishedAt)}</small>}
+                </article>
+              );
+            })}
+          </div>
+        }
+        <p className="fine-print">Latest 20 runs. A running job without a finish time may still be processing or may have been interrupted.</p>
+      </section>
 
       <section className="tool-card tool-wide research-inbox">
         <div className="watchlist-heading">

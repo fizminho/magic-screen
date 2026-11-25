@@ -23,6 +23,8 @@ import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
 import { handleAnalysisRequest, runScheduledResearchBrief } from "./lib/analysis.mjs";
 // @ts-ignore Web Push cryptography and routes are covered by Node regression tests.
 import { handlePushRequest } from "./lib/push.mjs";
+// @ts-ignore Scheduled job history is covered by Node regression tests.
+import { handleJobRunsRequest } from "./lib/jobs.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -65,6 +67,8 @@ export default {
       response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/inbox" || url.pathname === "/api/analysis/run") {
       response = await handleAnalysisRequest(request, env, url);
+    } else if (url.pathname === "/api/jobs/recent") {
+      response = await handleJobRunsRequest(request, env, url);
     } else if (url.pathname.startsWith("/api/push/")) {
       response = await handlePushRequest(request, env, url);
     } else if (url.pathname === "/api/settings") {
