@@ -78,7 +78,7 @@ The SEC `User-Agent` contact value must be configured by the owner before SEC re
 
 ## News and issuer announcements
 
-No general publisher-news RSS scraper is approved for the app. The Star RSS page describes personal, non-commercial RSS use, but its broader terms restrict online reuse and prohibit use of its content in AI/RAG without permission. The Edge and Bernama also impose restrictions on copying, storing or republishing their content. Do not ingest those feeds into D1 or send their content to Gemini without written permission.
+No general publisher-news RSS scraper is approved for the app. The Star RSS page describes personal, non-commercial RSS use, but its broader terms restrict online reuse and prohibit use of its content in AI/RAG without permission. The Edge and Bernama also impose restrictions on copying, storing or republishing their content. Do not ingest those feeds into D1 or send their content to any AI model without written permission.
 
 For the first release:
 - Use official SEC filings for US issuer event/filing alerts.
@@ -103,4 +103,26 @@ References:
 
 ## AI provider
 
-Gemini has not been wired into the replacement Worker yet. Before implementation, re-check Google's current API terms, free-tier quotas and data-use terms. Do not send provider raw quote data, holdings quantities, cost basis, credentials or identity to an LLM. Prefer derived metrics and filing metadata only, and preserve source attribution.
+### Google Gemini API
+Rejected for this app's current personal-consumer use. The Gemini API terms effective 23 March 2026 describe the service as intended for professional/business use, not consumer use. Google also states that Free Tier prompts and responses may be used to improve its products and may be reviewed by humans. Do not integrate Gemini Free or send personal portfolio data to it.
+
+References:
+- https://ai.google.dev/gemini-api/terms
+- https://ai.google.dev/gemini-api/docs/pricing
+
+### Cloudflare Workers AI
+Selected for the private research brief, subject to the following boundaries:
+
+- Use the Cloudflare Workers AI binding with model `@cf/zai-org/glm-4.7-flash`. Cloudflare lists this model as available on the Workers Free plan.
+- Workers Free includes 10,000 Neurons/day at no charge; requests fail when the free allocation is exhausted unless the account is upgraded. Do not enable paid billing or prepaid credits for this project without explicit owner approval.
+- Cloudflare's Workers AI data-usage commitment states zero retention for standard inference and that Customer Content is not used to train AI models. Stateful features, logging or application caching can change retention, so do not enable AI Gateway logging or log raw prompts/responses.
+- The GLM-4.7-Flash model is listed with an MIT licence. Cloudflare hosts the model; review its model licence and Cloudflare terms before changes.
+- AI input is restricted to public SEC companyfacts and public SEC filing metadata. Do not send holding/watchlist status, quantities, average cost, personal notes, portfolio weights, account identifiers, provider tokens, personal settings or MarketData.app quote data.
+- AI output is a public-company research brief only. No personalized buy/sell recommendation, target price or guaranteed-return statement. Every cited accession must be present in the supplied SEC source set.
+
+References:
+- https://developers.cloudflare.com/workers-ai/platform/pricing/
+- https://developers.cloudflare.com/workers-ai/platform/data-usage/
+- https://developers.cloudflare.com/workers-ai/models/glm-4.7-flash/
+- https://huggingface.co/zai-org/GLM-4.7-Flash
+- https://developers.cloudflare.com/workers-ai/changelog/product/workers-ai/
