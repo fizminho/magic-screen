@@ -38,7 +38,7 @@ export default {
       response = await handleAuthRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/quotes/")) {
       response = await handleQuoteRequest(request, env, url.pathname);
-    } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/")) {
+    } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/") || url.pathname === "/api/watchlist" || url.pathname.startsWith("/api/watchlist/")) {
       response = await handlePortfolioRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/")) {
       response = new Response(JSON.stringify({ error: "Not found." }), {
