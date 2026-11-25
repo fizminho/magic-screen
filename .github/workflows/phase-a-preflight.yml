@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   baseline:
-    if: ${{ hashFiles('package-lock.json') != '' }}
     name: Install, build, audit and regression tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -21,12 +20,17 @@ jobs:
         with:
           node-version: 22
       - name: Install locked dependencies
+        if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm ci --no-audit --no-fund
       - name: Build
+        if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm run build
       - name: Audit production dependencies
+        if: ${{ hashFiles('package-lock.json') != '' }}
         run: npm audit --omit=dev --audit-level=high
       - name: Run complete Node regression suite
+        if: ${{ hashFiles('package-lock.json') != '' }}
         run: node --experimental-strip-types --test worker/*.test.mjs
       - name: Validate Wrangler bundling and assets without deploying
+        if: ${{ hashFiles('package-lock.json') != '' }}
         run: npx --yes wrangler@4 deploy --dry-run
