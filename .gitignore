@@ -16,3 +16,4 @@ __pycache__
 *.pyc
 data/*.json
 dist-reports
+backup-*.sql
