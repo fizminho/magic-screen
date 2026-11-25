@@ -9,7 +9,7 @@ The owner explicitly authorized a complete clean rebuild of the existing `magic-
 - The replacement schema is defined across `migrations/0002_portfolio_schema.sql` through the current numbered migrations.
 - The one-time reset is implemented by `scripts/reset-production-d1.sh` and `.github/workflows/reset-production-d1.yml`.
 - The production workflow requires the exact manual confirmation `DROP-ALL-LEGACY-DATA`, can run only from `main`, explicitly sets `D1_SCOPE=--remote`, verifies the RP configuration and temporary setup secret, runs build/audit/tests/Wrangler dry-run, enumerates actual user tables, drops them, reapplies migrations, deploys and checks `/api/health`.
-- The script is also exercised against a local D1 database in CI. It has successfully removed and recreated a local database with 17 tables. This is **not** a production reset.
+- The script is also exercised against a local D1 database in CI. It has successfully removed and recreated a local database with the full current migration schema. This is **not** a production reset.
 - No production D1 data has been changed by this implementation.
 
 The normal deployment workflow applies pending migrations and deploys. It does **not** perform a blanket reset. The one-time destructive reset remains a separate manual cutover.
