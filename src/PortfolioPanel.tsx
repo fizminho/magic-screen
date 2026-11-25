@@ -355,10 +355,10 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
 
       <div className="holdings-table-wrap">
         <table className="holdings-table">
-          <thead><tr><th>Instrument</th><th>Quantity</th><th>Avg. cost</th><th>Latest quote</th><th>Source / as of</th><th></th></tr></thead>
+          <thead><tr><th>Instrument</th><th>Quantity</th><th>Avg. cost</th><th>Latest quote</th><th>Source / as of</th><th>SEC filings</th><th></th></tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={6} className="empty-cell">Loading holdings…</td></tr> :
-              holdings.length === 0 ? <tr><td colSpan={6} className="empty-cell">No holdings yet. Add your first US or Bursa position below.</td></tr> :
+            {loading ? <tr><td colSpan={7} className="empty-cell">Loading holdings…</td></tr> :
+              holdings.length === 0 ? <tr><td colSpan={7} className="empty-cell">No holdings yet. Add your first US or Bursa position below.</td></tr> :
               holdings.map((item) => (
                 <tr key={`${item.market}:${item.symbol}`}>
                   <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
@@ -366,6 +366,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <td>{formatMoney(item.avgCost, item.currency)}</td>
                   <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
                   <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
+                  <td>{item.market === "US" && item.cik ? <button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading}>{secLoading && secSymbol === item.symbol ? "Loading…" : "Filings"}</button> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                   <td><button className="button button-danger button-small" onClick={() => removeHolding(item)} disabled={busy}>Remove</button></td>
                 </tr>
               ))
@@ -381,16 +382,17 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
         </div>
         <div className="holdings-table-wrap">
           <table className="holdings-table watchlist-table">
-            <thead><tr><th>Instrument</th><th>Latest quote</th><th>Source / as of</th><th>Note</th><th></th></tr></thead>
+            <thead><tr><th>Instrument</th><th>Latest quote</th><th>Source / as of</th><th>Note</th><th>SEC filings</th><th></th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={5} className="empty-cell">Loading watchlist…</td></tr> :
-                watchlist.length === 0 ? <tr><td colSpan={5} className="empty-cell">Nothing on your watchlist yet.</td></tr> :
+              {loading ? <tr><td colSpan={6} className="empty-cell">Loading watchlist…</td></tr> :
+                watchlist.length === 0 ? <tr><td colSpan={6} className="empty-cell">Nothing on your watchlist yet.</td></tr> :
                 watchlist.map((item) => (
                   <tr key={`${item.market}:${item.symbol}`}>
                     <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
                     <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
                     <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
                     <td>{item.note || " "}</td>
+                    <td>{item.market === "US" && item.cik ? <button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading}>{secLoading && secSymbol === item.symbol ? "Loading…" : "Filings"}</button> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                     <td><button className="button button-danger button-small" onClick={() => removeWatchlistItem(item)} disabled={busy}>Remove</button></td>
                   </tr>
                 ))
@@ -402,9 +404,30 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           <label>Market<select value={watchMarket} onChange={(event) => setWatchMarket(event.target.value as "US" | "MY")}><option value="US">United States</option><option value="MY">Bursa Malaysia</option></select></label>
           <label>Symbol<input value={watchSymbol} onChange={(event) => setWatchSymbol(event.target.value.toUpperCase())} maxLength={15} placeholder={watchMarket === "US" ? "MSFT" : "1155"} required /></label>
           <label className="watch-note">Note<input value={watchNote} onChange={(event) => setWatchNote(event.target.value)} maxLength={500} placeholder="Optional reminder" /></label>
+          {watchMarket === "US" && <label>SEC CIK<input inputMode="numeric" maxLength={10} value={watchCik} onChange={(event) => setWatchCik(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} placeholder="Optional 10-digit CIK" /></label>}
           <button className="button button-secondary" type="submit" disabled={busy || (watchlist.length >= 50 && !existingWatchlistItem)}>Add to watchlist</button>
         </form>
       </section>
+
+      {secSymbol && (
+        <section className="tool-card tool-wide sec-filings-panel">
+          <div className="watchlist-heading">
+            <div><span className="eyebrow">OFFICIAL REGULATORY FILINGS</span><h3>{secCompanyName} · {secSymbol}</h3></div>
+            <button className="button button-quiet button-small" onClick={() => { setSecSymbol(""); setSecFilings([]); }}>Close</button>
+          </div>
+          {secFilings.length === 0 ? <p>No matching SEC filings from the last 30 days.</p> :
+            <div className="sec-filing-list">
+              {secFilings.map((filing) => (
+                <article className="sec-filing-row" key={filing.accessionNumber}>
+                  <div><b>{filing.form}</b><span>{filing.title}</span><small>{filing.summary}</small></div>
+                  <div><small>Filed {filing.filingDate}</small><a href={filing.url} target="_blank" rel="noreferrer">Open SEC filing</a></div>
+                </article>
+              ))}
+            </div>
+          }
+          <p className="fine-print">Metadata only. Filing documents open directly on sec.gov. SEC lookup requires a configured contact User-Agent and is limited to 5 requests per hour.</p>
+        </section>
+      )}
 
       <div className="portfolio-tools">
         <section className="tool-card">
@@ -415,6 +438,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             <label>Symbol<input value={symbol} onChange={(event) => setSymbol(event.target.value.toUpperCase())} placeholder={market === "US" ? "AAPL" : "1155"} maxLength={15} required /></label>
             <label>Quantity<input type="number" min="0.000001" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="100" required /></label>
             <label>Average cost<input type="number" min="0" step="any" value={avgCost} onChange={(event) => setAvgCost(event.target.value)} placeholder="Optional" /></label>
+            {market === "US" && <label>SEC CIK (optional)<input inputMode="numeric" maxLength={10} value={cik} onChange={(event) => setCik(event.target.value.replace(/[^0-9]/g, "").slice(0, 10))} placeholder="10-digit CIK" /></label>}
+            {market === "US" && <p className="field-wide fine-print">Find the CIK on <a href="https://www.sec.gov/edgar/search/" target="_blank" rel="noreferrer">SEC EDGAR company search</a>.</p>}
             <label className="field-wide">Notes<input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} placeholder="Optional private note" /></label>
             <button className="button button-primary field-wide" type="submit" disabled={busy || (holdings.length >= 20 && !existingHolding)}>Save holding</button>
           </form>
