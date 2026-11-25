@@ -160,10 +160,11 @@ jobs:
                   echo "$output"
                   return 1
                 fi
-                if echo "$json" | jq -e '.. | objects | select(.status? == "clean")' >/dev/null; then
+                remaining="$(echo "$json" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
+                if [[ "$remaining" == "0" ]]; then
                   return 0
                 fi
-                echo "::error::$label cache cleanup did not return clean."
+                echo "::error::$label cache cleanup still contains $remaining matching row(s)."
                 return 1
               fi
               echo "::warning::$label cleanup query failed on attempt $attempt:"
