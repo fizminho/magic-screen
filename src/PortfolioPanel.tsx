@@ -37,7 +37,7 @@ type DashboardMarket = {
   sectorWeights: Array<{ sector: string; value: number; weightPct: number }>;
 };
 type Dashboard = {
-  thresholds: { maxPositionPct: number };
+  thresholds: { maxPositionPct: number; alertMovePct: number };
   riskFlags: Array<{ market: "US" | "MY"; severity: "warning" | "caution"; code: string; message: string }>;
   holdingsCount: number;
   staleQuoteCount: number;
@@ -418,7 +418,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           })}
         </div>
         <div className="risk-flags" aria-live="polite">
-          <span className="eyebrow">RULE-BASED FLAGS · POSITION LIMIT {dashboard?.thresholds.maxPositionPct ?? settings.maxPositionPct}%</span>
+          <span className="eyebrow">RULE-BASED FLAGS · POSITION LIMIT {dashboard?.thresholds.maxPositionPct ?? settings.maxPositionPct}% · MOVE ALERT {dashboard?.thresholds.alertMovePct ?? settings.alertMovePct}%</span>
           {!dashboard ? <p>Checking portfolio rules…</p> :
             dashboard.riskFlags.length === 0 ? <p>No concentration or quote-quality flags at the moment.</p> :
             dashboard.riskFlags.map((flag, index) => (
@@ -572,7 +572,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
               onChange={(event) => setSettings((current) => ({ ...current, maxPositionPct: Number(event.target.value) }))} required /></label>
             <button className="button button-secondary field-wide" type="submit" disabled={busy}>Save settings</button>
           </form>
-          <p className="fine-print">Position size is used for rule-based concentration warnings. Daily move threshold is stored for the planned alert service; push notifications are not active yet.</p>
+          <p className="fine-print">Position size is used for rule-based concentration warnings. Daily move and position-size thresholds power local rule-based warnings. Push notifications are not active yet.</p>
           <div className="tool-actions">
             <a className="button button-secondary" href="/api/export?format=json">Download JSON</a>
             <a className="button button-quiet" href="/api/export?format=csv">Download CSV</a>
