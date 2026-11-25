@@ -11,7 +11,8 @@ function fakeDb({
   count = 1,
   authenticated = true,
   cache = null,
-  filings = []
+  filings = [],
+  instrument = undefined
 } = {}) {
   const calls = { batch: 0, statements: [], queries: [] };
   const DB = {
@@ -31,7 +32,7 @@ function fakeDb({
             } : null;
           }
           if (sql.includes("SELECT count FROM auth_attempt")) return { count };
-          if (sql.includes("FROM instrument")) return cik ? { id: 7, cik } : null;
+          if (sql.includes("FROM instrument")) return instrument === undefined ? { id: 7, cik } : instrument;
           if (sql.includes("FROM sec_fetch_cache")) return cache;
           return null;
         },
@@ -109,7 +110,7 @@ test("SEC filings endpoint fails closed without a real contact User-Agent", asyn
 });
 
 test("SEC filings endpoint requires a CIK on an active US instrument", async () => {
-  const { DB } = fakeDb({ cik: null });
+  const { DB } = fakeDb({ instrument: { id: 7, cik: null } });
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
     { DB, SEC_USER_AGENT: userAgent },
@@ -159,4 +160,49 @@ test("SEC lookup is rate-limited and handles SEC upstream throttling", async () 
     async () => new Response("{}", { status: 429 })
   );
   assert.equal(upstream.status, 503);
+});
+
+test("fresh SEC filing metadata is served from D1 without an upstream request", async () => {
+  const fetchedAt = new Date().toISOString();
+  const { DB, calls } = fakeDb({
+    cache: { fetchedAt, companyName: "Apple Inc." },
+    filings: [{
+      form: "10-Q", title: "AAPL · 10-Q filed 2026-11-24", summary: "Quarterly report.",
+      filingDate: "2026-11-24", reportDate: "2026-09-30",
+      accessionNumber: "0000320193-26-123456", primaryDocument: "aapl.htm",
+      fetchedAt, url: "https://www.sec.gov/Archives/edgar/data/320193/000032019326123456/aapl.htm"
+    }]
+  });
+  let fetchCalls = 0;
+  const response = await handleSecRequest(
+    new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
+    { DB, SEC_USER_AGENT: userAgent },
+    new URL(`${origin}/api/sec/filings?symbol=AAPL`),
+    async () => { fetchCalls++; throw new Error("cache should be used"); }
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.cached, true);
+  assert.equal(body.companyName, "Apple Inc.");
+  assert.equal(body.filings.length, 1);
+  assert.equal(fetchCalls, 0);
+  assert.equal(calls.batch, 0);
+});
+
+test("SEC cache miss persists filing metadata and a six-hour cache marker", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handleSecRequest(
+    new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
+    { DB, SEC_USER_AGENT: userAgent },
+    new URL(`${origin}/api/sec/filings?symbol=AAPL`),
+    async () => new Response(JSON.stringify(submissions()), { status: 200 })
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.cached, false);
+  assert.equal(body.filings.length, 2);
+  assert.equal(calls.batch, 1);
+  assert.equal(calls.statements.length, 4);
+  assert.match(calls.statements[1].sql, /INSERT INTO sec_filing/);
+  assert.match(calls.statements[3].sql, /INSERT INTO sec_fetch_cache/);
 });
