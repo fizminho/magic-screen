@@ -608,7 +608,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
               holdings.length === 0 ? <tr><td colSpan={7} className="empty-cell">No holdings yet. Add your first US or Bursa position below.</td></tr> :
               holdings.map((item) => (
                 <tr key={`${item.market}:${item.symbol}`}>
-                  <td><b>{item.brief.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
+                  <td><b>{item.symbol}</b><span className="market-tag">{item.market} · {item.currency}</span></td>
                   <td>{item.quantity.toLocaleString()}</td>
                   <td>{formatMoney(item.avgCost, item.currency)}</td>
                   <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
@@ -692,7 +692,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             {researchInbox.map((item) => (
               <article className="research-inbox-item" key={`${item.brief.symbol}:${item.createdAt}`}>
                 <div className="research-inbox-meta">
-                  <b>{item.symbol}</b>
+                  <b>{item.brief.symbol}</b>
                   <span className={`confidence confidence-${item.brief.confidence}`}>{item.brief.confidence} confidence</span>
                   <small>{formatDate(item.createdAt)}</small>
                 </div>
