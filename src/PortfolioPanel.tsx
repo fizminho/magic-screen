@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { fetchMarketDataQuotes } from "./providers/marketdata";
 import { parseManualQuotesCsv } from "./providers/manual-csv";
 import type { QuoteSnapshot } from "./providers/types";
@@ -87,7 +87,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     onError("");
   }
 
-  async function addHolding(event: React.FormEvent<HTMLFormElement>) {
+  async function addHolding(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onError(""); onNotice(""); setBusy(true);
     try {
