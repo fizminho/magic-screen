@@ -217,26 +217,27 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 - [x] **Recovery (document in `SECURITY.md`).** Documented the passkey-only recovery procedure in `SECURITY.md` and `docs/SETUP.md`; it clears only passkeys and sessions, leaving holdings intact. Strong Cloudflare account 2FA/passkey is documented.
 - [ ] **Device matrix** (record results in `docs/SETUP.md`): Android Chrome (browser and installed PWA), iOS Safari and the Home Screen PWA, desktop Chrome/Edge. If a passkey created in Safari does not work in the installed iOS PWA, log it in `docs/BLOCKERS.md` rather than assuming it works.
 
-### E2. Data providers
-- [ ] `QuoteProvider` interface: `getQuotes(symbols[]) → {symbol, price, prevClose, asOf, status}`. Implement one adapter using a Yahoo-style public chart endpoint. Bursa symbols use the `.KL` suffix (e.g. `1155.KL`); US use plain tickers. **Verify both on a real call before coding around them.** This endpoint is unofficial with no SLA; record that in `docs/DATA_SOURCES.md`.
-- [ ] Batch where the provider allows; otherwise process ≤ 25 symbols per run using a rotating cursor stored in `setting`.
-- [ ] Bursa quotes are **15-minute delayed**; label them "delayed" in the UI and in alert text.
-- [ ] Mark every quote with `status` (`ok`, `stale`, `unavailable`). Never fabricate or carry a stale number silently; the UI must show "as of".
-- [ ] News adapters (RSS/Atom only, no HTML scraping): Google News RSS per company/ticker query, Yahoo Finance RSS per ticker, and 2–3 Malaysian business RSS feeds (e.g. The Edge Malaysia, The Star, Bernama; **verify each URL is live and terms allow personal use**). US filings: SEC EDGAR submissions API (official; requires a descriptive `User-Agent` with contact email, set as a var).
-- [ ] Dedupe on `url_hash` (SHA-256 of normalised URL). Match items to instruments by ticker/company name. Keep only items from the last 72 h for analysis, 30 days for storage.
+### E2. Data providers (terms-first; no scraping)
+
+- [ ] `QuoteProvider` interface: `getQuotes(symbols[]) → {symbol, price, prevClose, currency, asOf, source, status}`. Preserve provider timestamps and never label delayed prices as live.
+- [ ] **US optional adapter:** MarketData.app Free Forever, only after the owner creates their own account and supplies their API token. Free tier is 100 credits/day and at least 24-hour delayed, with one year of history. The terms permit personal dashboards accessible only by the owner, but prohibit redistribution and require one source IP at a time. Use the provider's documented public API directly from the authenticated owner's browser (CORS is explicitly supported for personal dashboards); keep the token in session memory/sessionStorage only, never in D1, Worker secrets, Git or the frontend bundle. Do not fetch simultaneously from multiple devices. After a browser refresh, store only the returned quote snapshot in owner-only D1; other devices read that snapshot. Preserve `updated` and label it `24h delayed`. Cap requests below the 100-credit daily allowance.
+- [ ] **Bursa Malaysia:** no free, clearly licensed API is approved. Do not scrape Bursa pages, broker websites or undocumented endpoints. Support manual price entry and CSV import from the owner's own broker, subject to the broker's personal-use terms. Preserve import source and date. A licensed Bursa feed requires an explicit licence and owner approval.
+- [ ] Do not use Yahoo Finance chart endpoints/`yfinance` (automated collection is prohibited without prior permission), FMP free data for UI display (separate display licence required), or Alpha Vantage until its terms are clarified in writing. See `docs/DATA_SOURCES.md`.
+- [ ] **US filings:** use only official SEC EDGAR submissions and companyfacts APIs for portfolio CIKs. Configure `SEC_USER_AGENT` with app name and the owner's contact address. Target ≤2 requests/second, never exceed SEC's 10 requests/second fair-access ceiling, handle 429 and cache responses. Store filing metadata and official SEC links; do not mirror the whole EDGAR archive.
+- [ ] **News:** no publisher RSS or HTML scraping until the publisher's terms explicitly allow private-app storage and display. The initial source is SEC filings; Bursa/issuer announcements are owner-saved official links. Do not ingest The Edge, The Star, Bernama, Google News or Yahoo feeds into D1 or send their article text to Gemini without written permission.
+- [ ] Dedupe filing/link items on `url_hash` (SHA-256 of normalised URL). Match SEC filings to CIK/ticker. Keep filing metadata for 30 days unless pinned by the owner.
 - [ ] Wrap every external fetch: timeout 8 s, one retry max, failures logged to `job_run` and never thrown to the user.
 
-### E3. Cron jobs (all UTC; free plan allows 5, we use 4)
+### E3. Cron jobs (all UTC; Cloudflare free plan, 2 scheduled jobs)
 
 | Cron | Purpose |
 |---|---|
-| `*/30 1-9,13-21 * * 1-5` | Refresh quotes + news, evaluate alerts. Handler checks `schedule.ts` and only works on markets that are open (Bursa 01:00–09:00 UTC = 09:00–17:00 MYT; US 13:30–21:00 UTC covers EST and EDT) |
-| `30 0 * * 1-5` | Bursa morning brief (08:30 MYT) |
-| `0 13 * * 1-5` | US pre-market brief (08:00 ET in winter, 09:00 ET in summer) |
-| `0 2 * * 6` | Weekly recommendations + housekeeping (prune news > 30 days, old `alert_log`, old `job_run`) |
+| `0 1 * * 2-6` | Refresh SEC submissions for owned US tickers; evaluate filing alerts and prepare the daily brief after the previous US session |
+| `0 2 * * 6` | Weekly recommendations + housekeeping (prune unpinned filing metadata > 30 days, expired `alert_log`, old `job_run`, expired challenges and rate-limit windows) |
 
+- [ ] US quote refresh is manual from the owner's browser because the approved free provider enforces a single source IP and 24-hour delay. Bursa quotes are manual/CSV. Do not schedule quote-provider requests from Cloudflare Workers.
 - [ ] Implement `scheduled(controller, env, ctx)` switching on `controller.cron`.
-- [ ] Skip public holidays gracefully: if a market's quotes are unchanged all day, skip the brief and log `skipped_holiday`. Do not hardcode holiday lists.
+- [ ] Skip weekends/public holidays gracefully: if there are no new filings or usable quote snapshots, skip the brief and log `skipped_no_new_data`. Do not hardcode holiday lists.
 - [ ] Each job writes one `job_run` row (start, end, status, short detail). Use `ctx.waitUntil` only for fire-and-forget tails.
 - [ ] Use `env.DB.batch([...])` for multi-row writes. Stay under ~40 subrequests and ~50 D1 queries per invocation.
 
