@@ -55,14 +55,16 @@ References:
 - Use the official `data.sec.gov` submissions and companyfacts JSON APIs, plus official EDGAR filing archive links.
 - No API key is required. Every request must identify the application/operator in a descriptive `User-Agent` with a contact address.
 - SEC fair-access guidance sets a maximum of 10 requests/second across all machines. Magic Folio should stay well below this (target no more than 2 requests/second), fetch only portfolio CIKs, cache responses and respect 429 responses.
-- Store filing metadata (CIK, accession number, form, filed date, primary document and official SEC URL). Do not crawl the whole EDGAR site or mirror filings unnecessarily.
+- The owner enters a 1–10 digit CIK on a US holding/watchlist item; the Worker normalizes it to 10 digits. SEC's ticker/CIK association file is periodically updated but not guaranteed accurate or complete, so the app does not silently infer CIKs.
+- The on-demand owner-only endpoint fetches the company's submissions JSON, returns selected recent form metadata and official SEC URLs, and does not mirror full filings or persist article bodies. It is rate-limited to 5 lookups/hour per source IP.
+- Store filing metadata (CIK, accession number, form, filed date, primary document and official SEC URL) only if a later news/alert phase requires persistence. Do not crawl the whole EDGAR site or mirror filings unnecessarily.
 
 References:
 - https://www.sec.gov/about/developer-resources
 - https://www.sec.gov/about/webmaster-frequently-asked-questions
 - https://www.sec.gov/Archives/edgar/data/
 
-The SEC `User-Agent` contact value must be configured by the owner before automated SEC requests are enabled. Do not invent a contact email.
+The SEC `User-Agent` contact value must be configured by the owner before SEC requests are enabled. It must include the app name and the owner's real contact email. Do not use a placeholder or invent a contact email. The API stays disabled when this variable is missing.
 
 ## News and issuer announcements
 
