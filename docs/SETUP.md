@@ -27,8 +27,8 @@ npm run cf:dev
 ## First production passkey
 
 1. Confirm the final production hostname. Passkeys are bound to `RP_ID`; changing the hostname later requires re-registration.
-2. Configure `RP_ID` as the hostname only and `RP_ORIGIN` as the exact HTTPS origin in Worker vars.
-3. Generate a long random setup token and set it as the Cloudflare Worker secret named `SETUP_TOKEN`. Do not put it in `wrangler.toml`, GitHub vars or frontend code.
+2. Configure `RP_ID` as the hostname only, `RP_NAME=Magic Folio` and `RP_ORIGIN` as the exact HTTPS origin in Worker vars.
+3. Generate a 256-bit base64url token with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`, then set it using `npx wrangler secret put SETUP_TOKEN`. Do not put it in `wrangler.toml`, GitHub vars or frontend code.
 4. Deploy the replacement Worker and verify `/api/health`.
 5. Open the site in a supported HTTPS browser and enter the setup token once to create the first passkey.
 6. Sign in and add a second passkey on a separate device.
