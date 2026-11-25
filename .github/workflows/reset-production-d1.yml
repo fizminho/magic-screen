@@ -1,0 +1,51 @@
+name: One-time production D1 reset and cutover
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_reset:
+        description: Type DROP-ALL-LEGACY-DATA to permanently erase all user tables in magic-screen-db
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: magic-folio-production-cutover
+  cancel-in-progress: false
+
+jobs:
+  reset-and-deploy:
+    if: inputs.confirm_reset == 'DROP-ALL-LEGACY-DATA'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CONFIRM_PRODUCTION_RESET: ${{ inputs.confirm_reset }}
+      D1_DATABASE_NAME: magic-screen-db
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Verify credentials and ensure legacy product routes are gone
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          if grep -Eqi '/api/mfi/screen|/api/stocks|/api/pipeline/status|MFI_SESSION_COOKIE|syncMagicFormulaUniverse' worker/index.ts; then
+            echo "::error::Refusing production reset: legacy MFI Worker code is still present."
+            exit 1
+          fi
+          test -f migrations/0001_drop_legacy.sql
+          test -f migrations/0002_portfolio_schema.sql
+      - name: Install and build the replacement application
+        run: npm install --no-audit --no-fund && npm run build
+      - name: Reset all production D1 user tables and apply clean schema
+        run: bash scripts/reset-production-d1.sh
+      - name: Deploy the replacement Worker and assets
+        run: npx --yes wrangler@4 deploy
+
