@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "@passwordless-id/webauthn": "2.4.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261121.1",
