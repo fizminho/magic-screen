@@ -13,7 +13,7 @@ Magic Folio is a private, single-owner portfolio research workspace for US and B
 
 ## Current rebuild status
 
-The legacy screener UI and public MFI Worker endpoints have been removed from the rebuild branch. The current frontend is a clean Magic Folio shell. Backend portfolio APIs, passkey authentication, data providers, push alerts and AI analysis are implemented in later runbook phases.
+The legacy screener UI and public MFI Worker endpoints have been removed. The replacement Worker now serves passkey-only first-run setup, sign-in, credential management and session controls. Portfolio/holdings APIs, market data, news, scheduled jobs, push alerts and Gemini analysis remain later runbook phases.
 
 The D1 schema is defined in `migrations/`. A one-time production reset is separately guarded by `.github/workflows/reset-production-d1.yml` and requires the exact manual confirmation `DROP-ALL-LEGACY-DATA`. It is not run by ordinary deployments.
 
