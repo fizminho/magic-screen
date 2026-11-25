@@ -8,7 +8,7 @@
 - Passkey-only single-owner authentication using `@passwordless-id/webauthn`.
 - Optional MarketData.app Free Forever browser adapter for US delayed quotes.
 - Manual CSV imports for Bursa Malaysia quotes.
-- Gemini free tier is a future option only, subject to current provider terms and quotas.
+- Cloudflare Workers AI is the selected future analysis provider. It uses the Worker AI binding and does not require an external API key. The Workers Free allocation is 10,000 Neurons/day; do not enable paid billing or prepaid credits without owner approval.
 - Official SEC EDGAR filings are the planned US filing source.
 
 ## Local development
@@ -77,7 +77,7 @@ The one-time production reset is a separate manual workflow. It permanently remo
 
 ## Secrets
 
-Configure runtime credentials as Cloudflare Worker secrets only when the corresponding feature requires them. Never put Gemini, VAPID private, setup or session secrets in frontend variables, source files or GitHub artifacts.
+Configure runtime credentials as Cloudflare Worker secrets only when the corresponding feature requires them. Workers AI uses a Cloudflare binding, not a model API key. Never put VAPID private, setup or session secrets in frontend variables, source files or GitHub artifacts.
 
 ## Verification
 
