@@ -70,6 +70,9 @@ test("JSON export includes holdings watchlist and settings", async () => {
     { ...envConfig, DB }, new URL(`${origin}/api/export`)
   );
   assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-disposition"), /attachment; filename="magic-folio-\\d{4}-\\d{2}-\\d{2}\\.json"/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   const body = await response.json();
   assert.equal(body.holdings.length, 1);
   assert.equal(body.watchlist.length, 1);
