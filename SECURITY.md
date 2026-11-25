@@ -1,15 +1,26 @@
 # Security
 
-Magic Folio is designed as a private, single-owner portfolio research application. The rebuild is in progress; do not expose personal portfolio APIs until passkey authentication and authorization checks are implemented and tested.
+Magic Folio is a private, single-owner portfolio research application. Portfolio routes must remain unavailable until each route is explicitly protected by the owner session.
 
-## Security requirements
+## Authentication model
 
-- Passkey-only authentication using a reviewed WebAuthn implementation. No password fallback.
-- First-run registration must require a temporary setup secret. After owner enrollment, remove that secret.
-- Store only hashed session tokens; use secure, HttpOnly, SameSite cookies.
+- Passkey-only authentication using `@passwordless-id/webauthn`; no password login or password fallback.
+- WebAuthn registration and authentication require user verification, the expected challenge, exact origin, RP ID hash and a valid signature.
+- Challenges are cryptographically random, expire after 120 seconds and are consumed once.
+- The first passkey requires the temporary `SETUP_TOKEN` Worker secret. Subsequent passkeys require an authenticated owner session.
+- Register at least two passkeys on separate devices before removing `SETUP_TOKEN`.
+- Session cookies are HttpOnly and SameSite=Strict. Production uses the `__Host-session` cookie with Secure and Path=/; local development uses a non-`__Host-` cookie over localhost.
+- D1 stores only SHA-256 session-token hashes. Sessions expire after 7 days idle or 30 days absolute. Last-seen writes are throttled to once per hour.
+- Auth endpoints require the exact configured Origin and JSON content type for state-changing requests. Challenges and failed-verification attempts are rate limited.
+- Credential counters are checked when authenticators provide a non-zero counter. Synced passkeys that report zero remain supported.
+- Do not delete the final passkey. Credential management endpoints must enforce that invariant when implemented.
+
+## Data and API boundaries
+
 - Require an authenticated owner session for all portfolio, settings, export, push-subscription and AI-analysis endpoints.
-- Rate-limit authentication challenge and verification endpoints.
-- Never send holding quantities, session tokens, passkey material, provider credentials or setup secrets to an LLM.
+- Keep authentication state and health endpoints minimal. Return generic public errors.
+- Store only hashed session tokens; never log challenge payloads, credential public keys or session tokens.
+- Never send holding quantities, cost basis, session tokens, passkey material, provider credentials or setup secrets to an LLM.
 - Treat quote, news, RSS and user-supplied text as untrusted data.
 - Keep API keys in Worker secrets, never in frontend bundles or Git.
 - Use parameterized D1 queries and schema migrations. Do not execute DDL at request time.
@@ -18,10 +29,12 @@ Magic Folio is designed as a private, single-owner portfolio research applicatio
 
 The Worker applies a restrictive Content Security Policy, HSTS, content-type protection, anti-framing, referrer and permissions policies. CSP does not allow inline scripts or styles.
 
-## Production data reset
+## First-run setup and recovery
 
-The owner authorized a one-time clean reset of the existing `magic-screen-db`, without backup or migration of legacy data. The reset workflow is separate from ordinary deployment and requires explicit manual confirmation. It must not run until the replacement Worker is complete and the legacy endpoints are absent.
+The owner authorized a one-time clean reset of the existing `magic-screen-db`, without backup or migration of legacy data. The reset workflow is separate from ordinary deployment and requires explicit manual confirmation. It must not run until the replacement Worker and authentication controls are complete.
+
+For first registration, configure a long random `SETUP_TOKEN` as a Worker secret. Register the first passkey, sign in, add a second passkey on another device, then delete the setup secret. If every passkey is lost, use Cloudflare account access to set a fresh setup token, clear only the passkey and session records using the documented recovery procedure, register again, and remove the temporary token. Holdings remain intact. Protect the Cloudflare account itself with strong 2FA or a passkey.
 
 ## Verification
 
-CI runs the build, Node regression tests, production dependency audit and Wrangler dry-run. A successful CI run does not prove the live Cloudflare deployment has completed. Verify the live Worker and authentication boundary separately after release. Report security issues privately to the repository owner.
+CI runs the build, Node regression tests, production dependency audit and Wrangler dry-run. A successful CI run does not prove the live Cloudflare deployment has completed. Verify the live Worker, authentication boundary and device matrix separately after release. Report security issues privately to the repository owner.
