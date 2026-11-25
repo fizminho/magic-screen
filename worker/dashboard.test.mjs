@@ -114,9 +114,10 @@ test("dashboard emits configurable concentration and quote-quality flags", () =>
     { symbol: "AAPL", market: "US", quantity: 8, price: 110, prevClose: 100, quoteStatus: "ok" },
     { symbol: "MSFT", market: "US", quantity: 2, price: 100, prevClose: 100, quoteStatus: "stale" },
     { symbol: "NVDA", market: "US", quantity: 1, price: null, prevClose: null, quoteStatus: "unavailable" }
-  ], 50);
+  ], 50, 5);
   assert.equal(result.thresholds.maxPositionPct, 50);
-  assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));\n  assert.ok(result.riskFlags.some((flag) => flag.code === "large_daily_move"));
+  assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
+  assert.ok(result.riskFlags.some((flag) => flag.code === "large_daily_move"));
   assert.ok(result.riskFlags.some((flag) => flag.code === "stale_quotes"));
   assert.ok(result.riskFlags.some((flag) => flag.code === "missing_quotes"));
   assert.ok(result.riskFlags.every((flag) => flag.market === "US"));
@@ -125,6 +126,7 @@ test("dashboard emits configurable concentration and quote-quality flags", () =>
 test("dashboard endpoint applies the owner's configured concentration threshold", async () => {
   const { DB } = fakeDb({
     maxPositionPct: 20,
+    alertMovePct: 5,
     rows: [
       { symbol: "AAPL", market: "US", sector: "Technology", quantity: 8, price: 110, prevClose: 100, quoteStatus: "ok" },
       { symbol: "MSFT", market: "US", sector: "Technology", quantity: 2, price: 100, quoteStatus: "ok" }
@@ -137,4 +139,5 @@ test("dashboard endpoint applies the owner's configured concentration threshold"
   const result = await response.json();
   assert.equal(result.thresholds.maxPositionPct, 20);\n  assert.equal(result.thresholds.alertMovePct, 5);
   assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
+  assert.ok(result.riskFlags.some((flag) => flag.code === "large_daily_move"));
 });
