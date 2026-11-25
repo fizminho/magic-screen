@@ -366,7 +366,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       setSecCompanyName(filings.companyName);
       setSecFilings(filings.filings);
       await api(`/api/sec/companyfacts?symbol=${encodeURIComponent(item.symbol)}`);
-      const result = await api<ResearchResult>("/api/research/brief", {
+      const result = await api<ResearchResult>("/api/analysis/run", {
         method: "POST",
         body: JSON.stringify({ symbol: item.symbol })
       });
