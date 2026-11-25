@@ -92,7 +92,7 @@ export default {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const task = controller.cron === "0 1 * * 2-6"
-      ? runSecRefresh(env).then(async (refreshResult) => {
+      ? runSecRefresh(env).then(async (refreshResult: unknown) => {
           // Generate briefs only after fresh SEC data has been persisted.
           const briefResult = await runScheduledResearchBrief(env);
           return { refresh: refreshResult, brief: briefResult };
