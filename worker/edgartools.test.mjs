@@ -9,7 +9,7 @@ function mockDb() {
     prepare(sql) {
       calls.sql.push(sql);
       return {
-        values: [],
+        sql, values: [],
         bind(...values) { this.values = values; return this; },
         async all() {
           if (sql.includes("FROM instrument i")) return { results: [{ symbol: "AAPL" }, { symbol: "MSFT" }] };
