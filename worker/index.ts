@@ -95,6 +95,12 @@ export default {
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const lock = await env.DB.prepare("SELECT value FROM setting WHERE key='manual_job_lock'").first();
+    const lockExpiry = typeof lock?.value === "string" ? Date.parse(lock.value.slice(0, 24)) : 0;
+    if (Number.isFinite(lockExpiry) && lockExpiry > Date.now()) {
+      console.info("Scheduled task skipped because a manual job is running:", controller.cron);
+      return;
+    }
     const task = controller.cron === "0 1 * * 2-6"
       ? runSecRefresh(env).then(async (refreshResult: unknown) => {
           // Generate briefs only after fresh SEC data has been persisted.
