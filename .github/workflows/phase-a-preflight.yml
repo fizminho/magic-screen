@@ -137,7 +137,13 @@ jobs:
               FROM instrument WHERE market='US' AND symbol='AAPL';
           "
           holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
-          test "$holding_delete_status" = "200"
+          echo "holding delete HTTP status: $holding_delete_status"
+          cat /tmp/holding-delete.json
+          if [[ "$holding_delete_status" != "200" ]]; then
+            echo "Worker log around holding deletion:"
+            tail -n 100 /tmp/magic-folio-wrangler.log
+            exit 1
+          fi
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
           check_local_cleanup() {
             local label="$1"
