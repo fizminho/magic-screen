@@ -140,7 +140,7 @@ jobs:
           echo "$sec_filing_cleanup"
           echo "$sec_cache_cleanup"
           echo "$quote_cleanup"
-          grep -q "clean" <<< "$sec_filing_cleanup"
+          grep -q '"status": "clean"' <<< "$sec_filing_cleanup"
           grep -q "clean" <<< "$sec_cache_cleanup"
           grep -q "clean" <<< "$quote_cleanup"
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
