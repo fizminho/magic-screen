@@ -1,6 +1,6 @@
 import { jsonResponse } from "./auth.mjs";
 
-const MAX_BODY_BYTES = 1_500_000;
+const MAX_BODY_BYTES = 5_000_000;
 const MAX_COMPANIES = 50;
 const SYMBOL_RE = /^[A-Z0-9.-]{1,15}$/;
 
