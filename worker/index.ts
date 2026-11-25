@@ -11,6 +11,8 @@ import { handlePortfolioRequest } from "./lib/portfolio.mjs";
 import { handleDashboardRequest } from "./lib/dashboard.mjs";
 // @ts-ignore The JavaScript SEC module is exercised by Node regression tests.
 import { handleSecRequest } from "./lib/sec.mjs";
+// @ts-ignore The JavaScript SEC companyfacts module is exercised by Node regression tests.
+import { handleSecCompanyFactsRequest } from "./lib/sec-companyfacts.mjs";
 // @ts-ignore The JavaScript SEC company-facts module is covered by its Node regression tests.
 import { handleSecCompanyFactsRequest } from "./lib/sec-companyfacts.mjs";
 // @ts-ignore The JavaScript settings module is exercised by Node regression tests.
@@ -50,6 +52,8 @@ export default {
       response = await handleAuthRequest(request, env, url.pathname);
     } else if (url.pathname.startsWith("/api/quotes/")) {
       response = await handleQuoteRequest(request, env, url.pathname);
+    } else if (url.pathname === "/api/sec/companyfacts") {
+      response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/sec/filings") {
       response = await handleSecRequest(request, env, url);
     } else if (url.pathname === "/api/sec/companyfacts") {
