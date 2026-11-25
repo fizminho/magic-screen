@@ -57,6 +57,72 @@ export async function handleEdgarToolsRequest(request, env, url) {
     return jsonResponse({ provider: "EdgarTools", production_fundamentals_changed: false, rankings_changed: false, companies: rows.results || [] });
   }
 
+  if (request.method === "POST" && url.pathname === "/api/fundamentals/edgartools/normalized") {
+    const declaredLength = Number(request.headers.get("content-length") || 0);
+    if (declaredLength > MAX_BODY_BYTES) return jsonResponse({ error: "Payload too large." }, 413);
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return jsonResponse({ error: "Payload too large." }, 413);
+    let report;
+    try { report = JSON.parse(raw); } catch { return jsonResponse({ error: "Invalid normalized JSON." }, 400); }
+    if (report?.service !== "Magic Folio EdgarTools normalized analytics evidence" ||
+        report?.production_data_modified !== false || report?.schema_version !== 1 ||
+        !Array.isArray(report.companies) || report.companies.length < 1 || report.companies.length > MAX_COMPANIES ||
+        typeof report.source_report_generated_at !== "string" || !Number.isFinite(Date.parse(report.source_report_generated_at))) {
+      return jsonResponse({ error: "Invalid normalized evidence envelope." }, 400);
+    }
+
+    const now = new Date().toISOString();
+    const writes = [];
+    let metricCount = 0;
+    for (const company of report.companies) {
+      if (!SYMBOL_RE.test(company?.symbol || "") || company.provider_status !== "supported" ||
+          typeof company.accession !== "string" || !/^\\d{10}-\\d{2}-\\d{6}$/.test(company.accession) ||
+          !["10-K", "20-F", "40-F"].includes(company.form) || !Array.isArray(company.metrics) || company.metrics.length > 500) {
+        return jsonResponse({ error: "Invalid normalized company record." }, 400);
+      }
+      const seen = new Set();
+      for (const metric of company.metrics) {
+        const key = [metric.statement, metric.metric, metric.period_end, metric.period_type].join("|");
+        if (!["income_statement", "balance_sheet", "cash_flow_statement"].includes(metric.statement) ||
+            !/^[A-Za-z][A-Za-z0-9]*$/.test(metric.metric || "") ||
+            !/^\\d{4}-\\d{2}-\\d{2}$/.test(metric.period_end || "") ||
+            !["duration", "instant"].includes(metric.period_type) ||
+            (metric.statement === "balance_sheet") !== (metric.period_type === "instant") ||
+            !Number.isFinite(metric.value) || (metric.currency !== null && !/^[A-Z]{3}$/.test(metric.currency || "")) ||
+            seen.has(key)) {
+          return jsonResponse({ error: "Invalid or duplicate normalized metric." }, 400);
+        }
+        seen.add(key);
+        writes.push(env.DB.prepare(
+          "INSERT INTO edgartools_normalized_metric(symbol,accession,form,statement,metric,period_end,period_type,fiscal_label,value,currency,source_concept,source_label,standard_concept,balance,mapping_version,generated_at,ingested_at) " +
+          "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,accession,statement,metric,period_end,period_type) DO UPDATE SET " +
+          "form=excluded.form,fiscal_label=excluded.fiscal_label,value=excluded.value,currency=excluded.currency,source_concept=excluded.source_concept," +
+          "source_label=excluded.source_label,standard_concept=excluded.standard_concept,balance=excluded.balance,mapping_version=excluded.mapping_version," +
+          "generated_at=excluded.generated_at,ingested_at=excluded.ingested_at"
+        ).bind(company.symbol, company.accession, company.form, metric.statement, metric.metric, metric.period_end,
+          metric.period_type, metric.fiscal_label || null, metric.value, metric.currency || null,
+          typeof metric.source_concept === "string" ? metric.source_concept.slice(0, 200) : null,
+          typeof metric.source_label === "string" ? metric.source_label.slice(0, 200) : null,
+          typeof metric.standard_concept === "string" ? metric.standard_concept.slice(0, 120) : null,
+          typeof metric.balance === "string" ? metric.balance.slice(0, 20) : null,
+          Number.isInteger(company.mapping_version) ? company.mapping_version : 1,
+          report.source_report_generated_at, now));
+        metricCount++;
+      }
+    }
+    for (let offset = 0; offset < writes.length; offset += 50) {
+      await env.DB.batch(writes.slice(offset, offset + 50));
+    }
+    return jsonResponse({
+      received: report.companies.length,
+      metric_records: metricCount,
+      provider: "EdgarTools",
+      storage: "edgartools_normalized_metric",
+      production_fundamentals_changed: false,
+      rankings_changed: false
+    });
+  }
+
   if (request.method !== "POST" || url.pathname !== "/api/fundamentals/edgartools/ingest") {
     return jsonResponse({ error: "Not found." }, 404);
   }
