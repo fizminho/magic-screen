@@ -61,7 +61,6 @@ type PublicResearchBrief = {
   source_accessions: string[];
 };
 
-type ResearchInboxItem = { brief: PublicResearchBrief & { symbol: string }; model: string; createdAt: string };
 
 type ResearchInboxItem = { symbol: string; brief: PublicResearchBrief; createdAt: string };
 
@@ -147,8 +146,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
   const [researchInboxLoading, setResearchInboxLoading] = useState(true);
   const [researchInboxSymbol, setResearchInboxSymbol] = useState("");
-  const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
-  const [inboxLoading, setInboxLoading] = useState(false);
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -162,27 +159,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<string | null>(null);
   const [pushState, setPushState] = useState<"checking" | "unsupported" | "not-configured" | "not-subscribed" | "subscribed">("checking");
   const [pushBusy, setPushBusy] = useState(false);
-
-  async function refreshResearchInbox() {
-    setInboxLoading(true);
-    try {
-      const result = await api<{ briefs: ResearchInboxItem[] }>("/api/analysis/inbox");
-      setResearchInbox(result.briefs);
-    } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Unable to load the research inbox.");
-    } finally { setInboxLoading(false); }
-  }
-
-  function openInboxBrief(item: ResearchInboxItem) {
-    setResearchResult({
-      symbol: item.brief.symbol,
-      brief: item.brief,
-      model: item.model,
-      createdAt: item.createdAt,
-      cached: true,
-      sources: []
-    });
-  }
 
   async function refreshHoldings() {
     const result = await api<{ holdings: Holding[] }>("/api/holdings");
@@ -224,10 +200,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     const result = await api<{ settings: PortfolioSettings }>("/api/settings");
     setSettings(result.settings);
   }
-
-  useEffect(() => {
-    refreshResearchInbox().catch(() => undefined);
-  }, []);
 
   async function refreshPortfolio() {
     const results = await Promise.allSettled([
