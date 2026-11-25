@@ -122,9 +122,9 @@ PWA (React, Vite)  <--HTTPS-->  Cloudflare Worker (single file router + small mo
 | S9 | No secret scanning guard | Enable GitHub secret scanning + push protection (Settings → Code security) and add `.dev.vars.example` |
 | S10 | Unknown live tables from the retired SEC pipeline | Dropped by the owner-approved one-time reset script, which enumerates actual user tables at cutover |
 
-- [ ] **B1.** Run `npm outdated` and `npm audit` on the branch; capture actual output in `docs/CLEANUP_LOG.md`. The branch preflight workflow now runs the production audit. Do not assert a CVE not present in output.
-- [ ] **B2.** (PRs are closed later, in H8.) For each open Dependabot PR from A3: read the diff; if it is a **security fix or a patch/minor bump with green CI**, apply the same version change on the cleanup branch (`npm install pkg@version`). Majors: apply only if the build and tests pass; otherwise note as deferred.
-- [ ] **B3.** `npm audit fix` (no `--force`). If high/critical remain, upgrade the direct dependency manually; if impossible, record the advisory ID and a mitigation.
+- [x] **B1.** `npm outdated` and full `npm audit --audit-level=high` were run in CI. Audit reported 0 vulnerabilities. Outdated packages are major-version upgrades only: React/React DOM 19, Vite 8, TypeScript 7, React types 19 and plugin-react 6; retained current compatible majors for this rebuild.
+- [x] **B2.** Reviewed open Dependabot PRs #75, #77, #79, #80, #81, #82 and #83. All are major-version changes (or a now-obsolete icon dependency); none is a security patch or minor/patch update. Deferred React 19, Vite 8, TypeScript 7, React type 19, setup-node 7 and checkout 7 to avoid broad toolchain churn. PR #81 is obsolete because `lucide-react` was removed. Close stale/duplicate PRs in H8 after the cleanup PR is ready.
+- [x] **B3.** Full `npm audit --audit-level=high` passed with 0 vulnerabilities; no audit fix required. No `--force` upgrades were applied.
 - [x] **B4.** Generated and committed `package-lock.json` (lockfile v3) through a scoped branch workflow. Build, preflight, reset and deploy workflows use `npm ci`; production audit is blocking and actions are SHA-pinned.
 - [x] **B5.** `.github/dependabot.yml` groups minor and patch npm updates and retains the GitHub Actions ecosystem.
 - [x] **B6.** Added `.dev.vars.example` with names/placeholders only; `.gitignore` ignores local secrets while explicitly allowing the example file, `.env*`, and `backup-*.sql`.
