@@ -236,10 +236,10 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 | `0 2 * * 6` | Weekly recommendations + housekeeping (prune unpinned filing metadata > 30 days, expired `alert_log`, old `job_run`, expired challenges and rate-limit windows) |
 
 - [x] US quote refresh remains manual from the owner's browser because the approved free provider enforces a single source IP and 24-hour delay. Bursa quotes remain manual/CSV. No quote-provider requests run from Cloudflare Workers.
-- [x] Implement `scheduled(controller, env, ctx)` switching on the two UTC cron expressions. The SEC refresh is capped at 8 owned US instruments with a valid CIK (16 SEC requests maximum), sequential 550 ms spacing between every SEC request, bounded retries, filing metadata + companyfacts cache, and one `job_run` record. It records `skipped_no_new_data` when no filing was filed in the preceding UTC day; it does not hardcode exchange holidays. Weekly housekeeping prunes expired filings, caches, alerts, jobs, challenges and rate-limit windows.
-- [ ] Skip weekends/public holidays gracefully: if there are no new filings or usable quote snapshots, skip the brief and log `skipped_no_new_data`. Do not hardcode holiday lists.
+- [x] Implement `scheduled(controller, env, ctx)` switching on the two UTC cron expressions. The SEC refresh is capped at 6 owned US instruments with a valid CIK (12 SEC requests maximum), sequential 550 ms spacing between every SEC request, bounded retries, filing metadata + companyfacts cache, and one `job_run` record. It records `skipped_no_new_data` when no filing was filed in the preceding UTC day; it does not hardcode exchange holidays. Weekly housekeeping prunes expired filings, caches, alerts, jobs, challenges and rate-limit windows.
+- [x] Skip brief generation when no owned US instrument has a filing in the preceding UTC 24 hours or fresh usable SEC Company Facts; log `skipped_no_new_data` / `skipped_no_usable_data`. No holiday list is hardcoded.
 - [x] Each scheduled job writes one `job_run` row (start, end, status, bounded detail). `ctx.waitUntil` is used only to hand off the scheduled task.
-- [x] Multi-row filing writes and weekly cleanup use `env.DB.batch([...])`. The SEC job is bounded to 12 instruments and designed to stay below ~40 D1 statements per invocation.
+- [x] Multi-row filing writes and weekly cleanup use `env.DB.batch([...])`. The SEC job is bounded to 6 instruments; filing writes and weekly cleanup use D1 batches. Keep the scheduled brief candidate cap at 8 and monitor actual D1 query usage before increasing either cap.
 
 ### E4. Cloudflare Workers AI research brief
 - [x] Provider decision: Gemini API is rejected for this personal consumer app. Current Gemini API terms restrict the service to professional/business use rather than consumer use; the Free Tier may use prompts/responses to improve Google products and allow human review. Do not send portfolio data to Gemini.
@@ -258,8 +258,8 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 - [x] Implemented with native WebCrypto (VAPID JWT ES256 + RFC 8291 `aes128gcm` payload encryption); no third-party runtime dependency. Design and protocol references are recorded in `docs/DATA_SOURCES.md`.
 - [x] Owner-session and exact-Origin routes: `GET /api/push/config` (public VAPID key only), `POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `POST /api/push/test`. Subscriptions are capped at five and endpoints are restricted to supported HTTPS push services.
 - [x] HTTP 404/410 responses delete the expired subscription row.
-- [ ] Alert types: (1) holding moves ≥ `alert_move_pct` (default 4%) vs previous close; (2) a public filing signal the approved research rules classify as high impact; (3) morning brief ready. Dedupe with `alert_log.dedupe_key` (e.g. `move:AAPL:2026-11-25`). Max 8 pushes/day (setting).
-- [ ] Payload is short (title + 1 line + deep link `/#/holding/AAPL`). No quantities or P/L amounts in push text.
+- [x] Alert types: rules-based holding moves ≥ `alert_move_pct` (default 4%) vs previous close; high-impact SEC filing forms (`8-K`, `SC 13D`, `SC 13D/A`); and one daily scheduled research-brief-ready alert. Dedupe with `alert_log.dedupe_key`; daily push quota is atomically capped by `max_pushes_per_day` (default 8).
+- [x] Payload is short (title + one line + same-origin deep link). No quantities, cost basis, private notes or P/L amounts are included in push text.
 
 ### E6. API surface (all JSON, `cache-control: no-store`)
 `GET /api/health` (public, minimal) · `GET /api/auth/state` · `POST /api/auth/register/options|verify` (setup token or session) · `POST /api/auth/login/options|verify` · `POST /api/auth/logout` · `POST /api/auth/logout-all` · `GET /api/auth/credentials` · `PATCH|DELETE /api/auth/credentials/:id` · `GET /api/me` · `GET /api/export` (holdings + watchlist + settings as JSON/CSV, session required) · `GET /api/quotes/latest` and `POST /api/quotes/snapshots` (owner session) · `GET /api/sec/filings?symbol=...` (owner session, manual CIK + SEC contact User-Agent) · `GET|PUT|DELETE /api/holdings` · `GET|POST|DELETE /api/watchlist` · `GET /api/dashboard` · `GET /api/news?symbol=` · `GET /api/analysis/latest?kind=` · `POST /api/analysis/run` (manual, 10-minute cooldown, counts against the daily cap) · `POST /api/push/*` · `GET|PUT /api/settings`
@@ -274,7 +274,7 @@ Why: the app holds private holdings, so every `/api/*` route except health and t
 - [x] Holdings and Bursa quote CSV parsers are covered for duplicate rows, malformed values, limits, timestamps and optional fields.
 - [x] SEC fixture tests cover filing-form filtering, CIK/accession binding, official archive URL construction, User-Agent gating, owner-session gating, per-IP throttling, six-hour cache hit/miss and cache invalidation when CIK changes.
 - [ ] Add cryptographic WebAuthn signature/counter-regression fixtures and run actual browser passkey registration/login on supported devices.
-- [x] Workers AI output-schema validation and Web Push cryptography/endpoint validation tests are included. Market-window/DST, alert dedupe and SEC filing/news dedupe/matching tests remain pending.
+- [x] Workers AI output-schema validation, Web Push cryptography/endpoint validation, push quota gates and alert dedupe tests are included. Market-window/DST and SEC filing/news matching tests remain pending.
 
 **Done when:** `node --experimental-strip-types --test worker/**/*.test.mjs` passes; `wrangler dev` serves `/api/health`; a passkey register → login → dashboard → manual analysis → test push flow works locally.
 
@@ -306,7 +306,7 @@ Screens (mobile-first, one column): **Passkey sign-in / first-run setup · Dashb
 - [ ] **G2.** Deploy workflow: on `main` only; apply D1 migrations **before** deploy: `npx wrangler d1 migrations apply magic-screen-db --remote` then `npx wrangler deploy`. Keep `concurrency` and minimal permissions. Verify the live URL with `curl -fsS https://<worker>/api/health` as the last step (a green build is not proof of a live deploy).
 - [ ] **G3.** Secrets (set via `wrangler secret put`, never in files): `VAPID_PRIVATE_KEY` and the **temporary** `SETUP_TOKEN` (deleted after the first passkey is registered). No external AI API key is required for Workers AI. Document names only in `.dev.vars.example` and `docs/SETUP.md`.
 - [ ] **G4.** Vars in `wrangler.toml`: `APP_ENV`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`, `SEC_USER_AGENT`, `RP_ID`, `RP_NAME`, `RP_ORIGIN`. Bind Workers AI with `[ai] binding = "AI"`.
-- [ ] **G5.** Add `[triggers] crons = [...]` (Phase E3 table).
+- [x] **G5.** `[triggers] crons = [...]` is configured in `wrangler.toml` for the two UTC scheduled jobs.
 - [ ] **G6.** Cloudflare dashboard (free): add a WAF rate-limiting rule on `/api/auth/*` if available on the plan; otherwise rely on the D1 attempt counter. Turn on 2FA/passkey for the Cloudflare account and the GitHub account.
 - [ ] **G7.** Monitor Workers AI Neuron usage and keep the daily cap below the Workers Free allocation. Do not enable any paid billing/overage path without explicit owner approval.
 
