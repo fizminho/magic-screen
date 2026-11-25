@@ -45,6 +45,8 @@ export default {
       response = await handleQuoteRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/sec/filings") {
       response = await handleSecRequest(request, env, url);
+    } else if (url.pathname === "/api/settings") {
+      response = await handleSettingsRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/dashboard") {
       response = await handleDashboardRequest(request, env, url.pathname);
     } else if (url.pathname === "/api/holdings" || url.pathname.startsWith("/api/holdings/") || url.pathname === "/api/watchlist" || url.pathname.startsWith("/api/watchlist/")) {
