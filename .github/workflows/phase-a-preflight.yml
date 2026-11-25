@@ -123,9 +123,6 @@ jobs:
           dashboard_status="$(curl --silent --output /tmp/dashboard.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/dashboard -H "Cookie: magicfolio_session=$backup_token")"
           test "$dashboard_status" = "200"
           jq -e '.holdingsCount == 2 and (.markets[] | select(.market == "US") | .marketValue == 202 and .currency == "USD" and .dayChangeValue == 2 and .dayChangePct == 1) and (.markets[] | select(.market == "MY") | .marketValue == 321 and .currency == "MYR" and .dayChangeValue == 6 and .dayChangePct == 1.9)' /tmp/dashboard.json >/dev/null
-          holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
-          test "$holding_delete_status" = "200"
-          jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
           sec_fetched_at="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
           npx --yes wrangler@4 d1 execute magic-screen-db --local --command "
             INSERT INTO sec_fetch_cache(instrument_id,cik,fetched_at,company_name,filing_count)
@@ -134,6 +131,9 @@ jobs:
               SELECT '0000320193-26-000001','0000320193',id,'10-Q','AAPL 10-Q','Quarterly report.','2026-11-24','2026-09-30','aapl.htm','https://www.sec.gov/Archives/edgar/data/320193/000032019326000001/aapl.htm','$sec_fetched_at'
               FROM instrument WHERE market='US' AND symbol='AAPL';
           "
+          holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
+          test "$holding_delete_status" = "200"
+          jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
           sec_filing_remaining="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM sec_filing WHERE cik='0000320193';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
           sec_cache_remaining="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM sec_fetch_cache WHERE cik='0000320193';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
           test "$sec_filing_remaining" = "0"
