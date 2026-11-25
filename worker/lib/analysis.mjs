@@ -199,7 +199,7 @@ export async function runScheduledResearchBrief(env, { now = Date.now(), maxBrie
         ).bind(instrument.id, instrument.cik, cutoff).all();
         const filings = (filingRows.results || []).filter((item) =>
           typeof item.accessionNumber === "string" &&
-          /^\\d{10}-\\d{2}-\\d{6}$/.test(item.accessionNumber) &&
+          /^\d{10}-\d{2}-\d{6}$/.test(item.accessionNumber) &&
           item.accessionNumber.slice(0, 10) === instrument.cik &&
           typeof item.url === "string" && item.url.startsWith("https://www.sec.gov/Archives/")
         );
