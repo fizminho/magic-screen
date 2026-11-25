@@ -4,7 +4,7 @@ import { parseSecCompanyFacts } from "../lib/sec-companyfacts.mjs";
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
 const SEC_COMPANYFACTS = "https://data.sec.gov/api/xbrl/companyfacts/CIK";
 const FACTS_TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_INSTRUMENTS = 12;
+const MAX_INSTRUMENTS = 8;
 const SEC_PAUSE_MS = 550;
 
 function validUserAgent(value) {
@@ -112,6 +112,7 @@ export async function runSecRefresh(env, { fetcher = fetch, now = Date.now() } =
           ? payload.name.trim().slice(0, 200) : instrument.symbol;
         await storeFilings(env, instrument, filings, companyName, fetchedAt);
         filingCount += filings.length;
+        await pause(SEC_PAUSE_MS);
         const factsResult = await refreshCompanyFacts(env, instrument, env.SEC_USER_AGENT, fetcher, now);
         if (factsResult === "updated") factsUpdated++;
         else factsCached++;
@@ -162,7 +163,9 @@ export async function runWeeklyHousekeeping(env, { now = Date.now() } = {}) {
       env.DB.prepare("DELETE FROM job_run WHERE started_at < ? AND status <> 'running' AND id <> ?")
         .bind(cutoff90, jobId ?? -1),
       env.DB.prepare("DELETE FROM auth_challenge WHERE expires_at <= ?").bind(new Date(now).toISOString()),
-      env.DB.prepare("DELETE FROM auth_attempt WHERE window < ?").bind(new Date(now - 86400000).toISOString().slice(0, 13))
+      env.DB.prepare("DELETE FROM auth_attempt WHERE window < ?").bind(new Date(now - 86400000).toISOString().slice(0, 13)),
+      env.DB.prepare("DELETE FROM setting WHERE key LIKE 'ai_daily_%' AND substr(key,10,10) < ?")
+        .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10))
     ]);
     const changes = results.reduce((sum, item) => sum + Number(item.meta?.changes || 0), 0);
     await env.DB.prepare(
