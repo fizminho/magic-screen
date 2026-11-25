@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
-import { validatePushSubscription, sendPushToSubscription } from "./lib/push.mjs";
+import { validatePushSubscription, sendPushToSubscription, handlePushRequest } from "./lib/push.mjs";
 
 function b64url(bytes) {
   let binary = "";
@@ -83,4 +83,11 @@ test("push sender refuses endpoints outside the provider allowlist", async () =>
     }, { title: "x" }),
     /push_endpoint_rejected/
   );
+});
+
+test("public push config exposes only the VAPID public key without requiring a session", async () => {
+  const request = new Request("https://folio.example/api/push/config");
+  const response = await handlePushRequest(request, { VAPID_PUBLIC_KEY: "public-key" }, new URL(request.url));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { enabled: true, publicKey: "public-key" });
 });
