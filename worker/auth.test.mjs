@@ -7,9 +7,9 @@ test("base64url encodes without padding and uses URL-safe alphabet", () => {
 });
 
 test("cookie parser handles spaces, equals signs and duplicate cookie names safely", () => {
-  assert.deepEqual({ ...parseCookies("a=1; __Host-magicfolio_session=abc==; a=2") }, {
+  assert.deepEqual({ ...parseCookies("a=1; __Host-session=abc==; a=2") }, {
     a: "1",
-    "__Host-magicfolio_session": "abc=="
+    "__Host-session": "abc=="
   });
 });
 
@@ -59,6 +59,6 @@ test("auth mutations reject JSON lookalike media types", async () => {
       "content-type": "application/jsonp"
     },
     body: "{}"
-  }), { RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/verify");
+  }), { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/verify");
   assert.equal(response.status, 415);
 });
