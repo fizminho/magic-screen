@@ -5,7 +5,7 @@ Magic Folio is a private, single-owner portfolio research application. Portfolio
 ## Authentication model
 
 - Passkey-only authentication using `@passwordless-id/webauthn`; no password login or password fallback.
-- WebAuthn registration and authentication require user verification, the expected challenge, exact origin, RP ID hash and a valid signature.
+- WebAuthn registration and authentication require user presence and verification, the expected one-time challenge, exact request host and Origin, RP ID hash, matching discoverable user handle and a valid signature. Registration also checks that the credential ID matches the authenticator's attested credential data and rejects cross-origin ceremonies.
 - Challenges are cryptographically random, expire after 120 seconds and are consumed once.
 - The first passkey requires the temporary `SETUP_TOKEN` Worker secret. Subsequent passkeys require an authenticated owner session.
 - Register at least two passkeys on separate devices before removing `SETUP_TOKEN`.
