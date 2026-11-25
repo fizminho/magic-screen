@@ -56,6 +56,9 @@ test("scheduled brief uses only public SEC data and tracks the job", async () =>
   let prompt = "";
   const result = await runScheduledResearchBrief({
     DB,
+    VAPID_PUBLIC_KEY: "test-public",
+    VAPID_PRIVATE_KEY: "test-private",
+    VAPID_SUBJECT: "mailto:owner@example.com",
     AI: { async run(model, input) {
       modelCalls++;
       assert.equal(model, "@cf/zai-org/glm-4.7-flash");
@@ -74,9 +77,11 @@ test("scheduled brief uses only public SEC data and tracks the job", async () =>
 
   assert.equal(result.status, "success");
   assert.equal(result.generated, 1);
+  assert.equal(result.pushAlertsSent, 0);
   assert.equal(modelCalls, 1);
   assert.equal(/quantity|avg_cost|notes|portfolio weight|watchlist|holding/i.test(prompt), false);
   assert.ok(calls.statements.some((item) => item.sql.includes("INSERT INTO analysis")));
+  assert.ok(calls.statements.some((item) => item.sql.includes("FROM push_subscription")));
   assert.ok(calls.statements.some((item) => item.sql.includes("UPDATE job_run SET finished_at")));
 });
 
