@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { client as webauthnClient } from "@passwordless-id/webauthn";
 import PortfolioPanel from "./PortfolioPanel";
+import { clearDashboardSnapshot } from "./offline-dashboard";
 
 type AuthState = { registered: boolean; authenticated: boolean; passkeyCount: number; needsSetup: boolean };
 type PasskeyCredential = { id: string; name: string; createdAt: string; lastUsedAt: string | null; backedUp: boolean };
@@ -59,6 +60,7 @@ export default function App() {
       setCredentials([]);
       setCredentialNames({});
       sessionStorage.removeItem("magicfolio.marketdata.token");
+      clearDashboardSnapshot().catch(() => undefined);
     }
   }
   useEffect(() => {
