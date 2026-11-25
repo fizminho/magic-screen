@@ -338,7 +338,7 @@ export async function handleAnalysisRequest(request, env, url) {
       const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
       if (!validSymbol(symbol)) return jsonResponse({ error: "Provide a valid US ticker symbol." }, 400);
       const instrument = await env.DB.prepare(
-        "SELECT id FROM instrument WHERE market='US' AND symbol=? AND active=1 " +
+        "SELECT id,cik FROM instrument WHERE market='US' AND symbol=? AND active=1 " +
         "AND (EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=instrument.id) " +
         "OR EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=instrument.id))"
       ).bind(symbol).first();
@@ -360,7 +360,7 @@ export async function handleAnalysisRequest(request, env, url) {
         ]);
         let facts = [];
         try { facts = JSON.parse(factsRow?.factsJson || "{}").facts || []; } catch { facts = []; }
-        const sources = mapSources(brief.source_accessions, filingRows.results || [], facts, "0");
+        const sources = mapSources(brief.source_accessions, filingRows.results || [], facts, instrument.cik);
         return jsonResponse({ brief, model: row.model || MODEL, createdAt: row.createdAt, cached: true, sources });
       } catch { return jsonResponse({ brief: null }); }
     }
