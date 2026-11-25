@@ -56,7 +56,7 @@ References:
 - No API key is required. Every request must identify the application/operator in a descriptive `User-Agent` with a contact address.
 - SEC fair-access guidance sets a maximum of 10 requests/second across all machines. Magic Folio should stay well below this (target no more than 2 requests/second), fetch only portfolio CIKs, cache responses and respect 429 responses.
 - The owner enters a 1–10 digit CIK on a US holding/watchlist item; the Worker normalizes it to 10 digits. SEC's ticker/CIK association file is periodically updated but not guaranteed accurate or complete, so the app does not silently infer CIKs.
-- The on-demand owner-only endpoint fetches the company's submissions JSON, returns selected recent form metadata and official SEC URLs, and caches metadata in D1 for six hours. Filing metadata is retained for 30 days; full filing documents and article bodies are never mirrored. Cache misses are rate-limited to 5 upstream lookups/hour per source IP. Do not crawl the whole EDGAR site.
+- The on-demand owner-only endpoint fetches the company's submissions JSON, returns selected recent form metadata and official SEC URLs, and caches metadata in D1 for six hours. Filing metadata has a 30-day retention policy and is pruned on the next cache miss for that instrument; a scheduled global cleanup is still pending. Full filing documents and article bodies are never mirrored. Cache misses are rate-limited to 5 upstream lookups/hour per source IP. Do not crawl the whole EDGAR site.
 
 References:
 - https://www.sec.gov/about/developer-resources
