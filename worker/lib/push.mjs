@@ -158,6 +158,32 @@ export async function sendPushToSubscription(env, subscription, payload, fetcher
   return response;
 }
 
+export async function deliverPushBatch(env, subscriptions, payload, fetcher = fetch) {
+  const result = { attempted: 0, sent: 0, removed: 0, failed: 0 };
+  for (const subscription of subscriptions) {
+    result.attempted++;
+    try {
+      const response = await sendPushToSubscription(env, subscription, payload, fetcher);
+      if (response.status === 404 || response.status === 410) {
+        await env.DB.prepare("DELETE FROM push_subscription WHERE endpoint=?").bind(subscription.endpoint).run();
+        result.removed++;
+      } else if (response.ok) {
+        await env.DB.prepare("UPDATE push_subscription SET last_success_at=? WHERE endpoint=?")
+          .bind(new Date().toISOString(), subscription.endpoint).run();
+        result.sent++;
+      } else {
+        result.failed++;
+        console.warn("Push provider rejected delivery:", response.status);
+      }
+    } catch (error) {
+      result.failed++;
+      const code = error instanceof Error ? error.message : "unknown";
+      console.warn("Push delivery failed:", code.slice(0, 100));
+    }
+  }
+  return result;
+}
+
 export async function handlePushRequest(request, env, url, fetcher = fetch) {
   try {
     if (url.pathname === "/api/push/config" && request.method === "GET") {
@@ -209,24 +235,12 @@ export async function handlePushRequest(request, env, url, fetcher = fetch) {
       const subscriptions = await env.DB.prepare(
         "SELECT endpoint,p256dh,auth FROM push_subscription ORDER BY created_at DESC LIMIT ?"
       ).bind(MAX_SUBSCRIPTIONS).all();
-      let sent = 0;
-      let removed = 0;
-      for (const subscription of subscriptions.results || []) {
-        const response = await sendPushToSubscription(env, subscription, {
-          title: "Magic Folio",
-          body: "Push notifications are working.",
-          url: "/"
-        }, fetcher);
-        if (response.status === 404 || response.status === 410) {
-          await env.DB.prepare("DELETE FROM push_subscription WHERE endpoint=?").bind(subscription.endpoint).run();
-          removed++;
-        } else if (response.ok) {
-          await env.DB.prepare("UPDATE push_subscription SET last_success_at=? WHERE endpoint=?")
-            .bind(new Date().toISOString(), subscription.endpoint).run();
-          sent++;
-        }
-      }
-      return jsonResponse({ sent, removed });
+      const delivery = await deliverPushBatch(env, subscriptions.results || [], {
+        title: "Magic Folio",
+        body: "Push notifications are working.",
+        url: "/"
+      }, fetcher);
+      return jsonResponse(delivery);
     }
 
     return jsonResponse({ error: "Not found." }, 404);
