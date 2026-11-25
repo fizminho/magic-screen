@@ -15,6 +15,8 @@ const FORM_LABELS = {
   "SC 13G": "Beneficial ownership filing"
 };
 const SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK";
+const CACHE_SECONDS = 6 * 60 * 60;
+const RETENTION_DAYS = 30;
 
 function safeUserAgent(value) {
   return typeof value === "string" && value.length >= 12 && value.length <= 200 &&
@@ -50,11 +52,15 @@ function toFiling(item, index, symbol, cik, fetchedAt, cutoff) {
   const primaryDocument = item.primaryDocument?.[index] || "";
   const reportDate = item.reportDate?.[index] || null;
   if (!SEC_FORMS.has(form) || !/^\d{4}-\d{2}-\d{2}$/.test(filingDate || "") ||
-      filingDate < cutoff || !/^\d{10}-\d{2}-\d{6}$/.test(accessionNumber || "")) return null;
+      !Number.isFinite(Date.parse(filingDate)) || filingDate < cutoff ||
+      !/^\d{10}-\d{2}-\d{6}$/.test(accessionNumber || "") ||
+      accessionNumber.slice(0, 10) !== cik) return null;
 
   const accessionPath = accessionNumber.replace(/-/g, "");
   const cikPath = String(Number(cik));
-  const documentPath = primaryDocument
+  const safeDocument = typeof primaryDocument === "string" &&
+    primaryDocument.length <= 200 && !/[\\/?#\r\n]/.test(primaryDocument);
+  const documentPath = safeDocument && primaryDocument
     ? encodeURIComponent(primaryDocument)
     : `${accessionNumber}-index.htm`;
   const url = `https://www.sec.gov/Archives/edgar/data/${cikPath}/${accessionPath}/${documentPath}`;
@@ -65,12 +71,14 @@ function toFiling(item, index, symbol, cik, fetchedAt, cutoff) {
     cik,
     form,
     title: `${symbol} · ${form} filed ${filingDate}`,
-    summary: reportDate ? `${label}. Report period ended ${reportDate}.` : `${label} filed with the SEC.`,
+    summary: reportDate && /^\d{4}-\d{2}-\d{2}$/.test(reportDate)
+      ? `${label}. Report period ended ${reportDate}.`
+      : `${label} filed with the SEC.`,
     source: "SEC EDGAR",
     filingDate,
     reportDate,
     accessionNumber,
-    primaryDocument,
+    primaryDocument: safeDocument ? primaryDocument : "",
     publishedAt: `${filingDate}T00:00:00.000Z`,
     fetchedAt,
     url
@@ -83,7 +91,7 @@ export function parseSecSubmissions(payload, symbol, cik, now = Date.now()) {
       !Array.isArray(recent.accessionNumber) || !Array.isArray(recent.primaryDocument)) {
     throw new Error("sec_invalid_response");
   }
-  const cutoff = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const cutoff = new Date(now - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const fetchedAt = new Date(now).toISOString();
   const filings = [];
   for (let index = 0; index < recent.form.length; index++) {
@@ -91,6 +99,68 @@ export function parseSecSubmissions(payload, symbol, cik, now = Date.now()) {
     if (filing) filings.push(filing);
   }
   return filings.sort((a, b) => b.filingDate.localeCompare(a.filingDate)).slice(0, 20);
+}
+
+function formatCachedFiling(row, symbol, cik) {
+  return {
+    symbol,
+    cik,
+    form: row.form,
+    title: row.title,
+    summary: row.summary,
+    source: "SEC EDGAR",
+    filingDate: row.filingDate,
+    reportDate: row.reportDate,
+    accessionNumber: row.accessionNumber,
+    primaryDocument: row.primaryDocument || "",
+    publishedAt: `${row.filingDate}T00:00:00.000Z`,
+    fetchedAt: row.fetchedAt,
+    url: row.url
+  };
+}
+
+async function readCachedFilings(env, instrumentId, symbol, cik) {
+  const cache = await env.DB.prepare(
+    "SELECT fetched_at AS fetchedAt, company_name AS companyName FROM sec_fetch_cache WHERE instrument_id=?"
+  ).bind(instrumentId).first();
+  if (!cache || !Number.isFinite(Date.parse(cache.fetchedAt)) ||
+      Date.now() - Date.parse(cache.fetchedAt) >= CACHE_SECONDS * 1000) return null;
+
+  const rows = await env.DB.prepare(
+    "SELECT form, title, summary, filing_date AS filingDate, report_date AS reportDate, " +
+    "accession_number AS accessionNumber, primary_document AS primaryDocument, " +
+    "fetched_at AS fetchedAt, url FROM sec_filing WHERE instrument_id=? " +
+    "ORDER BY filing_date DESC LIMIT 20"
+  ).bind(instrumentId).all();
+  return {
+    companyName: cache.companyName,
+    filings: (rows.results || []).map((row) => formatCachedFiling(row, symbol, cik)),
+    cached: true
+  };
+}
+
+async function storeFilings(env, instrumentId, symbol, cik, companyName, filings, fetchedAt) {
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const statements = [
+    env.DB.prepare("DELETE FROM sec_filing WHERE instrument_id=? AND filing_date < ?")
+      .bind(instrumentId, cutoff),
+    ...filings.map((filing) => env.DB.prepare(
+      "INSERT INTO sec_filing(accession_number,instrument_id,form,title,summary,filing_date,report_date,primary_document,url,fetched_at) " +
+      "VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(accession_number) DO UPDATE SET " +
+      "instrument_id=excluded.instrument_id,form=excluded.form,title=excluded.title,summary=excluded.summary, " +
+      "filing_date=excluded.filing_date,report_date=excluded.report_date,primary_document=excluded.primary_document, " +
+      "url=excluded.url,fetched_at=excluded.fetched_at"
+    ).bind(
+      filing.accessionNumber, instrumentId, filing.form, filing.title, filing.summary,
+      filing.filingDate, filing.reportDate, filing.primaryDocument, filing.url, fetchedAt
+    )),
+    env.DB.prepare(
+      "INSERT INTO sec_fetch_cache(instrument_id,fetched_at,company_name,filing_count) VALUES(?,?,?,?) " +
+      "ON CONFLICT(instrument_id) DO UPDATE SET fetched_at=excluded.fetched_at, " +
+      "company_name=excluded.company_name,filing_count=excluded.filing_count"
+    ).bind(instrumentId, fetchedAt, companyName, filings.length)
+  ];
+  await env.DB.batch(statements);
 }
 
 export async function handleSecRequest(request, env, url, fetcher = fetch) {
@@ -107,17 +177,28 @@ export async function handleSecRequest(request, env, url, fetcher = fetch) {
       return jsonResponse({ error: "SEC contact User-Agent is not configured. Add an app name and contact email first." }, 503);
     }
 
-    await rateLimitRequest(request, env, "sec_fetch", 5);
     const instrument = await env.DB.prepare(
-      "SELECT cik FROM instrument WHERE market='US' AND symbol=? AND active=1"
+      "SELECT id, cik FROM instrument WHERE market='US' AND symbol=? AND active=1"
     ).bind(symbol).first();
     if (!instrument) return jsonResponse({ error: "Add this US ticker to holdings or watchlist first." }, 404);
     if (!instrument.cik) return jsonResponse({ error: "Add the 10-digit SEC CIK to this instrument first." }, 409);
 
-    const cik = instrument.cik;
-    const payload = await fetchSubmissions(cik, env.SEC_USER_AGENT, fetcher);
-    const filings = parseSecSubmissions(payload, symbol, cik);
-    return jsonResponse({ symbol, cik, companyName: payload.name || symbol, source: "SEC EDGAR", filings });
+    const cached = await readCachedFilings(env, instrument.id, symbol, instrument.cik);
+    if (cached) {
+      return jsonResponse({
+        symbol, cik: instrument.cik, companyName: cached.companyName || symbol,
+        source: "SEC EDGAR", cached: true, filings: cached.filings
+      });
+    }
+
+    await rateLimitRequest(request, env, "sec_fetch", 5);
+    const payload = await fetchSubmissions(instrument.cik, env.SEC_USER_AGENT, fetcher);
+    const filings = parseSecSubmissions(payload, symbol, instrument.cik);
+    const fetchedAt = new Date().toISOString();
+    const companyName = typeof payload.name === "string" && payload.name.trim()
+      ? payload.name.trim().slice(0, 200) : symbol;
+    await storeFilings(env, instrument.id, symbol, instrument.cik, companyName, filings, fetchedAt);
+    return jsonResponse({ symbol, cik: instrument.cik, companyName, source: "SEC EDGAR", cached: false, filings });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "rate_limited") return jsonResponse({ error: "SEC lookup limit reached. Try again later." }, 429);
