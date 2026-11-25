@@ -64,6 +64,7 @@ function mapSources(accessions, filings, facts, cik) {
       accessionNumber: item.accessionNumber,
       form: item.form || "SEC filing",
       filed: item.filed || "",
+      title: item.title || item.form || "SEC filing",
       url: `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${item.accessionNumber.replace(/-/g, "")}/`
     });
   }
@@ -72,7 +73,7 @@ function mapSources(accessions, filings, facts, cik) {
       accessionNumber: item.accessionNumber,
       form: item.form,
       filed: item.filingDate,
-      title: boundedText(item.title, 180),
+      title: boundedText(item.title || item.form || "SEC filing", 180),
       url: item.url
     });
   }
@@ -210,7 +211,7 @@ export async function handleAnalysisRequest(request, env, url) {
     const cached = await env.DB.prepare(
       "SELECT output_json AS outputJson,created_at AS createdAt FROM analysis WHERE kind='brief' AND input_hash=?"
     ).bind(inputHash).first();
-    if (cached && Date.now() - Date.parse(cached.createdAt) < CACHE_MS) {
+    if (cached && Number.isFinite(Date.parse(cached.createdAt)) && Date.now() - Date.parse(cached.createdAt) >= 0 && Date.now() - Date.parse(cached.createdAt) < CACHE_MS) {
       try {
         const brief = JSON.parse(cached.outputJson);
         return jsonResponse({
