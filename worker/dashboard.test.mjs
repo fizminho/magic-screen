@@ -6,7 +6,7 @@ const origin = "https://folio.example";
 const envConfig = { APP_ENV: "production", RP_ID: "folio.example", RP_ORIGIN: origin };
 const cookie = `__Host-session=${"s".repeat(43)}`;
 
-function fakeDb({ authenticated = true, rows = [], maxPositionPct = null } = {}) {
+function fakeDb({ authenticated = true, rows = [], maxPositionPct = null, alertMovePct = null } = {}) {
   const DB = {
     prepare(sql) {
       return {
@@ -23,7 +23,13 @@ function fakeDb({ authenticated = true, rows = [], maxPositionPct = null } = {})
           if (sql.includes("FROM setting WHERE key")) return maxPositionPct === null ? null : { value: String(maxPositionPct) };
           return null;
         },
-        async all() { return { results: rows }; },
+        async all() {
+          if (sql.includes("FROM setting")) return { results: [
+            ...(maxPositionPct === null ? [] : [{ key: "max_position_pct", value: String(maxPositionPct) }]),
+            ...(alertMovePct === null ? [] : [{ key: "alert_move_pct", value: String(alertMovePct) }])
+          ] };
+          return { results: rows };
+        },
         async run() { return { meta: { changes: 1 } }; }
       };
     }
@@ -105,12 +111,12 @@ test("dashboard endpoint returns calculated metrics for the owner", async () => 
 
 test("dashboard emits configurable concentration and quote-quality flags", () => {
   const result = calculateDashboard([
-    { symbol: "AAPL", market: "US", quantity: 8, price: 100, prevClose: 100, quoteStatus: "ok" },
+    { symbol: "AAPL", market: "US", quantity: 8, price: 110, prevClose: 100, quoteStatus: "ok" },
     { symbol: "MSFT", market: "US", quantity: 2, price: 100, prevClose: 100, quoteStatus: "stale" },
     { symbol: "NVDA", market: "US", quantity: 1, price: null, prevClose: null, quoteStatus: "unavailable" }
   ], 50);
   assert.equal(result.thresholds.maxPositionPct, 50);
-  assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
+  assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));\n  assert.ok(result.riskFlags.some((flag) => flag.code === "large_daily_move"));
   assert.ok(result.riskFlags.some((flag) => flag.code === "stale_quotes"));
   assert.ok(result.riskFlags.some((flag) => flag.code === "missing_quotes"));
   assert.ok(result.riskFlags.every((flag) => flag.market === "US"));
@@ -120,7 +126,7 @@ test("dashboard endpoint applies the owner's configured concentration threshold"
   const { DB } = fakeDb({
     maxPositionPct: 20,
     rows: [
-      { symbol: "AAPL", market: "US", sector: "Technology", quantity: 8, price: 100, quoteStatus: "ok" },
+      { symbol: "AAPL", market: "US", sector: "Technology", quantity: 8, price: 110, prevClose: 100, quoteStatus: "ok" },
       { symbol: "MSFT", market: "US", sector: "Technology", quantity: 2, price: 100, quoteStatus: "ok" }
     ]
   });
@@ -129,6 +135,6 @@ test("dashboard endpoint applies the owner's configured concentration threshold"
     { ...envConfig, DB }, "/api/dashboard"
   );
   const result = await response.json();
-  assert.equal(result.thresholds.maxPositionPct, 20);
+  assert.equal(result.thresholds.maxPositionPct, 20);\n  assert.equal(result.thresholds.alertMovePct, 5);
   assert.ok(result.riskFlags.some((flag) => flag.code === "position_concentration"));
 });
