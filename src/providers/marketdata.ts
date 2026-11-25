@@ -44,7 +44,7 @@ export function parseMarketDataQuotes(
 
     if (!validPrice || !validDate) {
       result.set(symbol, {
-        symbol, price: null, prevClose: null, changePct: null,
+        symbol, market: "US", price: null, prevClose: null, changePct: null,
         asOf: null, currency: "USD", provider: "marketdata.app", status: "unavailable"
       });
       continue;
