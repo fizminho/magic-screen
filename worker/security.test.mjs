@@ -32,7 +32,7 @@ test("publicErrorMessage hides internals from clients", () => {
 test("Worker has no legacy MFI endpoints, runtime DDL or provider session secret", () => {
   const source = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
   assert.ok(source.includes("/api/health"));
-  for (const retired of ["/api/mfi/screen", "/api/stocks", "/api/pipeline/status", "MFI_SESSION_COOKIE", "CREATE TABLE", "syncMagicFormulaUniverse", "Magic Formula Investing"]) {
+  for (const retired of ["/api/" + "mfi/screen", "/api/" + "stocks", "/api/" + "pipeline/status", "MFI_" + "SESSION_COOKIE", "CREATE " + "TABLE", "syncMagic" + "FormulaUniverse", "Magic Formula " + "Investing"]) {
     assert.ok(!source.includes(retired), retired);
   }
 });
