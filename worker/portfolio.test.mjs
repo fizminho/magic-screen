@@ -84,7 +84,7 @@ test("holdings import validates and upserts instruments and holdings in one batc
   assert.deepEqual(await response.json(), { saved: 2 });
   assert.equal(calls.batch, 1);
   assert.equal(calls.statements.length, 4);
-  assert.deepEqual(calls.statements[0].values, ["AAPL", "US", "AAPL", "AAPL", "USD"]);
+  assert.deepEqual(calls.statements[0].values, ["AAPL", "US", "AAPL", "AAPL", "USD", null]);
   assert.deepEqual(calls.statements[3].values.slice(0, 3), [50, 6.2, "Long-term"]);
 });
 
@@ -201,7 +201,7 @@ test("watchlist additions upsert instruments and notes in one bounded D1 batch",
   assert.deepEqual(await response.json(), { added: 2 });
   assert.equal(calls.batch, 1);
   assert.equal(calls.statements.length, 4);
-  assert.deepEqual(calls.statements[0].values, ["MSFT", "US", "MSFT", "MSFT", "USD"]);
+  assert.deepEqual(calls.statements[0].values, ["MSFT", "US", "MSFT", "MSFT", "USD", null]);
   assert.deepEqual(calls.statements[1].values.slice(0, 1), ["Watch earnings"]);
 });
 
@@ -296,4 +296,22 @@ test("watchlist API enforces 50 total instruments while allowing updates", async
   assert.equal(updated.status, 200);
   assert.deepEqual(await updated.json(), { added: 1 });
   assert.equal(updateCalls.batch, 1);
+});
+
+test("US instrument CIKs are normalized to ten digits and Bursa CIKs are rejected", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/holdings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ holdings: [{ symbol: "AAPL", market: "US", quantity: 1, cik: "320193" }] })
+  }), { ...envConfig, DB }, "/api/holdings");
+  assert.equal(response.status, 200);
+  assert.equal(calls.statements[0].values[5], "0000320193");
+
+  const invalid = await handlePortfolioRequest(new Request(`${origin}/api/holdings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ holdings: [{ symbol: "1155", market: "MY", quantity: 1, cik: "123456" }] })
+  }), { ...envConfig, DB }, "/api/holdings");
+  assert.equal(invalid.status, 400);
 });
