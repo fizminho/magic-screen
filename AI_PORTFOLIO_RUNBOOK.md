@@ -241,16 +241,16 @@ Why: the app holds holdings and spends the Gemini quota, so every `/api/*` route
 - [ ] Each job writes one `job_run` row (start, end, status, short detail). Use `ctx.waitUntil` only for fire-and-forget tails.
 - [ ] Use `env.DB.batch([...])` for multi-row writes. Stay under ~40 subrequests and ~50 D1 queries per invocation.
 
-### E4. Gemini analysis (Appendix D has the contract)
-- [ ] Call `POST https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent` with header `x-goog-api-key: <secret>` (never in the URL, never in the browser).
-- [ ] `GEMINI_MODEL` is a **var**. Pick a current free-tier-eligible Flash-class model from Google's models page; do not hardcode from memory.
-- [ ] Use `responseMimeType: "application/json"` + `responseSchema`, low temperature. Parse and **validate** the result in code; reject and log if invalid. One retry on malformed output, none on 429/quota.
-- [ ] Privacy: send tickers, weights (%), % price moves, news ids/titles/sources/dates only. **Never send quantities, cost basis, account info or the owner's identity.** Note: free-tier API content may be used by Google to improve its products per its terms; verify the current terms and record them in `docs/DATA_SOURCES.md`.
-- [ ] Daily cap: before each call count today's `analysis` rows; stop at `GEMINI_DAILY_CAP`.
-- [ ] Cache by `input_hash` (unique) so identical inputs never re-spend quota.
-- [ ] Two stored analysis kinds: `brief` (per market; includes the news → holding impact assessment in the same call) and `recommendation` (weekly, candidates only).
-- [ ] **Deterministic risk metrics computed in code, not by Gemini:** largest position %, top-3 concentration %, sector weights, market split (US/MY), count of holdings with stale quotes. Show them in the UI as rule-based flags (e.g. one position above a configurable limit) and pass them to Gemini as input.
-- [ ] Guardrails in code, not in the prompt: any ticker not in the supplied candidate/holding list is dropped; any cited `news_id` not supplied is dropped; confidence is clamped; text is length-limited; output is rendered as plain text (no HTML injection).
+### E4. Cloudflare Workers AI research brief
+- [x] Provider decision: Gemini API is rejected for this personal consumer app. Current Gemini API terms restrict the service to professional/business use rather than consumer use; the Free Tier may use prompts/responses to improve Google products and allow human review. Do not send portfolio data to Gemini.
+- [ ] Use the Cloudflare Workers AI binding `env.AI.run()` with `@cf/zai-org/glm-4.7-flash`. This model is listed as available on the Workers Free plan; free allowance is 10,000 Neurons/day. No external model API key is required.
+- [ ] Cloudflare Workers AI standard inference has zero data retention and Cloudflare does not use Customer Content to train models. Review the model's MIT licence and Cloudflare's data usage commitments before release.
+- [ ] **Input boundary:** send only public SEC companyfacts and public SEC filing metadata. Never send holding/watchlist status, quantities, average cost, notes, portfolio weights, account identifiers, provider tokens or personal settings. Do not send MarketData.app quote data to the model.
+- [ ] Analysis is a public-company research brief, not a personalized portfolio recommendation. No buy/sell command, target price or guaranteed return. Include uncertainty and data gaps.
+- [ ] Request structured JSON by prompt and validate it in code. If invalid, retry once with a short correction prompt; no retry on 429/quota/out-of-capacity errors. Render only plain text; never trust model HTML.
+- [ ] Output schema: `company_summary`, `financial_strengths`, `financial_risks`, `filing_signals`, `unknowns`, `confidence`, and `source_accessions`. Every source accession must exist in the SEC facts/filings supplied to the model; drop unknown citations.
+- [ ] Rate limit to 5 analyses/day per owner and cache by `input_hash` for 24 hours. Do not log raw prompts or model responses to application logs.
+- [ ] Deterministic portfolio risk metrics remain computed in code and displayed separately; they are not included in the AI prompt.
 
 ### E5. Web Push
 - [ ] Generate VAPID keys once with `npx web-push generate-vapid-keys` (do not add `web-push` as a dependency; it is Node-oriented). Store `VAPID_PRIVATE_KEY` as a secret; `VAPID_PUBLIC_KEY` and `VAPID_SUBJECT` (`mailto:`) as vars.
