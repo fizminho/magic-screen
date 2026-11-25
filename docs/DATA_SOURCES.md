@@ -18,7 +18,7 @@ The library is used as a dependency; no demo code was copied. Its browser client
 
 ## US market prices: optional Market Data API
 
-**Optional adapter implemented, not enabled:** MarketData.app Free Forever. The browser fetch adapter and owner-authenticated D1 quote-snapshot API exist; the API-token settings UI and instrument/portfolio UI are still pending.
+**Optional adapter implemented, not enabled:** MarketData.app Free Forever. The browser fetch adapter, owner-authenticated D1 quote-snapshot API and portfolio UI exist. Live account testing remains pending.
 
 - Personal, non-professional use only. Its terms permit data storage on a computer/device or cloud storage service only when the data is accessible only to the account owner.
 - Free tier: 100 API credits/day, standard pricing endpoints and at least 24-hour delayed data; history is limited to one year. It is not a real-time feed.
