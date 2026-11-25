@@ -1,7 +1,7 @@
 name: Build
 on:
   push:
-    branches: [main]
+    branches: [main, chore/ai-portfolio-rebuild]
   pull_request:
     branches: [main]
   workflow_dispatch:
