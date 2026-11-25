@@ -50,3 +50,15 @@ test("auth endpoints do not allow method confusion", async () => {
   assert.equal(response.status, 405);
   assert.equal(response.headers.get("allow"), "GET, POST");
 });
+
+test("auth mutations reject JSON lookalike media types", async () => {
+  const response = await handleAuthRequest(new Request("https://folio.example/api/auth/login/verify", {
+    method: "POST",
+    headers: {
+      origin: "https://folio.example",
+      "content-type": "application/jsonp"
+    },
+    body: "{}"
+  }), { RP_ID: "folio.example", RP_ORIGIN: "https://folio.example" }, "/api/auth/login/verify");
+  assert.equal(response.status, 415);
+});
