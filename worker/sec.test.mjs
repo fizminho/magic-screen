@@ -114,7 +114,7 @@ test("SEC filings endpoint requires a CIK on an active US instrument", async () 
   const { DB } = fakeDb({ instrument: { id: 7, cik: null } });
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => { throw new Error("must not fetch"); }
   );
@@ -127,7 +127,7 @@ test("SEC filings endpoint fetches only official submissions using declared User
   let requestedAgent = "";
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async (url, init) => {
       requestedUrl = String(url);
@@ -156,7 +156,7 @@ test("SEC lookup is rate-limited and handles SEC upstream throttling", async () 
   const { DB } = fakeDb();
   const upstream = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => new Response("{}", { status: 429 })
   );
@@ -177,7 +177,7 @@ test("fresh SEC filing metadata is served from D1 without an upstream request", 
   let fetchCalls = 0;
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => { fetchCalls++; throw new Error("cache should be used"); }
   );
@@ -194,7 +194,7 @@ test("SEC cache miss persists filing metadata and a six-hour cache marker", asyn
   const { DB, calls } = fakeDb();
   const response = await handleSecRequest(
     new Request(`${origin}/api/sec/filings?symbol=AAPL`, { headers: { cookie } }),
-    { DB, SEC_USER_AGENT: userAgent },
+    { ...envConfig, DB, SEC_USER_AGENT: userAgent },
     new URL(`${origin}/api/sec/filings?symbol=AAPL`),
     async () => new Response(JSON.stringify(submissions()), { status: 200 })
   );
