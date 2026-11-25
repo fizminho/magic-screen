@@ -90,7 +90,7 @@ async function sessionFor(request, env) {
   const tokenHash = await sha256Hex(token);
   const idleCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const row = await env.DB.prepare(
-    "SELECT token_hash, expires_at, last_seen_at FROM session WHERE token_hash = ? AND expires_at > ? AND last_seen_at > ?"
+    "SELECT token_hash, credential_id, expires_at, last_seen_at FROM session WHERE token_hash = ? AND expires_at > ? AND last_seen_at > ?"
   ).bind(tokenHash, nowIso(), idleCutoff).first();
   if (!row) return null;
   const refreshAfter = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -98,7 +98,7 @@ async function sessionFor(request, env) {
     await env.DB.prepare("UPDATE session SET last_seen_at = ? WHERE token_hash = ?")
       .bind(nowIso(), tokenHash).run();
   }
-  return { tokenHash, expiresAt: row.expires_at };
+  return { tokenHash, credentialId: row.credential_id, expiresAt: row.expires_at };
 }
 
 async function passkeyCount(env) {
@@ -441,7 +441,8 @@ async function credentialMutation(request, env, pathname) {
       if (!exists) return json({ error: "Passkey not found." }, 404);
       return json({ error: "The last passkey cannot be deleted." }, 409);
     }
-    return json({ ok: true, passkeyCount: await passkeyCount(env) });
+    return json({ ok: true, passkeyCount: await passkeyCount(env) }, 200,
+      session.credentialId === credentialId ? { "set-cookie": cookieHeader("", env, 0) } : {});
   }
 
   return json({ error: "Method not allowed." }, 405, { allow: "PATCH, DELETE" });
