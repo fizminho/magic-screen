@@ -529,6 +529,11 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   }
 
   useEffect(() => {
+    const savedToken = sessionStorage.getItem("magicfolio.marketdata.token");
+    if (savedToken) setMarketToken(savedToken);
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     async function loadPortfolio() {
