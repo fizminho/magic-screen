@@ -1,15 +1,4 @@
-export type QuoteStatus = "ok" | "stale" | "unavailable";
-
-export type QuoteSnapshot = {
-  symbol: string;
-  price: number | null;
-  prevClose: number | null;
-  changePct: number | null;
-  asOf: string | null;
-  currency: "USD";
-  provider: "marketdata.app";
-  status: QuoteStatus;
-};
+import type { QuoteProvider, QuoteSnapshot } from "./types";
 
 type MarketDataPayload = {
   s?: string;
@@ -63,8 +52,9 @@ export function parseMarketDataQuotes(
 
     result.set(symbol, {
       symbol,
+      market: "US",
       price,
-      prevClose: Number.isFinite(change) ? price - change : null,
+      prevClose: Number.isFinite(change) && price - change > 0 ? price - change : null,
       changePct: Number.isFinite(changePct) ? changePct : null,
       asOf: asOfDate.toISOString(),
       currency: "USD",
@@ -132,4 +122,12 @@ export async function fetchMarketDataQuotes(
     snapshots.push(...await fetchChunk(chunk, token.trim(), fetcher));
   }
   return snapshots;
+}
+
+export function createMarketDataProvider(token: string, fetcher: typeof fetch = fetch): QuoteProvider {
+  return {
+    id: "marketdata.app",
+    market: "US",
+    getQuotes: (symbols) => fetchMarketDataQuotes(symbols, token, fetcher)
+  };
 }
