@@ -107,9 +107,18 @@ jobs:
           holdings_get_status="$(curl --silent --output /tmp/holdings-get.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/holdings -H "Cookie: magicfolio_session=$backup_token")"
           test "$holdings_get_status" = "200"
           jq -e '.holdings | length == 2' /tmp/holdings-get.json >/dev/null
+          quote_asof="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+          quote_payload="$(jq -n --arg asOf "$quote_asof" '{quotes:[{symbol:"AAPL",market:"US",price:101,prevClose:100,changePct:0.01,asOf:$asOf,currency:"USD",provider:"marketdata.app",status:"ok"},{symbol:"1155",market:"MY",price:6.42,prevClose:6.3,changePct:0.0190476,asOf:$asOf,currency:"MYR",provider:"manual-csv",status:"ok"}]}')"
+          quote_status="$(curl --silent --output /tmp/quotes-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/quotes/snapshots -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data "$quote_payload")"
+          test "$quote_status" = "200"
+          jq -e '.saved == 2 and (.unmatchedSymbols | length == 0)' /tmp/quotes-post.json >/dev/null
+          holdings_after_quote="$(curl --silent --show-error --fail --resolve localhost:8787:127.0.0.1 http://localhost:8787/api/holdings -H "Cookie: magicfolio_session=$backup_token")"
+          echo "$holdings_after_quote" | jq -e '.holdings[] | select(.symbol == "AAPL") | .price == 101 and .quoteStatus == "ok"' >/dev/null
           holding_delete_status="$(curl --silent --output /tmp/holding-delete.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X DELETE http://localhost:8787/api/holdings/US/AAPL -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{}')"
           test "$holding_delete_status" = "200"
           jq -e '.deleted == true and .symbol == "AAPL"' /tmp/holding-delete.json >/dev/null
+          removed_quote_count="$(npx --yes wrangler@4 d1 execute magic-screen-db --local --json --command "SELECT COUNT(*) AS remaining FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL';" | jq -r '.. | objects | select(has("remaining")) | .remaining' | head -n 1)"
+          test "$removed_quote_count" = "0"
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
           test "$watchlist_status" = "200"
           jq -e '.added == 1' /tmp/watchlist-post.json >/dev/null
