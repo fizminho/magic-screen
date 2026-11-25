@@ -56,6 +56,31 @@ export function validateResearchBrief(value, allowedAccessions, symbol) {
   };
 }
 
+function mapSources(accessions, filings, facts, cik) {
+  const wanted = new Set(accessions);
+  const records = new Map();
+  for (const item of facts || []) {
+    if (typeof item.accessionNumber === "string") records.set(item.accessionNumber, {
+      accessionNumber: item.accessionNumber,
+      form: item.form || "SEC filing",
+      filed: item.filed || "",
+      url: `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${item.accessionNumber.replace(/-/g, "")}/`
+    });
+  }
+  for (const item of filings || []) {
+    if (typeof item.accessionNumber === "string") records.set(item.accessionNumber, {
+      accessionNumber: item.accessionNumber,
+      form: item.form,
+      filed: item.filingDate,
+      title: boundedText(item.title, 180),
+      url: item.url
+    });
+  }
+  return [...wanted].map((accession) => records.get(accession)).filter((item) =>
+    item && item.url.startsWith("https://www.sec.gov/Archives/")
+  );
+}
+
 async function sha256(value) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -160,14 +185,21 @@ export async function handleAnalysisRequest(request, env, url) {
         "FROM sec_filing WHERE instrument_id=? AND cik=? AND filing_date>=? ORDER BY filing_date DESC LIMIT 10"
       ).bind(instrument.id, instrument.cik, new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)).all()
     ]);
-    if (!factsRow || String(factsRow.cik).padStart(10, "0") !== instrument.cik) {
+    if (!factsRow || String(factsRow.cik).padStart(10, "0") !== instrument.cik ||
+        !Number.isFinite(Date.parse(factsRow.fetchedAt)) ||
+        Date.now() - Date.parse(factsRow.fetchedAt) >= 6 * 60 * 60 * 1000) {
       return jsonResponse({ error: "Refresh public SEC company facts before generating a research brief." }, 409);
     }
     let facts;
     try { facts = JSON.parse(factsRow.factsJson); } catch {
       return jsonResponse({ error: "Cached SEC company facts are invalid. Refresh them first." }, 409);
     }
-    const filings = filingRows.results || [];
+    const filings = (filingRows.results || []).filter((item) =>
+      typeof item.accessionNumber === "string" &&
+      /^\\d{10}-\\d{2}-\\d{6}$/.test(item.accessionNumber) &&
+      item.accessionNumber.slice(0, 10) === instrument.cik &&
+      typeof item.url === "string" && item.url.startsWith("https://www.sec.gov/Archives/")
+    );
     const allowedAccessions = new Set([
       ...(Array.isArray(facts.facts) ? facts.facts.map((item) => item.accessionNumber) : []),
       ...filings.map((item) => item.accessionNumber)
@@ -179,7 +211,13 @@ export async function handleAnalysisRequest(request, env, url) {
       "SELECT output_json AS outputJson,created_at AS createdAt FROM analysis WHERE kind='brief' AND input_hash=?"
     ).bind(inputHash).first();
     if (cached && Date.now() - Date.parse(cached.createdAt) < CACHE_MS) {
-      try { return jsonResponse({ brief: JSON.parse(cached.outputJson), cached: true }); } catch { /* regenerate */ }
+      try {
+        const brief = JSON.parse(cached.outputJson);
+        return jsonResponse({
+          brief, model: MODEL, createdAt: cached.createdAt, cached: true,
+          sources: mapSources(brief.source_accessions, filings, facts.facts, instrument.cik)
+        });
+      } catch { /* regenerate */ }
     }
 
     const dayKey = new Date().toISOString().slice(0, 10);
@@ -208,7 +246,10 @@ export async function handleAnalysisRequest(request, env, url) {
       "INSERT INTO analysis(kind,market,model,input_hash,output_json,created_at) VALUES('brief','US',?,?,?,?) " +
       "ON CONFLICT(input_hash) DO UPDATE SET model=excluded.model,output_json=excluded.output_json,created_at=excluded.created_at"
     ).bind(MODEL, inputHash, JSON.stringify(brief), createdAt).run();
-    return jsonResponse({ brief, cached: false });
+    return jsonResponse({
+      brief, model: MODEL, createdAt, cached: false,
+      sources: mapSources(brief.source_accessions, filings, facts.facts, instrument.cik)
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "origin_rejected") return jsonResponse({ error: "Request origin rejected." }, 403);
