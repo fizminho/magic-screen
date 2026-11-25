@@ -65,6 +65,7 @@ jobs:
             -e 's/^RP_ID = "investlah.binalah.com"$/RP_ID = "localhost"/' \
             -e 's#^RP_ORIGIN = "https://investlah.binalah.com"$#RP_ORIGIN = "http://localhost:8787"#' \
             wrangler.toml > wrangler.ci.toml
+          grep -E '^(APP_ENV|RP_ID|RP_ORIGIN) =' wrangler.ci.toml
           npx --yes wrangler@4 dev --config wrangler.ci.toml --local --ip 127.0.0.1 --port 8787 > /tmp/magic-folio-wrangler.log 2>&1 &
           worker_pid=$!
           trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
