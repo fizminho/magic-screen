@@ -21,6 +21,7 @@ import { handleExportRequest } from "./lib/export.mjs";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  AI: Ai;
   APP_ENV?: string;
   RP_ID?: string;
   RP_NAME?: string;
