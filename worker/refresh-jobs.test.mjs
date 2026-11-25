@@ -2,15 +2,24 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
 
-function mockDb({ instruments = [] } = {}) {
+function mockDb({ instruments = [], cursor = "" } = {}) {
   const calls = { prepared: [], batches: [], all: 0 };
   const DB = {
     prepare(sql) {
       const statement = {
         sql, values: [],
         bind(...values) { this.values = values; return this; },
-        async all() { calls.all++; return { results: instruments }; },
-        async first() { return null; },
+        async all() {
+          calls.all++;
+          if (!sql.includes("FROM instrument i")) return { results: [] };
+          const after = sql.includes("i.symbol > ?") ? String(this.values[0] || "") : "";
+          const limit = Number(this.values[this.values.length - 1] || instruments.length);
+          return { results: instruments.filter((item) => item.symbol > after).slice(0, limit) };
+        },
+        async first() {
+          if (sql.includes("sec_refresh_cursor")) return cursor ? { value: cursor } : null;
+          return null;
+        },
         async run() {
           calls.prepared.push({ sql, values: this.values });
           if (sql.startsWith("INSERT INTO job_run")) return { meta: { last_row_id: 1, changes: 1 } };
@@ -77,4 +86,53 @@ test("weekly housekeeping uses bounded retention windows", async () => {
   assert.equal(calls.batches[0].length, 8);
   assert.ok(calls.batches[0].some((item) => item.sql.includes("DELETE FROM sec_filing")));
   assert.ok(calls.batches[0].some((item) => item.sql.includes("DELETE FROM auth_challenge")));
+});
+
+test("scheduled SEC refresh rotates through symbols after the persisted cursor", async () => {
+  const instruments = [
+    { id: 1, symbol: "AAPL", cik: "0000000001" },
+    { id: 2, symbol: "AMZN", cik: "0000000002" },
+    { id: 3, symbol: "GOOG", cik: "0000000003" },
+    { id: 4, symbol: "MSFT", cik: "0000000004" },
+    { id: 5, symbol: "NVDA", cik: "0000000005" },
+    { id: 6, symbol: "TSLA", cik: "0000000006" }
+  ];
+  const { DB, calls } = mockDb({ instruments, cursor: "MSFT" });
+  const requested = [];
+  const fetcher = async (url) => {
+    requested.push(String(url));
+    if (String(url).includes("/submissions/")) {
+      return new Response(JSON.stringify({ name: "Company", filings: { recent: {
+        form: [], filingDate: [], accessionNumber: [], primaryDocument: []
+      } } }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      cik: Number(String(url).match(/CIK(\d+)\.json$/)?.[1]),
+      entityName: "Company", facts: { "us-gaap": {} }
+    }), { status: 200 });
+  };
+  const result = await runSecRefresh({ DB, SEC_USER_AGENT: userAgent }, {
+    fetcher, now: Date.parse("2026-11-25T01:00:00Z")
+  });
+  assert.equal(result.instruments, 2);
+  assert.ok(requested[0].endsWith("CIK0000000005.json"));
+  assert.ok(requested[2].endsWith("CIK0000000006.json"));
+  assert.ok(calls.prepared.some((item) => item.sql.includes("sec_refresh_cursor") && item.values[0] === "TSLA"));
+});
+
+test("scheduled SEC refresh stops immediately when SEC returns HTTP 429", async () => {
+  const instruments = [
+    { id: 1, symbol: "AAPL", cik: "0000320193" },
+    { id: 2, symbol: "MSFT", cik: "0000789019" }
+  ];
+  const { DB, calls } = mockDb({ instruments });
+  let requested = 0;
+  const result = await runSecRefresh({ DB, SEC_USER_AGENT: userAgent }, {
+    now: Date.parse("2026-11-25T01:00:00Z"),
+    fetcher: async () => { requested++; return new Response("rate limited", { status: 429 }); }
+  });
+  assert.equal(requested, 1);
+  assert.equal(result.rateLimited, true);
+  assert.equal(result.failed, 1);
+  assert.equal(calls.prepared.some((item) => item.sql.includes("sec_refresh_cursor")), false);
 });
