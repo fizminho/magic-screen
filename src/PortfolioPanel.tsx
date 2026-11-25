@@ -50,6 +50,22 @@ type PortfolioSettings = {
   maxPositionPct: number;
 };
 
+type ResearchResult = {
+  brief: {
+    company_summary: string;
+    financial_strengths: string[];
+    financial_risks: string[];
+    filing_signals: string[];
+    unknowns: string[];
+    confidence: "low" | "medium" | "high";
+    source_accessions: string[];
+  };
+  model: string;
+  createdAt: string;
+  cached: boolean;
+  sources: Array<{ accessionNumber: string; form: string; filed: string; title: string; url: string }>;
+};
+
 type WatchlistItem = {
   symbol: string;
   market: "US" | "MY";
@@ -109,6 +125,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [secFilings, setSecFilings] = useState<Array<{form:string;title:string;summary:string;filingDate:string;reportDate:string|null;url:string;accessionNumber:string}>>([]);
   const [secLoading, setSecLoading] = useState(false);
   const [secLoadingSymbol, setSecLoadingSymbol] = useState("");
+  const [researchLoadingSymbol, setResearchLoadingSymbol] = useState("");
+  const [researchResult, setResearchResult] = useState<(ResearchResult & { symbol: string }) | null>(null);
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -336,6 +354,29 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setSecLoading(false); setSecLoadingSymbol(""); }
   }
 
+  async function loadResearchBrief(item: { symbol: string; market: "US" | "MY"; cik: string | null }) {
+    if (item.market !== "US") { onError("Public SEC research is available for US instruments only."); return; }
+    if (!item.cik) { onError("Add the SEC CIK to this instrument first."); return; }
+    onError(""); onNotice(""); setResearchLoadingSymbol(item.symbol); setResearchResult(null);
+    try {
+      const filings = await api<{ companyName: string; filings: Array<{ form: string; title: string; summary: string; filingDate: string; reportDate: string | null; url: string; accessionNumber: string }> }>(
+        `/api/sec/filings?symbol=${encodeURIComponent(item.symbol)}`
+      );
+      setSecSymbol(item.symbol);
+      setSecCompanyName(filings.companyName);
+      setSecFilings(filings.filings);
+      await api(`/api/sec/companyfacts?symbol=${encodeURIComponent(item.symbol)}`);
+      const result = await api<ResearchResult>("/api/research/brief", {
+        method: "POST",
+        body: JSON.stringify({ symbol: item.symbol })
+      });
+      setResearchResult({ ...result, symbol: item.symbol });
+      onNotice(`Research brief ready for ${item.symbol}.`);
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to generate the research brief.");
+    } finally { setResearchLoadingSymbol(""); }
+  }
+
   async function refreshUsQuotes() {
     if (!marketToken.trim()) { onError("Save your Market Data API token first."); return; }
     const symbols = [...new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol))];
@@ -444,7 +485,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <td>{formatMoney(item.avgCost, item.currency)}</td>
                   <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
                   <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
-                  <td>{item.market === "US" && item.cik ? <button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
+                  <td>{item.market === "US" && item.cik ? <div className="row-actions"><button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading || !!researchLoadingSymbol}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button><button className="button button-small button-secondary" onClick={() => loadResearchBrief(item)} disabled={secLoading || !!researchLoadingSymbol}>{researchLoadingSymbol === item.symbol ? "Researching…" : "Research"}</button></div> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                   <td><button className="button button-danger button-small" onClick={() => removeHolding(item)} disabled={busy}>Remove</button></td>
                 </tr>
               ))
@@ -470,7 +511,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                     <td><b>{formatMoney(item.price, item.currency)}</b>{item.changePct !== null && <span className={item.changePct >= 0 ? "quote-positive" : "quote-negative"}>{(item.changePct * 100).toFixed(2)}%</span>}</td>
                     <td><span className={`quote-status quote-${item.quoteStatus}`}>{item.quoteStatus === "ok" ? (item.market === "US" ? "24h delayed" : "Manual") : item.quoteStatus}</span><small>{formatDate(item.quoteAsOf)}</small></td>
                     <td>{item.note || " "}</td>
-                    <td>{item.market === "US" && item.cik ? <button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading}>{secLoading && secSymbol === item.symbol ? "Loading…" : "Filings"}</button> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
+                    <td>{item.market === "US" && item.cik ? <div className="row-actions"><button className="button button-small" onClick={() => loadSecFilings(item)} disabled={secLoading || !!researchLoadingSymbol}>{secLoading && secLoadingSymbol === item.symbol ? "Loading…" : "Filings"}</button><button className="button button-small button-secondary" onClick={() => loadResearchBrief(item)} disabled={secLoading || !!researchLoadingSymbol}>{researchLoadingSymbol === item.symbol ? "Researching…" : "Research"}</button></div> : <small>{item.market === "US" ? "CIK needed" : "—"}</small>}</td>
                     <td><button className="button button-danger button-small" onClick={() => removeWatchlistItem(item)} disabled={busy}>Remove</button></td>
                   </tr>
                 ))
@@ -504,6 +545,36 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             </div>
           }
           <p className="fine-print">Metadata only. Filing documents open directly on sec.gov. SEC lookup requires a configured contact User-Agent and is limited to 5 requests per hour.</p>
+        </section>
+      )}
+
+      {researchResult && (
+        <section className="tool-card tool-wide research-panel">
+          <div className="watchlist-heading">
+            <div><span className="eyebrow">PUBLIC COMPANY RESEARCH · {researchResult.confidence.toUpperCase()} CONFIDENCE</span><h3>{researchResult.symbol} research brief</h3></div>
+            <button className="button button-quiet button-small" onClick={() => setResearchResult(null)}>Close</button>
+          </div>
+          <p>{researchResult.brief.company_summary}</p>
+          <div className="research-grid">
+            {([
+              ["Financial strengths", researchResult.brief.financial_strengths],
+              ["Financial risks", researchResult.brief.financial_risks],
+              ["Filing signals", researchResult.brief.filing_signals],
+              ["Unknowns / data gaps", researchResult.brief.unknowns]
+            ] as Array<[string, string[]]>).map(([title, items]) => (
+              <article className="research-list" key={title}>
+                <b>{title}</b>
+                {items.length ? <ul>{items.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p>No supported points returned.</p>}
+              </article>
+            ))}
+          </div>
+          <div className="research-sources">
+            <b>SEC sources</b>
+            {researchResult.sources.length ? researchResult.sources.map((source) => (
+              <a key={source.accessionNumber} href={source.url} target="_blank" rel="noreferrer">{source.form} · {source.filed} · {source.title}</a>
+            )) : <p>No recent filing citations were supplied.</p>}
+          </div>
+          <p className="fine-print">Generated by {researchResult.model} · {researchResult.cached ? "cached" : "new analysis"} · {formatDate(researchResult.createdAt)}. Uses public SEC company facts and filing metadata only. Holdings, quantities, average costs, notes and quote prices are not sent to the model. Not investment advice.</p>
         </section>
       )}
 
