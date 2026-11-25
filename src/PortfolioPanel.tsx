@@ -573,6 +573,11 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             <button className="button button-secondary field-wide" type="submit" disabled={busy}>Save settings</button>
           </form>
           <p className="fine-print">Position size is used for rule-based concentration warnings. Daily move threshold is stored for the planned alert service; push notifications are not active yet.</p>
+          <div className="tool-actions">
+            <a className="button button-secondary" href="/api/export?format=json">Download JSON</a>
+            <a className="button button-quiet" href="/api/export?format=csv">Download CSV</a>
+          </div>
+          <p className="fine-print">Exports include holdings, watchlist and settings only. Provider quote snapshots are excluded.</p>
         </section>
 
         <section className="tool-card tool-wide">
