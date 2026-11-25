@@ -27,6 +27,8 @@ import { handlePushRequest } from "./lib/push.mjs";
 import { handleJobRunsRequest } from "./lib/jobs.mjs";
 // @ts-ignore Owner-only manual job controls are covered by Worker regression tests.
 import { handleAdminJobsRequest } from "./jobs/admin.mjs";
+// @ts-ignore EdgarTools shadow ingestion is covered by dedicated regression tests.
+import { handleEdgarToolsRequest } from "./lib/edgartools.mjs";
 
 interface Env {
   ASSETS: Fetcher;
@@ -38,6 +40,7 @@ interface Env {
   RP_ORIGIN?: string;
   SETUP_TOKEN?: string;
   SEC_USER_AGENT?: string;
+  UNIVERSE_SYNC_TOKEN?: string;
   VAPID_PRIVATE_KEY?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_SUBJECT?: string;
@@ -69,6 +72,8 @@ export default {
       response = await handleSecCompanyFactsRequest(request, env, url);
     } else if (url.pathname === "/api/analysis/latest" || url.pathname === "/api/analysis/inbox" || url.pathname === "/api/analysis/run") {
       response = await handleAnalysisRequest(request, env, url);
+    } else if (url.pathname.startsWith("/api/fundamentals/edgartools/")) {
+      response = await handleEdgarToolsRequest(request, env, url);
     } else if (url.pathname === "/api/jobs/recent") {
       response = await handleJobRunsRequest(request, env, url);
     } else if (url.pathname === "/api/admin/jobs" || url.pathname === "/api/admin/jobs/run") {
