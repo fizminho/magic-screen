@@ -1,38 +1,27 @@
 # Security
 
-Magic Screen is a single-owner personal research app. It has no end-user accounts, login flow, Gemini integration or LLM API key.
+Magic Folio is designed as a private, single-owner portfolio research application. The rebuild is in progress; do not expose personal portfolio APIs until passkey authentication and authorization checks are implemented and tested.
 
-## Secrets
+## Security requirements
 
-| Secret | Location | Purpose |
-|---|---|---|
-| `MFI_SESSION_COOKIE` | Cloudflare Worker secret | Owner's authenticated MFI session. Required to refresh the candidate universe. |
+- Passkey-only authentication using a reviewed WebAuthn implementation. No password fallback.
+- First-run registration must require a temporary setup secret. After owner enrollment, remove that secret.
+- Store only hashed session tokens; use secure, HttpOnly, SameSite cookies.
+- Require an authenticated owner session for all portfolio, settings, export, push-subscription and AI-analysis endpoints.
+- Rate-limit authentication challenge and verification endpoints.
+- Never send holding quantities, session tokens, passkey material, provider credentials or setup secrets to an LLM.
+- Treat quote, news, RSS and user-supplied text as untrusted data.
+- Keep API keys in Worker secrets, never in frontend bundles or Git.
+- Use parameterized D1 queries and schema migrations. Do not execute DDL at request time.
 
-Never put the MFI cookie in source code, frontend variables, GitHub commits, prompts, or chat. Configure with `npx wrangler secret put MFI_SESSION_COOKIE`. Treat the cookie like a password and rotate it if exposed or expired.
+## Worker response protections
 
-No Gemini or other AI API key is used by the application.
+The Worker applies a restrictive Content Security Policy, HSTS, content-type protection, anti-framing, referrer and permissions policies. CSP does not allow inline scripts or styles.
 
-## Public API surface
+## Production data reset
 
-- `GET /api/health`
-- `GET /api/pipeline/status`
-- `GET /api/stocks`
-- `GET /api/mfi/screen`
+The owner authorized a one-time clean reset of the existing `magic-screen-db`, without backup or migration of legacy data. The reset workflow is separate from ordinary deployment and requires explicit manual confirmation. It must not run until the replacement Worker is complete and the legacy endpoints are absent.
 
-The MFI refresh endpoint caches successful results for six hours. Anonymous forced refreshes are subject to a 15-minute cooldown after the last successful sync. Failed upstream attempts are not persisted separately, so apply Cloudflare WAF rate limiting to public API paths.
+## Verification
 
-## Data handling
-
-- Shariah checks and manual Investing Paths observations are stored in browser localStorage.
-- The app does not upload these records to Worker or D1.
-- The AI prompt is copied only after a user action. AI research is external to the app.
-- No provider passwords, session cookies or API credentials belong in the prompt or pasted JSON.
-
-## Hardening
-
-- Security headers are applied to Worker responses.
-- Same-origin API; no wildcard CORS.
-- Public errors are sanitised.
-- GitHub Actions builds and runs regression tests before merge.
-
-A successful CI run does not prove that the live Cloudflare deployment has completed. Verify the live Worker separately after release.
+CI runs the build, Node regression tests, production dependency audit and Wrangler dry-run. A successful CI run does not prove the live Cloudflare deployment has completed. Verify the live Worker and authentication boundary separately after release. Report security issues privately to the repository owner.
