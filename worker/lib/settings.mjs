@@ -47,7 +47,7 @@ export async function handleSettingsRequest(request, env, pathname) {
       return jsonResponse({ error: "Provide valid settings." }, 400);
     }
     const keys = Object.keys(payload);
-    if (!keys.length || keys.some((key) => !(key in LIMITS))) {
+    if (!keys.length || keys.some((key) => !Object.hasOwn(LIMITS, key))) {
       return jsonResponse({ error: "Only alertMovePct and maxPositionPct can be updated." }, 400);
     }
 
