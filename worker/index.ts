@@ -17,6 +17,8 @@ import { handleSecCompanyFactsRequest } from "./lib/sec-companyfacts.mjs";
 import { handleSettingsRequest } from "./lib/settings.mjs";
 // @ts-ignore The JavaScript export module is exercised by Node regression tests.
 import { handleExportRequest } from "./lib/export.mjs";
+// @ts-ignore The public research module is exercised by its Node regression tests.
+import { handleResearchRequest } from "./lib/research.mjs";
 // @ts-ignore Scheduled job modules are covered by Node regression tests.
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
 // @ts-ignore AI analysis route is covered by Node regression tests.
@@ -91,7 +93,7 @@ export default {
       : controller.cron === "0 2 * * 6"
         ? runWeeklyHousekeeping(env)
         : Promise.resolve({ status: "ignored_unknown_cron" });
-    ctx.waitUntil(task.catch((error) => {
+    ctx.waitUntil(task.catch((error: unknown) => {
       const code = error instanceof Error ? error.message : "unknown";
       console.error("Scheduled task failed:", controller.cron, code.slice(0, 120));
     }));
