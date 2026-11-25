@@ -1,4 +1,4 @@
-import { parseCsvRows } from "./manual-csv";
+import { parseCsvRows } from "./manual-csv.ts";
 
 const SYMBOL_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,14}$/;
 const MAX_ROWS = 20;
