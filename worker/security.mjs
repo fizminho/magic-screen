@@ -4,6 +4,8 @@ export const CSP = [
   "script-src 'self'",
   "style-src 'self'",
   "font-src 'self'",
+  "manifest-src 'self'",
+  "worker-src 'self'",
   "img-src 'self' data:",
   "connect-src 'self' https://api.marketdata.app",
   "object-src 'none'",
