@@ -1,5 +1,6 @@
 // Minimal static-asset Worker. API routes are added with the authenticated
 // Magic Folio backend; no legacy MFI endpoints or runtime DDL remain.
+// @ts-ignore The JavaScript helper is covered by its Node regression tests.
 import { withSecurityHeaders } from "./security.mjs";
 
 interface Env { ASSETS: Fetcher; }
