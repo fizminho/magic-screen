@@ -47,7 +47,7 @@ function submissions(forms = ["10-Q", "8-K"], filingDates = ["2026-11-24", "2026
 test("SEC submissions parser filters forms, sorts and builds official archive URLs", () => {
   const now = Date.parse("2026-11-25T00:00:00Z");
   const payload = submissions(["10-Q", "8-K", "NT 10-Q", "10-K"], [
-    "2026-11-24", "2026-11-20", "2026-11-22", "2026-10-01"
+    "2026-11-24", "2026-11-20", "2026-11-22", "2026-10-30"
   ]);
   const filings = parseSecSubmissions(payload, "AAPL", "0000320193", now);
   assert.equal(filings.length, 3);
