@@ -37,6 +37,8 @@ type DashboardMarket = {
   sectorWeights: Array<{ sector: string; value: number; weightPct: number }>;
 };
 type Dashboard = {
+  thresholds: { maxPositionPct: number };
+  riskFlags: Array<{ market: "US" | "MY"; severity: "warning" | "caution"; code: string; message: string }>;
   holdingsCount: number;
   staleQuoteCount: number;
   unavailableQuoteCount: number;
@@ -379,7 +381,18 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             );
           })}
         </div>
-        <p className="dashboard-disclaimer">US and MY values are kept separate because they use different currencies. Metrics use available quotes, including stale prices where marked.</p>
+        <div className="risk-flags" aria-live="polite">
+          <span className="eyebrow">RULE-BASED FLAGS · POSITION LIMIT {dashboard?.thresholds.maxPositionPct ?? settings.maxPositionPct}%</span>
+          {!dashboard ? <p>Checking portfolio rules…</p> :
+            dashboard.riskFlags.length === 0 ? <p>No concentration or quote-quality flags at the moment.</p> :
+            dashboard.riskFlags.map((flag, index) => (
+              <div className={`risk-flag risk-${flag.severity}`} key={`${flag.code}:${flag.market}:${index}`}>
+                <b>{flag.market}</b><span>{flag.message}</span>
+              </div>
+            ))
+          }
+        </div>
+        <p className="dashboard-disclaimer">US and MY values are kept separate because they use different currencies. Metrics use available quotes, including stale prices where marked. Flags are deterministic checks, not investment advice.</p>
       </div>
 
       <div className="holdings-table-wrap">
