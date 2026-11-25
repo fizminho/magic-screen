@@ -20,7 +20,7 @@ import { handleExportRequest } from "./lib/export.mjs";
 // @ts-ignore Scheduled job modules are covered by Node regression tests.
 import { runSecRefresh, runWeeklyHousekeeping } from "./jobs/refresh.mjs";
 // @ts-ignore AI analysis route is covered by Node regression tests.
-import { handleAnalysisRequest } from "./lib/analysis.mjs";
+import { handleAnalysisRequest, runScheduledResearchBrief } from "./lib/analysis.mjs";
 // @ts-ignore Web Push cryptography and routes are covered by Node regression tests.
 import { handlePushRequest } from "./lib/push.mjs";
 
@@ -92,7 +92,11 @@ export default {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const task = controller.cron === "0 1 * * 2-6"
-      ? runSecRefresh(env)
+      ? runSecRefresh(env).then(async (refreshResult) => {
+          // Generate briefs only after fresh SEC data has been persisted.
+          const briefResult = await runScheduledResearchBrief(env);
+          return { refresh: refreshResult, brief: briefResult };
+        })
       : controller.cron === "0 2 * * 6"
         ? runWeeklyHousekeeping(env)
         : Promise.resolve({ status: "ignored_unknown_cron" });
