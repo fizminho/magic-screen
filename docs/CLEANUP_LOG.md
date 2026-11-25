@@ -38,3 +38,18 @@ Phase A is intentionally incomplete. Required next actions in an environment wit
 5. Only after the backup and inventory are verified may destructive migration planning continue.
 
 No production secret was deleted, no remote D1 data was changed, no existing branch was deleted, and no pull request was closed.
+
+
+## Phase A follow-up: repository/API checks and public limits
+
+- GitHub API confirms default branch main; its latest commit at inspection is b02d67c1ffdbf2d0ea50142c4e8f5bb3808e9244.
+- The first 20 commit records were inspected; this is not a substitute for the requested local git log --oneline -20 command output.
+- GitHub API confirms zero open PRs at the time of this check. There were therefore no open Dependabot PR diffs to port or classify.
+- The working branch exists and is based on the inspected main commit.
+- git status and a complete local git branch -a remain unverified because no shell checkout is available.
+- Public Cloudflare/Gemini documentation limits are recorded in docs/FREE_TIER_BUDGET.md. Exact Gemini project quotas and current account D1 metrics remain owner-account checks.
+- Licence/reference findings from the runbook's reference scan are recorded in docs/REFERENCES.md; no external code was copied.
+- A key product privacy consideration was added to the budget notes: Google documents Free-tier Gemini content may be used to improve products. The owner must accept this before sending portfolio context to Gemini.
+
+### Phase A remaining
+A4 production D1 export, A5 live table inventory, and A6 local install/build/test baseline remain blocked on an execution environment with Node.js/Wrangler and authorized Cloudflare credentials. Do not proceed to destructive phases C/D until those gates pass.
