@@ -62,8 +62,6 @@ type PublicResearchBrief = {
 };
 
 
-type ResearchInboxItem = { symbol: string; brief: PublicResearchBrief; createdAt: string };
-
 type ResearchResult = {
   brief: PublicResearchBrief;
   model: string;
@@ -143,9 +141,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
   const [secLoadingSymbol, setSecLoadingSymbol] = useState("");
   const [researchLoadingSymbol, setResearchLoadingSymbol] = useState("");
   const [researchResult, setResearchResult] = useState<(ResearchResult & { symbol: string }) | null>(null);
-  const [researchInbox, setResearchInbox] = useState<ResearchInboxItem[]>([]);
-  const [researchInboxLoading, setResearchInboxLoading] = useState(true);
-  const [researchInboxSymbol, setResearchInboxSymbol] = useState("");
   const [marketToken, setMarketToken] = useState("");
   const [symbol, setSymbol] = useState("");
   const [market, setMarket] = useState<"US" | "MY">("US");
@@ -448,32 +443,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
     } finally { setSecLoading(false); setSecLoadingSymbol(""); }
   }
 
-  async function refreshResearchInbox() {
-    setResearchInboxLoading(true);
-    try {
-      const result = await api<{ briefs: ResearchInboxItem[] }>("/api/analysis/briefs");
-      setResearchInbox(result.briefs);
-    } catch (cause) {
-      if (!(cause instanceof Error && (cause as Error & { status?: number }).status === 401)) {
-        onError(cause instanceof Error ? cause.message : "Unable to load research inbox.");
-      }
-    } finally { setResearchInboxLoading(false); }
-  }
-
-  async function openInboxBrief(symbol: string) {
-    setResearchInboxSymbol(symbol);
-    onError(""); onNotice("");
-    try {
-      const result = await api<ResearchResult & { brief: PublicResearchBrief | null }>(
-        `/api/analysis/latest?symbol=${encodeURIComponent(symbol)}`
-      );
-      if (!result.brief) throw new Error("This brief is no longer available for an instrument in your portfolio or watchlist.");
-      setResearchResult({ ...result, brief: result.brief, symbol });
-    } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "Unable to open this research brief.");
-    } finally { setResearchInboxSymbol(""); }
-  }
-
   async function loadResearchBrief(item: { symbol: string; market: "US" | "MY"; cik: string | null }) {
     if (item.market !== "US") { onError("Public SEC research is available for US instruments only."); return; }
     if (!item.cik) { onError("Add the SEC CIK to this instrument first."); return; }
@@ -525,10 +494,6 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
       onError(cause instanceof Error ? cause.message : "Unable to import Bursa CSV.");
     } finally { setBusy(false); }
   }
-
-  useEffect(() => {
-    void refreshResearchInbox();
-  }, []);
 
   const usCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "US").map((item) => item.symbol)).size;
   const myCount = new Set([...holdings, ...watchlist].filter((item) => item.market === "MY").map((item) => item.symbol)).size;
@@ -683,12 +648,12 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
           <div><span className="eyebrow">SCHEDULED & SAVED ANALYSIS</span><h3>Research inbox</h3></div>
           <div className="row-actions">
             <span className="holding-count">{researchInbox.length} briefs</span>
-            <button className="button button-small" type="button" onClick={refreshResearchInbox} disabled={researchInboxLoading}>
+            <button className="button button-small" type="button" onClick={refreshResearchInbox} disabled={inboxLoading}>
               {researchInboxLoading ? "Refreshing…" : "Refresh"}
             </button>
           </div>
         </div>
-        {researchInboxLoading ? <p>Loading saved research…</p> :
+        {inboxLoading ? <p>Loading saved research…</p> :
           researchInbox.length === 0 ? <p>No research briefs yet. Run Research on a US holding or watchlist item with a configured SEC CIK. Scheduled briefs will appear here after new SEC filings are processed.</p> :
           <div className="research-inbox-list">
             {researchInbox.map((item) => (
@@ -699,8 +664,8 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
                   <small>{formatDate(item.createdAt)}</small>
                 </div>
                 <p>{item.brief.company_summary}</p>
-                <button className="button button-small" type="button" onClick={() => openInboxBrief(item.symbol)} disabled={!!researchInboxSymbol}>
-                  {researchInboxSymbol === item.symbol ? "Opening…" : "Read brief"}
+                <button className="button button-small" type="button" onClick={() => openInboxBrief(item)}>
+                  Read brief
                 </button>
               </article>
             ))}
