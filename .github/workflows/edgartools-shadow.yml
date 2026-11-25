@@ -92,6 +92,10 @@ jobs:
           PY
       - name: Normalize statements for future analytics
         run: python scripts/edgartools_normalize.py --input edgartools-shadow.json --output edgartools-normalized.json
+      - name: Assess normalized data quality
+        run: |
+          python scripts/edgartools_quality.py --input edgartools-normalized.json --output edgartools-quality.json
+          python -m unittest discover -s scripts -p 'test_edgartools_quality.py' -v
       - name: Ingest normalized analytics metrics
         if: ${{ !inputs.symbols }}
         env:
@@ -157,6 +161,7 @@ jobs:
           path: |
             edgartools-shadow.json
             edgartools-normalized.json
+            edgartools-quality.json
             edgartools-ingest-response.json
             edgartools-normalized-ingest-response.json
           if-no-files-found: warn
