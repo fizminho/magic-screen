@@ -1,4 +1,5 @@
 // Magic Folio Worker: authenticated API routes plus static assets.
+// @ts-ignore JavaScript security helper is covered by its Node regression tests.
 import { withSecurityHeaders } from "./security.mjs";
 // @ts-ignore The JavaScript auth module is exercised by Node regression tests.
 import { handleAuthRequest } from "./lib/auth.mjs";
