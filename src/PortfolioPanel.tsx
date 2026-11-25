@@ -46,6 +46,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   const payload: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401) sessionStorage.removeItem("magicfolio.marketdata.token");
     const message = payload && typeof payload === "object" && "error" in payload &&
       typeof payload.error === "string" ? payload.error : "Request failed. Please try again.";
     throw new Error(message);
