@@ -298,6 +298,24 @@ export async function handleAnalysisRequest(request, env, url) {
     const session = await getOwnerSession(request, env);
     if (!session) return jsonResponse({ error: "Sign in required." }, 401);
 
+    if (request.method === "GET" && url.pathname === "/api/analysis/inbox") {
+      const rows = await env.DB.prepare(
+        "SELECT a.output_json AS outputJson,a.model,a.created_at AS createdAt " +
+        "FROM analysis a JOIN instrument i ON i.market='US' AND i.symbol=json_extract(a.output_json,'$.symbol') " +
+        "WHERE a.kind='brief' AND (EXISTS (SELECT 1 FROM holding h WHERE h.instrument_id=i.id) " +
+        "OR EXISTS (SELECT 1 FROM watchlist w WHERE w.instrument_id=i.id)) " +
+        "ORDER BY a.created_at DESC LIMIT 50"
+      ).all();
+      const briefs = (rows.results || []).flatMap((row) => {
+        try {
+          const brief = JSON.parse(row.outputJson);
+          if (!validSymbol(brief?.symbol) || !brief.company_summary) return [];
+          return [{ brief, model: row.model, createdAt: row.createdAt }];
+        } catch { return []; }
+      });
+      return jsonResponse({ briefs });
+    }
+
     if (request.method === "GET" && url.pathname === "/api/analysis/latest") {
       const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
       if (!validSymbol(symbol)) return jsonResponse({ error: "Provide a valid US ticker symbol." }, 400);
