@@ -174,6 +174,9 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
 
   const usCount = holdings.filter((item) => item.market === "US").length;
   const myCount = holdings.filter((item) => item.market === "MY").length;
+  const existingHolding = holdings.some((item) =>
+    item.market === market && item.symbol === symbol.trim().toUpperCase()
+  );
 
   return (
     <section className="portfolio-panel">
@@ -213,7 +216,7 @@ export default function PortfolioPanel({ onError, onNotice }: Props) {
             <label>Quantity<input type="number" min="0.000001" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="100" required /></label>
             <label>Average cost<input type="number" min="0" step="any" value={avgCost} onChange={(event) => setAvgCost(event.target.value)} placeholder="Optional" /></label>
             <label className="field-wide">Notes<input value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} placeholder="Optional private note" /></label>
-            <button className="button button-primary field-wide" type="submit" disabled={busy || holdings.length >= 20}>Save holding</button>
+            <button className="button button-primary field-wide" type="submit" disabled={busy || (holdings.length >= 20 && !existingHolding)}>Save holding</button>
           </form>
         </section>
 
