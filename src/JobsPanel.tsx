@@ -8,9 +8,37 @@ type JobRun = {
   detail: string | null;
 };
 
+type ResearchBrief = {
+  symbol: string;
+  company_summary: string;
+  financial_strengths: string[];
+  financial_risks: string[];
+  filing_signals: string[];
+  unknowns: string[];
+  confidence: "low" | "medium" | "high";
+  source_accessions: string[];
+  disclaimer: string;
+};
+
+type ResearchSource = {
+  accessionNumber: string;
+  form: string;
+  filed: string;
+  title: string;
+  url: string;
+};
+
+type ResearchResult = {
+  brief: ResearchBrief;
+  model: string;
+  createdAt: string;
+  cached: boolean;
+  sources: ResearchSource[];
+};
+
 const JOBS = [
   { id: "sec_refresh", label: "SEC refresh", description: "Fetch the latest SEC filings and company facts for tracked US stocks." },
-  { id: "research_brief", label: "Research Brief", description: "Generate AI research briefs from the latest available SEC data." }
+  { id: "research_brief", label: "Research Brief scan", description: "Scan tracked stocks with recent SEC filings and generate eligible research briefs." }
 ] as const;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -36,6 +64,8 @@ export default function JobsPanel({ onError, onNotice }: { onError: (value: stri
   const [runs, setRuns] = useState<JobRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState<string | null>(null);
+  const [ticker, setTicker] = useState("AAPL");
+  const [researchResult, setResearchResult] = useState<ResearchResult | null>(null);
 
   const refresh = useCallback(async () => {
     const result = await request<{ runs: JobRun[] }>("/api/admin/jobs");
@@ -62,6 +92,37 @@ export default function JobsPanel({ onError, onNotice }: { onError: (value: stri
     }
   }
 
+  async function generateTickerBrief() {
+    const symbol = ticker.trim().toUpperCase();
+    if (!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)) {
+      onError("Enter a valid US ticker symbol.");
+      return;
+    }
+    setRunning("brief:" + symbol);
+    setResearchResult(null);
+    onError("");
+    onNotice("");
+    try {
+      const result = await request<ResearchResult>("/api/analysis/run", {
+        method: "POST",
+        body: JSON.stringify({ symbol })
+      });
+      setResearchResult(result);
+      onNotice(`${symbol} Research Brief generated successfully.${result.cached ? " Existing cached result reused." : ""}`);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "Unable to generate the Research Brief.");
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  const briefSections: Array<{ heading: string; items: string[] }> = [
+    { heading: "Financial strengths", items: researchResult?.brief.financial_strengths || [] },
+    { heading: "Financial risks", items: researchResult?.brief.financial_risks || [] },
+    { heading: "Filing signals", items: researchResult?.brief.filing_signals || [] },
+    { heading: "Unknowns", items: researchResult?.brief.unknowns || [] }
+  ];
+
   return (
     <section className="auth-panel jobs-panel">
       <span className="eyebrow">OPERATIONS</span>
@@ -77,6 +138,57 @@ export default function JobsPanel({ onError, onNotice }: { onError: (value: stri
           </div>
         ))}
       </div>
+
+      <div className="credential-list">
+        <div className="credential-heading"><b>Generate brief for a ticker</b><span>Direct AI test</span></div>
+        <p>Generate a Research Brief for one US ticker without waiting for the scheduled recent-filing scan. Requires fresh SEC CompanyFacts data.</p>
+        <div className="session-card">
+          <div>
+            <label htmlFor="research-ticker"><b>US ticker</b></label>
+            <input id="research-ticker" className="text-field" value={ticker} maxLength={15}
+              autoCapitalize="characters" autoCorrect="off" spellCheck={false}
+              onChange={(event) => setTicker(event.target.value.toUpperCase())}
+              placeholder="e.g. AAPL" disabled={running !== null} />
+          </div>
+          <button className="button button-primary" onClick={generateTickerBrief}
+            disabled={running !== null || !ticker.trim()}>
+            {running === "brief:" + ticker.trim().toUpperCase() ? "Generating…" : "Generate brief"}
+          </button>
+        </div>
+      </div>
+
+      {researchResult && (
+        <div className="credential-list">
+          <div className="credential-heading">
+            <b>{researchResult.brief.symbol} Research Brief</b>
+            <span>{researchResult.brief.confidence} confidence</span>
+          </div>
+          <p>{researchResult.brief.company_summary}</p>
+          {briefSections.map(({ heading, items }) => items.length > 0 && (
+            <div className="credential-row" key={heading}>
+              <div className="credential-meta">
+                <b>{heading}</b>
+                {items.map((item, index) => <span key={index}>{item}</span>)}
+              </div>
+            </div>
+          ))}
+          <div className="credential-row">
+            <div className="credential-meta">
+              <b>Source filings</b>
+              {researchResult.sources.length > 0 ? researchResult.sources.map((source) => (
+                <a key={source.accessionNumber} href={source.url} target="_blank" rel="noreferrer">
+                  {source.form} · {source.filed || source.accessionNumber} · {source.title}
+                </a>
+              )) : <span>No source filing links were returned for the model's cited accessions.</span>}
+              {researchResult.brief.source_accessions.length > 0 && (
+                <span>Model accessions: {researchResult.brief.source_accessions.join(", ")}</span>
+              )}
+            </div>
+          </div>
+          <p className="fine-print">{researchResult.brief.disclaimer} · {researchResult.model} · {new Date(researchResult.createdAt).toLocaleString()}</p>
+        </div>
+      )}
+
       <div className="credential-list">
         <div className="credential-heading">
           <b>Recent executions</b>
