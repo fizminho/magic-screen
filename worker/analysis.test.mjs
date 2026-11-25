@@ -89,6 +89,21 @@ function analysisDb({ authenticated = true, factsAgeMs = 60_000, cached = null, 
           return null;
         },
         async all() {
+          if (sql.includes("FROM edgartools_normalized_metric")) return { results: [{
+            accession: "0000320193-26-000101",
+            form: "10-Q",
+            statement: "income_statement",
+            metric: "revenue",
+            periodEnd: "2026-09-30",
+            periodType: "duration",
+            fiscalLabel: "Q3",
+            value: 1000,
+            currency: null,
+            sourceConcept: "us-gaap_RevenueFromContractWithCustomerExcludingAssessedTax",
+            sourceLabel: "Revenue",
+            standardConcept: "RevenueFromContractWithCustomerExcludingAssessedTax",
+            balance: "credit"
+          }] };
           if (sql.includes("FROM sec_filing")) return { results: [{
             accessionNumber: "0000320193-26-000101",
             form: "10-Q",
@@ -140,7 +155,7 @@ test("analysis endpoint rejects stale public SEC facts before calling the model"
   assert.equal(called, false);
 });
 
-test("analysis endpoint sends only public SEC facts and metadata to Workers AI", async () => {
+test("analysis endpoint combines SEC evidence with normalized EdgarTools metrics for Workers AI", async () => {
   const { DB, calls } = analysisDb();
   let prompt = "";
   const response = await handleAnalysisRequest(
@@ -152,6 +167,9 @@ test("analysis endpoint sends only public SEC facts and metadata to Workers AI",
         assert.match(input.messages[0].content, /untrusted evidence/);
         assert.match(prompt, /exact reporting period/);
         assert.match(prompt, /quarterly duration figures with annual duration figures/);
+        assert.match(prompt, /edgartools_statement_metrics/);
+        assert.match(prompt, /unverified currency and scale/);
+        assert.match(prompt, /RevenueFromContractWithCustomerExcludingAssessedTax/);
         return { response: JSON.stringify({
           company_summary: "Apple reported revenue in its latest filing.",
           financial_strengths: ["Revenue was reported."],
