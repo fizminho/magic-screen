@@ -13,7 +13,7 @@ Magic Folio is a private, single-owner portfolio research workspace for US and B
 
 ## Current rebuild status
 
-The legacy screener UI and public MFI Worker endpoints have been removed. The replacement includes passkey bootstrap/sign-in, passkey inventory and recovery controls, owner-only holdings APIs/UI, quote snapshot APIs, an optional browser-only MarketData.app US delayed-quote adapter, and a strict manual Bursa CSV import parser/UI.
+The legacy screener UI and public MFI Worker endpoints have been removed. The replacement includes passkey bootstrap/sign-in, passkey inventory and recovery controls, owner-only holdings and watchlist APIs/UI, quote snapshot APIs, an optional browser-only MarketData.app US delayed-quote adapter, and a strict manual Bursa CSV import parser/UI.
 
 MarketData.app is optional and not enabled until the owner supplies their own API token. Its free tier is 100 credits/day, at least 24-hour delayed, US-only and one source IP at a time. The token stays in browser session storage and is never sent to the Worker. Bursa prices are manual/CSV until a licensed data source is approved. No publisher news scraping, SEC ingestion, scheduled jobs, push alerts or Gemini analysis are enabled yet.
 
