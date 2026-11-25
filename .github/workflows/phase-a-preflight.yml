@@ -174,10 +174,10 @@ jobs:
             echo "::error::$label cleanup query failed after 3 attempts."
             return 1
           }
-          check_local_cleanup "SEC filing" "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_filing WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;"
-          check_local_cleanup "SEC fetch" "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_fetch_cache WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;"
-          check_local_cleanup "SEC companyfacts" "SELECT CASE WHEN EXISTS(SELECT 1 FROM sec_companyfacts_cache WHERE cik='0000320193') THEN 'not-clean' ELSE 'clean' END AS status;"
-          check_local_cleanup "Quote" "SELECT CASE WHEN EXISTS(SELECT 1 FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL') THEN 'not-clean' ELSE 'clean' END AS status;"
+          check_local_cleanup "SEC filing" "SELECT COUNT(*) AS remaining FROM sec_filing WHERE cik='0000320193';"
+          check_local_cleanup "SEC fetch" "SELECT COUNT(*) AS remaining FROM sec_fetch_cache WHERE cik='0000320193';"
+          check_local_cleanup "SEC companyfacts" "SELECT COUNT(*) AS remaining FROM sec_companyfacts_cache WHERE cik='0000320193';"
+          check_local_cleanup "Quote" "SELECT COUNT(*) AS remaining FROM quote_latest q JOIN instrument i ON i.id=q.instrument_id WHERE i.symbol='AAPL';"
           watchlist_status="$(curl --silent --output /tmp/watchlist-post.json --write-out '%{http_code}' --resolve localhost:8787:127.0.0.1 -X POST http://localhost:8787/api/watchlist -H 'Origin: http://localhost:8787' -H 'Content-Type: application/json' -H "Cookie: magicfolio_session=$backup_token" --data '{"items":[{"symbol":"MSFT","market":"US","note":"CI watchlist"}]}')"
           echo "watchlist POST HTTP status: $watchlist_status"
           cat /tmp/watchlist-post.json
