@@ -143,6 +143,134 @@ async function generateBrief(env, prompt, allowedAccessions, symbol) {
   return validated;
 }
 
+
+/**
+ * Scheduled public-data-only brief generation.
+ * Holdings/watchlist are used only as an existence filter; no private portfolio
+ * fields are selected or included in the model prompt.
+ */
+export async function runScheduledResearchBrief(env, { now = Date.now(), maxBriefs = 5 } = {}) {
+  const startedAt = new Date(now).toISOString();
+  const inserted = await env.DB.prepare(
+    "INSERT INTO job_run(job,started_at,status,detail) VALUES('scheduled_research_brief',?,'running','Scheduled brief generation started')"
+  ).bind(startedAt).run();
+  const jobId = inserted.meta?.last_row_id;
+  let generated = 0;
+  let cachedCount = 0;
+  let skipped = 0;
+  let failed = 0;
+  let quotaExhausted = false;
+
+  try {
+    const cutoff = new Date(now - 86400000).toISOString().slice(0, 10);
+    const candidates = await env.DB.prepare(
+      "SELECT DISTINCT i.id,i.symbol,i.cik FROM instrument i " +
+      "JOIN sec_filing f ON f.instrument_id=i.id " +
+      "LEFT JOIN holding h ON h.instrument_id=i.id " +
+      "LEFT JOIN watchlist w ON w.instrument_id=i.id " +
+      "WHERE i.market='US' AND i.active=1 AND (h.instrument_id IS NOT NULL OR w.instrument_id IS NOT NULL) " +
+      "AND f.filing_date>=? AND i.cik IS NOT NULL " +
+      "ORDER BY i.symbol LIMIT ?"
+    ).bind(cutoff, Math.min(8, Math.max(1, maxBriefs))).all();
+    const instruments = candidates.results || [];
+
+    for (const instrument of instruments) {
+      try {
+        const factsRow = await env.DB.prepare(
+          "SELECT cik,fetched_at AS fetchedAt,facts_json AS factsJson FROM sec_companyfacts_cache WHERE instrument_id=?"
+        ).bind(instrument.id).first();
+        if (!factsRow || String(factsRow.cik).padStart(10, "0") !== instrument.cik ||
+            !Number.isFinite(Date.parse(factsRow.fetchedAt)) ||
+            now - Date.parse(factsRow.fetchedAt) >= 6 * 60 * 60 * 1000) {
+          skipped++;
+          continue;
+        }
+        const facts = JSON.parse(factsRow.factsJson);
+        if (!facts || facts.symbol !== instrument.symbol ||
+            String(facts.cik).padStart(10, "0") !== instrument.cik ||
+            facts.taxonomy !== "us-gaap" || !Array.isArray(facts.facts)) {
+          skipped++;
+          continue;
+        }
+        const filingRows = await env.DB.prepare(
+          "SELECT accession_number AS accessionNumber,form,title,summary,filing_date AS filingDate," +
+          "report_date AS reportDate,url FROM sec_filing WHERE instrument_id=? AND cik=? AND filing_date>=? " +
+          "ORDER BY filing_date DESC LIMIT 10"
+        ).bind(instrument.id, instrument.cik, cutoff).all();
+        const filings = (filingRows.results || []).filter((item) =>
+          typeof item.accessionNumber === "string" &&
+          /^\\d{10}-\\d{2}-\\d{6}$/.test(item.accessionNumber) &&
+          item.accessionNumber.slice(0, 10) === instrument.cik &&
+          typeof item.url === "string" && item.url.startsWith("https://www.sec.gov/Archives/")
+        );
+        const allowedAccessions = new Set([
+          ...facts.facts.map((item) => item.accessionNumber),
+          ...filings.map((item) => item.accessionNumber)
+        ].filter((item) => typeof item === "string"));
+        const inputHash = await sha256(JSON.stringify({ symbol: instrument.symbol, facts, filings }));
+        const cached = await env.DB.prepare(
+          "SELECT output_json AS outputJson FROM analysis WHERE kind='brief' AND input_hash=?"
+        ).bind(inputHash).first();
+        if (cached) {
+          cachedCount++;
+          continue;
+        }
+
+        const dayKey = new Date(now).toISOString().slice(0, 10);
+        const quotaKey = `ai_daily_${dayKey}`;
+        const reservation = await env.DB.prepare(
+          "INSERT INTO setting(key,value) VALUES(?, '1') " +
+          "ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1 " +
+          "WHERE CAST(value AS INTEGER) < ? RETURNING value"
+        ).bind(quotaKey, DAILY_LIMIT).first();
+        if (!reservation) {
+          quotaExhausted = true;
+          break;
+        }
+
+        let brief;
+        try {
+          brief = await generateBrief(env, buildPrompt(instrument.symbol, facts, filings), allowedAccessions, instrument.symbol);
+        } catch (error) {
+          await env.DB.prepare(
+            "UPDATE setting SET value=CAST(value AS INTEGER)-1 WHERE key=? AND CAST(value AS INTEGER)>0"
+          ).bind(quotaKey).run();
+          throw error;
+        }
+        await env.DB.prepare(
+          "INSERT INTO analysis(kind,market,model,input_hash,output_json,created_at) VALUES('brief','US',?,?,?,?) " +
+          "ON CONFLICT(input_hash) DO UPDATE SET model=excluded.model,output_json=excluded.output_json,created_at=excluded.created_at"
+        ).bind(MODEL, inputHash, JSON.stringify(brief), new Date(now).toISOString()).run();
+        generated++;
+      } catch (error) {
+        failed++;
+        const code = error instanceof Error ? error.message : "unknown";
+        console.warn("Scheduled research brief failed:", instrument.symbol, code.slice(0, 64));
+      }
+    }
+
+    const status = !instruments.length ? "skipped_no_new_data"
+      : failed && (generated || cachedCount) ? "partial"
+      : failed ? "failed"
+      : quotaExhausted ? "skipped_quota"
+      : generated || cachedCount ? "success"
+      : "skipped_no_usable_data";
+    const detail = JSON.stringify({
+      candidates: instruments.length, generated, cached: cachedCount, skipped, failed, quotaExhausted
+    }).slice(0, 1000);
+    await env.DB.prepare(
+      "UPDATE job_run SET finished_at=?,status=?,detail=? WHERE id=?"
+    ).bind(new Date().toISOString(), status, detail, jobId).run();
+    return { status, candidates: instruments.length, generated, cached: cachedCount, skipped, failed, quotaExhausted };
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "unknown";
+    await env.DB.prepare(
+      "UPDATE job_run SET finished_at=?,status='failed',detail=? WHERE id=?"
+    ).bind(new Date().toISOString(), code.slice(0, 160), jobId).run();
+    throw error;
+  }
+}
+
 export async function handleAnalysisRequest(request, env, url) {
   try {
     const session = await getOwnerSession(request, env);
