@@ -316,3 +316,64 @@ test("US instrument CIKs are normalized to ten digits and Bursa CIKs are rejecte
   }), { ...envConfig, DB }, "/api/holdings");
   assert.equal(invalid.status, 400);
 });
+
+
+test("US holding creation automatically resolves a missing CIK from the SEC ticker directory", async () => {
+  const { DB, calls } = fakeDb();
+  let requestedUrl = "";
+  let requestedAgent = "";
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/holdings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ holdings: [{ symbol: "AAPL", market: "US", quantity: 1 }] })
+  }), { ...envConfig, DB, SEC_USER_AGENT: "Magic Folio contact owner@binalah.com" },
+  "/api/holdings", async (url, options) => {
+    requestedUrl = url;
+    requestedAgent = options.headers["user-agent"];
+    return new Response(JSON.stringify({
+      "0": { cik_str: 320193, ticker: "AAPL", title: "Apple Inc." },
+      "1": { cik_str: 789019, ticker: "MSFT", title: "Microsoft Corporation" }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { saved: 1, cikResolved: 1 });
+  assert.equal(requestedUrl, "https://www.sec.gov/files/company_tickers.json");
+  assert.equal(requestedAgent, "Magic Folio contact owner@binalah.com");
+  assert.equal(calls.statements[0].values[5], "0000320193");
+});
+
+test("US watchlist creation automatically resolves CIKs and leaves Bursa symbols untouched", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/watchlist`, {
+    method: "POST",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ items: [
+      { symbol: "MSFT", market: "US" },
+      { symbol: "1155", market: "MY" }
+    ] })
+  }), { ...envConfig, DB, SEC_USER_AGENT: "Magic Folio contact owner@binalah.com" },
+  "/api/watchlist", async () => new Response(JSON.stringify({
+    "0": { cik_str: 789019, ticker: "MSFT", title: "Microsoft Corporation" },
+    "1": { cik_str: 320193, ticker: "AAPL", title: "Apple Inc." }
+  }), { status: 200 }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { added: 2, cikResolved: 1 });
+  assert.equal(calls.statements[0].values[5], "0000789019");
+  assert.equal(calls.statements[2].values[5], null);
+});
+
+test("SEC ticker directory failure does not block saving a US holding", async () => {
+  const { DB, calls } = fakeDb();
+  const response = await handlePortfolioRequest(new Request(`${origin}/api/holdings`, {
+    method: "PUT",
+    headers: { origin, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ holdings: [{ symbol: "AAPL", market: "US", quantity: 1 }] })
+  }), { ...envConfig, DB, SEC_USER_AGENT: "Magic Folio contact owner@binalah.com" },
+  "/api/holdings", async () => new Response("Unavailable", { status: 503 }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { saved: 1 });
+  assert.equal(calls.statements[0].values[5], null);
+});

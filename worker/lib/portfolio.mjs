@@ -10,6 +10,59 @@ const MAX_HOLDINGS = 20;
 const MAX_QUANTITY = 1_000_000_000_000;
 const MAX_AVG_COST = 1_000_000_000_000;
 
+const SEC_TICKER_DIRECTORY = "https://www.sec.gov/files/company_tickers.json";
+
+function hasSecContact(value) {
+  return typeof value === "string" && value.length >= 12 && value.length <= 200 &&
+    value.includes("@") && /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) &&
+    !/@(?:example\.(?:com|org|net)|invalid)$/i.test(value) &&
+    !/(?:your-email|yourname|test@)/i.test(value) && !/[\r\n]/.test(value);
+}
+
+// Resolve missing US CIKs in one SEC directory request per add/import operation.
+// Lookup failures are deliberately non-fatal: the instrument can still be saved
+// and the owner can supply a CIK manually later.
+async function resolveMissingCiks(items, env, fetcher) {
+  const missing = [...new Set(items
+    .filter((item) => item.market === "US" && !item.cik)
+    .map((item) => item.symbol))];
+  if (!missing.length || !hasSecContact(env.SEC_USER_AGENT)) return 0;
+
+  try {
+    const response = await fetcher(SEC_TICKER_DIRECTORY, {
+      method: "GET",
+      headers: { "user-agent": env.SEC_USER_AGENT, accept: "application/json" },
+      signal: AbortSignal.timeout(8_000),
+      cf: { cacheTtl: 86_400, cacheEverything: true }
+    });
+    if (!response.ok) return 0;
+    const directory = await response.json();
+    if (!directory || typeof directory !== "object" || Array.isArray(directory)) return 0;
+
+    const byTicker = new Map();
+    for (const entry of Object.values(directory)) {
+      if (!entry || typeof entry !== "object" || typeof entry.ticker !== "string") continue;
+      const ticker = entry.ticker.trim().toUpperCase();
+      const cik = Number(entry.cik_str);
+      if (!ticker || !Number.isInteger(cik) || cik <= 0 || cik > 9_999_999_999) continue;
+      if (!byTicker.has(ticker)) byTicker.set(ticker, String(cik).padStart(10, "0"));
+    }
+
+    let resolved = 0;
+    for (const item of items) {
+      if (item.market !== "US" || item.cik) continue;
+      const cik = byTicker.get(item.symbol);
+      if (cik) {
+        item.cik = cik;
+        resolved++;
+      }
+    }
+    return resolved;
+  } catch {
+    return 0;
+  }
+}
+
 function normalizeCik(value, market, errorCode = "invalid_holding") {
   if (value === null || value === undefined || value === "") return null;
   if (market !== "US" || typeof value !== "string" || !/^[0-9]{1,10}$/.test(value)) throw new Error(errorCode);
@@ -49,7 +102,7 @@ async function listHoldings(request, env) {
   return jsonResponse({ holdings: rows.results || [] });
 }
 
-async function upsertHoldings(request, env) {
+async function upsertHoldings(request, env, fetcher) {
   assertRequestOrigin(request, env);
   const session = await getOwnerSession(request, env);
   if (!session) return jsonResponse({ error: "Sign in required." }, 401);
@@ -66,6 +119,7 @@ async function upsertHoldings(request, env) {
     seen.add(key);
   }
   if (!holdings.length) return jsonResponse({ saved: 0 });
+  const cikResolved = await resolveMissingCiks(holdings, env, fetcher);
 
   const currentRows = await env.DB.prepare(
     "SELECT i.market, i.symbol FROM holding h JOIN instrument i ON i.id = h.instrument_id"
@@ -95,7 +149,7 @@ async function upsertHoldings(request, env) {
 
   const results = await env.DB.batch(statements);
   const saved = holdings.filter((_, index) => Number(results[index * 2 + 1]?.meta?.changes || 0) === 1).length;
-  return jsonResponse({ saved });
+  return jsonResponse(cikResolved ? { saved, cikResolved } : { saved });
 }
 
 async function deactivateUnusedInstrument(env, market, symbol) {
@@ -175,7 +229,7 @@ async function listWatchlist(request, env) {
   return jsonResponse({ items: rows.results || [] });
 }
 
-async function addWatchlistItems(request, env) {
+async function addWatchlistItems(request, env, fetcher) {
   assertRequestOrigin(request, env);
   const session = await getOwnerSession(request, env);
   if (!session) return jsonResponse({ error: "Sign in required." }, 401);
@@ -192,6 +246,7 @@ async function addWatchlistItems(request, env) {
     seen.add(key);
   }
   if (!items.length) return jsonResponse({ added: 0 });
+  const cikResolved = await resolveMissingCiks(items, env, fetcher);
 
   const currentRows = await env.DB.prepare(
     "SELECT i.market, i.symbol FROM watchlist w JOIN instrument i ON i.id = w.instrument_id"
@@ -220,7 +275,7 @@ async function addWatchlistItems(request, env) {
 
   const results = await env.DB.batch(statements);
   const added = items.filter((_, index) => Number(results[index * 2 + 1]?.meta?.changes || 0) === 1).length;
-  return jsonResponse({ added });
+  return jsonResponse(cikResolved ? { added, cikResolved } : { added });
 }
 
 async function deleteWatchlistItem(request, env, pathname) {
@@ -253,15 +308,15 @@ async function deleteWatchlistItem(request, env, pathname) {
   return jsonResponse({ deleted: true, market, symbol });
 }
 
-export async function handlePortfolioRequest(request, env, pathname) {
+export async function handlePortfolioRequest(request, env, pathname, fetcher = fetch) {
   try {
     if (pathname === "/api/holdings" && request.method === "GET") return await listHoldings(request, env);
-    if (pathname === "/api/holdings" && request.method === "PUT") return await upsertHoldings(request, env);
+    if (pathname === "/api/holdings" && request.method === "PUT") return await upsertHoldings(request, env, fetcher);
     if (pathname.startsWith("/api/holdings/") && request.method === "DELETE") {
       return await deleteHolding(request, env, pathname);
     }
     if (pathname === "/api/watchlist" && request.method === "GET") return await listWatchlist(request, env);
-    if (pathname === "/api/watchlist" && request.method === "POST") return await addWatchlistItems(request, env);
+    if (pathname === "/api/watchlist" && request.method === "POST") return await addWatchlistItems(request, env, fetcher);
     if (pathname.startsWith("/api/watchlist/") && request.method === "DELETE") {
       return await deleteWatchlistItem(request, env, pathname);
     }
